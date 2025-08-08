@@ -9,7 +9,7 @@ app.use(express.json()); // to parse JSON body
 app.use(cors());
 app.use("/users", router); // ✅ Use this instead of app.get()
 
-mongoose.connect("mongodb+srv://randiv:randiv123@cluster0.j8suyzq.mongodb.net/")
+mongoose.connect("mongodb+srv://EasyFarming:sliit@easyfarming.owlbj1f.mongodb.net/")
   .then(() => {
     console.log("Connected successfully to MongoDB");
     app.listen(5000, () => {
