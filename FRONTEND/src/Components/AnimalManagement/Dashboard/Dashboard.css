@@ -1,0 +1,238 @@
+/* Global box-sizing for easier layout control */
+/* Reset default body and html margins */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.dashboard-container {
+  display: flex;
+  height: 100vh;
+  font-family: Arial, sans-serif;
+  width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Dark Mode */
+.dashboard-container.dark {
+  background-color: #1e1e1e;
+  color: #f0f0f0;
+}
+
+.dashboard-container.dark .sidebar {
+  background-color: #111;
+}
+
+.dashboard-container.dark .card {
+  background-color: #2a2a2a;
+}
+
+.dashboard-container.dark .chart {
+  background-color: #2a2a2a;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  min-width: 240px; /* Prevent shrinking */
+  background-color: #2e7d32;
+  color: white;
+  padding: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar .logo {
+  font-size: 20px;
+  margin-bottom: 30px;
+  font-weight: bold;
+}
+
+.sidebar nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar nav ul li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  white-space: nowrap; /* prevent wrapping in nav items */
+  user-select: none;
+}
+
+.sidebar nav ul li:hover,
+.sidebar nav ul li.active {
+  background-color: #1b5e20;
+}
+
+/* Main */
+.main-content {
+  flex: 1 1 auto;
+  min-width: 0; /* Allow shrinking to prevent overflow */
+  background-color: #f7f3eb;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dark-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.btn-add {
+  background-color: #2e7d32;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-report {
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.profile img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+/* Cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.card {
+  background-color: white;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.card h4 {
+  font-size: 14px;
+  color: #555;
+}
+
+.card h2 {
+  font-size: 24px;
+  margin: 8px 0;
+}
+
+.positive {
+  color: green;
+  font-size: 12px;
+}
+
+.negative {
+  color: red;
+  font-size: 12px;
+}
+
+/* Charts */
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.chart {
+  background-color: white;
+  padding: 15px;
+  border-radius: 10px;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+/* Make chart canvases responsive */
+.chart canvas {
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: auto;
+    padding: 10px;
+  }
+
+  .main-content {
+    width: 100%;
+    min-width: auto;
+    padding: 10px;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .charts {
+    grid-template-columns: 1fr;
+  }
+
+  /* Adjust buttons to fit smaller screens */
+  .btn-add, .btn-report {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .topbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
