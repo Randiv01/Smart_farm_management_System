@@ -1,111 +1,118 @@
-import React, { useState, useEffect } from 'react';
-import Nav from '../Nav/Nav';
+import React from 'react';
+import Navbar from '../Navbar/Navbar';
 import './Home.css';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
-const URL = 'http://localhost:5000/users';
-const ESP32_IP = 'http://172.20.10.2'; // Replace with your actual ESP32 IP
-
-const feedAnimal = async () => {
-  try {
-    const response = await axios.get(`${ESP32_IP}/feed`);
-    alert("Feeding triggered: " + response.data);
-  } catch (err) {
-    console.error("ESP32 feed error:", err);
-    alert("Failed to feed animal. ESP32 not reachable.");
-  }
-};
-
-const fetchHandler = async () => {
-  try {
-    const res = await axios.get(URL);
-    return res.data;
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    return { users: [] };
-  }
-};
-
-function Home() {
-  const navigate = useNavigate();
-  const [users, setUsers] = useState([]);
-
-  useEffect(() => {
-    fetchHandler().then((data) => {
-      if (Array.isArray(data)) {
-        setUsers(data);
-      } else {
-        setUsers(data.users || []);
-      }
-    });
-  }, []);
-
-  const deleteUser = async (id) => {
-    try {
-      await axios.delete(`${URL}/${id}`);
-      setUsers((prev) => prev.filter((user) => user._id !== id));
-    } catch (error) {
-      console.error("Delete failed:", error);
-    }
-  };
-
+const Home = () => {
   return (
     <div className="home-container">
-      <Nav />
+      <Navbar />
 
-      <header className="home-header">
-        <h1>Welcome to Sunshine Farm</h1>
-        <p>Fresh organic produce & sustainable farming since 1995.</p>
-      </header>
-
-      <section className="section user-section">
-        <h2>Users List</h2>
-
-        <button className="btn-new-user" onClick={() => navigate('/add-user')}>
-          + New User
-        </button>
-
-        <button className="btn-feed" onClick={feedAnimal}>
-          🐾 Feed Animal
-        </button>
-
-        {users.length === 0 ? (
-          <p>No users found.</p>
-        ) : (
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Mobile</th>
-                <th>Address</th>
-                <th>Gender</th>
-                <th>Date of Birth</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(user => (
-                <tr key={user._id}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
-                  <td>{user.mobile || '-'}</td>
-                  <td>{user.address || '-'}</td>
-                  <td>{user.gender || '-'}</td>
-                  <td>{user.dob ? new Date(user.dob).toLocaleDateString() : '-'}</td>
-                  <td>
-                    <button className="btn-edit" onClick={() => navigate(`/update-user/${user._id}`)}>Edit</button>
-                    <button className="btn-delete" onClick={() => deleteUser(user._id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <section className="hero-section">
+        <div className="hero-content">
+          <h1>Welcome to Sunshine Farm</h1>
+          <p>Fresh Organic Produce & Sustainable Farming Since 1995</p>
+          <button className="btn-primary" onClick={() => alert('Feeding animals...')}>
+            🐾 Feed Our Animals
+          </button>
+        </div>
       </section>
+
+      <section className="about-section">
+        <div className="container">
+          <h2>About Sunshine Farm</h2>
+          <p>
+            At Sunshine Farm, we are dedicated to sustainable, organic farming practices
+            that nurture the earth and provide healthy produce. From fresh vegetables to
+            happy animals, we take pride in our natural approach.
+          </p>
+        </div>
+      </section>
+
+      <section className="services-section">
+        <div className="container">
+          <h2>Our Farm Products</h2>
+          <div className="services-cards">
+            <div className="card">
+              <img src="/images/vegetables.jpg" alt="Fresh Vegetables" />
+              <h3>Fresh Vegetables</h3>
+              <p>Grown organically and harvested daily for peak freshness.</p>
+            </div>
+            <div className="card">
+              <img src="/images/dairy.jpg" alt="Dairy Products" />
+              <h3>Dairy Products</h3>
+              <p>From happy cows to your table, quality guaranteed.</p>
+            </div>
+            <div className="card">
+              <img src="/images/honey.jpg" alt="Natural Honey" />
+              <h3>Natural Honey</h3>
+              <p>Pure, local honey straight from our beehives.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="testimonial-section">
+        <div className="container">
+          <h2>What Our Customers Say</h2>
+          <div className="testimonial-cards">
+            <div className="testimonial-card">
+              <p>
+                "Sunshine Farm’s veggies are the freshest I've ever tasted! Highly recommend."
+              </p>
+              <h4>- Mary P.</h4>
+            </div>
+            <div className="testimonial-card">
+              <p>
+                "The dairy products are creamy and delicious, and the farm feels so welcoming."
+              </p>
+              <h4>- John D.</h4>
+            </div>
+            <div className="testimonial-card">
+              <p>
+                "Love their honey! Such a pure natural taste. Truly farm-to-table."
+              </p>
+              <h4>- Linda K.</h4>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="contact-section">
+        <div className="container">
+          <h2>Get In Touch</h2>
+          <p>Questions? Visit us or drop a message.</p>
+          <address>
+            123 Sunshine Lane, Green Valley<br />
+            Phone: (555) 123-4567<br />
+            Email: contact@sunshinefarm.com
+          </address>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              alert('Thank you for subscribing!');
+            }}
+            className="newsletter-form"
+          >
+            <input
+              type="email"
+              placeholder="Enter your email"
+              required
+              aria-label="Email address"
+            />
+            <button type="submit" className="btn-primary">
+              Subscribe
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <div className="container">
+          <p>© 2025 Sunshine Farm. All Rights Reserved.</p>
+        </div>
+      </footer>
     </div>
   );
-}
+};
 
 export default Home;
