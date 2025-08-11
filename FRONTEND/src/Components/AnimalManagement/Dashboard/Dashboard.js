@@ -1,5 +1,5 @@
-// Dashboard.js
 import React, { useState } from "react";
+import TopNavbar from '../TopNavbar/TopNavbar.js';
 import { Line, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -21,10 +21,6 @@ import {
   HeartPulse,
   BarChart2,
   Plus,
-  Download,
-  Moon,
-  Sun,
-  Globe,
   Bell,
   UserCheckIcon
 } from "lucide-react";
@@ -44,7 +40,10 @@ ChartJS.register(
 export default function Dashboard() {
   const [darkMode, setDarkMode] = useState(false);
 
-  // Sample data for productivity and health charts
+  const handleMenuClick = () => {
+    console.log("Menu clicked!");
+  };
+
   const productivityData = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     datasets: [
@@ -83,107 +82,88 @@ export default function Dashboard() {
     ]
   };
 
-  // Sample animal types data for cards
   const animalTypes = [
-  {
-    id: 1,
-    name: "Cows",
-    total: 1,
-    image: "/images/cow.jpg" // assuming cows.jpg is also in public/images
-  },
-  {
-    id: 2,
-    name: "Goats",
-    total: 1,
-    image: "/images/goat.jpg"
-  },
-  {
-    id: 3,
-    name: "Chickens",
-    total: 1,
-    image: "/images/chicken.jpg"
-  },
-  {
-    id: 4,
-    name: "Pigs",
-    total: 120,
-    image: "/images/pig.jpg"
-  },
-  {
-    id: 5,
-    name: "Bees",
-    total: 1000,
-    image: "/images/bees.jpg"  // <-- here!
-  }
-];
+    { id: 1, name: "Cows", total: 1, image: "/images/cow.jpg" },
+    { id: 2, name: "Goats", total: 1, image: "/images/goat.jpg" },
+    { id: 3, name: "Chickens", total: 1, image: "/images/chicken.jpg" },
+    { id: 4, name: "Pigs", total: 120, image: "/images/pig.jpg" },
+    { id: 5, name: "Bees", total: 1000, image: "/images/bees.jpg" }
+  ];
 
-  // Summary data
   const totalAnimals = 3;
   const totalAnimalTypes = animalTypes.length;
   const totalCaretakers = 2;
 
   return (
     <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <h2 className="logo">Farm Manager</h2>
+      <aside className={`sidebar ${darkMode ? "dark" : ""}`}>
         <nav>
           <ul>
-            <li className="active"><Home size={30} /> Overview</li>
-            <li><Plus size={30} /> Register Animals</li>
-            <li><FileText size={30} /> Animal List</li>
-            <li><Calendar size={30} /> Feeding Schedule</li>
-            <li><HeartPulse size={30} /> Health</li>
-            <li><Activity size={30} /> Productivity</li>
-            <li><BarChart2 size={30} /> Reports</li>
-            <li><Bell size={30} /> Alerts</li>
-            <li><UserCheckIcon size={30} /> Caretaker</li>
-            <li><Settings size={30} /> Settings</li>
+            <li className="active">
+              <Home size={20} className="mr-2" />
+              <span>Overview</span>
+            </li>
+            <li>
+              <Plus size={20} className="mr-2" />
+              <span>Register Animals</span>
+            </li>
+            <li>
+              <FileText size={20} className="mr-2" />
+              <span>Animal List</span>
+            </li>
+            <li>
+              <Calendar size={20} className="mr-2" />
+              <span>Feeding Schedule</span>
+            </li>
+            <li>
+              <HeartPulse size={20} className="mr-2" />
+              <span>Health</span>
+            </li>
+            <li>
+              <Activity size={20} className="mr-2" />
+              <span>Productivity</span>
+            </li>
+            <li>
+              <BarChart2 size={20} className="mr-2" />
+              <span>Reports</span>
+            </li>
+            <li>
+              <Bell size={20} className="mr-2" />
+              <span>Alerts</span>
+            </li>
+            <li>
+              <UserCheckIcon size={20} className="mr-2" />
+              <span>Caretaker</span>
+            </li>
+            <li>
+              <Settings size={20} className="mr-2" />
+              <span>Settings</span>
+            </li>
           </ul>
         </nav>
       </aside>
 
-      {/* Main Content */}
+      <TopNavbar 
+        darkMode={darkMode} 
+        setDarkMode={setDarkMode} 
+        onMenuClick={handleMenuClick} 
+      />
+
       <main className="main-content">
-        {/* Header */}
-        <header className="topbar">
-          <h3>Farm Management Dashboard</h3>
-          <div className="topbar-right">
-            <button
-              className="dark-toggle"
-              onClick={() => setDarkMode(!darkMode)}
-              title="Toggle Dark Mode"
-            >
-              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <select className="language-select" title="Select Language" defaultValue="English">
-              <option>English</option>
-              <option>සිංහල</option>
-              <option>Tamil</option>
-            </select>
-            <div className="profile">
-              <img src="https://i.pravatar.cc/40" alt="Profile" />
-              <div className="profile-info">
-                <strong>John Doe</strong>
-                <span>Farm Administrator</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Farm Overview Section */}
-        <section className="farm-overview">
+        <section className={`farm-overview ${darkMode ? "dark" : ""}`}>
           <div className="overview-header">
-            <h4>Farm Overview</h4>
-            <button className="btn-add-animal-type">
-              <Plus size={16} /> Add New Animal Type
+            <h4>Current Animals in the Farm</h4><hr></hr><br />
+            <button
+              className="btn-add-animal-type"
+              onClick={() => alert("Add New Animal Type clicked!")}
+            >
+              Add New Animal Type
             </button>
           </div>
 
-          {/* Animal Types Cards */}
           <div className="animal-cards">
             {animalTypes.map((animal) => (
-              <div className="animal-card" key={animal.id}>
+              <div className={`animal-card ${darkMode ? "dark" : ""}`} key={animal.id}>
                 <img src={animal.image} alt={animal.name} />
                 <div className="animal-info">
                   <h5>{animal.name}</h5>
@@ -196,8 +176,7 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Summary row */}
-          <div className="summary-row">
+          <div className={`summary-row ${darkMode ? "dark" : ""}`}>
             <div className="summary-item">
               <strong>Total Animals</strong>
               <span>{totalAnimals}</span>
@@ -213,14 +192,13 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Charts */}
         <section className="charts">
-          <div className="chart">
-            <h4>Weekly Productivity</h4>
+          <div className={`chart ${darkMode ? "dark" : ""}`}>
+            <h4>Weekly Productivity Overview</h4>
             <Line data={productivityData} />
           </div>
-          <div className="chart">
-            <h4>Animal Health Status</h4>
+          <div className={`chart ${darkMode ? "dark" : ""}`}>
+            <h4>Animal Health Status Summary</h4>
             <Bar data={healthData} />
           </div>
         </section>
