@@ -83,11 +83,11 @@ export default function Dashboard() {
   };
 
   const animalTypes = [
-    { id: 1, name: "Cows", total: 1, image: "/images/cow.jpg" },
-    { id: 2, name: "Goats", total: 1, image: "/images/goat.jpg" },
-    { id: 3, name: "Chickens", total: 1, image: "/images/chicken.jpg" },
-    { id: 4, name: "Pigs", total: 120, image: "/images/pig.jpg" },
-    { id: 5, name: "Bees", total: 1000, image: "/images/bees.jpg" }
+    { id: 1, name: "Cows", total: 20, image: "/images/cow.jpg" },
+    { id: 2, name: "Goats", total: 12, image: "/images/goat.jpg" },
+    { id: 3, name: "Chickens", total: 200, image: "/images/chicken.jpg" },
+    { id: 4, name: "Pigs", total: 30, image: "/images/pig.jpg" },
+    { id: 5, name: "buffalo", total: 10, image: "/images/buffalo.jpg" }
   ];
 
   const totalAnimals = 3;
