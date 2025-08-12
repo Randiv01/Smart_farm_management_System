@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import TopNavbar from '../TopNavbar/TopNavbar.js';
 import { Line, Bar } from "react-chartjs-2";
+import { Link } from "react-router-dom";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -170,7 +171,9 @@ export default function Dashboard() {
                   <p>Total Animals: {animal.total}</p>
                 </div>
                 <div className="animal-card-footer">
-                  <button className="btn-view-details">View Details</button>
+                  <Link to={`/AnimalManagement/${animal.name.toLowerCase()}`}>
+                    <button className="btn-view-details">View Details</button>
+                  </Link>
                 </div>
               </div>
             ))}

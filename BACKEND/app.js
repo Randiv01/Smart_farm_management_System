@@ -1,21 +1,24 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const router = require("./routes/UserRoute"); // ✅ Correct path
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import animalRouter from "./routes/animalRoutes.js";
 
 const app = express();
-const cors = require("cors");
 
-app.use(express.json()); // to parse JSON body
+// Middleware
 app.use(cors());
-app.use("/users", router); // ✅ Use this instead of app.get()
+app.use(express.json());
 
-mongoose.connect("mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/")
+// Routes
+app.use("/animals", animalRouter);
+
+// MongoDB Connection (EXPLICITLY connects to 'EasyFarming' DB)
+mongoose.connect("mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
   .then(() => {
-    console.log("Connected successfully to MongoDB");
-    app.listen(5000, () => {
-      console.log("Server is running on port 5000");
-    });
+    console.log("✅ Connected to MongoDB (Database: 'EasyFarming')");
+    app.listen(5000, () => console.log("🚀 Server running on port 5000"));
   })
-  .catch((err) => {
-    console.log("Database connection failed:", err);
-  });
+  .catch(err => console.error("❌ MongoDB connection failed:", err));
