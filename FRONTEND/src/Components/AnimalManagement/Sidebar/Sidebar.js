@@ -31,11 +31,7 @@ export default function Sidebar({ darkMode, sidebarOpen, type }) {
             <Plus size={20} className="icon" />
             <span>Design your Plan</span>
           </li>
-          <li onClick={() => navigate(`/animal-list/${type}`)}>
-            <FileText size={20} className="icon" />
-            <span>Animal List</span>
-          </li>
-          <li>
+          <li onClick={() => navigate(`/feeding-scheduler`)}>
             <Calendar size={20} className="icon" />
             <span>Feeding Schedule</span>
           </li>

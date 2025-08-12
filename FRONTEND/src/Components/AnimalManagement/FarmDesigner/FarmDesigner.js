@@ -284,9 +284,6 @@ export default function FarmDesigner() {
       />
 
       <main className="main-content">
-        <h2 style={{ marginBottom: "1rem" }}>
-          Designing Farm Plan for: <em>{type || "Unknown"}</em>
-        </h2>
 
         <div className="container">
           <div className="toolbox">
