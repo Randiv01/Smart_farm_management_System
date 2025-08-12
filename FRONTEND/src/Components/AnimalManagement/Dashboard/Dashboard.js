@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import TopNavbar from '../TopNavbar/TopNavbar.js';
+import Sidebar from '../Sidebar/Sidebar.js';  // <-- New Sidebar import
 import { Line, Bar } from "react-chartjs-2";
 import { Link } from "react-router-dom";
 import {
@@ -23,7 +24,7 @@ import {
   BarChart2,
   Plus,
   Bell,
-  UserCheckIcon
+  UserCheck
 } from "lucide-react";
 import "./Dashboard.css";
 
@@ -40,9 +41,10 @@ ChartJS.register(
 
 export default function Dashboard() {
   const [darkMode, setDarkMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleMenuClick = () => {
-    console.log("Menu clicked!");
+    setSidebarOpen(!sidebarOpen);
   };
 
   const productivityData = {
@@ -88,7 +90,7 @@ export default function Dashboard() {
     { id: 2, name: "Goats", total: 12, image: "/images/goat.jpg" },
     { id: 3, name: "Chickens", total: 200, image: "/images/chicken.jpg" },
     { id: 4, name: "Pigs", total: 30, image: "/images/pig.jpg" },
-    { id: 5, name: "buffalo", total: 10, image: "/images/buffalo.jpg" }
+    { id: 5, name: "Buffalo", total: 10, image: "/images/buffalo.jpg" }
   ];
 
   const totalAnimals = 3;
@@ -97,52 +99,7 @@ export default function Dashboard() {
 
   return (
     <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
-      <aside className={`sidebar ${darkMode ? "dark" : ""}`}>
-        <nav>
-          <ul>
-            <li className="active">
-              <Home size={20} className="mr-2" />
-              <span>Overview</span>
-            </li>
-            <li>
-              <Plus size={20} className="mr-2" />
-              <span>Register Animals</span>
-            </li>
-            <li>
-              <FileText size={20} className="mr-2" />
-              <span>Animal List</span>
-            </li>
-            <li>
-              <Calendar size={20} className="mr-2" />
-              <span>Feeding Schedule</span>
-            </li>
-            <li>
-              <HeartPulse size={20} className="mr-2" />
-              <span>Health</span>
-            </li>
-            <li>
-              <Activity size={20} className="mr-2" />
-              <span>Productivity</span>
-            </li>
-            <li>
-              <BarChart2 size={20} className="mr-2" />
-              <span>Reports</span>
-            </li>
-            <li>
-              <Bell size={20} className="mr-2" />
-              <span>Alerts</span>
-            </li>
-            <li>
-              <UserCheckIcon size={20} className="mr-2" />
-              <span>Caretaker</span>
-            </li>
-            <li>
-              <Settings size={20} className="mr-2" />
-              <span>Settings</span>
-            </li>
-          </ul>
-        </nav>
-      </aside>
+      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={null} /> {/* Sidebar here */}
 
       <TopNavbar 
         darkMode={darkMode} 
@@ -153,7 +110,9 @@ export default function Dashboard() {
       <main className="main-content">
         <section className={`farm-overview ${darkMode ? "dark" : ""}`}>
           <div className="overview-header">
-            <h4>Current Animals in the Farm</h4><hr></hr><br />
+            <h4>Current Animals in the Farm</h4>
+            <hr />
+            <br />
             <button
               className="btn-add-animal-type"
               onClick={() => alert("Add New Animal Type clicked!")}

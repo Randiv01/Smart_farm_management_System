@@ -1,0 +1,35 @@
+﻿# Node modules
+node_modules/
+
+# Uploads directory
+/uploads/
+
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented libs
+coverage/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Debug files
+*.debug
+
+# System Files
+.DS_Store
+Thumbs.db

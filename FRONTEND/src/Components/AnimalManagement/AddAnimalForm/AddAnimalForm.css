@@ -1,34 +1,94 @@
 .form-container {
-  max-width: 500px;
-  margin: 20px auto;
-  padding: 20px;
+  max-width: 700px;
+  margin: 2rem auto;
+  background: #fff;
+  padding: 2rem;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+  color: #222;
+}
+
+.dark .form-container {
+  background: #222;
+  color: #ddd;
+}
+
+.form-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
 }
 
 .form-group {
-  margin-bottom: 15px;
+  flex: 1 1 45%;
+  display: flex;
+  flex-direction: column;
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 5px;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
 }
 
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 8px;
-  box-sizing: border-box;
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.dark .form-group input,
+.dark .form-group select,
+.dark .form-group textarea {
+  background: #333;
+  border-color: #555;
+  color: #ddd;
 }
 
 .submit-btn {
-  background: #4CAF50;
-  color: white;
-  padding: 10px 15px;
+  padding: 0.7rem 1.5rem;
+  font-size: 1.1rem;
+  background: #28a745;
   border: none;
-  border-radius: 4px;
+  color: white;
+  border-radius: 5px;
   cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.submit-btn:disabled {
+  background: #94d3a2;
+  cursor: not-allowed;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: #218838;
 }
 
 .error-message {
-  color: red;
-  margin-bottom: 15px;
+  margin-bottom: 1rem;
+  color: #d9534f;
+  font-weight: 600;
+}
+.success-message {
+  margin-bottom: 1rem;
+  color: #28a745;
+  font-weight: 600;
+  border: 1px solid #28a745;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: #d4edda;
+}
+
+.error-message {
+  margin-bottom: 1rem;
+  color: #d9534f;
+  font-weight: 600;
+  border: 1px solid #d9534f;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: #f8d7da;
 }

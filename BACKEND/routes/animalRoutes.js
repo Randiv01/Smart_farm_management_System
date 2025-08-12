@@ -2,7 +2,8 @@ import express from "express";
 import {
   getAnimalsByType,
   addAnimal,
-  deleteAnimal
+  deleteAnimal,
+  updateAnimal,
 } from "../controllers/animalController.js";
 
 const router = express.Router();
@@ -15,5 +16,8 @@ router.post("/:type", addAnimal);
 
 // DELETE /animals/:id
 router.delete("/:id", deleteAnimal);
+
+// PUT /animals/:id  <-- New update route
+router.put("/:id", updateAnimal);
 
 export default router;
