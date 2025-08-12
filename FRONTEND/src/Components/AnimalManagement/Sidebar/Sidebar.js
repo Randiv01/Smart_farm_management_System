@@ -27,9 +27,9 @@ export default function Sidebar({ darkMode, sidebarOpen, type }) {
             <Home size={20} className="mr-2" />
             <span>Overview</span>
           </li>
-          <li onClick={() => navigate(`/add-animal/${type}`)}>
+          <li onClick={() => navigate(`/AnimalManagement/design-plan/${type}`)}>
             <Plus size={20} className="icon" />
-            <span>Register Animals</span>
+            <span>Design your Plan</span>
           </li>
           <li onClick={() => navigate(`/animal-list/${type}`)}>
             <FileText size={20} className="icon" />
