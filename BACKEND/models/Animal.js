@@ -22,6 +22,8 @@ const animalSchema = new mongoose.Schema({
   milkProduction: Number, // daily liters or gallons
   feedType: String,
   notes: String,
+  qrCode: { type: String, unique: true }, // <-- NEW field
+
 }, { timestamps: true });
 
 export default mongoose.model("Animal", animalSchema);

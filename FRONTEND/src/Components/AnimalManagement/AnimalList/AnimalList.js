@@ -4,6 +4,9 @@ import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
 import "./AnimalList.css";
 import { useTheme } from '../contexts/ThemeContext.js';
+import QRCode from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function AnimalList() {
   const { type } = useParams();
@@ -153,6 +156,7 @@ export default function AnimalList() {
             <table className={`animal-table ${darkMode ? "dark" : ""}`}>
               <thead>
                 <tr>
+                  <th>QR Code</th>
                   <th>Name</th>
                   <th>Breed</th>
                   <th>Age</th>
@@ -180,6 +184,13 @@ export default function AnimalList() {
                 ) : (
                   animals.map((animal) => (
                     <tr key={animal._id}>
+                    <td>
+                      {animal.qrCode ? (
+                        <QRCodeCanvas value={animal.qrCode} size={50} />
+                      ) : (
+                        "-"
+                      )}
+                    </td>
                       <td>
                         {editId === animal._id ? (
                           <input

@@ -1,4 +1,5 @@
 import Animal from "../models/Animal.js";
+import { nanoid } from "nanoid";
 
 // Get all animals of a specific type
 export const getAnimalsByType = async (req, res) => {
@@ -13,10 +14,16 @@ export const getAnimalsByType = async (req, res) => {
 // Add a new animal
 export const addAnimal = async (req, res) => {
   try {
+    // Generate unique QR code link
+    const qrCodeId = nanoid();
+    const qrCodeURL = `${process.env.FRONTEND_URL}/animal/${qrCodeId}`;
+
     const animal = new Animal({
       ...req.body,
       type: req.params.type,
+      qrCode: qrCodeURL, // store QR code
     });
+
     await animal.save();
     res.status(201).json(animal);
   } catch (err) {

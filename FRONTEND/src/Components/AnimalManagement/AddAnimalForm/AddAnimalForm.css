@@ -92,3 +92,298 @@
   border-radius: 4px;
   background: #f8d7da;
 }
+/* Success Animation */
+.success-animation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.success-animation {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.animation-circle {
+  width: 100%;
+  height: 100%;
+  background: #28a745;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: scale(0);
+  animation: scaleUp 0.5s forwards;
+}
+
+.check-icon {
+  color: white;
+  font-size: 70px;
+  animation: fadeIn 0.3s 0.3s forwards;
+  opacity: 0;
+}
+
+@keyframes scaleUp {
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Success Animation */
+.success-animation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.success-animation {
+  width: 100px;
+  height: 100px;
+  position: relative;
+}
+
+.animation-circle {
+  width: 100px;
+  height: 100px;
+  background: #48bb78;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: scale(0);
+  opacity: 0;
+}
+
+.animate .animation-circle {
+  animation: circleGrow 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.check-icon {
+  color: white;
+  font-size: 50px;
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.animate .check-icon {
+  animation: checkAppear 0.3s ease 0.3s forwards;
+}
+
+@keyframes circleGrow {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes checkAppear {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Success Popup */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.success-popup {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 500px;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: popIn 0.3s ease-out;
+}
+
+.dark .success-popup {
+  background: #2d3748;
+  color: #f7fafc;
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.popup-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.popup-download-btn,
+.popup-close-btn,
+.popup-addmore-btn {
+  padding: 0.75rem 1.25rem;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.popup-download-btn {
+  background: #4299e1;
+}
+
+.popup-download-btn:hover {
+  background: #3182ce;
+  transform: translateY(-2px);
+}
+
+.popup-close-btn {
+  background: #718096;
+}
+
+.popup-close-btn:hover {
+  background: #4a5568;
+  transform: translateY(-2px);
+}
+
+.popup-addmore-btn {
+  background: #48bb78;
+}
+
+.popup-addmore-btn:hover {
+  background: #38a169;
+  transform: translateY(-2px);
+}
+
+.button-icon {
+  font-size: 1rem;
+}
+
+/* QR display container in popup */
+.popup-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.popup-qr-container.dark {
+  background: #1a202c;
+}
+
+.popup-qr-container h4 {
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  color: #2d3748;
+}
+
+.popup-qr-container.dark h4 {
+  color: #f7fafc;
+}
+
+.popup-qr-container canvas {
+  border: 4px solid #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Message Styles */
+.message {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.success-message {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.dark .success-message {
+  background: #22543d;
+  color: #c6f6d5;
+}
+
+.error-message {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.dark .error-message {
+  background: #742a2a;
+  color: #fed7d7;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .popup-buttons {
+    flex-direction: column;
+  }
+  
+  .popup-download-btn,
+  .popup-close-btn,
+  .popup-addmore-btn {
+    width: 100%;
+  }
+}

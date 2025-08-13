@@ -1,12 +1,19 @@
-import React, { useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
 import { useTheme } from '../contexts/ThemeContext.js';
 import "./AddAnimalForm.css";
+import { QRCodeCanvas } from "qrcode.react";
+import { jsPDF } from "jspdf";
+import { FaCheck, FaDownload, FaList, FaPlus } from "react-icons/fa";
 
 export default function AddAnimalForm() {
   const { type } = useParams();
+  const navigate = useNavigate();
+  const [qrData, setQrData] = useState(null);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showAnimation, setShowAnimation] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -26,8 +33,8 @@ export default function AddAnimalForm() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null); // For success or error messages
-  const [messageType, setMessageType] = useState(null); // "success" or "error"
+  const [message, setMessage] = useState(null);
+  const [messageType, setMessageType] = useState(null);
   const { theme } = useTheme();
   const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -43,6 +50,30 @@ export default function AddAnimalForm() {
           ? Number(value)
           : value,
     }));
+  };
+
+  const downloadQRAsPDF = () => {
+    const canvas = document.querySelector("canvas");
+    if (!canvas) return;
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF();
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    
+    // Add QR code (centered)
+    pdf.addImage(imgData, 'PNG', 50, 30, 100, 100);
+    
+    // Add title
+    pdf.setFontSize(20);
+    pdf.text(`Animal ID: ${qrData}`, pdfWidth / 2, 140, { align: 'center' });
+    
+    // Add additional info
+    pdf.setFontSize(14);
+    pdf.text(`Name: ${formData.name}`, pdfWidth / 2, 150, { align: 'center' });
+    pdf.text(`Breed: ${formData.breed}`, pdfWidth / 2, 160, { align: 'center' });
+    pdf.text(`Type: ${type}`, pdfWidth / 2, 170, { align: 'center' });
+    
+    pdf.save(`animal_qr_${qrData}.pdf`);
   };
 
   const handleSubmit = async (e) => {
@@ -75,10 +106,14 @@ export default function AddAnimalForm() {
         throw new Error(errData.error || "Failed to add animal");
       }
 
-      setMessage(
-        `${type.charAt(0).toUpperCase() + type.slice(1)} added successfully!`
-      );
-      setMessageType("success");
+      const addedAnimal = await response.json();
+      setQrData(addedAnimal._id);
+
+      // Show success animation and popup
+      setShowAnimation(true);
+      setTimeout(() => {
+        setShowSuccessPopup(true);
+      }, 1000);
 
       // Reset form
       setFormData({
@@ -105,6 +140,13 @@ export default function AddAnimalForm() {
     }
   };
 
+  const handleAddMore = () => {
+    setShowSuccessPopup(false);
+    setShowAnimation(false);
+    setQrData(null);
+    window.scrollTo(0, 0);
+  };
+
   return (
     <div className={`animal-page ${darkMode ? "dark" : ""}`}>
       <Sidebar sidebarOpen={sidebarOpen} type={type} />
@@ -125,7 +167,6 @@ export default function AddAnimalForm() {
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* form rows as before, see previous code */}
             <div className="form-row">
               <div className="form-group">
                 <label>Name *</label>
@@ -292,11 +333,66 @@ export default function AddAnimalForm() {
             </div>
 
             <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? "Adding..." : "Add Animal"}
+              {loading ? (
+                <span className="button-loading">
+                  <span className="spinner"></span> Adding...
+                </span>
+              ) : (
+                "Add Animal"
+              )}
             </button>
           </form>
         </div>
       </main>
+
+      {/* Success Animation */}
+      {showAnimation && (
+        <div className="success-animation-overlay">
+          <div className={`success-animation ${showAnimation ? "animate" : ""}`}>
+            <div className="animation-circle">
+              <FaCheck className="check-icon" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSuccessPopup && (
+        <div className="popup-overlay">
+          <div className={`success-popup ${darkMode ? "dark" : ""}`}>
+            <h3>Success!</h3>
+            <p>{type.charAt(0).toUpperCase() + type.slice(1)} added successfully.</p>
+            <p>QR code has been generated.</p>
+
+            <div className={`popup-qr-container ${darkMode ? "dark" : ""}`}>
+              <h4>Animal QR Code</h4>
+              <QRCodeCanvas value={qrData} size={150} />
+            </div>
+
+            <div className="popup-buttons">
+              <button 
+                onClick={downloadQRAsPDF}
+                className="popup-download-btn"
+              >
+                <FaDownload className="button-icon" /> Download QR
+              </button>
+
+              <button
+                onClick={() => navigate(`/AnimalManagement/${type}`)}
+                className="popup-close-btn"
+              >
+                <FaList className="button-icon" /> View List
+              </button>
+
+              <button
+                onClick={handleAddMore}
+                className="popup-addmore-btn"
+              >
+                <FaPlus className="button-icon" /> Add More
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
