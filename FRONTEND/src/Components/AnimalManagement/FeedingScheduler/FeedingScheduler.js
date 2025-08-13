@@ -10,7 +10,7 @@ export default function FeedingScheduler() {
   const [formData, setFormData] = useState({
     animalId: "",
     foodType: "",
-    quantity: "",
+    quantity: "", // in grams
     feedingTime: "",
     notes: "",
   });
@@ -20,6 +20,7 @@ export default function FeedingScheduler() {
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
   useEffect(() => {
+    // Fetch animals list from backend API
     const fetchAnimals = async () => {
       try {
         const res = await fetch("http://localhost:5000/animals");
@@ -32,11 +33,11 @@ export default function FeedingScheduler() {
     fetchAnimals();
   }, []);
 
-  // Fetch current weight from ESP32 every second
   useEffect(() => {
+    // Fetch current weight from ESP32 every 1 second
+    const esp32Ip = "192.168.1.10"; // Change to your ESP32 IP
     const fetchWeight = async () => {
       try {
-        const esp32Ip = "192.168.1.10"; // Replace with your ESP32 IP
         const res = await fetch(`http://${esp32Ip}/weight`);
         const text = await res.text();
         setCurrentWeight(text);
@@ -52,17 +53,19 @@ export default function FeedingScheduler() {
   }, []);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
-    if (!formData.animalId || !formData.foodType || !formData.quantity || !formData.feedingTime) {
+    if (
+      !formData.animalId ||
+      !formData.foodType ||
+      !formData.quantity ||
+      !formData.feedingTime
+    ) {
       setMessage("⚠ Please fill all required fields.");
       return;
     }
@@ -96,20 +99,21 @@ export default function FeedingScheduler() {
       setMessage("⚠ Please select an animal or 'Select All'.");
       return;
     }
+    if (!formData.quantity || Number(formData.quantity) <= 0) {
+      setMessage("⚠ Please enter a valid feeding quantity in grams.");
+      return;
+    }
 
     try {
-      const esp32Ip = "192.168.1.10"; // Replace with your ESP32 IP
+      const esp32Ip = "192.168.1.10"; // Change to your ESP32 IP
 
       const res = await fetch(`http://${esp32Ip}/feed`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
         },
         body: JSON.stringify({
-          animalId: formData.animalId,
-          foodType: formData.foodType || "default",
-          quantity: Number(formData.quantity) || 1,
+          quantity: Number(formData.quantity), // grams as number
         }),
       });
 
@@ -131,8 +135,16 @@ export default function FeedingScheduler() {
 
   return (
     <div className={`feeding-page ${darkMode ? "dark" : ""}`}>
-      <Sidebar darkMode={darkMode} setDarkMode={setDarkMode} sidebarOpen={sidebarOpen} />
-      <TopNavbar darkMode={darkMode} setDarkMode={setDarkMode} onMenuClick={handleMenuClick} />
+      <Sidebar
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        sidebarOpen={sidebarOpen}
+      />
+      <TopNavbar
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        onMenuClick={handleMenuClick}
+      />
 
       <main className="main-content">
         <div className={`feeding-container ${darkMode ? "dark" : ""}`}>
@@ -172,15 +184,16 @@ export default function FeedingScheduler() {
             />
 
             <label>
-              Quantity (kg/liters) <span className="required">*</span>
+              Quantity (grams) <span className="required">*</span>
             </label>
             <input
               type="number"
               name="quantity"
-              placeholder="Enter quantity"
+              placeholder="Enter quantity in grams"
               value={formData.quantity}
               onChange={handleChange}
               className={darkMode ? "dark" : ""}
+              min="1"
             />
 
             <label>
