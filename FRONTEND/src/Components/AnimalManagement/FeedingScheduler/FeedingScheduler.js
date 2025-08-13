@@ -2,9 +2,11 @@ import React, { useState, useEffect } from "react";
 import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
 import "./FeedingScheduler.css";
+import { useTheme } from '../contexts/ThemeContext.js';
 
 export default function FeedingScheduler() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme } = useTheme();
+  const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [animals, setAnimals] = useState([]);
   const [formData, setFormData] = useState({
@@ -135,16 +137,8 @@ export default function FeedingScheduler() {
 
   return (
     <div className={`feeding-page ${darkMode ? "dark" : ""}`}>
-      <Sidebar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        sidebarOpen={sidebarOpen}
-      />
-      <TopNavbar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        onMenuClick={handleMenuClick}
-      />
+       <Sidebar sidebarOpen={sidebarOpen} />
+       <TopNavbar onMenuClick={handleMenuClick} />
 
       <main className="main-content">
         <div className={`feeding-container ${darkMode ? "dark" : ""}`}>

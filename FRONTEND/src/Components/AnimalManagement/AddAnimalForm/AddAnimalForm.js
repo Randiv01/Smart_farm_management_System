@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
+import { useTheme } from '../contexts/ThemeContext.js';
 import "./AddAnimalForm.css";
 
 export default function AddAnimalForm() {
@@ -27,7 +28,8 @@ export default function AddAnimalForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null); // For success or error messages
   const [messageType, setMessageType] = useState(null); // "success" or "error"
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme } = useTheme();
+  const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
@@ -105,13 +107,8 @@ export default function AddAnimalForm() {
 
   return (
     <div className={`animal-page ${darkMode ? "dark" : ""}`}>
-      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
-
-      <TopNavbar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        onMenuClick={handleMenuClick}
-      />
+      <Sidebar sidebarOpen={sidebarOpen} type={type} />
+      <TopNavbar onMenuClick={handleMenuClick} />
 
       <main className="main-content">
         <div className={`form-container ${darkMode ? "dark" : ""}`}>

@@ -3,6 +3,7 @@ import TopNavbar from '../TopNavbar/TopNavbar.js';
 import Sidebar from '../Sidebar/Sidebar.js';  // <-- New Sidebar import
 import { Line, Bar } from "react-chartjs-2";
 import { Link } from "react-router-dom";
+import { useTheme } from '../contexts/ThemeContext.js';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -40,7 +41,8 @@ ChartJS.register(
 );
 
 export default function Dashboard() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme } = useTheme();           // <-- get current theme
+  const darkMode = theme === 'dark';       // <-- boolean for convenience
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleMenuClick = () => {
@@ -101,11 +103,7 @@ export default function Dashboard() {
     <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
       <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={null} /> {/* Sidebar here */}
 
-      <TopNavbar 
-        darkMode={darkMode} 
-        setDarkMode={setDarkMode} 
-        onMenuClick={handleMenuClick} 
-      />
+   <TopNavbar onMenuClick={handleMenuClick} /> 
 
       <main className="main-content">
         <section className={`farm-overview ${darkMode ? "dark" : ""}`}>

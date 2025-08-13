@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
+import { useTheme } from '../contexts/ThemeContext.js';
+
 import {
   Canvas,
   Rect,
@@ -18,7 +20,8 @@ export default function FarmDesigner() {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
 
-  const [darkMode, setDarkMode] = useState(false);
+  const { theme } = useTheme();
+  const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTool, setActiveTool] = useState("select"); // select, rect, circle, line, triangle, pencil, erase
 
@@ -276,12 +279,8 @@ export default function FarmDesigner() {
 
   return (
     <div className={`farm-designer-page ${darkMode ? "dark" : ""}`}>
-      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} />
-      <TopNavbar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        onMenuClick={handleMenuClick}
-      />
+       <Sidebar sidebarOpen={sidebarOpen} type={type} />
+       <TopNavbar onMenuClick={handleMenuClick} />
 
       <main className="main-content">
 
