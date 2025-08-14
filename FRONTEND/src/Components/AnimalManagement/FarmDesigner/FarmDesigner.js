@@ -29,6 +29,10 @@ export default function FarmDesigner() {
   const drawingObject = useRef(null);
   const startPos = useRef({ x: 0, y: 0 });
 
+  useEffect(() => {
+      document.title = "Farm Design";
+    }, []);
+
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
   useEffect(() => {

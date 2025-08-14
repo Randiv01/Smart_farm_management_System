@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import TopNavbar from '../TopNavbar/TopNavbar.js';
 import Sidebar from '../Sidebar/Sidebar.js';
 import { useTheme } from '../contexts/ThemeContext.js';
 import { useNavigate } from 'react-router-dom';
 import "./AddAnimalType.css";
+
 
 export default function AddAnimalType() {
   const { theme } = useTheme();
@@ -13,6 +14,10 @@ export default function AddAnimalType() {
   const [banner, setBanner] = useState(null); // File object
   const [fields, setFields] = useState([{ name: "", label: "", type: "text" }]);
   const navigate = useNavigate();
+
+   useEffect(() => {
+    document.title = "Add type";
+  }, []);
 
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 

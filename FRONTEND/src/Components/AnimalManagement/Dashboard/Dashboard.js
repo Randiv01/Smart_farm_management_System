@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import TopNavbar from '../TopNavbar/TopNavbar.js';
 import Sidebar from '../Sidebar/Sidebar.js';  
 import { Link, useNavigate } from 'react-router-dom';
 import { Line, Bar } from "react-chartjs-2";
 import { useTheme } from '../contexts/ThemeContext.js';
-
 
 import {
   Chart as ChartJS,
@@ -48,6 +47,10 @@ export default function Dashboard() {
   const { theme } = useTheme();           // <-- get current theme
   const darkMode = theme === 'dark';       // <-- boolean for convenience
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+   useEffect(() => {
+    document.title = "Animal Dashboard";
+  }, []);
 
   const handleMenuClick = () => {
     setSidebarOpen(!sidebarOpen);

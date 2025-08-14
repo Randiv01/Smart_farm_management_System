@@ -39,6 +39,10 @@ export default function AddAnimalForm() {
   const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+   useEffect(() => {
+    document.title = "Add animal";
+  }, []);
+
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
   const handleChange = (e) => {

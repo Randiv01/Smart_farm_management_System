@@ -38,6 +38,10 @@ export default function AnimalList() {
   const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  useEffect(() => {
+      document.title = "Animal List";
+    }, []);
+
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
   // Fetch animals

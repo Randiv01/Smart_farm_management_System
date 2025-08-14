@@ -19,6 +19,10 @@ export default function FeedingScheduler() {
   const [message, setMessage] = useState("");
   const [currentWeight, setCurrentWeight] = useState(null);
 
+  useEffect(() => {
+      document.title = "Feed shadule";
+    }, []);
+
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
   useEffect(() => {
