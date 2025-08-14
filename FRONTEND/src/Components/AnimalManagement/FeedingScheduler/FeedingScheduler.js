@@ -215,7 +215,7 @@ export default function FeedingScheduler() {
             />
 
             <div className="feeding-buttons">
-              <button type="submit" className={`btn-save ${darkMode ? "dark" : ""}`}>
+              <button type="submit" className={`btn-fsave ${darkMode ? "dark" : ""}`}>
                 💾 Save Schedule
               </button>
               <button

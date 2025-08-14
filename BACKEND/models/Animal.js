@@ -1,29 +1,20 @@
-import mongoose from "mongoose";
-
-const vaccinationRecordSchema = new mongoose.Schema({
-  vaccineName: String,
-  dateGiven: Date,
-}, { _id: false });
+import mongoose from 'mongoose';
 
 const animalSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  type: { type: String, required: true }, // e.g. cows, goats
-  breed: { type: String, required: true },
-  age: { type: Number, required: true },
-  dateOfBirth: Date,
-  gender: { type: String, enum: ["Male", "Female", "Unknown"], default: "Unknown" },
-  healthStatus: { type: String, default: "Healthy" },
-  weight: Number, // kg or lbs
-  owner: String,
-  location: String,
-  vaccinationRecords: [vaccinationRecordSchema],
-  lastCheckup: Date,
-  reproductiveStatus: String, // e.g. Pregnant, In heat, Not bred
-  milkProduction: Number, // daily liters or gallons
-  feedType: String,
-  notes: String,
-  qrCode: { type: String, unique: true }, // <-- NEW field
+  type: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'AnimalType',
+    required: true 
+  },
+  data: { type: mongoose.Schema.Types.Mixed, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
 
-}, { timestamps: true });
+// Update the updatedAt field on save
+animalSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
-export default mongoose.model("Animal", animalSchema);
+export default mongoose.model('Animal', animalSchema);

@@ -114,7 +114,7 @@ h2 {
   margin-top: 1.5rem;
 }
 
-.btn-save,
+.btn-fsave,
 .btn-feed-now,
 .btn-history {
   border: none;
@@ -126,11 +126,11 @@ h2 {
   color: white;
 }
 
-.btn-save {
+.btn-fsave {
   background: #228b22;
 }
 
-.btn-save:hover {
+.btn-fsave:hover {
   background: #1a6b1a;
   box-shadow: 0 4px 8px rgb(26 107 26 / 0.6);
 }
@@ -155,12 +155,12 @@ h2 {
 
 /* Dark mode buttons */
 
-.feeding-page.dark .btn-save {
+.feeding-page.dark .btn-fsave {
   background: #10b981;
   color: #065f46;
 }
 
-.feeding-page.dark .btn-save:hover {
+.feeding-page.dark .btn-fsave:hover {
   background: #059669;
   box-shadow: 0 4px 12px rgb(5 150 105 / 0.8);
 }

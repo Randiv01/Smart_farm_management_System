@@ -1,9 +1,14 @@
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import animalRouter from "./routes/animalRoutes.js";
+import { animalRouter } from "./routes/animalRoutes.js"; // Changed import
+import { animalTypeRouter } from "./routes/animalTypeRoutes.js"; // Changed import
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -15,14 +20,16 @@ app.use(cors({
 app.use(express.json());
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use("/animals", animalRouter);
+app.use("/animal-types", animalTypeRouter);
 
 // Ensure uploads folder exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
   console.log('📁 Created uploads directory');
 }
 
@@ -36,3 +43,5 @@ mongoose.connect("mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb
     app.listen(5000, () => console.log("🚀 Server running on port 5000"));
   })
   .catch(err => console.error("❌ MongoDB connection failed:", err));
+
+export default app;
