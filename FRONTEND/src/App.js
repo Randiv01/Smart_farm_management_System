@@ -7,6 +7,8 @@ import AddAnimalForm from './Components/AnimalManagement/AddAnimalForm/AddAnimal
 import FarmDesigner from './Components/AnimalManagement/FarmDesigner/FarmDesigner.js'; // <-- New import
 import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
 import FeedingScheduler from './Components/AnimalManagement/FeedingScheduler/FeedingScheduler.js';
+import AddAnimalType from './Components/AnimalManagement/AddAnimalType/AddAnimalType.js';
+
 
 
 function App() {
@@ -20,6 +22,7 @@ function App() {
           <Route path="/add-animal/:type" element={<AddAnimalForm />} />
           <Route path="/AnimalManagement/design-plan/:type" element={<FarmDesigner />} /> {/* New route */}
           <Route path="/feeding-scheduler" element={<FeedingScheduler />} />
+          <Route path="/AnimalManagement/add-animal-type" element={<AddAnimalType />} />
 
         </Routes>
       </LanguageProvider>

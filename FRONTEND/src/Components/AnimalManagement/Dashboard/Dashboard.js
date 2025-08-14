@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import TopNavbar from '../TopNavbar/TopNavbar.js';
-import Sidebar from '../Sidebar/Sidebar.js';  // <-- New Sidebar import
+import Sidebar from '../Sidebar/Sidebar.js';  
+import { Link, useNavigate } from 'react-router-dom';
 import { Line, Bar } from "react-chartjs-2";
-import { Link } from "react-router-dom";
 import { useTheme } from '../contexts/ThemeContext.js';
+
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,6 +43,8 @@ ChartJS.register(
 );
 
 export default function Dashboard() {
+
+  const navigate = useNavigate();
   const { theme } = useTheme();           // <-- get current theme
   const darkMode = theme === 'dark';       // <-- boolean for convenience
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -112,11 +116,11 @@ export default function Dashboard() {
             <hr />
             <br />
             <button
-              className="btn-add-animal-type"
-              onClick={() => alert("Add New Animal Type clicked!")}
-            >
-              Add New Animal Type
-            </button>
+                className="btn-add-animal-type"
+                onClick={() => navigate("/AnimalManagement/add-animal-type")}
+              >
+                Add New Animal Type
+              </button>
           </div>
 
           <div className="animal-cards">
