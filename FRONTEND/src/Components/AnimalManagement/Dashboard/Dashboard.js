@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
 import { Link, useNavigate } from "react-router-dom";
-import { Line, Bar } from "react-chartjs-2";
+import { Pie, Bar } from "react-chartjs-2";
 import { useTheme } from "../contexts/ThemeContext.js";
 import axios from "axios";
 
@@ -13,6 +13,7 @@ import {
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend
@@ -26,6 +27,7 @@ ChartJS.register(
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend
@@ -47,7 +49,7 @@ export default function Dashboard() {
   const [totalCaretakers, setTotalCaretakers] = useState(2);
 
   useEffect(() => {
-    document.title = "Animal Dashboard";
+    document.title = "Farm Animals Dashboard";
     fetchAnimalTypes();
   }, []);
 
@@ -55,9 +57,19 @@ export default function Dashboard() {
 
   const fetchAnimalTypes = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/animal-types");
-      setAnimalTypes(res.data);
-      const total = res.data.reduce((sum, type) => sum + (type.total || 0), 0);
+      const typesRes = await axios.get("http://localhost:5000/animal-types");
+      const types = typesRes.data;
+
+      const typesWithCounts = await Promise.all(types.map(async (type) => {
+        const countRes = await axios.get(`http://localhost:5000/animals/count?type=${type._id}`);
+        return {
+          ...type,
+          total: countRes.data.count || 0
+        };
+      }));
+
+      setAnimalTypes(typesWithCounts);
+      const total = typesWithCounts.reduce((sum, type) => sum + type.total, 0);
       setTotalAnimals(total);
     } catch (err) {
       console.error(err);
@@ -107,41 +119,83 @@ export default function Dashboard() {
     try {
       await axios.delete(`http://localhost:5000/animal-types/${animal._id}`);
       setAnimalTypes(animalTypes.filter(a => a._id !== animal._id));
+      fetchAnimalTypes();
     } catch (err) {
       console.error(err);
       alert("Delete failed");
     }
   };
 
-  const productivityData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  const generateColors = (count) => {
+    const colors = [];
+    const hueStep = 360 / count;
+    
+    for (let i = 0; i < count; i++) {
+      const hue = i * hueStep;
+      colors.push(`hsl(${hue}, 70%, 60%)`);
+    }
+    
+    return colors;
+  };
+
+  const animalColors = generateColors(animalTypes.length);
+
+  const animalsData = {
+    labels: animalTypes.map(type => type.name),
     datasets: [
-      { 
-        label: "Milk (L)", 
-        data: [120, 130, 100, 140, 150, 160, 140], 
-        borderColor: "#2e7d32", 
-        backgroundColor: "rgba(46, 125, 50, 0.1)", 
-        tension: 0.3,
-        borderWidth: 2
-      },
-      { 
-        label: "Eggs (units)", 
-        data: [250, 240, 270, 280, 290, 340, 320], 
-        borderColor: "#f57c00", 
-        backgroundColor: "rgba(245, 124, 0, 0.1)", 
-        tension: 0.3,
-        borderWidth: 2
-      },
-      { 
-        label: "Meat (kg)", 
-        data: [60, 62, 50, 70, 45, 75, 65], 
-        borderColor: "#6d4c41", 
-        backgroundColor: "rgba(109, 76, 65, 0.1)", 
-        tension: 0.3,
+      {
+        data: animalTypes.map(type => type.total),
+        backgroundColor: animalColors,
+        borderColor: darkMode ? "#1f2937" : "#ffffff",
         borderWidth: 2
       }
     ]
   };
+
+  const animalsOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: "right",
+      labels: {
+        color: darkMode ? '#f9fafb' : '#1f2937', // Explicit color setting
+        font: { size: 12 },
+        padding: 20,
+        generateLabels: (chart) => {
+          const data = chart.data.datasets[0].data;
+          const total = data.reduce((sum, val) => sum + val, 0);
+          return chart.data.labels.map((label, index) => {
+            const value = data[index];
+            const percent = total ? Math.round((value / total) * 100) : 0;
+            return {
+              text: `${label}: ${percent}% (${value})`,
+              fillStyle: chart.data.datasets[0].backgroundColor[index],
+              strokeStyle: chart.data.datasets[0].borderColor,
+              fontColor: darkMode ? '#f9fafb' : '#1f2937', // Explicit font color
+              index
+            };
+          });
+        }
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: function(context) {
+          const data = context.dataset.data;
+          const total = data.reduce((sum, val) => sum + val, 0);
+          const value = context.raw;
+          const percent = total ? Math.round((value / total) * 100) : 0;
+          return `${context.label}: ${value} (${percent}%)`;
+        }
+      }
+    }
+  },
+  animation: {
+    animateRotate: true,
+    animateScale: true
+  }
+};
 
   const healthData = {
     labels: ["Healthy", "Monitoring", "Treatment", "Recovery"],
@@ -186,7 +240,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="animal-cards">
-              {animalTypes.map((animal) => (
+              {animalTypes.map((animal, index) => (
                 <div className={`animal-card ${darkMode ? "dark" : ""}`} key={animal._id}>
                   <div className="image-wrapper">
                     <img
@@ -218,10 +272,10 @@ export default function Dashboard() {
                           autoFocus
                         />
                         <div className="edit-buttons">
-                          <button className="btn-save" onClick={() => handleRename(animal)}>
+                          <button className="btn-cardsave" onClick={() => handleRename(animal)}>
                             <span className="btn-icon">✓</span>
                           </button>
-                          <button className="btn-cancel" onClick={() => setEditingId(null)}>
+                          <button className="btn-cardcancel" onClick={() => setEditingId(null)}>
                             <span className="btn-icon">×</span>
                           </button>
                         </div>
@@ -230,7 +284,7 @@ export default function Dashboard() {
                       <div className="name-container">
                         <h5>{animal.name}</h5>
                         <button 
-                          className="btn-edit" 
+                          className="btn-cardedit" 
                           onClick={() => { 
                             setEditingId(animal._id); 
                             setNameInput(animal.name); 
@@ -240,7 +294,7 @@ export default function Dashboard() {
                         </button>
                       </div>
                     )}
-                    <p>Total Animals: {animal.total}</p>
+                    <p>Total {animal.name}: {animal.total}</p>
                   </div>
 
                   <div className="animal-card-footer">
@@ -249,7 +303,7 @@ export default function Dashboard() {
                         <span className="btn-icon">→</span> View Details
                       </button>
                     </Link>
-                    <button className="btn-delete" onClick={() => handleDelete(animal)}>
+                    <button className="btn-carddelete" onClick={() => handleDelete(animal)}>
                       <span className="btn-icon">🗑</span>
                     </button>
                   </div>
@@ -274,85 +328,51 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section className="charts">
-          <div className={`chart ${darkMode ? "dark" : ""}`}>
-            <h4>Weekly Productivity Overview</h4>
-            <div className="chart-container">
-              <Line 
-                data={productivityData} 
-                options={{
-                  responsive: true,
-                  plugins: {
-                    legend: {
-                      position: 'top',
-                      labels: {
-                        color: darkMode ? '#f9fafb' : '#1f2937',
-                        font: {
-                          size: 12
+         <section className="charts">
+            <div className="chart">
+              <h4>Overview of Farm Animals</h4>
+              <div className="chart-container">
+                <Pie 
+                  data={animalsData} 
+                  options={animalsOptions}
+                />
+              </div>
+            </div>
+            <div className="chart">
+              <h4>Animal Health Status Summary</h4>
+              <div className="chart-container">
+                <Bar 
+                  data={healthData} 
+                  options={{
+                    responsive: true,
+                    plugins: {
+                      legend: {
+                        display: false
+                      }
+                    },
+                    scales: {
+                      x: {
+                        grid: {
+                          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        },
+                        ticks: {
+                          color: darkMode ? '#f9fafb' : '#1f2937'
+                        }
+                      },
+                      y: {
+                        grid: {
+                          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        },
+                        ticks: {
+                          color: darkMode ? '#f9fafb' : '#1f2937'
                         }
                       }
                     }
-                  },
-                  scales: {
-                    x: {
-                      grid: {
-                        color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      },
-                      ticks: {
-                        color: darkMode ? '#f9fafb' : '#1f2937'
-                      }
-                    },
-                    y: {
-                      grid: {
-                        color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      },
-                      ticks: {
-                        color: darkMode ? '#f9fafb' : '#1f2937'
-                      }
-                    }
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
             </div>
-          </div>
-          <div className={`chart ${darkMode ? "dark" : ""}`}>
-            <h4>Animal Health Status Summary</h4>
-            <div className="chart-container">
-              <Bar 
-                data={healthData} 
-                options={{
-                  responsive: true,
-                  plugins: {
-                    legend: {
-                      display: false,
-                      labels: {
-                        color: darkMode ? '#f9fafb' : '#1f2937'
-                      }
-                    }
-                  },
-                  scales: {
-                    x: {
-                      grid: {
-                        color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      },
-                      ticks: {
-                        color: darkMode ? '#f9fafb' : '#1f2937'
-                      }
-                    },
-                    y: {
-                      grid: {
-                        color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      },
-                      ticks: {
-                        color: darkMode ? '#f9fafb' : '#1f2937'
-                      }
-                    }
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </section>
+          </section>
       </main>
     </div>
   );

@@ -4,56 +4,60 @@ import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
 import "./AnimalList.css";
 import { useTheme } from '../contexts/ThemeContext.js';
-import QRCode from "qrcode.react";
 import { QRCodeCanvas } from "qrcode.react";
-import { QRCodeSVG } from "qrcode.react";
 
 export default function AnimalList() {
   const { type } = useParams();
   const navigate = useNavigate();
-
-  const [animals, setAnimals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [editId, setEditId] = useState(null);
-
-  const [editData, setEditData] = useState({
-    name: "",
-    breed: "",
-    age: "",
-    dateOfBirth: "",
-    gender: "Unknown",
-    healthStatus: "",
-    weight: "",
-    owner: "",
-    location: "",
-    lastCheckup: "",
-    reproductiveStatus: "",
-    milkProduction: "",
-    feedType: "",
-    notes: "",
-  });
-
   const { theme } = useTheme();
   const darkMode = theme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  useEffect(() => {
+  const [animals, setAnimals] = useState([]);
+  const [animalType, setAnimalType] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState({});
+
+    useEffect(() => {
       document.title = "Animal List";
     }, []);
 
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
-  // Fetch animals
-  const fetchAnimals = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`http://localhost:5000/animals/${type}`);
-      if (!res.ok) throw new Error("Failed to fetch animals");
-      const data = await res.json();
-      setAnimals(data || []);
+      
+      // First try to find by name (case insensitive)
+      const typeRes = await fetch(`http://localhost:5000/animal-types/${type}`);
+      
+      if (!typeRes.ok) {
+        throw new Error(`Animal type not found: ${typeRes.status}`);
+      }
+
+      const typeData = await typeRes.json();
+      setAnimalType(typeData);
+
+      // Initialize edit data structure with only Basic Info fields
+      const initialEditData = {};
+      const basicInfoCategory = typeData.categories.find(cat => cat.name === "Basic Info");
+      if (basicInfoCategory) {
+        basicInfoCategory.fields.forEach(field => {
+          initialEditData[field.name] = "";
+        });
+      }
+      setEditData(initialEditData);
+
+      // Fetch animals of this type
+      const animalsRes = await fetch(`http://localhost:5000/animals?type=${typeData._id}`);
+      if (!animalsRes.ok) throw new Error("Failed to fetch animals");
+      setAnimals(await animalsRes.json() || []);
+      
     } catch (err) {
+      console.error("Fetch error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -61,10 +65,9 @@ export default function AnimalList() {
   };
 
   useEffect(() => {
-    fetchAnimals();
+    fetchData();
   }, [type]);
 
-  // Delete animal
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this animal?")) {
       try {
@@ -72,48 +75,30 @@ export default function AnimalList() {
           method: "DELETE",
         });
         if (!res.ok) throw new Error("Failed to delete animal");
-        fetchAnimals();
+        fetchData();
       } catch (err) {
         setError(err.message);
       }
     }
   };
 
-  // Edit animal
   const handleEdit = (animal) => {
     setEditId(animal._id);
-    setEditData({
-      name: animal.name || "",
-      breed: animal.breed || "",
-      age: animal.age || "",
-      dateOfBirth: animal.dateOfBirth ? animal.dateOfBirth.slice(0, 10) : "",
-      gender: animal.gender || "Unknown",
-      healthStatus: animal.healthStatus || "",
-      weight: animal.weight || "",
-      owner: animal.owner || "",
-      location: animal.location || "",
-      lastCheckup: animal.lastCheckup ? animal.lastCheckup.slice(0, 10) : "",
-      reproductiveStatus: animal.reproductiveStatus || "",
-      milkProduction: animal.milkProduction || "",
-      feedType: animal.feedType || "",
-      notes: animal.notes || "",
+    const editValues = {};
+    Object.keys(editData).forEach(key => {
+      editValues[key] = animal.data[key] || "";
     });
-    setError(null);
+    setEditData(editValues);
   };
 
-  // Update animal
   const handleUpdate = async (id) => {
     try {
       const res = await fetch(`http://localhost:5000/animals/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...editData,
-          age: Number(editData.age),
-          weight: Number(editData.weight),
-          milkProduction: Number(editData.milkProduction),
-          dateOfBirth: editData.dateOfBirth || null,
-          lastCheckup: editData.lastCheckup || null,
+          data: editData,
+          updatedAt: Date.now()
         }),
       });
 
@@ -123,11 +108,7 @@ export default function AnimalList() {
       }
 
       const updatedAnimal = await res.json();
-
-      setAnimals((prev) =>
-        prev.map((a) => (a._id === id ? updatedAnimal : a))
-      );
-
+      setAnimals(prev => prev.map(a => a._id === id ? updatedAnimal : a));
       setEditId(null);
       setError(null);
     } catch (err) {
@@ -135,269 +116,143 @@ export default function AnimalList() {
     }
   };
 
-  return (
-    <div className={`animal-page ${darkMode ? "dark" : ""}`}>
-       <Sidebar sidebarOpen={sidebarOpen} type={type} />
-       <TopNavbar onMenuClick={handleMenuClick} />
+  if (loading) {
+    return (
+      <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+        <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+        <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+          <TopNavbar onMenuClick={handleMenuClick} />
+          <div className="loading-container">
+            <p>Loading {type} data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-      <main className="main-content">
-        <div className={`animal-list-container ${darkMode ? "dark" : ""}`}>
+  if (error) {
+    return (
+      <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+        <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+        <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+          <TopNavbar onMenuClick={handleMenuClick} />
+          <div className="error-container">
+            <h2>Error Loading {type}</h2>
+            <p className="error-message">{error}</p>
+            <button 
+              className={`btn-retry ${darkMode ? "dark" : ""}`}
+              onClick={fetchData}
+            >
+              Retry
+            </button>
+            <button 
+              className={`btn-back ${darkMode ? "dark" : ""}`}
+              onClick={() => navigate('/AnimalManagement')}
+            >
+              Back to Animal Management
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!animalType) {
+    return (
+      <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+        <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+        <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+          <TopNavbar onMenuClick={handleMenuClick} />
+          <div className="error-container">
+            <h2>Animal Type Not Found</h2>
+            <p>The animal type "{type}" could not be loaded.</p>
+            <button 
+              className={`btn-back ${darkMode ? "dark" : ""}`}
+              onClick={() => navigate('/AnimalManagement')}
+            >
+              Back to Animal Management
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get only Basic Info fields to display as columns
+  const basicInfoFields = [];
+  const basicInfoCategory = animalType.categories?.find(cat => cat.name === "Basic Info");
+  if (basicInfoCategory) {
+    basicInfoCategory.fields?.forEach(field => {
+      basicInfoFields.push({
+        name: field.name,
+        label: field.label
+      });
+    });
+  }
+
+  return (
+    <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+      <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+        <TopNavbar onMenuClick={handleMenuClick} />
+
+        <main className="animal-list-page">
           <div className="header">
-            <h2>{type.charAt(0).toUpperCase() + type.slice(1)} List</h2>
+            <h2>{animalType.name} List</h2>
             <button
               className={`btn-add ${darkMode ? "dark" : ""}`}
-              onClick={() => navigate(`/add-animal/${type}`)}
+              onClick={() => navigate(`/add-animal/${animalType._id}`)}
             >
-              ➕ Add New {type}
+              ➕ Add New {animalType.name}
             </button>
           </div>
 
-          {loading ? (
-            <p>Loading...</p>
-          ) : error ? (
-            <p className="error">{error}</p>
-          ) : (
+          <div className="table-responsive">
             <table className={`animal-table ${darkMode ? "dark" : ""}`}>
               <thead>
                 <tr>
                   <th>QR Code</th>
-                  <th>Name</th>
-                  <th>Breed</th>
-                  <th>Age</th>
-                  <th>Date of Birth</th>
-                  <th>Gender</th>
-                  <th>Health Status</th>
-                  <th>Weight</th>
-                  <th>Owner</th>
-                  <th>Location</th>
-                  <th>Last Checkup</th>
-                  <th>Reproductive Status</th>
-                  <th>Milk Production</th>
-                  <th>Feed Type</th>
-                  <th>Notes</th>
+                  {basicInfoFields.map((field, index) => (
+                    <th key={index}>{field.label}</th>
+                  ))}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {animals.length === 0 ? (
                   <tr>
-                    <td colSpan="15" className="no-data">
-                      No {type} found.
+                    <td colSpan={basicInfoFields.length + 2} className="no-data">
+                      No {animalType.name} found.
                     </td>
                   </tr>
                 ) : (
-                  animals.map((animal) => (
+                  animals.map(animal => (
                     <tr key={animal._id}>
-                    <td>
-                      {animal.qrCode ? (
-                        <QRCodeCanvas value={animal.qrCode} size={50} />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
                       <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.name}
-                            onChange={(e) =>
-                              setEditData({ ...editData, name: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
+                        {animal.qrCode ? (
+                          <QRCodeCanvas value={animal.qrCode} size={50} level="H" />
                         ) : (
-                          animal.name
+                          <span>-</span>
                         )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.breed}
-                            onChange={(e) =>
-                              setEditData({ ...editData, breed: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.breed
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            type="number"
-                            value={editData.age}
-                            onChange={(e) =>
-                              setEditData({ ...editData, age: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.age
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            type="date"
-                            value={editData.dateOfBirth}
-                            onChange={(e) =>
-                              setEditData({ ...editData, dateOfBirth: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : animal.dateOfBirth ? (
-                          animal.dateOfBirth.slice(0, 10)
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <select
-                            value={editData.gender}
-                            onChange={(e) =>
-                              setEditData({ ...editData, gender: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          >
-                            <option value="Unknown">Unknown</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                          </select>
-                        ) : (
-                          animal.gender || "Unknown"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.healthStatus}
-                            onChange={(e) =>
-                              setEditData({ ...editData, healthStatus: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          <span
-                            className={`status-badge ${
-                              animal.healthStatus ? animal.healthStatus.toLowerCase() : ""
-                            }`}
-                          >
-                            {animal.healthStatus || "-"}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            type="number"
-                            value={editData.weight}
-                            onChange={(e) =>
-                              setEditData({ ...editData, weight: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.weight || "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.owner}
-                            onChange={(e) =>
-                              setEditData({ ...editData, owner: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.owner || "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.location}
-                            onChange={(e) =>
-                              setEditData({ ...editData, location: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.location || "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            type="date"
-                            value={editData.lastCheckup}
-                            onChange={(e) =>
-                              setEditData({ ...editData, lastCheckup: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : animal.lastCheckup ? (
-                          animal.lastCheckup.slice(0, 10)
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.reproductiveStatus}
-                            onChange={(e) =>
-                              setEditData({ ...editData, reproductiveStatus: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.reproductiveStatus || "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            type="number"
-                            value={editData.milkProduction}
-                            onChange={(e) =>
-                              setEditData({ ...editData, milkProduction: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.milkProduction || "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <input
-                            value={editData.feedType}
-                            onChange={(e) =>
-                              setEditData({ ...editData, feedType: e.target.value })
-                            }
-                            className={darkMode ? "dark" : ""}
-                          />
-                        ) : (
-                          animal.feedType || "-"
-                        )}
-                      </td>
-                      <td>
-                        {editId === animal._id ? (
-                          <textarea
-                            value={editData.notes}
-                            onChange={(e) =>
-                              setEditData({ ...editData, notes: e.target.value })
-                            }
-                            rows={2}
-                            className={darkMode ? "dark" : ""}
-                            style={{ resize: "vertical" }}
-                          />
-                        ) : (
-                          animal.notes || "-"
-                        )}
-                      </td>
+                      </td>              
+                      {basicInfoFields.map((field, idx) => (
+                        <td key={idx}>
+                          {editId === animal._id ? (
+                            <input
+                              type={field.name.includes('date') ? 'date' : 'text'}
+                              value={editData[field.name] || ''}
+                              onChange={(e) => setEditData({
+                                ...editData,
+                                [field.name]: e.target.value
+                              })}
+                              className={darkMode ? "dark" : ""}
+                            />
+                          ) : (
+                            animal.data[field.name] || "-"
+                          )}
+                        </td>
+                      ))}
+                      
                       <td>
                         {editId === animal._id ? (
                           <>
@@ -436,9 +291,9 @@ export default function AnimalList() {
                 )}
               </tbody>
             </table>
-          )}
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

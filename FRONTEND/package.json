@@ -12,6 +12,7 @@
     "@types/react-dom": "^19.1.7",
     "axios": "^1.10.0",
     "chart.js": "^4.5.0",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "fabric": "^6.7.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.539.0",

@@ -1,8 +1,8 @@
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import { animalRouter } from "./routes/animalRoutes.js"; // Changed import
-import { animalTypeRouter } from "./routes/animalTypeRoutes.js"; // Changed import
+import { animalRouter } from "./routes/animalRoutes.js";
+import { animalTypeRouter } from "./routes/animalTypeRoutes.js";
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -18,6 +18,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
