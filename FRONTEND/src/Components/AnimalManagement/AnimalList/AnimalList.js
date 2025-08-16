@@ -19,10 +19,11 @@ export default function AnimalList() {
   const [error, setError] = useState(null);
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
+  const [popup, setPopup] = useState({ show: false, success: true, message: "", type: "" }); // type: 'delete'|'save'|'error'
 
-    useEffect(() => {
-      document.title = "Animal List";
-    }, []);
+  useEffect(() => {
+    document.title = "Animal List";
+  }, []);
 
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
@@ -30,32 +31,22 @@ export default function AnimalList() {
     try {
       setLoading(true);
       setError(null);
-      
-      // First try to find by name (case insensitive)
-      const typeRes = await fetch(`http://localhost:5000/animal-types/${type}`);
-      
-      if (!typeRes.ok) {
-        throw new Error(`Animal type not found: ${typeRes.status}`);
-      }
 
+      const typeRes = await fetch(`http://localhost:5000/animal-types/${type}`);
+      if (!typeRes.ok) throw new Error(`Animal type not found: ${typeRes.status}`);
       const typeData = await typeRes.json();
       setAnimalType(typeData);
 
-      // Initialize edit data structure with only Basic Info fields
       const initialEditData = {};
       const basicInfoCategory = typeData.categories.find(cat => cat.name === "Basic Info");
       if (basicInfoCategory) {
-        basicInfoCategory.fields.forEach(field => {
-          initialEditData[field.name] = "";
-        });
+        basicInfoCategory.fields.forEach(field => initialEditData[field.name] = "");
       }
       setEditData(initialEditData);
 
-      // Fetch animals of this type
       const animalsRes = await fetch(`http://localhost:5000/animals?type=${typeData._id}`);
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
       setAnimals(await animalsRes.json() || []);
-      
     } catch (err) {
       console.error("Fetch error:", err);
       setError(err.message);
@@ -64,22 +55,33 @@ export default function AnimalList() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [type]);
+  useEffect(() => { fetchData(); }, [type]);
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this animal?")) {
-      try {
-        const res = await fetch(`http://localhost:5000/animals/${id}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) throw new Error("Failed to delete animal");
-        fetchData();
-      } catch (err) {
-        setError(err.message);
-      }
+  // ------------------- POPUP -------------------
+  const showPopup = (message, success = true, type = "save") => {
+    setPopup({ show: true, message, success, type });
+    if (type === "save") {
+      setTimeout(() => setPopup({ ...popup, show: false }), 2500);
     }
+  };
+
+  const handleDelete = (id) => {
+    setPopup({
+      show: true,
+      message: "Are you sure you want to delete this animal?",
+      success: false,
+      type: "delete",
+      confirmAction: async () => {
+        try {
+          const res = await fetch(`http://localhost:5000/animals/${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error("Failed to delete animal");
+          fetchData();
+          showPopup("Animal deleted successfully!", true, "save");
+        } catch (err) {
+          showPopup(err.message, false, "error");
+        }
+      }
+    });
   };
 
   const handleEdit = (animal) => {
@@ -96,99 +98,69 @@ export default function AnimalList() {
       const res = await fetch(`http://localhost:5000/animals/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          data: editData,
-          updatedAt: Date.now()
-        }),
+        body: JSON.stringify({ data: editData, updatedAt: Date.now() }),
       });
-
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
         throw new Error(errorData?.message || "Failed to update animal");
       }
-
       const updatedAnimal = await res.json();
       setAnimals(prev => prev.map(a => a._id === id ? updatedAnimal : a));
       setEditId(null);
-      setError(null);
+      showPopup("Animal updated successfully!", true, "save");
     } catch (err) {
-      setError(err.message);
+      showPopup(err.message, false, "error");
     }
   };
 
-  if (loading) {
-    return (
-      <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
-        <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
-        <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
-          <TopNavbar onMenuClick={handleMenuClick} />
-          <div className="loading-container">
+  // ------------------- LOADING -------------------
+  if (loading) return (
+    <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+      <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+        <TopNavbar onMenuClick={handleMenuClick} />
+        <div className="loader-overlay">
+          <div className="loader-scene">
+            <div className="loader"></div>
             <p>Loading {type} data...</p>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
-        <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
-        <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
-          <TopNavbar onMenuClick={handleMenuClick} />
-          <div className="error-container">
-            <h2>Error Loading {type}</h2>
-            <p className="error-message">{error}</p>
-            <button 
-              className={`btn-retry ${darkMode ? "dark" : ""}`}
-              onClick={fetchData}
-            >
-              Retry
-            </button>
-            <button 
-              className={`btn-back ${darkMode ? "dark" : ""}`}
-              onClick={() => navigate('/AnimalManagement')}
-            >
-              Back to Animal Management
-            </button>
-          </div>
+  if (error) return (
+    <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+      <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+        <TopNavbar onMenuClick={handleMenuClick} />
+        <div className="error-container">
+          <h2>Error Loading {type}</h2>
+          <p className="error-message">{error}</p>
+          <button className={`btn-retry ${darkMode ? "dark" : ""}`} onClick={fetchData}>Retry</button>
+          <button className={`btn-back ${darkMode ? "dark" : ""}`} onClick={() => navigate('/AnimalManagement')}>Back</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (!animalType) {
-    return (
-      <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
-        <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
-        <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
-          <TopNavbar onMenuClick={handleMenuClick} />
-          <div className="error-container">
-            <h2>Animal Type Not Found</h2>
-            <p>The animal type "{type}" could not be loaded.</p>
-            <button 
-              className={`btn-back ${darkMode ? "dark" : ""}`}
-              onClick={() => navigate('/AnimalManagement')}
-            >
-              Back to Animal Management
-            </button>
-          </div>
+  if (!animalType) return (
+    <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
+      <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} type={type} />
+      <div className={`main-content-wrapper ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+        <TopNavbar onMenuClick={handleMenuClick} />
+        <div className="error-container">
+          <h2>Animal Type Not Found</h2>
+          <p>The animal type "{type}" could not be loaded.</p>
+          <button className={`btn-back ${darkMode ? "dark" : ""}`} onClick={() => navigate('/AnimalManagement')}>Back</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // Get only Basic Info fields to display as columns
   const basicInfoFields = [];
   const basicInfoCategory = animalType.categories?.find(cat => cat.name === "Basic Info");
-  if (basicInfoCategory) {
-    basicInfoCategory.fields?.forEach(field => {
-      basicInfoFields.push({
-        name: field.name,
-        label: field.label
-      });
-    });
-  }
+  if (basicInfoCategory) basicInfoCategory.fields?.forEach(field => basicInfoFields.push({ name: field.name, label: field.label }));
 
   return (
     <div className={`dashboard-container ${darkMode ? "dark" : ""}`}>
@@ -199,10 +171,7 @@ export default function AnimalList() {
         <main className="animal-list-page">
           <div className="header">
             <h2>{animalType.name} List</h2>
-            <button
-              className={`btn-add ${darkMode ? "dark" : ""}`}
-              onClick={() => navigate(`/add-animal/${animalType._id}`)}
-            >
+            <button className={`btn-add ${darkMode ? "dark" : ""}`} onClick={() => navigate(`/add-animal/${animalType._id}`)}>
               ➕ Add New {animalType.name}
             </button>
           </div>
@@ -212,77 +181,46 @@ export default function AnimalList() {
               <thead>
                 <tr>
                   <th>QR Code</th>
-                  {basicInfoFields.map((field, index) => (
-                    <th key={index}>{field.label}</th>
-                  ))}
+                  {basicInfoFields.map((field, idx) => <th key={idx}>{field.label}</th>)}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {animals.length === 0 ? (
-                  <tr>
-                    <td colSpan={basicInfoFields.length + 2} className="no-data">
-                      No {animalType.name} found.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={basicInfoFields.length + 2} className="no-data">No {animalType.name} found.</td></tr>
                 ) : (
                   animals.map(animal => (
                     <tr key={animal._id}>
-                      <td>
+                      <td style={{ textAlign: "center" }}>
                         {animal.qrCode ? (
-                          <QRCodeCanvas value={animal.qrCode} size={50} level="H" />
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>              
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <QRCodeCanvas value={animal.qrCode} size={80} level="H" />
+                            <span style={{ marginTop: "4px", fontSize: "0.8rem" }}>{animal.animalId || "-"}</span>
+                          </div>
+                        ) : <span>-</span>}
+                      </td>
                       {basicInfoFields.map((field, idx) => (
                         <td key={idx}>
                           {editId === animal._id ? (
                             <input
                               type={field.name.includes('date') ? 'date' : 'text'}
                               value={editData[field.name] || ''}
-                              onChange={(e) => setEditData({
-                                ...editData,
-                                [field.name]: e.target.value
-                              })}
+                              onChange={(e) => setEditData({ ...editData, [field.name]: e.target.value })}
                               className={darkMode ? "dark" : ""}
                             />
-                          ) : (
-                            animal.data[field.name] || "-"
-                          )}
+                          ) : (animal.data[field.name] || "-")}
                         </td>
                       ))}
-                      
                       <td>
                         {editId === animal._id ? (
                           <>
-                            <button
-                              className={`btn-save ${darkMode ? "dark" : ""}`}
-                              onClick={() => handleUpdate(animal._id)}
-                            >
-                              💾 Save
-                            </button>
-                            <button
-                              className={`btn-cancel ${darkMode ? "dark" : ""}`}
-                              onClick={() => setEditId(null)}
-                            >
-                              ✖ Cancel
-                            </button>
+                            <button className={`btn-listsave ${darkMode ? "dark" : ""}`} onClick={() => handleUpdate(animal._id)}>💾 Save</button>
+                            <button className={`btn-listcancel ${darkMode ? "dark" : ""}`} onClick={() => setEditId(null)}>✖ Cancel</button>
                           </>
                         ) : (
                           <>
-                            <button
-                              className={`btn-edit ${darkMode ? "dark" : ""}`}
-                              onClick={() => handleEdit(animal)}
-                            >
-                              ✏ Edit
-                            </button>
-                            <button
-                              className={`btn-delete ${darkMode ? "dark" : ""}`}
-                              onClick={() => handleDelete(animal._id)}
-                            >
-                              🗑 Delete
-                            </button>
+                            <button className={`btn-listedit ${darkMode ? "dark" : ""}`} onClick={() => handleEdit(animal)}>✏ Edit</button>
+                            <button className={`btn-listdelete ${darkMode ? "dark" : ""}`} onClick={() => handleDelete(animal._id)}>🗑 Delete</button>
                           </>
                         )}
                       </td>
@@ -294,6 +232,24 @@ export default function AnimalList() {
           </div>
         </main>
       </div>
+
+      {/* ✅ Animated Popup */}
+      {popup.show && (
+        <div className="popup-overlay">
+          <div className={`popup-box ${popup.success ? "success" : "error"} ${popup.type === "delete" ? "delete-popup" : ""}`}>
+            <p>{popup.message}</p>
+            {popup.type === "delete" && (
+              <div className="popup-actions">
+                <button className="btn-confirm" onClick={() => {
+                  popup.confirmAction?.();
+                  setPopup({ ...popup, show: false });
+                }}>Yes</button>
+                <button className="btn-cancel" onClick={() => setPopup({ ...popup, show: false })}>No</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

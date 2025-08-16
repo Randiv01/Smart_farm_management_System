@@ -444,6 +444,85 @@
   width: 100%;
 }
 
+/* Popup Overlay */
+.popup-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  background: rgba(0,0,0,0.4);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.popup-box {
+  background: #fff;
+  padding: 2rem 2.5rem;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 300px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  animation: popIn 0.4s ease;
+  pointer-events: all;
+}
+
+.popup-box.success { border-top: 6px solid #27ae60; }
+.popup-box.error { border-top: 6px solid #e74c3c; }
+
+.popup-box p {
+  margin-top: 1rem;
+  font-size: 1rem;
+  color: #333;
+  font-weight: 500;
+}
+
+/* ✅ Checkmark animation */
+.checkmark {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+  box-shadow: inset 0 0 0 #27ae60;
+  animation: fillGreen .4s ease forwards;
+}
+.checkmark::after {
+  content: "";
+  position: absolute;
+  left: 14px; top: 18px;
+  width: 12px; height: 24px;
+  border-right: 4px solid #fff;
+  border-bottom: 4px solid #fff;
+  transform: scale(0) rotate(45deg);
+  animation: checkStroke .4s .4s forwards;
+}
+@keyframes fillGreen { to { box-shadow: inset 0 0 0 30px #27ae60; } }
+@keyframes checkStroke { to { transform: scale(1) rotate(45deg); } }
+
+/* ❌ Cross animation */
+.crossmark {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: #e74c3c;
+  position: relative;
+}
+.crossmark::before,
+.crossmark::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 28px; height: 4px;
+  background: #fff;
+  transform-origin: center;
+  transform: translate(-50%, -50%) scale(0);
+  animation: crossStroke .3s forwards;
+}
+.crossmark::after { transform: translate(-50%, -50%) rotate(-45deg) scale(0); animation-delay: .2s; }
+.crossmark::before { transform: translate(-50%, -50%) rotate(45deg) scale(0); }
+@keyframes crossStroke { to { transform: translate(-50%, -50%) scale(1) rotate(var(--deg, 45deg)); } }
+
+@keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+
 /* ---------------- Responsive ---------------- */
 @media (max-width: 1200px) {
   .animal-cards {
@@ -564,4 +643,14 @@
   height: 300px;
   width: 80%;
   margin: 0 auto;
+}
+
+.animal-info .type-id {
+  padding: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: #555;
+  margin: 2px 0;
+}
+.dark .animal-info .type-id {
+  color: #d1d5db; /* lighter text for dark mode */
 }

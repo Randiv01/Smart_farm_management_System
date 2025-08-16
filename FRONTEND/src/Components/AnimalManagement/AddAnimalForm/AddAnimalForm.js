@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import TopNavbar from "../TopNavbar/TopNavbar.js";
 import Sidebar from "../Sidebar/Sidebar.js";
 import { useTheme } from '../contexts/ThemeContext.js';
+import { useLoader } from "../contexts/LoaderContext.js"; // <-- loader context
 import { QRCodeCanvas } from "qrcode.react";
 import { jsPDF } from "jspdf";
 import "./AddAnimalForm.css";
@@ -14,11 +15,12 @@ export default function AddAnimalForm() {
   const darkMode = theme === "dark";
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const { setLoading: setGlobalLoading } = useLoader(); // <-- loader context
+
   const [animalType, setAnimalType] = useState(null);
   const [formData, setFormData] = useState({});
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [qrData, setQrData] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
@@ -26,7 +28,7 @@ export default function AddAnimalForm() {
   useEffect(() => {
     const fetchAnimalType = async () => {
       try {
-        setLoading(true);
+        setGlobalLoading(true);
         const isObjectId = /^[0-9a-fA-F]{24}$/.test(type);
         const endpoint = isObjectId
           ? `http://localhost:5000/animal-types/${type}`
@@ -43,16 +45,16 @@ export default function AddAnimalForm() {
             initialData[field.name] = field.type === 'checkbox' ? false : "";
           });
         }
-        initialData.generateQR = true; // <-- initially checked
+        initialData.generateQR = true;
         setFormData(initialData);
       } catch (err) {
         setError(err.message);
       } finally {
-        setLoading(false);
+        setGlobalLoading(false);
       }
     };
     fetchAnimalType();
-  }, [type]);
+  }, [type, setGlobalLoading]);
 
   const handleChange = e => {
     const { name, value, type: inputType, checked } = e.target;
@@ -62,7 +64,7 @@ export default function AddAnimalForm() {
   const handleSubmit = async e => {
     e.preventDefault();
     try {
-      setLoading(true);
+      setGlobalLoading(true);
       const res = await fetch("http://localhost:5000/animals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,7 +85,7 @@ export default function AddAnimalForm() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setGlobalLoading(false);
     }
   };
 
@@ -105,7 +107,7 @@ export default function AddAnimalForm() {
   };
 
   if (error) return <div className="form-container">{error}</div>;
-  if (loading || !animalType) return <div className="form-container">Loading...</div>;
+  if (!animalType) return <div className="form-container">Loading...</div>;
 
   const basicCategory = animalType.categories.find(cat => cat.name === "Basic Info");
 
@@ -145,7 +147,6 @@ export default function AddAnimalForm() {
               </div>
             )}
 
-            {/* Generate QR Checkbox */}
             <div className="form-group checkbox-group">
               <input 
                 type="checkbox" 
@@ -157,7 +158,7 @@ export default function AddAnimalForm() {
               <label htmlFor="generateQR">Generate QR Code?</label>
             </div>
 
-            <button type="submit" disabled={loading} className="submit-btn">{loading ? "Adding..." : `Add ${animalType.name}`}</button>
+            <button type="submit" className="submit-btn">Add {animalType.name}</button>
           </form>
         </div>
 

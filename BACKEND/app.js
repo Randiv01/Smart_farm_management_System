@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import { animalRouter } from "./routes/animalRoutes.js";
 import { animalTypeRouter } from "./routes/animalTypeRoutes.js";
+import feedStockRouter from "./routes/feedStockRoutes.js";
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -26,6 +27,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Routes
 app.use("/animals", animalRouter);
 app.use("/animal-types", animalTypeRouter);
+app.use("/feed-stocks", feedStockRouter);
 
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, 'uploads');

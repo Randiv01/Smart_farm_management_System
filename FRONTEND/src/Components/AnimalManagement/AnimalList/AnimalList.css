@@ -105,7 +105,7 @@
 .animal-table th,
 .animal-table td {
   padding: 12px 15px;
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -166,10 +166,10 @@
 }
 
 /* Action buttons */
-.btn-edit,
-.btn-delete,
-.btn-save,
-.btn-cancel {
+.btn-listedit,
+.btn-listdelete,
+.btn-listsave,
+.btn-listcancel {
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
@@ -179,55 +179,55 @@
   transition: all 0.2s ease;
 }
 
-.btn-edit {
+.btn-listedit {
   background-color: #3182ce;
   color: white;
 }
 
-.btn-edit:hover {
+.btn-listedit:hover {
   background-color: #2c5282;
 }
 
-.btn-delete {
+.btn-listdelete {
   background-color: #e53e3e;
   color: white;
 }
 
-.btn-delete:hover {
+.btn-listdelete:hover {
   background-color: #c53030;
 }
 
-.btn-save {
+.btn-listsave {
   background-color: #38a169;
   color: white;
 }
 
-.btn-save:hover {
+.btn-listsave:hover {
   background-color: #2f855a;
 }
 
-.btn-cancel {
+.btn-listcancel {
   background-color: #718096;
   color: white;
 }
 
-.btn-cancel:hover {
+.btn-listcancel:hover {
   background-color: #4a5568;
 }
 
-.dark .btn-edit {
+.dark .btn-listedit {
   background-color: #4299e1;
 }
 
-.dark .btn-delete {
+.dark .btn-listdelete {
   background-color: #f56565;
 }
 
-.dark .btn-save {
+.dark .btn-listsave {
   background-color: #48bb78;
 }
 
-.dark .btn-cancel {
+.dark .btn-listcancel {
   background-color: #a0aec0;
 }
 
@@ -307,10 +307,71 @@
   background-color: #a0aec0;
 }
 
+/* QR code container inside table cell */
+.animal-qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* QR code itself */
+.animal-qr-container canvas {
+  max-width: 80px;
+  max-height: 80px;
+}
+
+/* Animal ID below QR code */
+.animal-qr-container span {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #333;
+}
+
+/* Dark mode adjustment */
+.dashboard-container.dark .animal-qr-container span {
+  color: #f9fafb;
+}
+
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
   .main-content-wrapper.sidebar-open {
     margin-left: 0;
+  }
+  
+  .animal-table th,
+  .animal-table td {
+    padding: 10px 12px;
+  font-size: 0.88rem;
+  }
+  
+  .btn-listedit,
+  .btn-listdelete,
+  .btn-listsave,
+  .btn-listcancel {
+    padding: 5px 10px;
+    font-size: 0.85rem;
+  }
+  
+  .animal-qr-container canvas {
+    max-width: 70px;
+    max-height: 70px;
+  }
+}
+
+@media (max-width: 992px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header h2 {
+    font-size: 1.3rem;
+  }
+  
+  .btn-add {
+    width: 100%;
+    justify-content: center;
   }
   
   .animal-table th,
@@ -319,11 +380,225 @@
     font-size: 0.85rem;
   }
   
+  .animal-table th:nth-child(3),
+  .animal-table td:nth-child(3),
+  .animal-table th:nth-child(4),
+  .animal-table td:nth-child(4) {
+    display: none;
+  }
+  
+  .animal-qr-container canvas {
+    max-width: 60px;
+    max-height: 60px;
+  }
+}
+
+@media (max-width: 768px) {
+  .animal-list-page {
+    padding: 15px;
+  }
+  
+  .header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .animal-table th,
+  .animal-table td {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+  
+  .animal-table th:nth-child(5),
+  .animal-table td:nth-child(5) {
+    display: none;
+  }
+  
+  .btn-listedit,
+  .btn-listdelete,
+  .btn-listsave,
+  .btn-listcancel {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    margin-right: 3px;
+  }
+  
+  .animal-qr-container canvas {
+    max-width: 50px;
+    max-height: 50px;
+  }
+  
+  .animal-qr-container span {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .animal-list-page {
+    padding: 10px;
+  }
+  
+  .header h2 {
+    font-size: 1.1rem;
+  }
+  
+  .btn-add {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+  
+  .animal-table {
+    font-size: 0.75rem;
+  }
+  
+  .animal-table th,
+  .animal-table td {
+    padding: 5px 6px;
+    font-size: 0.75rem;
+  }
+  
+  .animal-table th:nth-child(2),
+  .animal-table td:nth-child(2) {
+    display: none;
+  }
+  
   .btn-edit,
   .btn-delete,
   .btn-save,
   .btn-cancel {
-    padding: 4px 8px;
-    font-size: 0.8rem;
+    padding: 3px 6px;
+    font-size: 0.7rem;
   }
+  
+  .animal-qr-container canvas {
+    max-width: 40px;
+    max-height: 40px;
+  }
+  
+  .animal-qr-container span {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .animal-table th:nth-child(6),
+  .animal-table td:nth-child(6) {
+    display: none;
+  }
+  
+  .btn-listedit,
+  .btn-listdelete,
+  .btn-listsave,
+  .btn-listcancel {
+    display: block;
+    width: 100%;
+    margin-bottom: 3px;
+    margin-right: 0;
+  }
+  
+  .animal-table td:last-child {
+    min-width: 80px;
+  }
+}
+
+/* ------------------- Popup Overlay ------------------- */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* ------------------- Popup Box ------------------- */
+.popup-box {
+  background-color: #fff;
+  padding: 20px 25px;
+  border-radius: 12px;
+  width: 350px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  transform: scale(0.8);
+  animation: popIn 0.3s ease forwards;
+  font-family: 'Inter', sans-serif;
+  position: relative;
+}
+
+
+/* Success & Error Styles */
+.popup-box.success {
+  border-left: 6px solid #38a169;
+}
+.popup-box.error {
+  border-left: 6px solid #e53e3e;
+}
+
+/* Delete confirmation special */
+.popup-box.delete-popup {
+  border-left: 6px solid #d69e2e;
+}
+
+/* Popup message */
+.popup-box p {
+  margin: 0 0 15px 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* Popup actions (for delete) */
+.popup-actions {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.popup-actions .btn-confirm,
+.popup-actions .btn-cancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.popup-actions .btn-confirm {
+  background-color: #e53e3e;
+  color: #fff;
+}
+
+.popup-actions .btn-confirm:hover {
+  background-color: #c53030;
+}
+
+.popup-actions .btn-cancel {
+  background-color: #a0aec0;
+  color: #fff;
+}
+
+.popup-actions .btn-cancel:hover {
+  background-color: #718096;
+}
+
+/* Popup Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Optional fadeOut animation if needed */
+@keyframes popOut {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.8); opacity: 0; }
 }

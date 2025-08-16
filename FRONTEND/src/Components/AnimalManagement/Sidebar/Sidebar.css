@@ -1,4 +1,40 @@
-/* Sidebar.css */
+/* Sidebar brand/logo */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  flex-direction: column; /* stack logo and name vertically */
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.sidebar-logo {
+  width: 50px;
+  height: 50px;
+  margin-bottom: 10px;
+  border-radius: 8px; /* optional rounded corners */
+}
+
+.sidebar-title-container {
+  width: 100%;
+}
+
+.sidebar-title {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 5px;
+}
+
+.sidebar-title-underline {
+  border: none;
+  height: 2px;
+  background-color: #ffffff70; /* semi-transparent white bar */
+  width: 80%; /* adjust length of bar */
+  margin: 0 auto;
+}
+
+/* Sidebar basic styling (already existing) */
 .sidebar {
   width: 240px;
   background-color: #2e7d32;
@@ -12,12 +48,10 @@
   transition: all 0.3s ease;
 }
 
-
-
 .sidebar nav ul {
   list-style: none;
   padding: 0;
-  margin-top: 30px;
+  margin-top: 10px; /* less since brand has its own space */
 }
 
 .sidebar nav ul li {
@@ -38,4 +72,69 @@
 .sidebar.closed {
   width: 60px; /* Optional: shrink sidebar */
   overflow: hidden;
+}
+
+
+/* ================== Mobile Responsive ================== */
+@media screen and (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .sidebar-title {
+    font-size: 1rem;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    width: 180px;
+    left: -180px; /* hidden by default */
+    top: 0;
+    height: 100%;
+    z-index: 999;
+    padding: 15px;
+    transition: all 0.3s ease;
+  }
+
+  .sidebar.open {
+    left: 0; /* slide in when active */
+  }
+
+  .sidebar-title {
+    font-size: 0.95rem;
+  }
+
+  .sidebar-logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .sidebar nav ul li {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .sidebar {
+    width: 160px;
+    left: -160px; /* hidden */
+    padding: 10px;
+  }
+
+  .sidebar-logo {
+    width: 35px;
+    height: 35px;
+  }
+
+  .sidebar-title {
+    font-size: 0.85rem;
+  }
+
+  .sidebar nav ul li {
+    padding: 8px;
+    font-size: 0.85rem;
+  }
 }

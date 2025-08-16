@@ -59,28 +59,13 @@
   transition: background 0.3s ease;
 }
 
-.submit-btn:disabled {
-  background: #94d3a2;
-  cursor: not-allowed;
-}
-
-.submit-btn:hover:not(:disabled) {
+.submit-btn:hover {
   background: #218838;
 }
 
-.error-message {
-  margin-bottom: 1rem;
-  color: #d9534f;
-  font-weight: 600;
-}
-.success-message {
-  margin-bottom: 1rem;
-  color: #28a745;
-  font-weight: 600;
-  border: 1px solid #28a745;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  background: #d4edda;
+.submit-btn:disabled {
+  background: #94d3a2;
+  cursor: not-allowed;
 }
 
 .error-message {
@@ -92,120 +77,16 @@
   border-radius: 4px;
   background: #f8d7da;
 }
-/* Success Animation */
-.success-animation-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
 
-.success-animation {
-  position: relative;
-  width: 150px;
-  height: 150px;
+.success-message {
+  margin-bottom: 1rem;
+  color: #28a745;
+  font-weight: 600;
+  border: 1px solid #28a745;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: #d4edda;
 }
-
-.animation-circle {
-  width: 100%;
-  height: 100%;
-  background: #28a745;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transform: scale(0);
-  animation: scaleUp 0.5s forwards;
-}
-
-.check-icon {
-  color: white;
-  font-size: 70px;
-  animation: fadeIn 0.3s 0.3s forwards;
-  opacity: 0;
-}
-
-@keyframes scaleUp {
-  to {
-    transform: scale(1);
-  }
-}
-
-@keyframes fadeIn {
-  to {
-    opacity: 1;
-  }
-}
-
-/* Success Animation */
-.success-animation {
-  width: 100px;
-  height: 100px;
-  position: relative;
-  margin: 0 auto; /* center horizontally */
-}
-
-.animation-circle {
-  width: 100px;
-  height: 100px;
-  background: #48bb78;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transform: scale(0);
-  opacity: 0;
-}
-
-.animate .animation-circle {
-  animation: circleGrow 0.4s ease-out forwards;
-}
-
-.check-icon {
-  color: white;
-  font-size: 50px;
-  opacity: 0;
-  transform: scale(0);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0);
-}
-
-.animate .check-icon {
-  animation: checkAppear 0.3s ease 0.4s forwards; /* delay after circle grows */
-}
-
-@keyframes circleGrow {
-  0% { transform: scale(0); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes checkAppear {
-  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-}
-
-/* Center success popup content vertically */
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center; /* center vertically */
-  z-index: 1000;
-}
-
 
 /* Success Popup */
 .popup-overlay {
@@ -237,14 +118,8 @@
 }
 
 @keyframes popIn {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .popup-buttons {
@@ -300,10 +175,6 @@
   transform: translateY(-2px);
 }
 
-.button-icon {
-  font-size: 1rem;
-}
-
 /* QR display container in popup */
 .popup-qr-container {
   display: flex;
@@ -337,63 +208,17 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-/* Message Styles */
-.message {
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.5rem;
-  border-radius: 6px;
-  font-weight: 500;
-}
-
-.success-message {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.dark .success-message {
-  background: #22543d;
-  color: #c6f6d5;
-}
-
-.error-message {
-  background: #fed7d7;
-  color: #742a2a;
-}
-
-.dark .error-message {
-  background: #742a2a;
-  color: #fed7d7;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-  .form-row {
-    flex-direction: column;
-    gap: 0;
-  }
-  
-  .popup-buttons {
-    flex-direction: column;
-  }
-  
-  .popup-download-btn,
-  .popup-close-btn,
-  .popup-addmore-btn {
-    width: 100%;
-  }
-}
-
 /* Checkbox Styles */
 .form-group.checkbox-group {
-  display: flex;           /* horizontal layout */
-  flex-direction: row;     /* ensure row layout */
-  align-items: center;     /* vertically center checkbox and label */
-  gap: 0.5rem;             /* space between checkbox and label */
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .form-group.checkbox-group label {
-  margin: 0;               /* remove bottom margin */
-  cursor: pointer;         /* pointer on hover */
+  margin: 0;
+  cursor: pointer;
 }
 
 .form-group.checkbox-group input[type="checkbox"] {
@@ -443,3 +268,69 @@
   border-color: #48bb78;
 }
 
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .popup-buttons {
+    flex-direction: column;
+  }
+  
+  .popup-download-btn,
+  .popup-close-btn,
+  .popup-addmore-btn {
+    width: 100%;
+  }
+}
+
+/* Success Animation */
+.success-animation {
+  width: 100px;
+  height: 100px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.animation-circle {
+  width: 100px;
+  height: 100px;
+  background: #48bb78;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: scale(0);
+  opacity: 0;
+}
+
+.animate .animation-circle {
+  animation: circleGrow 0.4s ease-out forwards;
+}
+
+.check-icon {
+  color: white;
+  font-size: 50px;
+  opacity: 0;
+  transform: scale(0);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+}
+
+.animate .check-icon {
+  animation: checkAppear 0.3s ease 0.4s forwards;
+}
+
+@keyframes circleGrow {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes checkAppear {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}

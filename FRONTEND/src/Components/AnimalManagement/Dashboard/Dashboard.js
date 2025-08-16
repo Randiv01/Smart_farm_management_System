@@ -4,6 +4,7 @@ import Sidebar from "../Sidebar/Sidebar.js";
 import { Link, useNavigate } from "react-router-dom";
 import { Pie, Bar } from "react-chartjs-2";
 import { useTheme } from "../contexts/ThemeContext.js";
+import { useLoader } from "../contexts/LoaderContext.js";
 import axios from "axios";
 
 import {
@@ -40,13 +41,15 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [animalTypes, setAnimalTypes] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [imageInput, setImageInput] = useState({});
-
   const [totalAnimals, setTotalAnimals] = useState(0);
   const [totalCaretakers, setTotalCaretakers] = useState(2);
+
+  const { setLoading } = useLoader(); // global loader
+
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
 
   useEffect(() => {
     document.title = "Farm Animals Dashboard";
@@ -55,24 +58,33 @@ export default function Dashboard() {
 
   const handleMenuClick = () => setSidebarOpen(!sidebarOpen);
 
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => setPopup({ ...popup, show: false }), 2000);
+  };
+
   const fetchAnimalTypes = async () => {
     try {
+      setLoading(true);
       const typesRes = await axios.get("http://localhost:5000/animal-types");
       const types = typesRes.data;
 
-      const typesWithCounts = await Promise.all(types.map(async (type) => {
-        const countRes = await axios.get(`http://localhost:5000/animals/count?type=${type._id}`);
-        return {
-          ...type,
-          total: countRes.data.count || 0
-        };
-      }));
+      const typesWithCounts = await Promise.all(
+        types.map(async (type) => {
+          const countRes = await axios.get(`http://localhost:5000/animals/count?type=${type._id}`);
+          return {
+            ...type,
+            total: countRes.data.count || 0
+          };
+        })
+      );
 
       setAnimalTypes(typesWithCounts);
       const total = typesWithCounts.reduce((sum, type) => sum + type.total, 0);
       setTotalAnimals(total);
     } catch (err) {
       console.error(err);
+      showPopup("error", "Failed to fetch animal types");
     } finally {
       setLoading(false);
     }
@@ -88,9 +100,10 @@ export default function Dashboard() {
       setAnimalTypes(animalTypes.map((a) => (a._id === animal._id ? res.data : a)));
       setEditingId(null);
       setNameInput("");
+      showPopup("success", "Rename successful!");
     } catch (err) {
       console.error(err);
-      alert("Rename failed");
+      showPopup("error", "Rename failed!");
     }
   };
 
@@ -108,9 +121,10 @@ export default function Dashboard() {
       });
       setAnimalTypes(animalTypes.map((a) => (a._id === animal._id ? res.data : a)));
       setImageInput({ ...imageInput, [animal._id]: null });
+      showPopup("success", "Image updated successfully!");
     } catch (err) {
       console.error(err);
-      alert("Failed to update image");
+      showPopup("error", "Failed to update image");
     }
   };
 
@@ -120,21 +134,20 @@ export default function Dashboard() {
       await axios.delete(`http://localhost:5000/animal-types/${animal._id}`);
       setAnimalTypes(animalTypes.filter(a => a._id !== animal._id));
       fetchAnimalTypes();
+      showPopup("success", "Animal type deleted!");
     } catch (err) {
       console.error(err);
-      alert("Delete failed");
+      showPopup("error", "Delete failed");
     }
   };
 
   const generateColors = (count) => {
     const colors = [];
     const hueStep = 360 / count;
-    
     for (let i = 0; i < count; i++) {
       const hue = i * hueStep;
       colors.push(`hsl(${hue}, 70%, 60%)`);
     }
-    
     return colors;
   };
 
@@ -153,49 +166,46 @@ export default function Dashboard() {
   };
 
   const animalsOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: "right",
-      labels: {
-        color: darkMode ? '#f9fafb' : '#1f2937', // Explicit color setting
-        font: { size: 12 },
-        padding: 20,
-        generateLabels: (chart) => {
-          const data = chart.data.datasets[0].data;
-          const total = data.reduce((sum, val) => sum + val, 0);
-          return chart.data.labels.map((label, index) => {
-            const value = data[index];
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "right",
+        labels: {
+          color: darkMode ? '#f9fafb' : '#1f2937',
+          font: { size: 12 },
+          padding: 20,
+          generateLabels: (chart) => {
+            const data = chart.data.datasets[0].data;
+            const total = data.reduce((sum, val) => sum + val, 0);
+            return chart.data.labels.map((label, index) => {
+              const value = data[index];
+              const percent = total ? Math.round((value / total) * 100) : 0;
+              return {
+                text: `${label}: ${percent}% (${value})`,
+                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                strokeStyle: chart.data.datasets[0].borderColor,
+                fontColor: darkMode ? '#f9fafb' : '#1f2937',
+                index
+              };
+            });
+          }
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const data = context.dataset.data;
+            const total = data.reduce((sum, val) => sum + val, 0);
+            const value = context.raw;
             const percent = total ? Math.round((value / total) * 100) : 0;
-            return {
-              text: `${label}: ${percent}% (${value})`,
-              fillStyle: chart.data.datasets[0].backgroundColor[index],
-              strokeStyle: chart.data.datasets[0].borderColor,
-              fontColor: darkMode ? '#f9fafb' : '#1f2937', // Explicit font color
-              index
-            };
-          });
+            return `${context.label}: ${value} (${percent}%)`;
+          }
         }
       }
     },
-    tooltip: {
-      callbacks: {
-        label: function(context) {
-          const data = context.dataset.data;
-          const total = data.reduce((sum, val) => sum + val, 0);
-          const value = context.raw;
-          const percent = total ? Math.round((value / total) * 100) : 0;
-          return `${context.label}: ${value} (${percent}%)`;
-        }
-      }
-    }
-  },
-  animation: {
-    animateRotate: true,
-    animateScale: true
-  }
-};
+    animation: { animateRotate: true, animateScale: true }
+  };
 
   const healthData = {
     labels: ["Healthy", "Monitoring", "Treatment", "Recovery"],
@@ -233,84 +243,75 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {loading ? (
-            <div className="loading-spinner">
-              <div className="spinner"></div>
-              <p>Loading animal types...</p>
-            </div>
-          ) : (
-            <div className="animal-cards">
-              {animalTypes.map((animal, index) => (
-                <div className={`animal-card ${darkMode ? "dark" : ""}`} key={animal._id}>
-                  <div className="image-wrapper">
-                    <img
-                      src={animal.bannerImage ? `http://localhost:5000${animal.bannerImage}` : "/images/default.jpg"}
-                      alt={animal.name}
-                      onClick={() => document.getElementById(`file-${animal._id}`).click()}
-                    />
-                    <input
-                      type="file"
-                      id={`file-${animal._id}`}
-                      style={{ display: "none" }}
-                      accept="image/*"
-                      onChange={(e) => handleImageChange(e, animal)}
-                    />
-                    {imageInput[animal._id] && (
-                      <button className="btn-upload" onClick={() => handleImageSubmit(animal)}>
-                        <span className="btn-icon">↑</span> Upload
-                      </button>
-                    )}
-                  </div>
+          <div className="animal-cards">
+            {animalTypes.map((animal, index) => (
+              <div className={`animal-card ${darkMode ? "dark" : ""}`} key={animal._id}>
+                <div className="image-wrapper">
+                  <img
+                    src={animal.bannerImage ? `http://localhost:5000${animal.bannerImage}` : "/images/default.jpg"}
+                    alt={animal.name}
+                    onClick={() => document.getElementById(`file-${animal._id}`).click()}
+                  />
+                  <input
+                    type="file"
+                    id={`file-${animal._id}`}
+                    style={{ display: "none" }}
+                    accept="image/*"
+                    onChange={(e) => handleImageChange(e, animal)}
+                  />
+                  {imageInput[animal._id] && (
+                    <button className="btn-upload" onClick={() => handleImageSubmit(animal)}>
+                      <span className="btn-icon">↑</span> Upload
+                    </button>
+                  )}
+                </div>
 
-                  <div className="animal-info">
-                    {editingId === animal._id ? (
-                      <div className="edit-container">
-                        <input 
-                          value={nameInput} 
-                          onChange={(e) => setNameInput(e.target.value)} 
-                          className="inline-input" 
-                          autoFocus
-                        />
-                        <div className="edit-buttons">
-                          <button className="btn-cardsave" onClick={() => handleRename(animal)}>
-                            <span className="btn-icon">✓</span>
-                          </button>
-                          <button className="btn-cardcancel" onClick={() => setEditingId(null)}>
-                            <span className="btn-icon">×</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="name-container">
-                        <h5>{animal.name}</h5>
-                        <button 
-                          className="btn-cardedit" 
-                          onClick={() => { 
-                            setEditingId(animal._id); 
-                            setNameInput(animal.name); 
-                          }}
-                        >
-                          <span className="btn-icon">✎</span>
+                <div className="animal-info">
+                  {editingId === animal._id ? (
+                    <div className="edit-container">
+                      <input 
+                        value={nameInput} 
+                        onChange={(e) => setNameInput(e.target.value)} 
+                        className="inline-input" 
+                        autoFocus
+                      />
+                      <div className="edit-buttons">
+                        <button className="btn-cardsave" onClick={() => handleRename(animal)}>
+                          <span className="btn-icon">✓</span>
+                        </button>
+                        <button className="btn-cardcancel" onClick={() => setEditingId(null)}>
+                          <span className="btn-icon">×</span>
                         </button>
                       </div>
-                    )}
-                    <p>Total {animal.name}: {animal.total}</p>
-                  </div>
-
-                  <div className="animal-card-footer">
-                    <Link to={`/AnimalManagement/${animal.name.toLowerCase()}`}>
-                      <button className="btn-view-details">
-                        <span className="btn-icon">→</span> View Details
+                    </div>
+                  ) : (
+                    <div className="name-container">
+                      <h5>{animal.name}</h5>
+                      <button 
+                        className="btn-cardedit" 
+                        onClick={() => { setEditingId(animal._id); setNameInput(animal.name); }}
+                      >
+                        <span className="btn-icon">✎</span>
                       </button>
-                    </Link>
-                    <button className="btn-carddelete" onClick={() => handleDelete(animal)}>
-                      <span className="btn-icon">🗑</span>
-                    </button>
-                  </div>
+                    </div>
+                  )}
+                  <p className="type-id">TypeID: {animal.typeId}</p>
+                  <p>Total {animal.name}: {animal.total}</p>
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div className="animal-card-footer">
+                  <Link to={`/AnimalManagement/${animal.name.toLowerCase()}`}>
+                    <button className="btn-view-details">
+                      <span className="btn-icon">→</span> View Details
+                    </button>
+                  </Link>
+                  <button className="btn-carddelete" onClick={() => handleDelete(animal)}>
+                    <span className="btn-icon">🗑</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div className={`summary-row ${darkMode ? "dark" : ""}`}>
             <div className="summary-item">
@@ -328,52 +329,51 @@ export default function Dashboard() {
           </div>
         </section>
 
-         <section className="charts">
-            <div className="chart">
-              <h4>Overview of Farm Animals</h4>
-              <div className="chart-container">
-                <Pie 
-                  data={animalsData} 
-                  options={animalsOptions}
-                />
-              </div>
+        <section className="charts">
+          <div className="chart">
+            <h4>Overview of Farm Animals</h4>
+            <div className="chart-container">
+              <Pie data={animalsData} options={animalsOptions} />
             </div>
-            <div className="chart">
-              <h4>Animal Health Status Summary</h4>
-              <div className="chart-container">
-                <Bar 
-                  data={healthData} 
-                  options={{
-                    responsive: true,
-                    plugins: {
-                      legend: {
-                        display: false
-                      }
+          </div>
+          <div className="chart">
+            <h4>Animal Health Status Summary</h4>
+            <div className="chart-container">
+              <Bar 
+                data={healthData} 
+                options={{
+                  responsive: true,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: {
+                      grid: { color: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
+                      ticks: { color: darkMode ? '#f9fafb' : '#1f2937' }
                     },
-                    scales: {
-                      x: {
-                        grid: {
-                          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                        },
-                        ticks: {
-                          color: darkMode ? '#f9fafb' : '#1f2937'
-                        }
-                      },
-                      y: {
-                        grid: {
-                          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                        },
-                        ticks: {
-                          color: darkMode ? '#f9fafb' : '#1f2937'
-                        }
-                      }
+                    y: {
+                      grid: { color: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
+                      ticks: { color: darkMode ? '#f9fafb' : '#1f2937' }
                     }
-                  }}
-                />
-              </div>
+                  }
+                }}
+              />
             </div>
-          </section>
+          </div>
+        </section>
       </main>
+
+      {/* Popup Notification */}
+      {popup.show && (
+        <div className={`popup-overlay ${popup.show ? "show" : ""}`}>
+          <div className={`popup-box ${popup.type}`}>
+            {popup.type === "success" ? (
+              <div className="checkmark"></div>
+            ) : (
+              <div className="crossmark"></div>
+            )}
+            <p>{popup.message}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

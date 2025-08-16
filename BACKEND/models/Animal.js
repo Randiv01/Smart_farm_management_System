@@ -6,6 +6,7 @@ const animalSchema = new mongoose.Schema({
     ref: 'AnimalType', 
     required: true 
   },
+  animalId: { type: String, required: true, unique: true }, // NEW: Auto-generated AnimalID
   data: { 
     type: mongoose.Schema.Types.Mixed, 
     required: true 

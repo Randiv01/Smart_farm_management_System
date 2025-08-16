@@ -13,20 +13,22 @@ const TopNavbar = ({ onMenuClick }) => {
 
   return (
     <header
-      className={`fixed top-0 left-60 right-0 h-16 flex items-center px-4 md:px-6 z-10 transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-b border-gray-700 shadow-md' : 'bg-white border-b border-gray-200 shadow-sm'}
-      `}
+      className={`fixed top-0 left-0 right-0 h-16 flex items-center px-4 md:px-6 z-30 transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-b border-gray-700 shadow-md' : 'bg-white border-b border-gray-200 shadow-sm'}`}
     >
       <div className="flex items-center justify-between w-full">
         {/* Left Section */}
-        <div className="flex items-center">
-          <button
-            onClick={onMenuClick}
-            className={`p-2 rounded-md ${darkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-600'} md:hidden`}
-          >
-            <MenuIcon size={24} />
-          </button>
-          <h2 className={`ml-2 md:ml-0 text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+        <div className="flex items-center" style={{ paddingLeft: '240px' }}>
+          {/* Menu Button: Always visible on mobile */}
+         <button
+              onClick={onMenuClick}
+              className={`absolute left-[185px] top-3 p-2 rounded-md mr-2 md:hidden z-40 ${
+                darkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-600'
+              }`}
+            >
+              <MenuIcon size={24} />
+            </button>
+          <h2 className={`text-xl font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
             {t('dashboard.title')}
           </h2>
         </div>
@@ -54,7 +56,7 @@ const TopNavbar = ({ onMenuClick }) => {
               <span className="absolute top-1 right-1 bg-[#E67E22] rounded-full w-2 h-2"></span>
             </button>
             {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 z-50 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <div className={`absolute right-0 mt-2 w-72 sm:w-80 rounded-md shadow-lg py-1 z-50 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                 <div className={`px-4 py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                   <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                     {t('notifications.title')}
@@ -85,13 +87,13 @@ const TopNavbar = ({ onMenuClick }) => {
               <div className={`rounded-full p-1 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                 <UserIcon size={18} className={darkMode ? 'text-gray-200' : 'text-gray-600'} />
               </div>
-              <span className={`hidden md:inline text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+              <span className={`hidden sm:inline text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                 John Farmer
               </span>
               <ChevronDownIcon size={16} className={darkMode ? 'text-white' : 'text-gray-600'} />
             </button>
             {userMenuOpen && (
-              <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <div className={`absolute right-0 mt-2 w-40 sm:w-48 rounded-md shadow-lg py-1 z-50 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                 <a href="#" className={`block px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}>
                   {t('user.profile')}
                 </a>
