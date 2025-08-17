@@ -1,15 +1,15 @@
 import './App.css';
 import Home from './Components/Home/Home.js';
 import { Routes, Route } from 'react-router-dom';
-import Dashboard from './Components/AnimalManagement/Dashboard/Dashboard.js';
-import AnimalList from './Components/AnimalManagement/AnimalList/AnimalList.js';
-import AddAnimalForm from './Components/AnimalManagement/AddAnimalForm/AddAnimalForm.js';
-import FarmDesigner from './Components/AnimalManagement/FarmDesigner/FarmDesigner.js'; // <-- New import
+import Dashboard from './Components/AnimalManagement/Dashboard/Dashboard.jsx';
+import AnimalList from './Components/AnimalManagement/AnimalList/AnimalList.jsx';
+import AddAnimalForm from './Components/AnimalManagement/AddAnimalForm/AddAnimalForm.jsx';
+import FarmDesigner from './Components/AnimalManagement/FarmDesigner/FarmDesigner.jsx'; // <-- New import
 import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
 import FeedingScheduler from './Components/AnimalManagement/FeedingScheduler/FeedingScheduler.js';
-import AddAnimalType from './Components/AnimalManagement/AddAnimalType/AddAnimalType.js';
-import FeedStock from './Components/AnimalManagement/FeedStocks/FeedStocks.js';
-import AnimalHealth from './Components/AnimalManagement/AnimalHealth/AnimalHealth.js';
+import AddAnimalType from './Components/AnimalManagement/AddAnimalType/AddAnimalType.jsx';
+import FeedStock from './Components/AnimalManagement/FeedStocks/FeedStocks.jsx';
+import AnimalHealth from './Components/AnimalManagement/AnimalHealth/AnimalHealth.jsx';
 import HealthReport from './Components/AnimalManagement/HealthReport/HealthReport.js';
 import { LoaderProvider } from './Components/AnimalManagement/contexts/LoaderContext.js';
 

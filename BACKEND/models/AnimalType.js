@@ -3,7 +3,9 @@ import mongoose from 'mongoose';
 const fieldSchema = new mongoose.Schema({
   name: { type: String, required: true },
   label: { type: String, required: true },
-  type: { type: String, enum: ['text', 'number', 'date', 'select'], default: 'text' },
+  type: { type: String, enum: ['text', 'number', 'date', 'time', 'datetime', 'select', 'checkbox', 'tel'], default: 'text' 
+},
+
   options: { type: [String], default: [] } // Only used if type === 'select'
 });
 
