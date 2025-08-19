@@ -4,6 +4,7 @@ import cors from "cors";
 import { animalRouter } from "./routes/animalRoutes.js";
 import { animalTypeRouter } from "./routes/animalTypeRoutes.js";
 import feedStockRouter from "./routes/feedStockRoutes.js";
+import zonesRouter from "./routes/zoneRoutes.js";
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -28,6 +29,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use("/animals", animalRouter);
 app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
+app.use("/zones", zonesRouter);
 
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, 'uploads');

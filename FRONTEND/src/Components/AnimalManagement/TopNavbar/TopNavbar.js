@@ -1,45 +1,49 @@
-import React, { useState } from 'react';
-import { MenuIcon, BellIcon, ChevronDownIcon, UserIcon, SunIcon, MoonIcon } from 'lucide-react';
-import LanguageSelector from '../UI/UI/LanguageSelector.js';
-import { useLanguage } from '../contexts/LanguageContext.js';
-import { useTheme } from '../contexts/ThemeContext.js';
+import React, { useState } from "react";
+import { MenuIcon, BellIcon, ChevronDownIcon, UserIcon, SunIcon, MoonIcon } from "lucide-react";
+import LanguageSelector from "../UI/UI/LanguageSelector.js";
+import { useLanguage } from "../contexts/LanguageContext.js";
+import { useTheme } from "../contexts/ThemeContext.js";
 
-const TopNavbar = ({ onMenuClick }) => {
+const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   const { theme, toggleTheme } = useTheme();
-  const darkMode = theme === 'dark';
+  const darkMode = theme === "dark";
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { t } = useLanguage();
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 h-16 flex items-center px-4 md:px-6 z-30 transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-b border-gray-700 shadow-md' : 'bg-white border-b border-gray-200 shadow-sm'}`}
+      className={`
+        fixed top-0 left-0 right-0 h-16 flex items-center z-30 transition-all duration-300
+        ${darkMode ? "bg-gray-900 border-b border-gray-700 shadow-md" : "bg-white border-b border-gray-200 shadow-sm"}
+        ${sidebarOpen ? "lg:pl-64 lg:ml-0" : "lg:pl-20"}   // ✅ responsive
+        pl-4 pr-4 md:pr-6
+      `}
     >
       <div className="flex items-center justify-between w-full">
-        {/* Left Section */}
-        <div className="flex items-center" style={{ paddingLeft: '240px' }}>
-          {/* Menu Button: Always visible on mobile */}
-         <button
-              onClick={onMenuClick}
-              className={`absolute left-[185px] top-3 p-2 rounded-md mr-2 md:hidden z-40 ${
-                darkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-600'
-              }`}
-            >
-              <MenuIcon size={24} />
-            </button>
-          <h2 className={`text-xl font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-            {t('dashboard.title')}
+        {/* Left Side */}
+        <div className="flex items-center">
+          {/* Toggle Sidebar */}
+          <button
+            onClick={onMenuClick}
+            className={`p-2 rounded-md mr-2 ${
+              darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-600"
+            }`}
+          >
+            <MenuIcon size={24} />
+          </button>
+
+          <h2 className={`text-lg md:text-xl font-semibold truncate ${darkMode ? "text-white" : "text-gray-800"}`}>
+            {t("dashboard.title", { defaultValue: "Animal Management Dashboard" })}
           </h2>
         </div>
 
-        {/* Right Section */}
+        {/* Right Side */}
         <div className="flex items-center space-x-2">
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-md ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-            aria-label="Toggle Dark Mode"
+            className={`p-2 rounded-md ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
           >
             {darkMode ? <SunIcon size={20} className="text-yellow-300" /> : <MoonIcon size={20} className="text-gray-600" />}
           </button>
@@ -49,62 +53,28 @@ const TopNavbar = ({ onMenuClick }) => {
           {/* Notifications */}
           <div className="relative">
             <button
-              className={`p-2 rounded-full relative ${darkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-600'}`}
+              className={`p-2 rounded-full relative ${darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-600"}`}
               onClick={() => setNotificationsOpen(!notificationsOpen)}
             >
               <BellIcon size={20} />
               <span className="absolute top-1 right-1 bg-[#E67E22] rounded-full w-2 h-2"></span>
             </button>
-            {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-72 sm:w-80 rounded-md shadow-lg py-1 z-50 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                <div className={`px-4 py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                    {t('notifications.title')}
-                  </h3>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  <a href="#" className={`px-4 py-3 flex ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
-                    <div className="w-full">
-                      <p className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                        {t('notifications.healthAlert')}
-                      </p>
-                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {t('notifications.temperatureAbove')}
-                      </p>
-                    </div>
-                  </a>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* User Menu */}
           <div className="relative">
             <button
-              className={`flex items-center space-x-2 p-2 rounded-md ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              className={`flex items-center space-x-2 p-2 rounded-md ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
               onClick={() => setUserMenuOpen(!userMenuOpen)}
             >
-              <div className={`rounded-full p-1 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                <UserIcon size={18} className={darkMode ? 'text-gray-200' : 'text-gray-600'} />
+              <div className={`rounded-full p-1 ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
+                <UserIcon size={18} className={darkMode ? "text-gray-200" : "text-gray-600"} />
               </div>
-              <span className={`hidden sm:inline text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+              <span className={`hidden sm:inline text-sm font-medium truncate ${darkMode ? "text-white" : "text-gray-800"}`}>
                 John Farmer
               </span>
-              <ChevronDownIcon size={16} className={darkMode ? 'text-white' : 'text-gray-600'} />
+              <ChevronDownIcon size={16} className={darkMode ? "text-white" : "text-gray-600"} />
             </button>
-            {userMenuOpen && (
-              <div className={`absolute right-0 mt-2 w-40 sm:w-48 rounded-md shadow-lg py-1 z-50 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                <a href="#" className={`block px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}>
-                  {t('user.profile')}
-                </a>
-                <a href="#" className={`block px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}>
-                  {t('user.settings')}
-                </a>
-                <a href="#" className={`block px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100'}`}>
-                  {t('user.signOut')}
-                </a>
-              </div>
-            )}
           </div>
         </div>
       </div>

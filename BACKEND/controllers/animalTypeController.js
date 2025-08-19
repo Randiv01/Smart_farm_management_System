@@ -9,17 +9,22 @@ const __dirname = path.dirname(__filename);
 // Create new animal type with auto-generated TypeID
 export const createAnimalType = async (req, res) => {
   try {
-    const { name, categories } = req.body;
+    const { name, managementType, caretakers, categories, caretakerName } = req.body;
 
     if (!name || !categories) {
-      return res.status(400).json({ message: "Name and categories are required", received: { name, categories } });
+      return res.status(400).json({ 
+        message: "Name and categories are required", 
+        received: { name, categories } 
+      });
     }
 
-    // Parse categories
+    // Parse categories and caretakers if they're strings
     let parsedCategories;
-    try {
-      parsedCategories = JSON.parse(categories);
+    let parsedCaretakers = [];
 
+    try {
+      parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
+      
       // Validate fields & add default options for select type
       parsedCategories.forEach(category => {
         category.fields.forEach(field => {
@@ -30,8 +35,16 @@ export const createAnimalType = async (req, res) => {
         });
       });
 
+      // Parse caretakers if provided
+      if (caretakers) {
+        parsedCaretakers = typeof caretakers === 'string' ? JSON.parse(caretakers) : caretakers;
+      }
+
     } catch (e) {
-      return res.status(400).json({ message: "Invalid categories format", error: e.message, receivedCategories: categories });
+      return res.status(400).json({ 
+        message: "Invalid data format", 
+        error: e.message 
+      });
     }
 
     // Handle file upload
@@ -51,8 +64,11 @@ export const createAnimalType = async (req, res) => {
     const animalType = new AnimalType({
       name: name.toLowerCase(),
       typeId,
+      managementType: managementType || 'individual',
       bannerImage,
-      categories: parsedCategories
+      categories: parsedCategories,
+      caretakers: parsedCaretakers,
+      caretakerName: caretakerName || ''
     });
 
     await animalType.save();
@@ -70,11 +86,14 @@ export const createAnimalType = async (req, res) => {
 // Get all animal types
 export const getAllAnimalTypes = async (req, res) => {
   try {
-    const animalTypes = await AnimalType.find();
+    const animalTypes = await AnimalType.find().select('-__v');
     res.json(animalTypes);
   } catch (error) {
     console.error("Error fetching animal types:", error);
-    res.status(500).json({ message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
+    res.status(500).json({ 
+      message: error.message, 
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
 
@@ -85,46 +104,69 @@ export const getAnimalTypeByIdOrName = async (req, res) => {
     let animalType;
 
     if (/^[0-9a-fA-F]{24}$/.test(identifier)) {
-      animalType = await AnimalType.findById(identifier);
+      animalType = await AnimalType.findById(identifier).select('-__v');
     } else {
-      animalType = await AnimalType.findOne({ name: { $regex: new RegExp(`^${identifier}$`, 'i') } });
+      animalType = await AnimalType.findOne({ 
+        name: { $regex: new RegExp(`^${identifier}$`, 'i') } 
+      }).select('-__v');
     }
 
     if (!animalType) return res.status(404).json({ message: 'Animal type not found' });
-
     res.json(animalType);
 
   } catch (error) {
     console.error("Error fetching animal type:", error);
-    res.status(500).json({ message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
+    res.status(500).json({ 
+      message: error.message, 
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
 
 // Update animal type
 export const updateAnimalType = async (req, res) => {
   try {
-    const { name, categories } = req.body;
+    const { name, managementType, caretakers, categories, caretakerName } = req.body;
+    
     let parsedCategories;
+    let parsedCaretakers;
+    
     if (categories && typeof categories === 'string') {
       try {
         parsedCategories = JSON.parse(categories);
-
-        // Validate fields & add default options for select type
         parsedCategories.forEach(category => {
           category.fields.forEach(field => {
             if (!field.name || !field.label) throw new Error("Each field must have a name and label");
-            if (field.type === 'select' && (!field.options || !Array.isArray(field.options))) field.options = [];
+            if (field.type === 'select' && (!field.options || !Array.isArray(field.options))) {
+              field.options = [];
+            }
           });
         });
-
       } catch (parseError) {
-        return res.status(400).json({ message: "Invalid categories format", error: parseError.message });
+        return res.status(400).json({ 
+          message: "Invalid categories format", 
+          error: parseError.message 
+        });
       }
     }
 
-    const updateData = { 
+    if (caretakers && typeof caretakers === 'string') {
+      try {
+        parsedCaretakers = JSON.parse(caretakers);
+      } catch (parseError) {
+        return res.status(400).json({ 
+          message: "Invalid caretakers format", 
+          error: parseError.message 
+        });
+      }
+    }
+
+    const updateData = {
       name: name ? name.toLowerCase() : undefined,
-      categories: parsedCategories || categories
+      managementType,
+      categories: parsedCategories || categories,
+      caretakers: parsedCaretakers || caretakers,
+      caretakerName: caretakerName !== undefined ? caretakerName : undefined
     };
 
     // Update banner image if uploaded
@@ -137,16 +179,26 @@ export const updateAnimalType = async (req, res) => {
       updateData.bannerImage = `/uploads/${req.file.filename}`;
     }
 
-    Object.keys(updateData).forEach(key => { if (updateData[key] === undefined) delete updateData[key]; });
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) delete updateData[key];
+    });
 
-    const updatedType = await AnimalType.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    const updatedType = await AnimalType.findByIdAndUpdate(
+      req.params.id, 
+      updateData, 
+      { new: true, runValidators: true }
+    ).select('-__v');
+    
     if (!updatedType) return res.status(404).json({ message: 'Animal type not found' });
-
     res.json(updatedType);
 
   } catch (error) {
     console.error("Error updating animal type:", error);
-    res.status(400).json({ message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
+    res.status(400).json({ 
+      message: error.message, 
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
 
@@ -166,6 +218,9 @@ export const deleteAnimalType = async (req, res) => {
 
   } catch (error) {
     console.error("Error deleting animal type:", error);
-    res.status(500).json({ message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
+    res.status(500).json({ 
+      message: error.message, 
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
