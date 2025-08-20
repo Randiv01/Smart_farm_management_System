@@ -17,8 +17,9 @@ import {
     Tooltip,
     Legend
 } from "chart.js";
-import { FiEdit2, FiTrash2, FiPlus, FiX, FiCheck, FiUpload, FiSearch } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiPlus, FiX, FiCheck, FiUpload, FiSearch, FiAlertCircle } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import Loader from '../Loader/Loader.js';  // Import the Loader component // Import the Loader component
 
 // Register necessary chart.js components and plugins
 ChartJS.register(CategoryScale, LinearScale, ArcElement, BarElement, Title, Tooltip, Legend, ChartDataLabels);
@@ -46,6 +47,8 @@ export default function Dashboard() {
     const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
     const [confirmDelete, setConfirmDelete] = useState({ show: false, animal: null });
     const [searchTerm, setSearchTerm] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
 
     // Intersection Observer hooks for chart animations
     const { ref: pieRef, inView: pieInView } = useInView({ triggerOnce: true, threshold: 0.3 });
@@ -84,6 +87,8 @@ export default function Dashboard() {
     const fetchAnimalTypes = async () => {
         // Set loading state to true before starting the API call
         setLoading(true);
+        setIsLoading(true);
+        setFetchError(null);
         try {
             const res = await axios.get("http://localhost:5000/animal-types");
             const types = await Promise.all(
@@ -95,10 +100,13 @@ export default function Dashboard() {
             setAnimalTypes(types);
             setTotalAnimals(types.reduce((sum, t) => sum + t.total, 0));
         } catch (err) {
+            console.error("Failed to fetch animal types:", err);
+            setFetchError("Failed to fetch animal types. Please try again later.");
             showPopup("error", "Failed to fetch animal types");
         } finally {
             // Set loading state to false after the API call completes (either success or error)
             setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -141,29 +149,29 @@ export default function Dashboard() {
     };
 
     /**
- * Handles the update of a caretaker name.
- */
-const handleUpdateCaretaker = async (animal) => {
-    if (!caretakerInput.trim()) return;
-    
-    try {
-        // Create updated caretakers array - update the first caretaker's name
-        const updatedCaretakers = animal.caretakers && animal.caretakers.length > 0
-            ? [{ ...animal.caretakers[0], name: caretakerInput }]
-            : [{ id: Date.now().toString(), name: caretakerInput, mobile: "" }];
-
-        const res = await axios.put(`http://localhost:5000/animal-types/${animal._id}`, { 
-            caretakers: updatedCaretakers 
-        });
+     * Handles the update of a caretaker name.
+     */
+    const handleUpdateCaretaker = async (animal) => {
+        if (!caretakerInput.trim()) return;
         
-        setAnimalTypes(animalTypes.map(a => a._id === animal._id ? res.data : a));
-        setEditingCaretakerId(null);
-        setCaretakerInput("");
-        showPopup("success", "Caretaker updated!");
-    } catch {
-        showPopup("error", "Caretaker update failed!");
-    }
-};
+        try {
+            // Create updated caretakers array - update the first caretaker's name
+            const updatedCaretakers = animal.caretakers && animal.caretakers.length > 0
+                ? [{ ...animal.caretakers[0], name: caretakerInput }]
+                : [{ id: Date.now().toString(), name: caretakerInput, mobile: "" }];
+
+            const res = await axios.put(`http://localhost:5000/animal-types/${animal._id}`, { 
+                caretakers: updatedCaretakers 
+            });
+            
+            setAnimalTypes(animalTypes.map(a => a._id === animal._id ? res.data : a));
+            setEditingCaretakerId(null);
+            setCaretakerInput("");
+            showPopup("success", "Caretaker updated!");
+        } catch {
+            showPopup("error", "Caretaker update failed!");
+        }
+    };
 
     /**
      * Handles the selection of a new image file.
@@ -391,18 +399,37 @@ const handleUpdateCaretaker = async (animal) => {
         visible: { opacity: 1, y: 0 }
     };
 
+    // Show loader while data is being fetched
+    if (isLoading) {
+        return <Loader darkMode={darkMode} />;
+    }
+
     return (
         <div className="pb-10" style={{ backgroundColor: darkMode ? "#1f2937" : "#f7e9cb" }}>
-            {/* Farm Overview */}
-            {animalTypes.length > 0 && (
-                <section className={`rounded-2xl p-4 sm:p-6 mb-6 ${darkMode ? "bg-dark-card" : "bg-white"} shadow-lg transition-all duration-300`}>
-                    <div className="flex flex-wrap justify-between items-center mb-4 sm:mb-6 gap-4">
-                        <div>
-                            <h4 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">Farm Overview</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Manage your animal types and view statistics</p>
-                        </div>
+            {/* Show error message if fetch failed */}
+            {fetchError && (
+                <div className={`p-4 mb-6 rounded-xl ${darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-800"} flex items-center gap-3`}>
+                    <FiAlertCircle className="text-xl" />
+                    <p>{fetchError}</p>
+                    <button 
+                        onClick={fetchAnimalTypes}
+                        className="ml-auto px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
 
-                        <div className="flex gap-3 items-center">
+            {/* Farm Overview */}
+            <section className={`rounded-2xl p-4 sm:p-6 mb-6 ${darkMode ? "bg-dark-card" : "bg-white"} shadow-lg transition-all duration-300`}>
+                <div className="flex flex-wrap justify-between items-center mb-4 sm:mb-6 gap-4">
+                    <div>
+                        <h4 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">Farm Overview</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Manage your animal types and view statistics</p>
+                    </div>
+
+                    <div className="flex gap-3 items-center">
+                        {animalTypes.length > 0 && (
                             <div className={`relative ${darkMode ? "bg-gray-700" : "bg-gray-100"} rounded-xl px-3 py-2 flex items-center`}>
                                 <FiSearch className="text-gray-500 mr-2" />
                                 <input
@@ -413,20 +440,22 @@ const handleUpdateCaretaker = async (animal) => {
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
+                        )}
 
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="bg-gradient-to-tr from-green-500 to-green-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
-                                onClick={() => navigate("/AnimalManagement/add-animal-type")}
-                            >
-                                <FiPlus className="text-lg" />
-                                <span>Add Animal Type</span>
-                            </motion.button>
-                        </div>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="bg-gradient-to-tr from-green-500 to-green-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
+                            onClick={() => navigate("/AnimalManagement/add-animal-type")}
+                        >
+                            <FiPlus className="text-lg" />
+                            <span>Add Animal Type</span>
+                        </motion.button>
                     </div>
+                </div>
 
-                    {/* Quick Stats */}
+                {/* Quick Stats */}
+                {animalTypes.length > 0 && (
                     <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 p-4 rounded-xl ${darkMode ? "bg-gray-700" : "bg-gray-50"} transition-all duration-300`}>
                         <div className={`p-3 rounded-lg ${darkMode ? "bg-gray-600" : "bg-white"} shadow-sm transition-all duration-300`}>
                             <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">Total Animals</p>
@@ -447,9 +476,11 @@ const handleUpdateCaretaker = async (animal) => {
                             </p>
                         </div>
                     </div>
+                )}
 
-                    {/* Animal Type Cards */}
-                    {filteredAnimalTypes.length > 0 ? (
+                {/* Animal Type Cards */}
+                {animalTypes.length > 0 ? (
+                    filteredAnimalTypes.length > 0 ? (
                         <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                             {filteredAnimalTypes.map((animal, index) => (
                                 <motion.div
@@ -537,69 +568,69 @@ const handleUpdateCaretaker = async (animal) => {
                                                 </motion.button>
                                             </div>
                                         )}
-                                     {/* Caretaker Name section - Fixed to work with caretakers array */}
-                                      <div className="mt-2 mb-2">
-                                          <div className="flex justify-between items-center">
-                                              <div className="flex items-center">
-                                                  <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mr-2">Caretaker:</p>
-                                                  {editingCaretakerId === animal._id ? (
-                                                      <div className="flex items-center gap-2">
-                                                          <input
-                                                              value={caretakerInput}
-                                                              onChange={e => setCaretakerInput(e.target.value)}
-                                                              className={`w-32 px-2 py-1 rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-400 ${darkMode ? "bg-gray-600 border-gray-500 text-dark-text" : "bg-gray-50 border-gray-300 text-gray-800"} text-sm transition-all duration-200`}
-                                                              placeholder="Caretaker name"
-                                                              autoFocus
-                                                          />
-                                                          <div className="flex gap-1">
-                                                              <motion.button
-                                                                  whileHover={{ scale: 1.1 }}
-                                                                  whileTap={{ scale: 0.9 }}
-                                                                  className="bg-blue-600 text-white p-1 rounded-md hover:bg-blue-700 transition-all"
-                                                                  onClick={() => handleUpdateCaretaker(animal)}
-                                                              >
-                                                                  <FiCheck size={16} />
-                                                              </motion.button>
-                                                              <motion.button
-                                                                  whileHover={{ scale: 1.1 }}
-                                                                  whileTap={{ scale: 0.9 }}
-                                                                  className="bg-red-600 text-white p-1 rounded-md hover:bg-red-700 transition-all"
-                                                                  onClick={() => setEditingCaretakerId(null)}
-                                                              >
-                                                                  <FiX size={16} />
-                                                              </motion.button>
-                                                          </div>
-                                                      </div>
-                                                  ) : (
-                                                      <span className={`text-sm ${darkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                                          {animal.caretakers && animal.caretakers.length > 0 
-                                                              ? animal.caretakers.map(c => c.name).join(', ')
-                                                              : "Not assigned"
-                                                          }
-                                                      </span>
-                                                  )}
-                                              </div>
-                                              
-                                              {editingCaretakerId !== animal._id && (
-                                                  <motion.button
-                                                      whileHover={{ scale: 1.2 }}
-                                                      whileTap={{ scale: 0.9 }}
-                                                      className="text-blue-500 hover:text-blue-700 transition-colors"
-                                                      onClick={() => { 
-                                                          setEditingCaretakerId(animal._id); 
-                                                          // Set input to the first caretaker's name or empty string
-                                                          setCaretakerInput(
-                                                              animal.caretakers && animal.caretakers.length > 0 
-                                                                  ? animal.caretakers[0].name 
-                                                                  : ""
-                                                          ); 
-                                                      }}
-                                                  >
-                                                      <FiEdit2 size={14} />
-                                                  </motion.button>
-                                              )}
-                                          </div>
-                                      </div>
+                                        {/* Caretaker Name section - Fixed to work with caretakers array */}
+                                        <div className="mt-2 mb-2">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center">
+                                                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mr-2">Caretaker:</p>
+                                                    {editingCaretakerId === animal._id ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                value={caretakerInput}
+                                                                onChange={e => setCaretakerInput(e.target.value)}
+                                                                className={`w-32 px-2 py-1 rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-400 ${darkMode ? "bg-gray-600 border-gray-500 text-dark-text" : "bg-gray-50 border-gray-300 text-gray-800"} text-sm transition-all duration-200`}
+                                                                placeholder="Caretaker name"
+                                                                autoFocus
+                                                            />
+                                                            <div className="flex gap-1">
+                                                                <motion.button
+                                                                    whileHover={{ scale: 1.1 }}
+                                                                    whileTap={{ scale: 0.9 }}
+                                                                    className="bg-blue-600 text-white p-1 rounded-md hover:bg-blue-700 transition-all"
+                                                                    onClick={() => handleUpdateCaretaker(animal)}
+                                                                >
+                                                                    <FiCheck size={16} />
+                                                                </motion.button>
+                                                                <motion.button
+                                                                    whileHover={{ scale: 1.1 }}
+                                                                    whileTap={{ scale: 0.9 }}
+                                                                    className="bg-red-600 text-white p-1 rounded-md hover:bg-red-700 transition-all"
+                                                                    onClick={() => setEditingCaretakerId(null)}
+                                                                >
+                                                                    <FiX size={16} />
+                                                                </motion.button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className={`text-sm ${darkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                                            {animal.caretakers && animal.caretakers.length > 0 
+                                                                ? animal.caretakers.map(c => c.name).join(', ')
+                                                                : "Not assigned"
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                
+                                                {editingCaretakerId !== animal._id && (
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.2 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        className="text-blue-500 hover:text-blue-700 transition-colors"
+                                                        onClick={() => { 
+                                                            setEditingCaretakerId(animal._id); 
+                                                            // Set input to the first caretaker's name or empty string
+                                                            setCaretakerInput(
+                                                                animal.caretakers && animal.caretakers.length > 0 
+                                                                    ? animal.caretakers[0].name 
+                                                                    : ""
+                                                            ); 
+                                                        }}
+                                                    >
+                                                        <FiEdit2 size={14} />
+                                                    </motion.button>
+                                                )}
+                                            </div>
+                                        </div>
 
                                         <div className="flex justify-between items-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">
                                             <span>TypeID: {animal.typeId}</span>
@@ -639,15 +670,33 @@ const handleUpdateCaretaker = async (animal) => {
                                 </motion.div>
                             ))}
                         </div>
-                    ) : animalTypes.length > 0 ? (
+                    ) : (
                         <div className={`p-8 text-center rounded-xl ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
                             <p className="text-gray-500 dark:text-gray-400">No animal types found matching your search.</p>
                         </div>
-                    ) : null}
-                </section>
-            )}
+                    )
+                ) : (
+                    // Show empty state when there are no animal types
+                    <div className={`p-8 text-center rounded-xl ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                        <FiAlertCircle className="mx-auto text-4xl text-gray-400 mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No Animal Types Found</h3>
+                        <p className="text-gray-500 dark:text-gray-400 mb-6">
+                            There are no animal types in the database. Add your first animal type to get started.
+                        </p>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="bg-gradient-to-tr from-green-500 to-green-600 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:shadow-lg transition-all duration-200 mx-auto"
+                            onClick={() => navigate("/AnimalManagement/add-animal-type")}
+                        >
+                            <FiPlus className="text-lg" />
+                            <span>Add Your First Animal Type</span>
+                        </motion.button>
+                    </div>
+                )}
+            </section>
 
-            {/* Charts Section */}
+            {/* Charts Section - Only show if there are animal types */}
             {animalTypes.length > 0 && (
                 <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     {/* Pie Chart */}

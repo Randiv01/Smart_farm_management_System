@@ -19,9 +19,29 @@ export default function AddAnimalForm() {
   const [qrData, setQrData] = useState(null);
   const [errorMessages, setErrorMessages] = useState([]);
   const [touchedFields, setTouchedFields] = useState({});
+  const [zones, setZones] = useState([]);
+  const [selectedZone, setSelectedZone] = useState("");
+  const [animalCount, setAnimalCount] = useState(1); // For batch animals
+  const [batchId, setBatchId] = useState(""); // For batch animals
 
   useEffect(() => {
     document.title = "Add New Animal";
+  }, []);
+
+  // Fetch available zones
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/zones");
+        if (res.ok) {
+          const data = await res.json();
+          setZones(data.zones || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch zones:", err);
+      }
+    };
+    fetchZones();
   }, []);
 
   // Helper for realistic placeholders
@@ -60,6 +80,11 @@ export default function AddAnimalForm() {
         });
         initialData.generateQR = true;
         setFormData(initialData);
+
+        // Generate a batch ID if this is a batch management type
+        if (data.managementType === "batch") {
+          setBatchId(`BATCH-${Date.now()}`);
+        }
       } catch (err) {
         setErrorMessages([err.message]);
       } finally {
@@ -158,6 +183,29 @@ export default function AddAnimalForm() {
       });
     });
 
+    // Validate zone selection
+    if (!selectedZone) {
+      setErrorMessages(["Please select a zone for the animal"]);
+      isValid = false;
+    } else {
+      const selectedZoneData = zones.find(z => z._id === selectedZone);
+      if (selectedZoneData) {
+        const availableSpace = selectedZoneData.capacity - selectedZoneData.currentOccupancy;
+        const animalsToAdd = animalType?.managementType === "batch" ? animalCount : 1;
+        
+        if (availableSpace < animalsToAdd) {
+          setErrorMessages([`Selected zone can only accommodate ${availableSpace} more animals. You're trying to add ${animalsToAdd}.`]);
+          isValid = false;
+        }
+      }
+    }
+
+    // Validate animal count for batch types
+    if (animalType?.managementType === "batch" && animalCount < 1) {
+      setErrorMessages(["Animal count must be at least 1"]);
+      isValid = false;
+    }
+
     setFieldErrors(newErrors);
     setTouchedFields(
       Object.keys(formData).reduce((acc, key) => ({ ...acc, [key]: true }), {})
@@ -165,29 +213,59 @@ export default function AddAnimalForm() {
     return isValid;
   };
 
-  // Handle submit
+  // Handle submit - different endpoints for individual vs batch
   const handleSubmit = async e => {
     e.preventDefault();
 
     const isValid = validateAllFields();
     if (!isValid) {
-      setErrorMessages(["Please fill all required fields correctly"]);
       return;
     }
 
     try {
       setGlobalLoading(true);
-      const res = await fetch("http://localhost:5000/animals", {
+      
+      let endpoint, method, body;
+      
+      if (animalType.managementType === "batch") {
+        // Use batch endpoint
+        endpoint = "http://localhost:5000/animals/batch";
+        body = JSON.stringify({ 
+          type: animalType._id, 
+          data: formData, 
+          zoneId: selectedZone,
+          count: animalCount,
+          batchId: batchId
+        });
+      } else {
+        // Use individual endpoint
+        endpoint = "http://localhost:5000/animals";
+        body = JSON.stringify({ 
+          type: animalType._id, 
+          data: formData, 
+          generateQR: formData.generateQR,
+          zoneId: selectedZone 
+        });
+      }
+      
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: animalType._id, data: formData, generateQR: formData.generateQR }),
+        body: body
       });
+      
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to add animal");
       }
+      
       const result = await res.json();
-      setQrData(result.qrCode);
+      
+      // Only show QR for individual animals
+      if (animalType.managementType !== "batch" && result.qrCode) {
+        setQrData(result.qrCode);
+      }
+      
       setShowSuccessPopup(true);
 
       const resetData = {};
@@ -195,6 +273,12 @@ export default function AddAnimalForm() {
       setFormData(resetData);
       setFieldErrors({});
       setTouchedFields({});
+      setSelectedZone("");
+      
+      // Reset batch count but keep the same batch ID
+      if (animalType.managementType === "batch") {
+        setAnimalCount(1);
+      }
     } catch (err) {
       setErrorMessages([err.message]);
     } finally {
@@ -224,9 +308,50 @@ export default function AddAnimalForm() {
 
   return (
     <div className={`max-w-6xl mx-auto p-6 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>
-      <h2 className="text-2xl font-semibold mb-6">Add New {animalType.name}</h2>
+      <h2 className="text-2xl font-semibold mb-6">
+        Add New {animalType.name} 
+        {animalType.managementType === "batch" && " Batch"}
+      </h2>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Batch Information (only show for batch types) */}
+        {animalType.managementType === "batch" && (
+          <div className={`p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
+            <h3 className="text-xl font-semibold mb-4">Batch Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className={`font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Number of Animals *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={animalCount}
+                  onChange={(e) => setAnimalCount(parseInt(e.target.value) || 1)}
+                  className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-gray-300"} border`}
+                  required
+                />
+              </div>
+              
+              <div className="flex flex-col">
+                <label className={`font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Batch ID
+                </label>
+                <input
+                  type="text"
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                  className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-gray-300"} border`}
+                  placeholder="Batch ID"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  This ID will be used to identify all animals in this batch
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {animalType.categories.map(category => (
             <div key={category.name} className={`p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
@@ -283,25 +408,71 @@ export default function AddAnimalForm() {
           ))}
         </div>
 
+        {/* Zone Selection */}
         <div className={`p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              name="generateQR"
-              checked={formData.generateQR}
-              onChange={handleChange}
-              className={`w-5 h-5 rounded border-2 ${darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"} checked:bg-green-600 transition`}
-            />
-            <span className={`font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Generate QR Code?</span>
-          </label>
+          <h3 className="text-xl font-semibold mb-4">Zone Assignment</h3>
+          <div className="flex flex-col">
+            <label className={`font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Select Zone *
+            </label>
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              required
+              className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-gray-300"} border`}
+            >
+              <option value="">Select a zone</option>
+              {zones.map(zone => (
+                <option 
+                  key={zone._id} 
+                  value={zone._id}
+                  disabled={zone.currentOccupancy >= zone.capacity}
+                >
+                  {zone.name} ({zone.currentOccupancy}/{zone.capacity})
+                  {zone.currentOccupancy >= zone.capacity && " - FULL"}
+                </option>
+              ))}
+            </select>
+            {selectedZone && zones.find(z => z._id === selectedZone) && (
+              <div className="text-sm mt-1">
+                <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
+                  Available space: {zones.find(z => z._id === selectedZone).capacity - zones.find(z => z._id === selectedZone).currentOccupancy} animals
+                </span>
+                {animalType.managementType === "batch" && (
+                  <span className="block mt-1">
+                    You're adding {animalCount} animal{animalCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* QR Code option (only for individual animals) */}
+        {animalType.managementType !== "batch" && (
+          <div className={`p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="generateQR"
+                checked={formData.generateQR}
+                onChange={handleChange}
+                className={`w-5 h-5 rounded border-2 ${darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"} checked:bg-green-600 transition`}
+              />
+              <span className={`font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Generate QR Code?</span>
+            </label>
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
           >
-            Add {animalType.name}
+            {animalType.managementType === "batch" 
+              ? `Add Batch of ${animalCount} ${animalType.name}${animalCount !== 1 ? 's' : ''}`
+              : `Add ${animalType.name}`
+            }
           </button>
         </div>
       </form>
@@ -316,7 +487,10 @@ export default function AddAnimalForm() {
               </div>
             </div>
             <p className={`mt-4 ${darkMode ? "text-gray-200" : "text-gray-700"}`}>
-              {animalType.name} added successfully
+              {animalType.managementType === "batch" 
+                ? `Successfully added ${animalCount} ${animalType.name}${animalCount !== 1 ? 's' : ''} to the batch`
+                : `${animalType.name} added successfully`
+              }
             </p>
             {qrData && (
               <div className={`p-4 rounded-xl my-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>

@@ -21,6 +21,9 @@ export default function AnimalList() {
     message: "",
     type: "",
   });
+  const [zones, setZones] = useState([]);
+  const [moveZoneId, setMoveZoneId] = useState("");
+  const [animalToMove, setAnimalToMove] = useState(null);
 
   // Search & filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,6 +31,22 @@ export default function AnimalList() {
 
   useEffect(() => {
     document.title = "Animal List";
+  }, []);
+
+  // Fetch zones
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/zones");
+        if (res.ok) {
+          const data = await res.json();
+          setZones(data.zones || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch zones:", err);
+      }
+    };
+    fetchZones();
   }, []);
 
   // ------------------ FETCH DATA ------------------
@@ -56,7 +75,8 @@ export default function AnimalList() {
         `http://localhost:5000/animals?type=${typeData._id}`
       );
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
-      setAnimals((await animalsRes.json()) || []);
+      const animalsData = await animalsRes.json();
+      setAnimals(animalsData || []);
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -150,7 +170,7 @@ export default function AnimalList() {
         name: field.name,
         label: field.label,
         type: field.type,
-        options: field.options || null, // dynamically get options
+        options: field.options || null,
       })
     );
 
@@ -279,6 +299,7 @@ export default function AnimalList() {
             >
               <tr>
                 <th className="p-3 text-center">QR & ID</th>
+                <th className="p-3">Zone</th>
                 {basicInfoFields.map((field, idx) => (
                   <th key={idx} className="p-3">
                     {field.label}
@@ -291,7 +312,7 @@ export default function AnimalList() {
               {filteredAnimals.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={basicInfoFields.length + 2}
+                    colSpan={basicInfoFields.length + 3}
                     className="p-4 text-center italic text-gray-500 dark:text-gray-400"
                   >
                     No matching {animalType.name} found.
@@ -317,6 +338,14 @@ export default function AnimalList() {
                           {animal.animalId}
                         </div>
                       </div>
+                    </td>
+
+                    {/* Zone */}
+                    <td className="p-2 text-center">
+                      {animal.assignedZone 
+                        ? zones.find(z => z._id === animal.assignedZone)?.name || "Unknown"
+                        : "Not assigned"
+                      }
                     </td>
 
                     {/* Dynamic Fields */}
@@ -401,6 +430,15 @@ export default function AnimalList() {
                               ✏ Edit
                             </button>
                             <button
+                              onClick={() => {
+                                setAnimalToMove(animal);
+                                setMoveZoneId("");
+                              }}
+                              className="px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"
+                            >
+                              🏠 Move
+                            </button>
+                            <button
                               onClick={() => handleDelete(animal._id)}
                               className="px-2 py-1 rounded bg-btn-red text-white hover:bg-red-600"
                             >
@@ -418,9 +456,73 @@ export default function AnimalList() {
         </div>
       </main>
 
+      {/* Move Zone Modal */}
+      {animalToMove && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
+          <div className={`bg-white dark:bg-dark-card p-6 rounded-xl w-96 ${darkMode ? "text-dark-text" : ""}`}>
+            <h3 className="text-lg font-semibold mb-4">Move {animalToMove.data?.name} to another zone</h3>
+            <select
+              value={moveZoneId}
+              onChange={(e) => setMoveZoneId(e.target.value)}
+              className="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">Select a zone</option>
+              {zones.map(zone => (
+                <option 
+                  key={zone._id} 
+                  value={zone._id}
+                  disabled={zone.currentOccupancy >= zone.capacity && zone._id !== animalToMove.assignedZone?.toString()}
+                >
+                  {zone.name} ({zone.currentOccupancy}/{zone.capacity})
+                  {zone.currentOccupancy >= zone.capacity && zone._id !== animalToMove.assignedZone?.toString() && " - FULL"}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAnimalToMove(null)}
+                className="px-4 py-2 rounded bg-gray-400 text-white hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!moveZoneId) {
+                    showPopup("Please select a zone", false, "error");
+                    return;
+                  }
+                  
+                  try {
+                    const res = await fetch(`http://localhost:5000/animals/${animalToMove._id}/move-zone`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ zoneId: moveZoneId }),
+                    });
+                    
+                    if (!res.ok) {
+                      const errorData = await res.json();
+                      throw new Error(errorData.message || "Failed to move animal");
+                    }
+                    
+                    showPopup("Animal moved successfully!");
+                    setAnimalToMove(null);
+                    fetchData(); // Refresh data
+                  } catch (err) {
+                    showPopup(err.message, false, "error");
+                  }
+                }}
+                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+              >
+                Move
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Popup */}
       {popup.show && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div
             className={`bg-white dark:bg-dark-card p-5 rounded-2xl w-80 max-w-[90%] text-center shadow-lg animate-popIn border-l-4 ${
               popup.success

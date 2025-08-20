@@ -6,7 +6,7 @@ const animalSchema = new mongoose.Schema({
     ref: 'AnimalType', 
     required: true 
   },
-  animalId: { type: String, required: true, unique: true }, // NEW: Auto-generated AnimalID
+  animalId: { type: String, required: true, unique: true },
   data: { 
     type: mongoose.Schema.Types.Mixed, 
     required: true 
@@ -15,6 +15,17 @@ const animalSchema = new mongoose.Schema({
     type: String, 
     unique: true, 
     sparse: true 
+  },
+  // NEW: Track zone assignment
+  assignedZone: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Zone',
+    default: null
+  },
+  // NEW: For batch animals, track if they're part of a batch
+  batchId: {
+    type: String,
+    default: null
   },
   createdAt: { 
     type: Date, 
@@ -35,5 +46,7 @@ animalSchema.pre('save', function(next) {
 // Indexes for better performance
 animalSchema.index({ type: 1 });
 animalSchema.index({ qrCode: 1 }, { unique: true, sparse: true });
+animalSchema.index({ assignedZone: 1 }); // NEW: Index for zone queries
+animalSchema.index({ batchId: 1 }); // NEW: Index for batch queries
 
 export default mongoose.model('Animal', animalSchema);

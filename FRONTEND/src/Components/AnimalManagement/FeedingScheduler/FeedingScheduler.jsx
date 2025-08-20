@@ -55,28 +55,57 @@ export default function FeedingScheduler() {
   const [loading, setLoading] = useState(false);
   const [confirmFeedNow, setConfirmFeedNow] = useState(false);
 
-   // Fetch animals, feeds, and history
+  // Fetch animals, feeds, and history
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        console.log("Fetching data from backend...");
+        
+        // Use the correct endpoints from your backend
         const responses = await Promise.all([
-          fetch("http://localhost:5000/feeding/animals"),
-          fetch("http://localhost:5000/feeding/feeds"),
-          fetch("http://localhost:5000/feeding/history")
+          fetch("http://localhost:5000/animals"),          // Changed to match your animalRouter
+          fetch("http://localhost:5000/feed-stocks"),      // Changed to match your feedStockRouter
+          fetch("http://localhost:5000/feeding/history")  // This should match your feeding routes
         ]);
 
-        const errors = responses.filter(res => !res.ok);
-        if (errors.length > 0) throw new Error(`Failed to fetch: ${errors.map(e => e.statusText).join(", ")}`);
+        console.log("Response statuses:", responses.map(r => r.status));
 
-        const [animalsData, feedsData, historyData] = await Promise.all(responses.map(res => res.json()));
+        const errors = responses.filter(res => !res.ok);
+        if (errors.length > 0) {
+          throw new Error(`Failed to fetch: ${errors.map(e => e.statusText).join(", ")}`);
+        }
+
+        const [animalsData, feedsData, historyData] = await Promise.all(
+          responses.map(res => res.json().catch(err => {
+            console.error("JSON parsing error:", err);
+            return [];
+          }))
+        );
+
+        console.log("Animals data:", animalsData);
+        console.log("Feeds data:", feedsData);
+        console.log("History data:", historyData);
 
         setAnimals(animalsData || []);
         setFeeds(feedsData || []);
         setFeedingHistory(historyData || []);
       } catch (err) {
-        console.error(err);
-        toast.error("Failed to load data. Please try again.");
+        console.error("Fetch error:", err);
+        toast.error("Failed to load data. Please check if backend is running on port 5000.");
+        
+        // Fallback mock data for development
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Using mock data for development");
+          setAnimals([
+            { _id: "1", name: "Cow", breed: "Holstein", feedSize: 5, feedUnit: "kg" },
+            { _id: "2", name: "Chicken", breed: "Leghorn", feedSize: 0.1, feedUnit: "kg" }
+          ]);
+          setFeeds([
+            { _id: "1", foodName: "Corn", remaining: 100, quantity: 100, unit: "kg" },
+            { _id: "2", foodName: "Wheat", remaining: 50, quantity: 50, unit: "kg" }
+          ]);
+        }
       } finally {
         setLoading(false);
       }
@@ -189,13 +218,17 @@ export default function FeedingScheduler() {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/feed-schedule", {
+      // Use the correct endpoint for scheduling feeding
+      const res = await fetch("http://localhost:5000/feeding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to save schedule");
+      }
 
       toast.success("Feeding schedule saved successfully!");
       setFormData({
@@ -209,11 +242,14 @@ export default function FeedingScheduler() {
       });
 
       // Refresh history
-      const historyRes = await fetch("http://localhost:5000/feeding-history");
-      const historyData = await historyRes.json();
-      setFeedingHistory(historyData || []);
+      const historyRes = await fetch("http://localhost:5000/feeding/history");
+      if (historyRes.ok) {
+        const historyData = await historyRes.json();
+        setFeedingHistory(historyData || []);
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error("Submit error:", err);
+      toast.error(err.message || "Failed to save schedule");
     } finally {
       setLoading(false);
     }
@@ -426,11 +462,17 @@ export default function FeedingScheduler() {
             }}
           >
             <option value="">-- Select Animal --</option>
-            {animals.map((a) => (
-              <option key={a._id} value={a._id}>
-                {a.name} {a.breed && `(${a.breed})`}
-              </option>
-            ))}
+            {loading ? (
+              <option value="" disabled>Loading animals...</option>
+            ) : animals.length === 0 ? (
+              <option value="" disabled>No animals found</option>
+            ) : (
+              animals.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.name} {a.breed && `(${a.breed})`}
+                </option>
+              ))
+            )}
           </select>
           {recommendedFeedSize && (
             <p className={`text-sm ${
@@ -467,17 +509,23 @@ export default function FeedingScheduler() {
             }}
           >
             <option value="">-- Select Feed --</option>
-            {feeds.map((f) => (
-              <option
-                key={f._id}
-                value={f._id}
-                disabled={f.remaining <= 0}
-                className={f.remaining <= 0 ? "text-red-500" : ""}
-              >
-                {f.foodName} ({f.remaining} {feedUnit} remaining)
-                {f.remaining <= 0 && " - OUT OF STOCK"}
-              </option>
-            ))}
+            {loading ? (
+              <option value="" disabled>Loading feeds...</option>
+            ) : feeds.length === 0 ? (
+              <option value="" disabled>No feeds found</option>
+            ) : (
+              feeds.map((f) => (
+                <option
+                  key={f._id}
+                  value={f._id}
+                  disabled={f.remaining <= 0}
+                  className={f.remaining <= 0 ? "text-red-500" : ""}
+                >
+                  {f.foodName} ({f.remaining} {f.unit || feedUnit} remaining)
+                  {f.remaining <= 0 && " - OUT OF STOCK"}
+                </option>
+              ))
+            )}
           </select>
           {formData.foodId && selectedFeedRemaining < 100 && (
             <p className="text-sm text-yellow-600 dark:text-yellow-300">
