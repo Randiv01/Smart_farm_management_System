@@ -598,7 +598,7 @@ const fetchAnimalTypes = async () => {
                 type="number"
                 placeholder="0"
                 value={newZone.capacity}
-                onChange={(e) => setNewZone({ ...newZone, capacity: parseInt(e.target.value || "0") })}
+                onChange={(e) => setNewZone({ ...newZone, capacity: parseInt(e.target.value || "") })}
                 className={`w-full px-3 py-2 rounded-lg border ${
                   darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"
                 }`}
@@ -636,7 +636,7 @@ const fetchAnimalTypes = async () => {
                 onChange={(e) =>
                   setNewZone({
                     ...newZone,
-                    dimensions: { ...newZone.dimensions, length: parseFloat(e.target.value || "0") },
+                    dimensions: { ...newZone.dimensions, length: parseFloat(e.target.value || "") },
                   })
                 }
                 className={`w-full px-3 py-2 rounded-lg border ${
@@ -653,7 +653,7 @@ const fetchAnimalTypes = async () => {
                 onChange={(e) =>
                   setNewZone({
                     ...newZone,
-                    dimensions: { ...newZone.dimensions, width: parseFloat(e.target.value || "0") },
+                    dimensions: { ...newZone.dimensions, width: parseFloat(e.target.value || "") },
                   })
                 }
                 className={`w-full px-3 py-2 rounded-lg border ${

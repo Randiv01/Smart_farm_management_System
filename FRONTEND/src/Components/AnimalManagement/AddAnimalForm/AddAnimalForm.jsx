@@ -21,8 +21,8 @@ export default function AddAnimalForm() {
   const [touchedFields, setTouchedFields] = useState({});
   const [zones, setZones] = useState([]);
   const [selectedZone, setSelectedZone] = useState("");
-  const [animalCount, setAnimalCount] = useState(1); // For batch animals
-  const [batchId, setBatchId] = useState(""); // For batch animals
+  const [animalCount, setAnimalCount] = useState(1);
+  const [batchId, setBatchId] = useState("");
 
   useEffect(() => {
     document.title = "Add New Animal";
@@ -326,8 +326,9 @@ export default function AddAnimalForm() {
                 <input
                   type="number"
                   min="1"
+                  placeholder="1"
                   value={animalCount}
-                  onChange={(e) => setAnimalCount(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setAnimalCount(parseInt(e.target.value) || "")}
                   className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-gray-300"} border`}
                   required
                 />

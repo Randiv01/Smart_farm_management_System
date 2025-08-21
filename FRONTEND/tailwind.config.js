@@ -11,6 +11,12 @@ module.exports = {
         "dark-card": "#1f2937",
         "dark-text": "#f9fafb",
         "dark-gray": "#374151",
+        // Additional button-specific colors
+        "btn-blue": "#2563eb",       // download / export / info actions
+        "btn-teal": "#059669",       // add another / accent actions
+        "btn-red": "#ef4444",        // cancel / delete / error
+        "btn-yellow": "#fbbf24",     // warning / optional actions
+        "btn-gray": "#6b7280",       // neutral secondary
 
 
       },

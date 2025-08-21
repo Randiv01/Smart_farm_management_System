@@ -49,7 +49,7 @@ export default function AnimalList() {
     fetchZones();
   }, []);
 
-  // ------------------ FETCH DATA ------------------
+  // Fetch data with zone information
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -71,8 +71,9 @@ export default function AnimalList() {
         );
       setEditData(initialEditData);
 
+      // Fetch animals with populated zone data
       const animalsRes = await fetch(
-        `http://localhost:5000/animals?type=${typeData._id}`
+        `http://localhost:5000/animals?type=${typeData._id}&populate=zone`
       );
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
       const animalsData = await animalsRes.json();
@@ -125,7 +126,7 @@ export default function AnimalList() {
     setEditData(editValues);
   };
 
-  // ------------------ UPDATE WITH VALIDATION ------------------
+  // Update with validation
   const handleUpdate = async (id) => {
     // Validate empty fields
     const emptyFields = Object.entries(editData)
@@ -159,7 +160,7 @@ export default function AnimalList() {
     }
   };
 
-  // ------------------ BASIC INFO FIELDS ------------------
+  // Basic Info fields
   const basicInfoFields = [];
   const basicInfoCategory = animalType?.categories?.find(
     (cat) => cat.name === "Basic Info"
@@ -174,7 +175,7 @@ export default function AnimalList() {
       })
     );
 
-  // ------------------ SEARCH & FILTER LOGIC ------------------
+  // Search & filter logic
   const handleFilterChange = (field, value) => {
     setFilterValues({ ...filterValues, [field]: value });
   };
@@ -200,7 +201,7 @@ export default function AnimalList() {
     return matchesSearch && matchesFilters;
   });
 
-  // ------------------ LOADING / ERROR ------------------
+  // Loading / Error
   if (loading)
     return (
       <div className="flex justify-center items-center h-48 text-dark-gray dark:text-dark-text">
@@ -227,15 +228,15 @@ export default function AnimalList() {
           </button>
         )}
         <button
-          className="px-4 py-2 rounded bg-btn-gray text-white hover:bg-gray-700"
-          onClick={() => navigate("/AnimalManagement")}
-        >
-          Back
-        </button>
+            className="px-4 py-2 rounded bg-btn-gray text-white hover:bg-gray-700"
+            onClick={() => navigate("/AnimalManagement")}
+          >
+            Back
+          </button>
       </div>
     );
 
-  // ------------------ RENDER ------------------
+  // Render
   return (
     <div className={`${darkMode ? "dark bg-dark-bg" : "bg-light-beige"}`}>
       <main className="p-5">
@@ -342,9 +343,11 @@ export default function AnimalList() {
 
                     {/* Zone */}
                     <td className="p-2 text-center">
-                      {animal.assignedZone 
-                        ? zones.find(z => z._id === animal.assignedZone)?.name || "Unknown"
-                        : "Not assigned"
+                      {animal.zone 
+                        ? animal.zone.name || "Unknown"
+                        : animal.assignedZone 
+                          ? zones.find(z => z._id === animal.assignedZone)?.name || "Unknown"
+                          : "Not assigned"
                       }
                     </td>
 

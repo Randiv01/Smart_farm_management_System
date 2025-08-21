@@ -1,11 +1,13 @@
+// server.js (or your main file)
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import { animalRouter } from "./routes/animalRoutes.js";
-import { animalTypeRouter } from "./routes/animalTypeRoutes.js";
-import feedStockRouter from "./routes/feedStockRoutes.js";
-import zonesRouter from "./routes/zoneRoutes.js";
-import emergencyRoutes from "./routes/emergencyRoutes.js";
+import { animalRouter } from "./AnimalManagement/routes/animalRoutes.js";
+import { animalTypeRouter } from "./AnimalManagement/routes/animalTypeRoutes.js";
+import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
+import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
+import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import dotenv from "dotenv";
 dotenv.config();
 import path from 'path';
@@ -34,6 +36,12 @@ app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
+app.use('/api/users', userRoutes);
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", message: "Server is running" });
+});
 
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -43,7 +51,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // MongoDB Connection
-mongoose.connect("mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority", {
+mongoose.connect("mongodb+srv://EasyFarming:sliit123@easyFarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority", {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })

@@ -18,21 +18,28 @@ import AnimalZones from './Components/AnimalManagement/AnimalZones/AnimalZones.j
 import Productivity from './Components/AnimalManagement/Productivity/Productivity.jsx';
 import Settings from './Components/AnimalManagement/Settings/Settings.jsx';
 import Alerts from './Components/AnimalManagement/Alerts/Alerts.jsx';
+import { UserProvider } from './Components/AnimalManagement/contexts/UserContext.js';
+
+//login or register
+import Register from './Components/Registration/Registration.jsx';
 
 // ✅ Import Home and Login
-import Home from './Components/Home/Home.js';
+import Home from './Components/Home/Home.jsx';
 import Login from './Components/Login/login.jsx';
 
 function App() {
   return (
     <div className="App">
+   
       <LoaderProvider>
         <LanguageProvider>
           <ThemeProvider>
+             <UserProvider>
             <Routes>
               {/* ✅ Public routes (no sidebar/topbar) */}
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+               <Route path="/Register" element={<Register />} />
 
               {/* ✅ Protected routes with Layout */}
               <Route element={<Layout />}>
@@ -52,9 +59,11 @@ function App() {
                 <Route path="/alerts" element={<Alerts />} />   
               </Route>
             </Routes>
+            </UserProvider>
           </ThemeProvider>
         </LanguageProvider>
       </LoaderProvider>
+      
     </div>
   );
 }

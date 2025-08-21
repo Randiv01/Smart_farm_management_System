@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Home,
@@ -29,6 +29,17 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
     { path: "/settings", icon: Settings, label: "Settings" },
   ];
 
+  // Auto-close sidebar if resized to mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024 && sidebarOpen) {
+        toggleSidebar && toggleSidebar(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [sidebarOpen, toggleSidebar]);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -42,15 +53,15 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
       <aside
         className={`
           fixed top-0 left-0 h-full z-40 transition-all duration-300 ease-in-out
-          ${sidebarOpen ? "w-64" : "w-0 lg:w-20"} 
-          ${darkMode ? "bg-green-900" : "bg-green-700"} 
-          text-white flex flex-col shadow-lg overflow-hidden
+          ${darkMode ? "bg-green-900" : "bg-green-700"} text-white flex flex-col shadow-lg overflow-hidden
+          ${sidebarOpen ? "w-64" : "w-0"} 
+          ${sidebarOpen ? "lg:w-64" : "lg:w-20"}
         `}
       >
         {/* Logo */}
         <div
           className="flex flex-col items-center py-4 px-2 border-b border-white/20 cursor-pointer"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/AnimalManagement")}
         >
           <img
             src="/logo192.png"
@@ -73,7 +84,6 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
                 <button
                   onClick={() => {
                     navigate(item.path);
-                    // Only auto-close sidebar on mobile
                     if (window.innerWidth < 1024) {
                       toggleSidebar && toggleSidebar();
                     }
@@ -98,23 +108,14 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
           </ul>
         </nav>
 
-        {/* User Section */}
-        <div className="p-3 border-t border-white/20">
-          <div
-            className={`flex items-center ${sidebarOpen ? "justify-start" : "justify-center"}`}
-            onClick={() => navigate("/profile")}
-          >
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <UserCheck size={16} />
-            </div>
-            {sidebarOpen && (
-              <div className="ml-3 overflow-hidden hidden lg:block">
-                <p className="text-sm font-medium truncate">Admin User</p>
-                <p className="text-xs opacity-70 truncate">Farm Manager</p>
-              </div>
-            )}
+        {/* Footer: only show when sidebar is open */}
+        {sidebarOpen && (
+          <div className="p-4 border-t border-white/20 flex flex-col items-center justify-center text-center text-white/80 text-xs space-y-1">
+            <span className="font-bold text-sm text-white">Mount Olive</span>
+            <span className="text-white/70 text-xs">Farm House v1.0</span>
+            <span className="text-white/50 text-xs">© 2025 Mount Olive Animal Admin</span>
           </div>
-        </div>
+        )}
       </aside>
     </>
   );
