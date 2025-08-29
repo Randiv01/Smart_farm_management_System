@@ -22,7 +22,7 @@ import ProtectedRoute from "./Components/AnimalManagement/ProtectedRoute/Protect
 // ✅ Contexts (Animal)
 import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
 import { LoaderProvider } from './Components/AnimalManagement/contexts/LoaderContext.js';
-import { ThemeProvider } from './Components/AnimalManagement/contexts/ThemeContext.js';
+import { ThemeProvider as AnimalThemeProvider } from './Components/AnimalManagement/contexts/ThemeContext.js';
 import { UserProvider } from './Components/AnimalManagement/contexts/UserContext.js';
 
 // ----------------- Inventory Management -----------------
@@ -30,26 +30,38 @@ import { IThemeProvider } from './Components/InventoryManagement/Icontexts/IThem
 import ILayout from './Components/InventoryManagement/Ilayout/ILayout.jsx';
 import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 
-// ----------------- Registration & Auth -----------------
-import Register from './Components/Registration/Registration.jsx';
-import Home from './Components/Home/Home.jsx';
-import Login from './Components/Login/login.jsx';
+// ----------------- User / Frontend Pages -----------------
+import Register from './Components/UserHome/Registration/Registration.jsx';
+import Home from './Components/UserHome/UHHome/UHHome.jsx';
+import Login from './Components/UserHome/Login/login.jsx';
+
+// ✅ User-side Contexts
+import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
+import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
+import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
 
 function App() {
   return (
     <div className="App">
-      {/* ---------------- Animal Management Context Wrappers ---------------- */}
+      {/* ---------------- User / Frontend Routes ---------------- */}
+      <UserThemeProvider>
+        <CartProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+            </Routes>
+          </AuthProvider>
+        </CartProvider>
+      </UserThemeProvider>
+
+      {/* ---------------- Animal Management / Admin Routes ---------------- */}
       <LoaderProvider>
         <LanguageProvider>
-          <ThemeProvider>
+          <AnimalThemeProvider>
             <UserProvider>
               <Routes>
-                {/* ✅ Public routes (no sidebar/topbar) */}
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-
-                {/* ✅ Animal Management Routes (restricted to role=animal) */}
                 <Route
                   element={
                     <ProtectedRoute allowedRoles={["animal"]}>
@@ -74,11 +86,11 @@ function App() {
                 </Route>
               </Routes>
             </UserProvider>
-          </ThemeProvider>
+          </AnimalThemeProvider>
         </LanguageProvider>
       </LoaderProvider>
 
-      {/* ---------------- Inventory Management Context Wrapper ---------------- */}
+      {/* ---------------- Inventory Management ---------------- */}
       <IThemeProvider>
         <Routes>
           <Route element={<ILayout />}>
