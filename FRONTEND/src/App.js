@@ -17,6 +17,7 @@ import AnimalZones from './Components/AnimalManagement/AnimalZones/AnimalZones.j
 import Productivity from './Components/AnimalManagement/Productivity/Productivity.jsx';
 import Settings from './Components/AnimalManagement/Settings/Settings.jsx';
 import Alerts from './Components/AnimalManagement/Alerts/Alerts.jsx';
+import ProtectedRoute from "./Components/AnimalManagement/ProtectedRoute/ProtectedRoute.jsx";
 
 // ✅ Contexts (Animal)
 import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
@@ -28,7 +29,6 @@ import { UserProvider } from './Components/AnimalManagement/contexts/UserContext
 import { IThemeProvider } from './Components/InventoryManagement/Icontexts/IThemeContext.jsx';
 import ILayout from './Components/InventoryManagement/Ilayout/ILayout.jsx';
 import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
-
 
 // ----------------- Registration & Auth -----------------
 import Register from './Components/Registration/Registration.jsx';
@@ -49,8 +49,14 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
 
-                {/* ✅ Animal Management Routes */}
-                <Route element={<Layout />}>
+                {/* ✅ Animal Management Routes (restricted to role=animal) */}
+                <Route
+                  element={
+                    <ProtectedRoute allowedRoles={["animal"]}>
+                      <Layout />
+                    </ProtectedRoute>
+                  }
+                >
                   <Route path="/AnimalManagement" element={<Dashboard />} />
                   <Route path="/AnimalManagement/:type" element={<AnimalList />} />
                   <Route path="/AnimalProductivity/:type" element={<AnimalProductivity />} />
@@ -73,15 +79,13 @@ function App() {
       </LoaderProvider>
 
       {/* ---------------- Inventory Management Context Wrapper ---------------- */}
-    <IThemeProvider>
-  <Routes>
-    <Route element={<ILayout />}>
-      <Route path="/InventoryManagement" element={<IDashboard />} />
-    </Route>
-  </Routes>
-</IThemeProvider>
-
-
+      <IThemeProvider>
+        <Routes>
+          <Route element={<ILayout />}>
+            <Route path="/InventoryManagement" element={<IDashboard />} />
+          </Route>
+        </Routes>
+      </IThemeProvider>
     </div>
   );
 }
