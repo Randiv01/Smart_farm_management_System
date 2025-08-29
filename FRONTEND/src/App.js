@@ -34,6 +34,7 @@ import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 import Register from './Components/UserHome/Registration/Registration.jsx';
 import Home from './Components/UserHome/UHHome/UHHome.jsx';
 import Login from './Components/UserHome/Login/login.jsx';
+import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx'; // Make sure to import Navbar
 
 // ✅ User-side Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -43,61 +44,64 @@ import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHCont
 function App() {
   return (
     <div className="App">
-      {/* ---------------- User / Frontend Routes ---------------- */}
-      <UserThemeProvider>
-        <CartProvider>
-          <AuthProvider>
+      {/* Wrap everything in a single AuthProvider and other providers */}
+      <AuthProvider>
+        <UserThemeProvider>
+          <CartProvider>
+            {/* Single Routes component for all routes */}
             <Routes>
-              <Route path="/" element={<Home />} />
+              {/* User/Frontend Routes */}
+              <Route path="/" element={
+                <>
+                  <Navbar />
+                  <Home />
+                </>
+              } />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              
+              {/* Animal Management Routes */}
+              <Route path="/AnimalManagement/*" element={
+                <LoaderProvider>
+                  <LanguageProvider>
+                    <AnimalThemeProvider>
+                      <UserProvider>
+                        <ProtectedRoute allowedRoles={["animal"]}>
+                          <Layout />
+                        </ProtectedRoute>
+                      </UserProvider>
+                    </AnimalThemeProvider>
+                  </LanguageProvider>
+                </LoaderProvider>
+              }>
+                <Route index element={<Dashboard />} />
+                <Route path=":type" element={<AnimalList />} />
+                <Route path="productivity/:type" element={<AnimalProductivity />} />
+                <Route path="add-animal/:type" element={<AddAnimalForm />} />
+                <Route path="design-plan/:type" element={<FarmDesigner />} />
+                <Route path="feeding-scheduler" element={<FeedingScheduler />} />
+                <Route path="add-animal-type" element={<AddAnimalType />} />
+                <Route path="feed-stock" element={<FeedStock />} />
+                <Route path="animal-health" element={<AnimalHealth />} />
+                <Route path="health-report/:type" element={<HealthReport />} />
+                <Route path="zones" element={<AnimalZones />} />
+                <Route path="productivity" element={<Productivity />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="alerts" element={<Alerts />} />
+              </Route>
+              
+              {/* Inventory Management Routes */}
+              <Route path="/InventoryManagement/*" element={
+                <IThemeProvider>
+                  <ILayout />
+                </IThemeProvider>
+              }>
+                <Route index element={<IDashboard />} />
+              </Route>
             </Routes>
-          </AuthProvider>
-        </CartProvider>
-      </UserThemeProvider>
-
-      {/* ---------------- Animal Management / Admin Routes ---------------- */}
-      <LoaderProvider>
-        <LanguageProvider>
-          <AnimalThemeProvider>
-            <UserProvider>
-              <Routes>
-                <Route
-                  element={
-                    <ProtectedRoute allowedRoles={["animal"]}>
-                      <Layout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route path="/AnimalManagement" element={<Dashboard />} />
-                  <Route path="/AnimalManagement/:type" element={<AnimalList />} />
-                  <Route path="/AnimalProductivity/:type" element={<AnimalProductivity />} />
-                  <Route path="/add-animal/:type" element={<AddAnimalForm />} />
-                  <Route path="/AnimalManagement/design-plan/:type" element={<FarmDesigner />} />
-                  <Route path="/feeding-scheduler" element={<FeedingScheduler />} />
-                  <Route path="/AnimalManagement/add-animal-type" element={<AddAnimalType />} />
-                  <Route path="/feed-stock" element={<FeedStock />} />
-                  <Route path="/animal-health" element={<AnimalHealth />} />
-                  <Route path="/HealthReport/:type" element={<HealthReport />} />
-                  <Route path="/zones" element={<AnimalZones />} />
-                  <Route path="/Productivity" element={<Productivity />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/alerts" element={<Alerts />} />
-                </Route>
-              </Routes>
-            </UserProvider>
-          </AnimalThemeProvider>
-        </LanguageProvider>
-      </LoaderProvider>
-
-      {/* ---------------- Inventory Management ---------------- */}
-      <IThemeProvider>
-        <Routes>
-          <Route element={<ILayout />}>
-            <Route path="/InventoryManagement" element={<IDashboard />} />
-          </Route>
-        </Routes>
-      </IThemeProvider>
+          </CartProvider>
+        </UserThemeProvider>
+      </AuthProvider>
     </div>
   );
 }
