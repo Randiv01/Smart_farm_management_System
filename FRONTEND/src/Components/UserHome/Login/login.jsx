@@ -65,29 +65,29 @@ const LoginPage = () => {
       }
 
       // Redirect based on role
-      switch(role) {
-        case "animal": 
-          navigate("/AnimalManagement"); 
-          break;
-        case "plant": 
-          navigate("/PlantManagement"); 
-          break;
-        case "inv": 
-          navigate("/InventoryManagement"); 
-          break;
-        case "emp": 
-          navigate("/EmployeeManagement"); 
-          break;
-        case "health": 
-          navigate("/HealthManagement"); 
-          break;
-        case "owner": 
-          navigate("/OwnerDashboard"); 
-          break;
-        default: 
-          navigate("/"); 
-          break;
-      }
+        switch(role) {
+          case "animal": 
+            navigate("/AnimalManagement"); 
+            break;
+          case "plant": 
+            navigate("/PlantManagement"); 
+            break;
+          case "inv": 
+            navigate("/InventoryManagement"); 
+            break;
+          case "emp": 
+            navigate("/EmployeeManagement"); 
+            break;
+          case "health": 
+            navigate("/doctor/home"); 
+            break;
+          case "owner": 
+            navigate("/OwnerDashboard"); 
+            break;
+          default: 
+            navigate("/"); 
+            break;
+        }
 
     } catch (err) {
       console.error("Login error details:", err);

@@ -1,5 +1,5 @@
 import './App.css';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 
 // ----------------- Animal Management -----------------
 import Dashboard from './Components/AnimalManagement/Dashboard/Dashboard.jsx';
@@ -19,7 +19,7 @@ import Settings from './Components/AnimalManagement/Settings/Settings.jsx';
 import Alerts from './Components/AnimalManagement/Alerts/Alerts.jsx';
 import ProtectedRoute from "./Components/AnimalManagement/ProtectedRoute/ProtectedRoute.jsx";
 
-// ✅ Contexts (Animal)
+// Animal Contexts
 import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
 import { LoaderProvider } from './Components/AnimalManagement/contexts/LoaderContext.js';
 import { ThemeProvider as AnimalThemeProvider } from './Components/AnimalManagement/contexts/ThemeContext.js';
@@ -34,46 +34,74 @@ import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 import Register from './Components/UserHome/Registration/Registration.jsx';
 import Home from './Components/UserHome/UHHome/UHHome.jsx';
 import Login from './Components/UserHome/Login/login.jsx';
-import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx'; // Make sure to import Navbar
+import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 
-// ✅ User-side Contexts
+// User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
 import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
 import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
 
+// ----------------- HEALTH MANAGEMENT (Gimani part) -----------------
+import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
+import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
+
+// Layouts (Health)
+import AdminLayout from './Components/HealthManagement/H_layouts/H_AdminLayout.js';
+import DoctorLayout from './Components/HealthManagement/H_layouts/H_DoctorLayout.js';
+import PlantPathologistLayout from './Components/HealthManagement/H_layouts/H_PlantPathologistLayout.js';
+
+// ADMIN COMPONENTS (Health)
+import AddminPart from './Components/HealthManagement/AdminPart/HealthAddminPart.js';
+import DoctorDetails from './Components/HealthManagement/AdminPart/DoctorDetails/DoctorDetails.js';
+import SpecialistDetails from './Components/HealthManagement/AdminPart/H_SpecialistDetails/H_SpecialistDetails.js';
+import MedicineCompany from './Components/HealthManagement/AdminPart/H_MedicineCompany/H_MedicineCompany.js';
+import MediStore from './Components/HealthManagement/AdminPart/H_MediStore/H_MediStore.js';
+import TreatmentsDetails from './Components/HealthManagement/AdminPart/TreatmentsDetails/TreatmentsDetails.js';
+import TreatmentsPayments from './Components/HealthManagement/AdminPart/TreatmentsPayments/TreatmentsPayments.js';
+import AdminProfile from './Components/HealthManagement/AdminPart/AdminProfile/AdminProfile.js';
+import H_PlantPathologist from './Components/HealthManagement/AdminPart/H_PlantPathologist/H_PlantPathologist.js';
+
+// DOCTOR COMPONENTS (Health)
+import DoctorDashboard from './Components/HealthManagement/DoctorPart/DoctorDashBoard.js';
+import HealthAnimal from './Components/HealthManagement/DoctorPart/HealthAnimal.js';
+import DoctorTreatment from './Components/HealthManagement/DoctorPart/DoctorTreatment.js';
+import DoctorAdditional from './Components/HealthManagement/DoctorPart/DoctorAdditional.js';
+
+// PLANT PATHOLOGIST COMPONENTS (Health)
+import PlantPathologistHome from "./Components/HealthManagement/PlantPathologistPart/PlantPathologistHome.js";
+import FertiliserStock from './Components/HealthManagement/PlantPathologistPart/H_FertiliserStock.js';
+import FertiliserDetails from './Components/HealthManagement/PlantPathologistPart/H_FertiliserDetails.js';
+import H_FertiliserAdd from './Components/HealthManagement/PlantPathologistPart/H_FertiliserAdd.js';
+import PlantPathologistAdditional from './Components/HealthManagement/PlantPathologistPart/PathologisticAdditional.js';
+import PlantPathologistProfile from './Components/HealthManagement/PlantPathologistPart/PathologisticProfile.js';
+
 function App() {
   return (
     <div className="App">
-      {/* Wrap everything in a single AuthProvider and other providers */}
+      {/* ----------------- User / Frontend Routes ----------------- */}
       <AuthProvider>
         <UserThemeProvider>
           <CartProvider>
-            {/* Single Routes component for all routes */}
             <Routes>
-              {/* User/Frontend Routes */}
-              <Route path="/" element={
-                <>
-                  <Navbar />
-                  <Home />
-                </>
-              } />
+              <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               
-              {/* Animal Management Routes */}
+              {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
-                <LoaderProvider>
-                  <LanguageProvider>
-                    <AnimalThemeProvider>
-                      <UserProvider>
-                        <ProtectedRoute allowedRoles={["animal"]}>
+                <ProtectedRoute allowedRoles={["animal"]}>
+                  <LoaderProvider>
+                    <LanguageProvider>
+                      <AnimalThemeProvider>
+                        <UserProvider>
                           <Layout />
-                        </ProtectedRoute>
-                      </UserProvider>
-                    </AnimalThemeProvider>
-                  </LanguageProvider>
-                </LoaderProvider>
+                        </UserProvider>
+                      </AnimalThemeProvider>
+                    </LanguageProvider>
+                  </LoaderProvider>
+                </ProtectedRoute>
               }>
+                {/* Index route = Dashboard */}
                 <Route index element={<Dashboard />} />
                 <Route path=":type" element={<AnimalList />} />
                 <Route path="productivity/:type" element={<AnimalProductivity />} />
@@ -89,19 +117,79 @@ function App() {
                 <Route path="settings" element={<Settings />} />
                 <Route path="alerts" element={<Alerts />} />
               </Route>
-              
-              {/* Inventory Management Routes */}
+
+              {/* ----------------- Inventory Management Routes ----------------- */}
               <Route path="/InventoryManagement/*" element={
                 <IThemeProvider>
                   <ILayout />
                 </IThemeProvider>
               }>
                 <Route index element={<IDashboard />} />
+                {/* Add other inventory routes here as needed */}
               </Route>
             </Routes>
           </CartProvider>
         </UserThemeProvider>
       </AuthProvider>
+
+      {/* ----------------- Health Management Routes (Separate like in old code) ----------------- */}
+      <HLanguageProvider>
+        <HThemeProvider>
+          <Routes>
+            {/* Doctor */}
+            <Route path="/doctor/*" element={
+              <ProtectedRoute allowedRoles={["health"]}>
+                <DoctorLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="home" replace />} />
+              <Route path="home" element={<DoctorDashboard />} />
+              <Route path="animals" element={<HealthAnimal />} />
+              <Route path="medicine-stock" element={<MediStore />} />
+              <Route path="pharmacy" element={<MedicineCompany />} />
+              <Route path="vet-specialist" element={<SpecialistDetails />} />
+              <Route path="treatment-details" element={<DoctorTreatment />} />
+              <Route path="help" element={<DoctorAdditional />} />
+              <Route path="*" element={<Navigate to="home" replace />} />
+            </Route>
+
+            {/* Plant Pathologist */}
+            <Route path="/plant-pathologist/*" element={
+              <ProtectedRoute allowedRoles={["health"]}>
+                <PlantPathologistLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="home" replace />} />
+              <Route path="home" element={<PlantPathologistHome />} />
+              <Route path="fertiliser-stock" element={<FertiliserStock />} />
+              <Route path="fertiliser-details" element={<FertiliserDetails />} />
+              <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
+              <Route path="help" element={<PlantPathologistAdditional />} />
+              <Route path="profile" element={<PlantPathologistProfile />} />
+              <Route path="*" element={<Navigate to="home" replace />} />
+            </Route>
+
+            {/* Admin */}
+            <Route path="/admin/*" element={
+              <ProtectedRoute allowedRoles={["health"]}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="aaa" replace />} />
+              <Route path="aaa" element={<AddminPart />} />
+              <Route path="doctor-details" element={<DoctorDetails />} />
+              <Route path="specialist-details" element={<SpecialistDetails />} />
+              <Route path="medicine-company" element={<MedicineCompany />} />
+              <Route path="medistore" element={<MediStore />} />
+              <Route path="treatments-details" element={<TreatmentsDetails />} />
+              <Route path="treatments-payments" element={<TreatmentsPayments />} />
+              <Route path="profile" element={<AdminProfile />} />
+              <Route path="plant-pathologist" element={<H_PlantPathologist />} />
+              <Route path="*" element={<Navigate to="aaa" replace />} />
+            </Route>
+          </Routes>
+        </HThemeProvider>
+      </HLanguageProvider>
     </div>
   );
 }

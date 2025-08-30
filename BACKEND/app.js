@@ -29,6 +29,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/Health_uploads', express.static(path.join(__dirname, 'HealthManagement', 'Health_uploads')));
+
+// Ensure uploads folders exist
+const uploadsDir = path.join(__dirname, 'uploads');
+const healthUploadsDir = path.join(__dirname, 'HealthManagement', 'Health_uploads');
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('📁 Created uploads directory');
+}
+
+if (!fs.existsSync(healthUploadsDir)) {
+  fs.mkdirSync(healthUploadsDir, { recursive: true });
+  console.log('📁 Created Health_uploads directory');
+}
 
 // Routes
 app.use("/animals", animalRouter);
@@ -38,17 +53,31 @@ app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
 app.use('/api/users', userRoutes);
 
+// Health Management Routes
+import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
+import specialistRoutes from "./HealthManagement/Routes/HealthSpecialistRoute.js";
+import medicineCompanyRoutes from "./HealthManagement/Routes/H_MedicineCompanyRoute.js";
+import mediStoreRoutes from "./HealthManagement/Routes/H_mediStoreRoute.js";
+import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologistRoute.js";
+import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
+import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
+
+app.use("/api/doctors", doctorRoutes);
+app.use("/api/specialists", specialistRoutes);
+app.use("/api/medicine-companies", medicineCompanyRoutes);
+app.use("/api/medistore", mediStoreRoutes);
+app.use("/api/plant-pathologists", plantPathologistRoutes);
+app.use("/api/fertilisers", fertiliserRoutes);
+app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running" });
 });
 
-// Ensure uploads folder exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-  console.log('📁 Created uploads directory');
-}
+app.get("/", (req, res) => {
+  res.send("Backend is running!");
+});
 
 // MongoDB Connection
 mongoose.connect("mongodb+srv://EasyFarming:sliit123@easyFarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority", {
