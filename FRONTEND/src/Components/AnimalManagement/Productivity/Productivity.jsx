@@ -577,7 +577,7 @@ export default function AnimalProductivity() {
             {filteredAnimalTypes.map(type => (
               <div
                 key={type._id}
-                onClick={() => navigate(`/AnimalProductivity/${type.name.toLowerCase()}`)}
+                onClick={() => navigate(`/AnimalManagement/AnimalProductivity/${type.name.toLowerCase()}`)}
                 className={`cursor-pointer overflow-hidden rounded-lg shadow-md transition-all hover:shadow-lg ${
                   darkMode ? "bg-gray-800 hover:bg-gray-750" : "bg-white hover:bg-gray-50"
                 }`}

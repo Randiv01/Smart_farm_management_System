@@ -1,4 +1,6 @@
 // server.js (or your main file)
+import dotenv from "dotenv";
+dotenv.config(); 
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -7,8 +9,9 @@ import { animalTypeRouter } from "./AnimalManagement/routes/animalTypeRoutes.js"
 import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
+import { doctorRouter } from './AnimalManagement/routes/doctorRoutes.js';
+import { sendMedicalRequest, testEmail } from './AnimalManagement/controllers/medicalRequestController.js';
 import userRoutes from "./routes/userRoutes.js";
-import dotenv from "dotenv";
 dotenv.config();
 import path from 'path';
 import fs from 'fs';
@@ -52,6 +55,9 @@ app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/doctors', doctorRouter);
+app.post('/api/medical-request', sendMedicalRequest);
+app.post('/api/test-email', testEmail);
 
 // Health Management Routes
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";

@@ -49,6 +49,36 @@ export default function AnimalList() {
     fetchZones();
   }, []);
 
+  // Helper function to safely get zone information
+  const getZoneInfo = (animal) => {
+    if (!animal) return { name: "Not assigned", id: null };
+    
+    // Check different possible ways the zone data might be structured
+    if (animal.assignedZone && typeof animal.assignedZone === 'object') {
+      return {
+        name: animal.assignedZone.name || "Unknown",
+        id: animal.assignedZone._id
+      };
+    }
+    
+    if (animal.assignedZone && typeof animal.assignedZone === 'string') {
+      // If it's just an ID string, try to find the zone in the zones state
+      const foundZone = zones.find(z => z._id === animal.assignedZone);
+      return foundZone 
+        ? { name: foundZone.name, id: foundZone._id }
+        : { name: "Unknown", id: animal.assignedZone };
+    }
+    
+    if (animal.zoneId) {
+      const foundZone = zones.find(z => z._id === animal.zoneId);
+      return foundZone 
+        ? { name: foundZone.name, id: foundZone._id }
+        : { name: "Unknown", id: animal.zoneId };
+    }
+    
+    return { name: "Not assigned", id: null };
+  };
+
   // Fetch data with zone information
   const fetchData = async () => {
     try {
@@ -60,24 +90,79 @@ export default function AnimalList() {
       const typeData = await typeRes.json();
       setAnimalType(typeData);
 
-      // Initialize editData for Basic Info only
-      const basicInfoCategory = typeData.categories.find(
-        (cat) => cat.name === "Basic Info"
+      // Initialize editData for appropriate category
+      const mainCategory = typeData.categories.find(
+        cat => cat.name === "Basic Info" || cat.name === "Batch Info" || cat.name === "Hive/Farm Info"
       );
       const initialEditData = {};
-      if (basicInfoCategory)
-        basicInfoCategory.fields.forEach(
+      if (mainCategory)
+        mainCategory.fields.forEach(
           (field) => (initialEditData[field.name] = "")
         );
       setEditData(initialEditData);
 
       // Fetch animals with populated zone data
       const animalsRes = await fetch(
-        `http://localhost:5000/animals?type=${typeData._id}&populate=zone`
+        `http://localhost:5000/animals?type=${typeData._id}`
       );
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
       const animalsData = await animalsRes.json();
-      setAnimals(animalsData || []);
+      
+      // For batch/group management, group animals by batchId
+      if (typeData.managementType === "batch") {
+        const batchGroups = {};
+        animalsData.forEach(animal => {
+          if (animal.batchId) {
+            if (!batchGroups[animal.batchId]) {
+              batchGroups[animal.batchId] = {
+                ...animal,
+                count: 1,
+                animals: [animal]
+              };
+            } else {
+              batchGroups[animal.batchId].count += 1;
+              batchGroups[animal.batchId].animals.push(animal);
+            }
+          } else {
+            // Handle individual animals in batch types (shouldn't normally happen)
+            if (!batchGroups[animal._id]) {
+              batchGroups[animal._id] = {
+                ...animal,
+                count: 1,
+                animals: [animal]
+              };
+            }
+          }
+        });
+        
+        // Convert to array
+        setAnimals(Object.values(batchGroups));
+      } else if (typeData.managementType === "other") {
+        // For "other" management type (hives/farms), group by a unique identifier
+        // Use batchId if available, otherwise use the first field from Hive/Farm Info
+        const hiveFarmGroups = {};
+        const mainField = typeData.categories.find(cat => cat.name === "Hive/Farm Info")?.fields[0]?.name || "name";
+        
+        animalsData.forEach(animal => {
+          const groupKey = animal.batchId || animal.data[mainField] || animal._id;
+          
+          if (!hiveFarmGroups[groupKey]) {
+            hiveFarmGroups[groupKey] = {
+              ...animal,
+              groupId: groupKey,
+              animals: [animal]
+            };
+          } else {
+            hiveFarmGroups[groupKey].animals.push(animal);
+          }
+        });
+        
+        // Convert to array
+        setAnimals(Object.values(hiveFarmGroups));
+      } else {
+        // For individual management, show all animals
+        setAnimals(animalsData);
+      }
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -96,20 +181,45 @@ export default function AnimalList() {
       setTimeout(() => setPopup({ ...popup, show: false }), 2500);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id, isGroup = false, groupType = "individual") => {
     setPopup({
       show: true,
-      message: "Are you sure you want to delete this animal?",
+      message: isGroup 
+        ? `Are you sure you want to delete this entire ${groupType === "batch" ? "batch" : groupType === "other" ? "hive/farm" : "group"}? This will delete all items in this ${groupType === "batch" ? "batch" : groupType === "other" ? "hive/farm" : "group"}.` 
+        : "Are you sure you want to delete this animal?",
       success: false,
       type: "delete",
       confirmAction: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/animals/${id}`, {
-            method: "DELETE",
-          });
-          if (!res.ok) throw new Error("Failed to delete animal");
+          if (isGroup) {
+            if (groupType === "batch") {
+              const res = await fetch(`http://localhost:5000/animals/batch/${id}`, {
+                method: "DELETE",
+              });
+              if (!res.ok) throw new Error("Failed to delete batch");
+            } else {
+              // For "other" type, we need to delete all animals in the group
+              // First find all animals with this groupId
+              const groupAnimals = animals.find(a => 
+                (a.batchId === id) || (a.groupId === id) || (a._id === id)
+              )?.animals || [];
+              
+              // Delete each animal individually
+              for (const animal of groupAnimals) {
+                const res = await fetch(`http://localhost:5000/animals/${animal._id}`, {
+                  method: "DELETE",
+                });
+                if (!res.ok) throw new Error("Failed to delete animal");
+              }
+            }
+          } else {
+            const res = await fetch(`http://localhost:5000/animals/${id}`, {
+              method: "DELETE",
+            });
+            if (!res.ok) throw new Error("Failed to delete animal");
+          }
           fetchData();
-          showPopup("Animal deleted successfully!", true, "save");
+          showPopup(isGroup ? `${groupType === "batch" ? "Batch" : groupType === "other" ? "Hive/Farm" : "Group"} deleted successfully!` : "Animal deleted successfully!", true, "save");
         } catch (err) {
           showPopup(err.message, false, "error");
         }
@@ -126,54 +236,74 @@ export default function AnimalList() {
     setEditData(editValues);
   };
 
-  // Update with validation
-  const handleUpdate = async (id) => {
-    // Validate empty fields
-    const emptyFields = Object.entries(editData)
-      .filter(([key, value]) => !value || value.toString().trim() === "")
-      .map(([key]) => key);
+const handleUpdate = async (id) => {
+  // Validate empty fields
+  const emptyFields = Object.entries(editData)
+    .filter(([key, value]) => !value || value.toString().trim() === "")
+    .map(([key]) => key);
 
-    if (emptyFields.length > 0) {
-      showPopup(
-        `Please fill all fields before saving. Missing: ${emptyFields.join(
-          ", "
-        )}`,
-        false,
-        "error"
-      );
-      return;
-    }
+  if (emptyFields.length > 0) {
+    showPopup(
+      `Please fill all fields before saving. Missing: ${emptyFields.join(
+        ", "
+      )}`,
+      false,
+      "error"
+    );
+    return;
+  }
 
-    try {
-      const res = await fetch(`http://localhost:5000/animals/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: editData, updatedAt: Date.now() }),
-      });
-      if (!res.ok) throw new Error("Failed to update animal");
-      const updatedAnimal = await res.json();
-      setAnimals((prev) => prev.map((a) => (a._id === id ? updatedAnimal : a)));
-      setEditId(null);
-      showPopup("Animal updated successfully!");
-    } catch (err) {
-      showPopup(err.message, false, "error");
+  try {
+    // First get the current animal data
+    const currentAnimalRes = await fetch(`http://localhost:5000/animals/${id}`);
+    if (!currentAnimalRes.ok) throw new Error("Failed to fetch current animal data");
+    const currentAnimal = await currentAnimalRes.json();
+    
+    // Merge the updated fields with existing data
+    const mergedData = {
+      ...currentAnimal.data, // Keep all existing data
+      ...editData           // Override with updated fields
+    };
+
+    const res = await fetch(`http://localhost:5000/animals/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: mergedData, updatedAt: Date.now() }),
+    });
+    if (!res.ok) throw new Error("Failed to update animal");
+    const updatedAnimal = await res.json();
+    setAnimals((prev) => prev.map((a) => (a._id === id ? updatedAnimal : a)));
+    setEditId(null);
+    showPopup("Animal updated successfully!");
+  } catch (err) {
+    showPopup(err.message, false, "error");
+  }
+};
+
+  // Get appropriate fields based on management type
+  const getDisplayFields = () => {
+    if (!animalType) return [];
+    
+    if (animalType.managementType === "batch") {
+      return animalType.categories.find(cat => cat.name === "Batch Info")?.fields || [];
+    } else if (animalType.managementType === "other") {
+      return animalType.categories.find(cat => cat.name === "Hive/Farm Info")?.fields || [];
+    } else {
+      return animalType.categories.find(cat => cat.name === "Basic Info")?.fields || [];
     }
   };
 
-  // Basic Info fields
-  const basicInfoFields = [];
-  const basicInfoCategory = animalType?.categories?.find(
-    (cat) => cat.name === "Basic Info"
-  );
-  if (basicInfoCategory)
-    basicInfoCategory.fields?.forEach((field) =>
-      basicInfoFields.push({
-        name: field.name,
-        label: field.label,
-        type: field.type,
-        options: field.options || null,
-      })
-    );
+  const displayFields = getDisplayFields();
+
+  // Get group identifier for display
+  const getGroupIdentifier = (animal) => {
+    if (animalType.managementType === "batch") {
+      return animal.batchId;
+    } else if (animalType.managementType === "other") {
+      return animal.groupId || animal.batchId || animal._id;
+    }
+    return animal.animalId;
+  };
 
   // Search & filter logic
   const handleFilterChange = (field, value) => {
@@ -184,13 +314,14 @@ export default function AnimalList() {
     const matchesSearch = searchQuery
       ? Object.values(animal.data).some((val) =>
           String(val).toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        ) || 
+        (getGroupIdentifier(animal) && getGroupIdentifier(animal).toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
 
     const matchesFilters = Object.keys(filterValues).every((key) => {
       if (!filterValues[key]) return true;
       const val = animal.data[key] || "";
-      if (basicInfoFields.find((f) => f.name === key)?.type === "number") {
+      if (displayFields.find((f) => f.name === key)?.type === "number") {
         return Number(val) === Number(filterValues[key]);
       }
       return String(val)
@@ -248,12 +379,16 @@ export default function AnimalList() {
             }`}
           >
             {animalType.name} List
+            {animalType.managementType !== "individual" && 
+              ` (${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} View)`}
           </h2>
           <button
-            onClick={() => navigate(`/add-animal/${animalType._id}`)}
+            onClick={() => navigate(`/AnimalManagement/add-animal/${animalType._id}`)}
             className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-btn-teal text-white hover:bg-teal-700"
           >
-            ➕ Add New {animalType.name}
+            ➕ Add New {animalType.managementType !== "individual" 
+              ? (animalType.managementType === "batch" ? "Batch" : "Hive/Farm") 
+              : animalType.name}
           </button>
         </div>
 
@@ -266,7 +401,7 @@ export default function AnimalList() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-dark-card dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-btn-teal focus:border-btn-teal"
           />
-          {basicInfoFields.slice(0, 2).map((field) => (
+          {displayFields.slice(0, 2).map((field) => (
             <input
               key={field.name}
               type={
@@ -301,7 +436,10 @@ export default function AnimalList() {
               <tr>
                 <th className="p-3 text-center">QR & ID</th>
                 <th className="p-3">Zone</th>
-                {basicInfoFields.map((field, idx) => (
+                {animalType.managementType === "batch" && (
+                  <th className="p-3 text-center">Count</th>
+                )}
+                {displayFields.map((field, idx) => (
                   <th key={idx} className="p-3">
                     {field.label}
                   </th>
@@ -313,7 +451,7 @@ export default function AnimalList() {
               {filteredAnimals.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={basicInfoFields.length + 3}
+                    colSpan={displayFields.length + (animalType.managementType === "batch" ? 4 : 3)}
                     className="p-4 text-center italic text-gray-500 dark:text-gray-400"
                   >
                     No matching {animalType.name} found.
@@ -327,32 +465,56 @@ export default function AnimalList() {
                       darkMode ? "bg-dark-card text-dark-text" : "bg-white"
                     } hover:${darkMode ? "bg-dark-gray" : "bg-gray-100"}`}
                   >
-                    {/* QR Code + Animal ID */}
+                    {/* QR Code + Animal/Batch/Hive ID */}
                     <td className="p-3">
                       <div className="flex flex-col items-center justify-center">
-                        {animal.qrCode ? (
-                          <QRCodeCanvas value={animal.qrCode} size={60} level="H" />
+                        {animalType.managementType !== "individual" ? (
+                          // For batch/other animals, show group ID and QR code
+                          <div className="text-center">
+                            <QRCodeCanvas 
+                              value={getGroupIdentifier(animal)} 
+                              size={60} 
+                              level="H" 
+                              className="mx-auto" // Center the QR code
+                            />
+                            <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                              {animalType.managementType === "batch" ? "Batch: " : "ID: "}
+                              {getGroupIdentifier(animal)}
+                            </div>
+                          </div>
+                        ) : animal.qrCode ? (
+                          // For individual animals, show individual QR code
+                          <div className="text-center">
+                            <QRCodeCanvas 
+                              value={animal.qrCode} 
+                              size={60} 
+                              level="H" 
+                              className="mx-auto" // Center the QR code
+                            />
+                            <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                              {animal.animalId}
+                            </div>
+                          </div>
                         ) : (
                           "-"
                         )}
-                        <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                          {animal.animalId}
-                        </div>
                       </div>
                     </td>
 
                     {/* Zone */}
                     <td className="p-2 text-center">
-                      {animal.zone 
-                        ? animal.zone.name || "Unknown"
-                        : animal.assignedZone 
-                          ? zones.find(z => z._id === animal.assignedZone)?.name || "Unknown"
-                          : "Not assigned"
-                      }
+                      {getZoneInfo(animal).name}
                     </td>
 
+                    {/* Count for batch animals only */}
+                    {animalType.managementType === "batch" && (
+                      <td className="p-2 text-center font-semibold">
+                        {animal.count}
+                      </td>
+                    )}
+
                     {/* Dynamic Fields */}
-                    {basicInfoFields.map((field, idx) => (
+                    {displayFields.map((field, idx) => (
                       <td key={idx} className="p-2 text-center">
                         {editId === animal._id ? (
                           field.type === "select" && field.options ? (
@@ -442,7 +604,13 @@ export default function AnimalList() {
                               🏠 Move
                             </button>
                             <button
-                              onClick={() => handleDelete(animal._id)}
+                              onClick={() => handleDelete(
+                                animalType.managementType !== "individual" 
+                                  ? (animalType.managementType === "batch" ? animal.batchId : animal.groupId || animal._id)
+                                  : animal._id,
+                                animalType.managementType !== "individual",
+                                animalType.managementType
+                              )}
                               className="px-2 py-1 rounded bg-btn-red text-white hover:bg-red-600"
                             >
                               🗑 Delete
@@ -463,7 +631,11 @@ export default function AnimalList() {
       {animalToMove && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div className={`bg-white dark:bg-dark-card p-6 rounded-xl w-96 ${darkMode ? "text-dark-text" : ""}`}>
-            <h3 className="text-lg font-semibold mb-4">Move {animalToMove.data?.name} to another zone</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Move {animalType.managementType !== "individual" 
+                ? (animalType.managementType === "batch" ? "Batch" : "Hive/Farm") 
+                : animalToMove.data?.name} to another zone
+            </h3>
             <select
               value={moveZoneId}
               onChange={(e) => setMoveZoneId(e.target.value)}
@@ -474,10 +646,10 @@ export default function AnimalList() {
                 <option 
                   key={zone._id} 
                   value={zone._id}
-                  disabled={zone.currentOccupancy >= zone.capacity && zone._id !== animalToMove.assignedZone?.toString()}
+                  disabled={zone.currentOccupancy >= zone.capacity && zone._id !== getZoneInfo(animalToMove).id}
                 >
                   {zone.name} ({zone.currentOccupancy}/{zone.capacity})
-                  {zone.currentOccupancy >= zone.capacity && zone._id !== animalToMove.assignedZone?.toString() && " - FULL"}
+                  {zone.currentOccupancy >= zone.capacity && zone._id !== getZoneInfo(animalToMove).id && " - FULL"}
                 </option>
               ))}
             </select>
@@ -496,18 +668,51 @@ export default function AnimalList() {
                   }
                   
                   try {
-                    const res = await fetch(`http://localhost:5000/animals/${animalToMove._id}/move-zone`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ zoneId: moveZoneId }),
-                    });
-                    
-                    if (!res.ok) {
-                      const errorData = await res.json();
-                      throw new Error(errorData.message || "Failed to move animal");
+                    // For batch/other animals, use the appropriate update endpoint
+                    if (animalType.managementType !== "individual") {
+                      if (animalType.managementType === "batch") {
+                        const res = await fetch(`http://localhost:5000/animals/batch/${animalToMove.batchId}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ zoneId: moveZoneId }),
+                        });
+                        
+                        if (!res.ok) {
+                          const errorData = await res.json();
+                          throw new Error(errorData.message || "Failed to move batch");
+                        }
+                      } else {
+                        // For "other" type, move each animal individually
+                        for (const animal of animalToMove.animals || [animalToMove]) {
+                          const res = await fetch(`http://localhost:5000/animals/${animal._id}/move-zone`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ zoneId: moveZoneId }),
+                          });
+                          
+                          if (!res.ok) {
+                            const errorData = await res.json();
+                            throw new Error(errorData.message || "Failed to move animal");
+                          }
+                        }
+                      }
+                    } else {
+                      // For individual animals
+                      const res = await fetch(`http://localhost:5000/animals/${animalToMove._id}/move-zone`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ zoneId: moveZoneId }),
+                      });
+                      
+                      if (!res.ok) {
+                        const errorData = await res.json();
+                        throw new Error(errorData.message || "Failed to move animal");
+                      }
                     }
                     
-                    showPopup("Animal moved successfully!");
+                    showPopup(animalType.managementType !== "individual" 
+                      ? `${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} moved successfully!` 
+                      : "Animal moved successfully!");
                     setAnimalToMove(null);
                     fetchData(); // Refresh data
                   } catch (err) {

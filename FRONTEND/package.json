@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@fortawesome/free-regular-svg-icons": "^7.0.0",
     "@fortawesome/free-solid-svg-icons": "^7.0.0",
     "@fortawesome/react-fontawesome": "^0.2.3",
@@ -23,6 +24,7 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.539.0",
     "multer": "^2.0.2",
+    "nodemailer": "^7.0.6",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
@@ -35,6 +37,7 @@
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
     "recharts": "^3.1.2",
+    "twilio": "^5.8.2",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },

@@ -46,25 +46,7 @@ export default function AnimalHealth() {
     document.title = "Animal Health Dashboard";
     fetchData();
   }, []);
-
- const handleEmergencyProtocol = async () => {
-  try {
-    setGlobalLoading(true);
-    await axios.post("http://localhost:5000/emergency/trigger", {
-      phone: "+94769285819",
-      email: "your_test_email@gmail.com",
-      message: "🚨 Emergency Alert: Critical animal health case detected!"
-    });
-    alert("🚨 Emergency protocol activated! Email sent, SMS & call simulated.");
-  } catch (err) {
-    console.error("Emergency protocol failed:", err);
-    alert("❌ Failed to trigger emergency protocol.");
-  } finally {
-    setGlobalLoading(false);
-  }
-};
-
-
+  
 
   const fetchData = async () => {
     try {
@@ -174,18 +156,25 @@ export default function AnimalHealth() {
     ],
   };
 
-  const genderChartData = {
-    labels: ["Male", "Female"],
-    datasets: [
-      {
-        label: "Animals by Gender",
-        data: [genderStats.male, genderStats.female],
-        backgroundColor: ["#3b82f6", "#ec4899"],
-        borderColor: darkMode ? "#374151" : "#e5e7eb",
-        borderWidth: 1
-      },
-    ],
-  };
+  const vaccinationChartData = {
+  labels: Object.keys(vaccinationStats),
+  datasets: [
+    {
+      label: "Vaccination Status",
+      data: Object.values(vaccinationStats),
+      backgroundColor: [
+        "#3b82f6", // Not Vaccinated - blue
+        "#f59e0b", // Partially Vaccinated - amber
+        "#10b981", // Fully Vaccinated - green
+        "#ef4444", // Overdue - red
+        "#9ca3af", // Unknown - gray
+      ],
+      borderColor: darkMode ? "#374151" : "#e5e7eb",
+      borderWidth: 1
+    },
+  ],
+};
+
 
   // Emergency status colors
   const getStatusColor = (status) => {
@@ -208,22 +197,6 @@ export default function AnimalHealth() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800 dark:text-white">Animal Health Dashboard</h2>
           <div className="flex gap-2">
-            <button 
-  onClick={handleEmergencyProtocol}
-  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-md transition-colors flex items-center"
->
-  🚨 Emergency Protocol
-</button>
-
-            <button 
-              onClick={() => navigate("/medical-support")}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition-colors flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M11 17a1 1 0 001.447.894l4-2A1 1 0 0017 15V9.236a1 1 0 00-1.447-.894l-4 2a1 1 0 00-.553.894V17zM15.211 6.276a1 1 0 000-1.788l-4.764-2.382a1 1 0 00-.894 0L4.789 4.488a1 1 0 000 1.788l4.764 2.382a1 1 0 00.894 0l4.764-2.382zM4.447 8.342A1 1 0 003 9.236V15a1 1 0 00.553.894l4 2A1 1 0 009 17v-5.764a1 1 0 00-.553-.894l-4-2z" />
-              </svg>
-              Medical Support
-            </button>
           </div>
         </div>
 
@@ -314,7 +287,7 @@ export default function AnimalHealth() {
             {animalTypes.map(type => (
               <div
                 key={type._id}
-                onClick={() => navigate(`/HealthReport/${type.name.toLowerCase()}`)}
+                onClick={() => navigate(`/AnimalManagement/HealthReport/${type.name.toLowerCase()}`)}
                 className={`cursor-pointer overflow-hidden rounded-lg shadow-md transition-all hover:shadow-lg ${
                   darkMode ? "bg-gray-800 hover:bg-gray-750" : "bg-white hover:bg-gray-50"
                 }`}
@@ -421,10 +394,10 @@ export default function AnimalHealth() {
           </div>
 
           <div className={`p-5 rounded-xl shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Gender Distribution</h3>
+           <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Vaccination Status Distribution</h3>
             <div className="h-64">
               <Pie 
-                data={genderChartData} 
+                data={vaccinationChartData} 
                 options={{ 
                   responsive: true,
                   maintainAspectRatio: false,

@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useLoader } from "../contexts/LoaderContext";
+import { useNavigate } from "react-router-dom";
+
 
 // Main component with updated logic
 function AddAnimalType() {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const { loading, setLoading } = useLoader();
+  const navigate = useNavigate();
+  
 
   // State for the main animal type name and banner
   const [name, setName] = useState("");
@@ -38,19 +42,17 @@ function AddAnimalType() {
       fields: [
         { name: "name", label: "Name", type: "text", required: true },
         { name: "breed", label: "Breed", type: "text", required: true },
-        { name: "zone", label: "Zone", type: "select", options: [], required: true },
-        { name: "zoneType", label: "Zone Type", type: "select", options: [], required: true },
         { name: "age", label: "Age", type: "number", required: true },
         { name: "dob", label: "Date of Birth", type: "date", required: true },
         { name: "gender", label: "Gender", type: "select", options: ["Male", "Female"], required: true },
-        { name: "owner", label: "Owner", type: "text", required: true },
+        { name: "owner", label: "Owner", type: "select", options: ["Mount Olive", "Other"], required: true },
       ],
     },
     {
       name: "Health Info",
       fields: [
-        { name: "weight", label: "Weight", type: "number", required: false },
-        { name: "temperature", label: "Temperature", type: "number", required: false },
+       { name: "weight", label: "Weight (kg)", type: "number", required: false },
+      { name: "temperature", label: "Temperature (°C)", type: "number", required: false },
         {
           name: "healthStatus",
           label: "Health Status",
@@ -67,7 +69,6 @@ function AddAnimalType() {
           options: ["Not Vaccinated", "Partially Vaccinated", "Fully Vaccinated", "Overdue", "Unknown"],
           required: true,
         },
-        { name: "treatments", label: "Treatments", type: "text", required: false },
         {
           name: "reproductiveStatus",
           label: "Reproductive Status",
@@ -80,10 +81,16 @@ function AddAnimalType() {
     {
       name: "Productivity Info",
       fields: [
-        { name: "milkProduction", label: "Milk Production", type: "number", required: false },
+        { name: "milkProduction", label: "Milk Production(L)", type: "number", required: false },
         { name: "eggProduction", label: "Egg Production", type: "number", required: false },
-        { name: "feedType", label: "Feed Type", type: "text", required: false },
-        { name: "growthMetrics", label: "Growth Metrics", type: "text", required: false },
+        {
+          name: "feedType",
+          label: "Feed Type",
+          type: "select", 
+          options: ["Grass", "Hay", "Silage", "Grains", "Concentrates","Supplements"],
+          required: false,
+        },
+
       ],
     },
   ];
@@ -92,11 +99,8 @@ function AddAnimalType() {
     {
       name: "Batch Info",
       fields: [
-        { name: "batchName", label: "Batch Name/ID", type: "text", required: true },
+        { name: "batchName", label: "Batch Name", type: "text", required: true },
         { name: "species", label: "Species", type: "text", required: true },
-        { name: "zone", label: "Zone", type: "select", options: [], required: true },
-        { name: "zoneType", label: "Zone Type", type: "select", options: [], required: true },
-        { name: "numAnimals", label: "Number of Animals", type: "number", required: true },
         { name: "arrivalDate", label: "Arrival Date", type: "date", required: true },
       ],
     },
@@ -122,15 +126,13 @@ function AddAnimalType() {
     {
       name: "Hive/Farm Info",
       fields: [
-        { name: "zone", label: "Zone", type: "select", options: [], required: true },
-        { name: "zoneType", label: "Zone Type", type: "select", options: [], required: true },
-        { name: "hiveID", label: "Hive ID", type: "text", required: true },
+        { name: "hiveName", label: "Hive Name", type: "text", required: true },
         { name: "hiveHealth", label: "Hive Health", type: "select", options: ["Healthy", "Pest Infestation", "Weak Colony"], required: true },
-        { name: "queenAge", label: "Queen Age", type: "number", required: false },
+
       ],
     },
     {
-      name: "Natural Farm Metrics",
+      name: "Productivity Info",
       fields: [
         { name: "biodiversityScore", label: "Biodiversity Score", type: "number", required: false },
         { name: "soilMoisture", label: "Soil Moisture (%)", type: "number", required: false },
@@ -676,8 +678,11 @@ function AddAnimalType() {
               )}
             </div>
             <p className="text-sm font-medium dark:text-gray-200 mb-2">{popup.message}</p>
-            <button
-              onClick={() => setPopup({ ...popup, show: false })}
+           <button
+              onClick={() => {
+                setPopup({ ...popup, show: false });
+                navigate("/AnimalManagement");
+              }}
               className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium ${
                 popup.success 
                   ? "bg-green-600 hover:bg-green-700 text-white" 
@@ -686,6 +691,7 @@ function AddAnimalType() {
             >
               OK
             </button>
+
           </div>
         </div>
       )}

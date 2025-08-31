@@ -66,10 +66,10 @@ export const createAnimal = async (req, res) => {
   }
 };
 
-// Create batch animals
+// Create batch animals - UPDATED: Don't generate individual QR codes
 export const createBatchAnimals = async (req, res) => {
   try {
-    const { type, data, generateQR, zoneId, batchId, count } = req.body;
+    const { type, data, zoneId, batchId, count, generateQR } = req.body;
 
     let animalType;
     if (mongoose.Types.ObjectId.isValid(type)) {
@@ -104,15 +104,18 @@ export const createBatchAnimals = async (req, res) => {
       nextNumber = parseInt(lastIdParts[2]) + 1;
     }
 
-    // Create all animals in the batch
+    // Create all animals in the batch - NO individual QR codes for batch animals
     for (let i = 0; i < count; i++) {
       const animalId = `MO-${animalType.typeId}-${String(nextNumber + i).padStart(3, '0')}`;
-      const qrCode = generateQR ? uuidv4() : undefined;
       
       const animal = new Animal({
         type: animalType._id,
-        data: { ...data, batchNumber: i + 1 }, // Add batch position to data
-        qrCode,
+        data: { 
+          ...data, 
+          batchNumber: i + 1, // Add batch position to data
+          batchId: batchIdentifier // Also store batch ID in data for easy filtering
+        },
+        qrCode: null, // No individual QR codes for batch animals
         animalId,
         assignedZone: zoneId || null,
         batchId: batchIdentifier
@@ -132,7 +135,8 @@ export const createBatchAnimals = async (req, res) => {
     res.status(201).json({
       message: `Created ${count} animals in batch ${batchIdentifier}`,
       batchId: batchIdentifier,
-      animalsCount: count
+      animalsCount: count,
+      batchQRCode: batchIdentifier // Use batch ID as the QR code for the entire batch
     });
   } catch (error) {
     console.error('Create batch animals error:', error);
@@ -140,7 +144,7 @@ export const createBatchAnimals = async (req, res) => {
   }
 };
 
-// Get all animals (optionally filtered by type)
+// Get all animals (optionally filtered by type) - FIXED: Proper population
 export const getAnimals = async (req, res) => {
   try {
     const query = {};
@@ -158,7 +162,11 @@ export const getAnimals = async (req, res) => {
       query.type = typeDoc._id;
     }
     
-    const animals = await Animal.find(query).populate('type').populate('assignedZone');
+    // FIXED: Properly populate assignedZone field
+    const animals = await Animal.find(query)
+      .populate('type')
+      .populate('assignedZone');
+    
     res.json(animals);
   } catch (error) {
     console.error('Get animals error:', error);
@@ -169,7 +177,9 @@ export const getAnimals = async (req, res) => {
 // Get single animal
 export const getAnimal = async (req, res) => {
   try {
-    const animal = await Animal.findById(req.params.id).populate('type').populate('assignedZone');
+    const animal = await Animal.findById(req.params.id)
+      .populate('type')
+      .populate('assignedZone');
     if (!animal) return res.status(404).json({ message: 'Animal not found' });
     res.json(animal);
   } catch (error) {
@@ -200,7 +210,7 @@ export const updateAnimal = async (req, res) => {
 
       // Update occupancy in both zones if zone is changing
       if (animal.assignedZone && animal.assignedZone.toString() !== zoneId) {
-        await updateZoneOccupancy(animal.assignedZone, -1);
+        await updateZoneOccupancy(animal.assignedZone.toString(), -1);
         await updateZoneOccupancy(zoneId, 1);
       } else if (!animal.assignedZone && zoneId) {
         // Animal didn't have a zone before
@@ -242,7 +252,7 @@ export const deleteAnimal = async (req, res) => {
 
     // Update zone occupancy if animal was assigned to a zone
     if (zoneId) {
-      await updateZoneOccupancy(zoneId, -1);
+      await updateZoneOccupancy(zoneId.toString(), -1);
     }
 
     res.json({ message: 'Animal deleted successfully' });
@@ -318,7 +328,7 @@ export const moveAnimalToZone = async (req, res) => {
 
     // Update occupancy in both zones
     if (oldZoneId) {
-      await updateZoneOccupancy(oldZoneId, -1);
+      await updateZoneOccupancy(oldZoneId.toString(), -1);
     }
     await updateZoneOccupancy(zoneId, 1);
 
@@ -407,6 +417,99 @@ export const updateAnimalHealth = async (req, res) => {
     res.json(updatedAnimal);
   } catch (error) {
     console.error('Update animal health error:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Get animals by batch ID
+export const getAnimalsByBatch = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    
+    const animals = await Animal.find({ batchId })
+      .populate('type')
+      .populate('assignedZone');
+    
+    if (animals.length === 0) {
+      return res.status(404).json({ message: 'No animals found for this batch' });
+    }
+
+    res.json({
+      batchId,
+      count: animals.length,
+      animals
+    });
+  } catch (error) {
+    console.error('Get animals by batch error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update batch information (update all animals in a batch)
+export const updateBatchAnimals = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { data, zoneId } = req.body;
+
+    // Find all animals in the batch
+    const batchAnimals = await Animal.find({ batchId });
+    if (batchAnimals.length === 0) {
+      return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    // If zone is being updated, handle occupancy changes
+    if (zoneId) {
+      // Check if new zone can accommodate all animals in the batch
+      const accommodationCheck = await canZoneAccommodate(zoneId, batchAnimals.length);
+      if (!accommodationCheck.canAccommodate) {
+        return res.status(400).json({ 
+          message: 'Cannot move batch to zone', 
+          reason: accommodationCheck.reason 
+        });
+      }
+
+      // Update occupancy for both old and new zones
+      const oldZones = {};
+      batchAnimals.forEach(animal => {
+        if (animal.assignedZone) {
+          const zoneId = animal.assignedZone.toString();
+          oldZones[zoneId] = (oldZones[zoneId] || 0) + 1;
+        }
+      });
+
+      // Remove animals from old zones
+      for (const [zoneId, count] of Object.entries(oldZones)) {
+        await updateZoneOccupancy(zoneId, -count);
+      }
+
+      // Add animals to new zone
+      await updateZoneOccupancy(zoneId, batchAnimals.length);
+    }
+
+    // Update all animals in the batch
+    const updateFields = {
+      data: { ...batchAnimals[0].data, ...data }, // Merge existing data with new data
+      updatedAt: Date.now(),
+      ...(zoneId && { assignedZone: zoneId })
+    };
+
+    await Animal.updateMany(
+      { batchId },
+      updateFields
+    );
+
+    // Get updated animals
+    const updatedAnimals = await Animal.find({ batchId })
+      .populate('type')
+      .populate('assignedZone');
+
+    res.json({
+      message: `Updated ${updatedAnimals.length} animals in batch ${batchId}`,
+      batchId,
+      animals: updatedAnimals
+    });
+  } catch (error) {
+    console.error('Update batch animals error:', error);
     res.status(400).json({ message: error.message });
   }
 };

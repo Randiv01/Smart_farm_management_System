@@ -22,23 +22,53 @@ export default function AddAnimalForm() {
   const [zones, setZones] = useState([]);
   const [selectedZone, setSelectedZone] = useState("");
   const [animalCount, setAnimalCount] = useState(1);
-  const [batchId, setBatchId] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [groupQRCode, setGroupQRCode] = useState("");
 
   useEffect(() => {
     document.title = "Add New Animal";
   }, []);
 
+  // Enhanced fetch function with better error handling
+  const fetchWithErrorHandling = async (url, options = {}) => {
+    try {
+      const res = await fetch(url, options);
+      const contentType = res.headers.get("content-type");
+      const responseText = await res.text();
+      
+      // Check if response is HTML instead of JSON
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        throw new Error(`Server returned HTML instead of JSON. Status: ${res.status}`);
+      }
+      
+      // Try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+      }
+      
+      if (!res.ok) {
+        throw new Error(data.message || `Server error: ${res.status}`);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`Fetch error for ${url}:`, error);
+      throw error;
+    }
+  };
+
   // Fetch available zones
   useEffect(() => {
     const fetchZones = async () => {
       try {
-        const res = await fetch("http://localhost:5000/zones");
-        if (res.ok) {
-          const data = await res.json();
-          setZones(data.zones || []);
-        }
+        const data = await fetchWithErrorHandling("http://localhost:5000/zones");
+        setZones(data.zones || []);
       } catch (err) {
         console.error("Failed to fetch zones:", err);
+        setErrorMessages([`Failed to load zones: ${err.message}`]);
       }
     };
     fetchZones();
@@ -66,9 +96,8 @@ export default function AddAnimalForm() {
         const endpoint = isObjectId
           ? `http://localhost:5000/animal-types/${type}`
           : `http://localhost:5000/animal-types/name/${type.toLowerCase()}`;
-        const res = await fetch(endpoint);
-        if (!res.ok) throw new Error("Animal type not found");
-        const data = await res.json();
+        
+        const data = await fetchWithErrorHandling(endpoint);
         setAnimalType(data);
 
         // Initialize formData with all fields from all categories
@@ -81,9 +110,13 @@ export default function AddAnimalForm() {
         initialData.generateQR = true;
         setFormData(initialData);
 
-        // Generate a batch ID if this is a batch management type
-        if (data.managementType === "batch") {
-          setBatchId(`BATCH-${Date.now()}`);
+        // Generate IDs based on management type
+        if (data.managementType === "batch" || data.managementType === "other") {
+          const newGroupId = data.managementType === "batch" 
+            ? `BATCH-${Date.now()}` 
+            : `GROUP-${Date.now()}`;
+          setGroupId(newGroupId);
+          setGroupQRCode(newGroupId);
         }
       } catch (err) {
         setErrorMessages([err.message]);
@@ -185,24 +218,25 @@ export default function AddAnimalForm() {
 
     // Validate zone selection
     if (!selectedZone) {
-      setErrorMessages(["Please select a zone for the animal"]);
+      setErrorMessages(prev => [...prev, "Please select a zone for the animal"]);
       isValid = false;
     } else {
       const selectedZoneData = zones.find(z => z._id === selectedZone);
       if (selectedZoneData) {
         const availableSpace = selectedZoneData.capacity - selectedZoneData.currentOccupancy;
-        const animalsToAdd = animalType?.managementType === "batch" ? animalCount : 1;
+        const animalsToAdd = (animalType?.managementType === "batch" || animalType?.managementType === "other") 
+          ? animalCount : 1;
         
         if (availableSpace < animalsToAdd) {
-          setErrorMessages([`Selected zone can only accommodate ${availableSpace} more animals. You're trying to add ${animalsToAdd}.`]);
+          setErrorMessages(prev => [...prev, `Selected zone can only accommodate ${availableSpace} more animals. You're trying to add ${animalsToAdd}.`]);
           isValid = false;
         }
       }
     }
 
-    // Validate animal count for batch types
-    if (animalType?.managementType === "batch" && animalCount < 1) {
-      setErrorMessages(["Animal count must be at least 1"]);
+    // Validate animal count for group types
+    if ((animalType?.managementType === "batch" || animalType?.managementType === "other") && animalCount < 1) {
+      setErrorMessages(prev => [...prev, "Animal count must be at least 1"]);
       isValid = false;
     }
 
@@ -213,9 +247,10 @@ export default function AddAnimalForm() {
     return isValid;
   };
 
-  // Handle submit - different endpoints for individual vs batch
+  // Handle submit - different endpoints for individual vs group
   const handleSubmit = async e => {
     e.preventDefault();
+    setErrorMessages([]); // Clear previous errors
 
     const isValid = validateAllFields();
     if (!isValid) {
@@ -225,20 +260,22 @@ export default function AddAnimalForm() {
     try {
       setGlobalLoading(true);
       
-      let endpoint, method, body;
+      let endpoint, body;
       
-      if (animalType.managementType === "batch") {
-        // Use batch endpoint
-        endpoint = "http://localhost:5000/animals/batch";
+      if (animalType.managementType === "batch" || animalType.managementType === "other") {
+        endpoint = animalType.managementType === "batch" 
+          ? "http://localhost:5000/animals/batch" 
+          : "http://localhost:5000/animals/group";
+        
         body = JSON.stringify({ 
           type: animalType._id, 
           data: formData, 
           zoneId: selectedZone,
           count: animalCount,
-          batchId: batchId
+          groupId: groupId,
+          generateQR: false
         });
       } else {
-        // Use individual endpoint
         endpoint = "http://localhost:5000/animals";
         body = JSON.stringify({ 
           type: animalType._id, 
@@ -248,26 +285,22 @@ export default function AddAnimalForm() {
         });
       }
       
-      const res = await fetch(endpoint, {
+      const result = await fetchWithErrorHandling(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: body
       });
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to add animal");
-      }
-      
-      const result = await res.json();
-      
-      // Only show QR for individual animals
-      if (animalType.managementType !== "batch" && result.qrCode) {
+      // Show QR for individual animals or group QR for groups
+      if (animalType.managementType === "individual" && result.qrCode) {
         setQrData(result.qrCode);
+      } else if (animalType.managementType === "batch" || animalType.managementType === "other") {
+        setQrData(groupId);
       }
       
       setShowSuccessPopup(true);
 
+      // Reset form but preserve group settings
       const resetData = {};
       Object.keys(formData).forEach(key => resetData[key] = key === 'generateQR' ? true : "");
       setFormData(resetData);
@@ -275,11 +308,12 @@ export default function AddAnimalForm() {
       setTouchedFields({});
       setSelectedZone("");
       
-      // Reset batch count but keep the same batch ID
-      if (animalType.managementType === "batch") {
+      // Reset group count but keep the same group ID for next group
+      if (animalType.managementType === "batch" || animalType.managementType === "other") {
         setAnimalCount(1);
       }
     } catch (err) {
+      console.error("Submission error:", err);
       setErrorMessages([err.message]);
     } finally {
       setGlobalLoading(false);
@@ -301,23 +335,29 @@ export default function AddAnimalForm() {
     pdf.setFontSize(20);
     pdf.text(`QR: ${qrData}`, 105, 140, { align: 'center' });
     pdf.text(`Type: ${animalType?.name || ''}`, 105, 150, { align: 'center' });
-    pdf.save(`animal_${qrData}.pdf`);
+    if (animalType?.managementType === "batch" || animalType?.managementType === "other") {
+      pdf.text(`Group Size: ${animalCount} animals`, 105, 160, { align: 'center' });
+      pdf.text(`Group Type: ${animalType.managementType === "batch" ? "Batch" : "Group"}`, 105, 170, { align: 'center' });
+    }
+    pdf.save(`${animalType?.managementType === "individual" ? 'animal' : 'group'}_${qrData}.pdf`);
   };
 
-  if (!animalType) return <div className="p-4">Loading...</div>;
+  if (!animalType) return <div className="p-4">Loading animal type...</div>;
 
   return (
     <div className={`max-w-6xl mx-auto p-6 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>
       <h2 className="text-2xl font-semibold mb-6">
         Add New {animalType.name} 
-        {animalType.managementType === "batch" && " Batch"}
+        {animalType.managementType !== "individual" && ` ${animalType.managementType === "batch" ? "Batch" : "Group"}`}
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Batch Information (only show for batch types) */}
-        {animalType.managementType === "batch" && (
+        {/* Group Information (only show for batch/other types) */}
+        {(animalType.managementType === "batch" || animalType.managementType === "other") && (
           <div className={`p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
-            <h3 className="text-xl font-semibold mb-4">Batch Information</h3>
+            <h3 className="text-xl font-semibold mb-4">
+              {animalType.managementType === "batch" ? "Batch" : "Group"} Information
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className={`font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -328,7 +368,7 @@ export default function AddAnimalForm() {
                   min="1"
                   placeholder="1"
                   value={animalCount}
-                  onChange={(e) => setAnimalCount(parseInt(e.target.value) || "")}
+                  onChange={(e) => setAnimalCount(parseInt(e.target.value) || 1)}
                   className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-gray-300"} border`}
                   required
                 />
@@ -336,17 +376,21 @@ export default function AddAnimalForm() {
               
               <div className="flex flex-col">
                 <label className={`font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  Batch ID
+                  {animalType.managementType === "batch" ? "Batch ID" : "Group ID"} *
                 </label>
                 <input
                   type="text"
-                  value={batchId}
-                  onChange={(e) => setBatchId(e.target.value)}
+                  value={groupId}
+                  onChange={(e) => {
+                    setGroupId(e.target.value);
+                    setGroupQRCode(e.target.value);
+                  }}
                   className={`p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-gray-300"} border`}
-                  placeholder="Batch ID"
+                  placeholder={animalType.managementType === "batch" ? "Batch ID" : "Group ID"}
+                  required
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  This ID will be used to identify all animals in this batch
+                  This ID and QR code will represent the entire {animalType.managementType === "batch" ? "batch" : "group"}
                 </p>
               </div>
             </div>
@@ -439,7 +483,7 @@ export default function AddAnimalForm() {
                 <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
                   Available space: {zones.find(z => z._id === selectedZone).capacity - zones.find(z => z._id === selectedZone).currentOccupancy} animals
                 </span>
-                {animalType.managementType === "batch" && (
+                {(animalType.managementType === "batch" || animalType.managementType === "other") && (
                   <span className="block mt-1">
                     You're adding {animalCount} animal{animalCount !== 1 ? 's' : ''}
                   </span>
@@ -450,7 +494,7 @@ export default function AddAnimalForm() {
         </div>
 
         {/* QR Code option (only for individual animals) */}
-        {animalType.managementType !== "batch" && (
+        {animalType.managementType === "individual" && (
           <div className={`p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -470,9 +514,9 @@ export default function AddAnimalForm() {
             type="submit"
             className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
           >
-            {animalType.managementType === "batch" 
-              ? `Add Batch of ${animalCount} ${animalType.name}${animalCount !== 1 ? 's' : ''}`
-              : `Add ${animalType.name}`
+            {animalType.managementType === "individual" 
+              ? `Add ${animalType.name}`
+              : `Add ${animalType.managementType === "batch" ? "Batch" : "Group"} of ${animalCount} ${animalType.name}${animalCount !== 1 ? 's' : ''}`
             }
           </button>
         </div>
@@ -480,25 +524,65 @@ export default function AddAnimalForm() {
 
       {/* Success & QR Popup */}
       {showSuccessPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50" onClick={handleAddMore}>
-          <div className={`rounded-2xl p-8 max-w-md text-center ${darkMode ? "bg-gray-800" : "bg-white shadow-xl"}`} onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50"
+          onClick={handleAddMore}
+        >
+          <div
+            className={`rounded-2xl p-8 max-w-md text-center ${
+              darkMode ? "bg-gray-800" : "bg-white shadow-xl"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Success Icon */}
             <div className="flex justify-center items-center mb-4">
               <div className="w-24 h-24 bg-green-600 rounded-full flex justify-center items-center">
                 <span className="text-white text-4xl">✓</span>
               </div>
             </div>
+
+            {/* Success Message */}
             <p className={`mt-4 ${darkMode ? "text-gray-200" : "text-gray-700"}`}>
-              {animalType.managementType === "batch" 
-                ? `Successfully added ${animalCount} ${animalType.name}${animalCount !== 1 ? 's' : ''} to the batch`
-                : `${animalType.name} added successfully`
+              {animalType.managementType === "individual"
+                ? `${animalType.name} added successfully`
+                : `Successfully added ${animalType.managementType === "batch" ? "batch" : "group"} of ${animalCount} ${animalType.name}${
+                    animalCount !== 1 ? "s" : ""
+                  }`
               }
             </p>
+
+            {/* QR Code Section */}
             {qrData && (
-              <div className={`p-4 rounded-xl my-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
-                <QRCodeCanvas value={qrData} size={180} level="H" includeMargin />
-                <h4 className={`mt-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>QR: {qrData}</h4>
+              <div
+                className={`p-4 rounded-xl my-4 ${
+                  darkMode ? "bg-gray-700" : "bg-gray-50"
+                }`}
+              >
+                {/* Center QR */}
+                <div className="flex justify-center">
+                  <QRCodeCanvas value={qrData} size={180} level="H" includeMargin />
+                </div>
+
+                {/* QR Text */}
+                <h4
+                  className={`mt-3 text-center ${
+                    darkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  {animalType.managementType === "individual" ? "QR:" : `${animalType.managementType === "batch" ? "Batch" : "Group"} QR:`}{" "}
+                  {qrData}
+                </h4>
+
+                {/* Group Info */}
+                {animalType.managementType !== "individual" && (
+                  <p className="text-sm mt-2 text-center">
+                    This QR code represents the entire {animalType.managementType === "batch" ? "batch" : "group"} of {animalCount} animals
+                  </p>
+                )}
               </div>
             )}
+
+            {/* Buttons */}
             <div className="flex flex-wrap justify-center gap-3 mt-4">
               {qrData && (
                 <button

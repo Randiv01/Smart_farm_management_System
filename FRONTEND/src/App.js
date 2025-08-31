@@ -89,34 +89,37 @@ function App() {
               
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
-                <ProtectedRoute allowedRoles={["animal"]}>
-                  <LoaderProvider>
-                    <LanguageProvider>
-                      <AnimalThemeProvider>
-                        <UserProvider>
-                          <Layout />
-                        </UserProvider>
-                      </AnimalThemeProvider>
-                    </LanguageProvider>
-                  </LoaderProvider>
-                </ProtectedRoute>
-              }>
-                {/* Index route = Dashboard */}
-                <Route index element={<Dashboard />} />
-                <Route path=":type" element={<AnimalList />} />
-                <Route path="productivity/:type" element={<AnimalProductivity />} />
-                <Route path="add-animal/:type" element={<AddAnimalForm />} />
-                <Route path="design-plan/:type" element={<FarmDesigner />} />
-                <Route path="feeding-scheduler" element={<FeedingScheduler />} />
-                <Route path="add-animal-type" element={<AddAnimalType />} />
-                <Route path="feed-stock" element={<FeedStock />} />
-                <Route path="animal-health" element={<AnimalHealth />} />
-                <Route path="health-report/:type" element={<HealthReport />} />
-                <Route path="zones" element={<AnimalZones />} />
-                <Route path="productivity" element={<Productivity />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="alerts" element={<Alerts />} />
-              </Route>
+              <ProtectedRoute allowedRoles={["animal"]}>
+                <LoaderProvider>
+                  <LanguageProvider>
+                    <AnimalThemeProvider>
+                      <UserProvider>
+                        <Layout />
+                      </UserProvider>
+                    </AnimalThemeProvider>
+                  </LanguageProvider>
+                </LoaderProvider>
+              </ProtectedRoute>
+            }>
+              {/* Static routes first */}
+              <Route index element={<Dashboard />} />
+              <Route path="feeding-scheduler" element={<FeedingScheduler />} />
+              <Route path="add-animal-type" element={<AddAnimalType />} />
+              <Route path="feed-stock" element={<FeedStock />} />
+              <Route path="animal-health" element={<AnimalHealth />} />
+              <Route path="HealthReport/:type" element={<HealthReport />} />
+              <Route path="add-animal/:type" element={<AddAnimalForm />} />
+              <Route path="AnimalProductivity/:type" element={<AnimalProductivity />} />
+              <Route path="design-plan/:type" element={<FarmDesigner />} />
+              <Route path="zones" element={<AnimalZones />} />
+              <Route path="productivity" element={<Productivity />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="alerts" element={<Alerts />} />
+              
+              {/* Dynamic catch-all last */}
+              <Route path=":type" element={<AnimalList />} />
+            </Route>
+
 
               {/* ----------------- Inventory Management Routes ----------------- */}
               <Route path="/InventoryManagement/*" element={
