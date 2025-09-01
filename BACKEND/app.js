@@ -11,6 +11,7 @@ import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
 import { doctorRouter } from './AnimalManagement/routes/doctorRoutes.js';
 import { sendMedicalRequest, testEmail } from './AnimalManagement/controllers/medicalRequestController.js';
+import productivityRouter from './AnimalManagement/routes/productivityRoutes.js';
 import userRoutes from "./routes/userRoutes.js";
 dotenv.config();
 import path from 'path';
@@ -56,6 +57,7 @@ app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/doctors', doctorRouter);
+app.use("/productivity", productivityRouter);
 app.post('/api/medical-request', sendMedicalRequest);
 app.post('/api/test-email', testEmail);
 
