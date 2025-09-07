@@ -20,39 +20,47 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ----------------------- Uploads Setup -----------------------
-const uploadsDir = path.join(__dirname, 'PlantManagement', 'Uploads');
-const healthUploadsDir = path.join(__dirname, 'HealthManagement', 'Health_uploads');
+const uploadsDir = path.join(__dirname, "uploads");
+const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
 
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-if (!fs.existsSync(healthUploadsDir)) fs.mkdirSync(healthUploadsDir, { recursive: true });
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log("📁 Created uploads directory");
+}
 
-app.use('/uploads', express.static(uploadsDir));
-app.use('/Health_uploads', express.static(healthUploadsDir));
+if (!fs.existsSync(healthUploadsDir)) {
+  fs.mkdirSync(healthUploadsDir, { recursive: true });
+  console.log("📁 Created Health_uploads directory");
+}
+
+app.use("/uploads", express.static(uploadsDir));
+app.use("/Health_uploads", express.static(healthUploadsDir));
 
 // Multer setup (optional if you handle uploads in individual routes)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
+  },
 });
 const fileFilter = (req, file, cb) => {
   const allowed = /jpeg|jpg|png|gif/;
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowed.test(ext)) cb(null, true);
-  else cb(new Error('Only images are allowed'));
+  else cb(new Error("Only images are allowed"));
 };
 const upload = multer({ storage, fileFilter });
 
 // ----------------------- MongoDB Connection -----------------------
-const MONGO_URI = "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
+const MONGO_URI =
+  "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
 
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(MONGO_URI, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
     });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
@@ -68,14 +76,14 @@ import { animalTypeRouter } from "./AnimalManagement/routes/animalTypeRoutes.js"
 import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
-import { doctorRouter } from './AnimalManagement/routes/doctorRoutes.js';
-import { sendMedicalRequest, testEmail } from './AnimalManagement/controllers/medicalRequestController.js';
-import productivityRouter from './AnimalManagement/routes/productivityRoutes.js';
+import { doctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
+import { sendMedicalRequest, testEmail } from "./AnimalManagement/controllers/medicalRequestController.js";
+import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
 // Plant Management
 import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
-import plantRoutes from './PlantManagement/Routes/plantRoutes.js';
+import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
 import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import productivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
 
@@ -95,11 +103,11 @@ app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/doctors', doctorRouter);
+app.use("/api/users", userRoutes);
+app.use("/api/doctors", doctorRouter);
 app.use("/productivity", productivityRouter);
-app.post('/api/medical-request', sendMedicalRequest);
-app.post('/api/test-email', testEmail);
+app.post("/api/medical-request", sendMedicalRequest);
+app.post("/api/test-email", testEmail);
 
 // Health Management
 app.use("/api/doctors", doctorRoutes);
@@ -112,7 +120,7 @@ app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 
 // Plant Management
 app.use("/api/inspections", inspectionRoutes);
-app.use('/api/plants', plantRoutes);
+app.use("/api/plants", plantRoutes);
 app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", productivityRoutes);
 

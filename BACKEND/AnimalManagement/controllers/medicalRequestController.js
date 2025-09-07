@@ -1,8 +1,7 @@
 import nodemailer from 'nodemailer';
 import Doctor from '../models/Doctor.js';
 import QRCode from 'qrcode';
-import fs from 'fs';
-import path from 'path';
+import Animal from '../models/Animal.js';
 
 const createTransporter = () => {
   console.log('📧 Email Configuration:');
@@ -40,13 +39,34 @@ const generateQRCode = async (text) => {
       width: 200,
       margin: 2,
       color: {
-        dark: '#2C5530', // Mount Olive green color
+        dark: '#2C5530',
         light: '#FFFFFF'
       }
     });
     return qrCodeDataUrl;
   } catch (error) {
     console.error('❌ Error generating QR code:', error);
+    return null;
+  }
+};
+
+// Function to get additional animal details
+const getAnimalDetails = async (animalId) => {
+  try {
+    const animal = await Animal.findById(animalId).populate('type');
+    if (!animal) return null;
+    
+    return {
+      type: animal.type?.name || 'Unknown',
+      breed: animal.data?.breed || 'Not specified',
+      age: animal.data?.age || 'Unknown',
+      location: animal.assignedZone?.location || 'Main Farm',
+      batchId: animal.batchId || 'Individual',
+      lastCheckup: animal.data?.lastCheckup || 'Not recorded',
+      specialNotes: animal.data?.specialNotes || 'None'
+    };
+  } catch (error) {
+    console.error('Error fetching animal details:', error);
     return null;
   }
 };
@@ -62,6 +82,9 @@ export const sendMedicalRequest = async (req, res) => {
     console.log('Doctor email from request:', doctorEmail);
     console.log('Doctor ID from request:', doctorId);
 
+    // Get additional animal details
+    const animalDetails = await getAnimalDetails(animalId);
+    
     // If doctorId is provided, look up the doctor in database
     if (doctorId && !toEmail) {
       console.log('Looking up doctor by ID:', doctorId);
@@ -105,7 +128,7 @@ export const sendMedicalRequest = async (req, res) => {
     // Generate QR code
     const qrCodeDataUrl = await generateQRCode(qrCodeData || animalId);
     
-    const emailSubject = `🚨 URGENT: Medical Emergency - ${animalName} at Mount Olive Farm House`;
+    const emailSubject = `🚨 URGENT: Medical Emergency - ${animalName} (ID: ${animalId})`;
     
     const transporter = createTransporter();
     if (!transporter) {
@@ -122,7 +145,7 @@ export const sendMedicalRequest = async (req, res) => {
       console.log('✅ Email transporter verified successfully');
       
       const currentDate = new Date().toLocaleString();
-      const managerInfo = managerName || 'Animal Manager';
+      const managerInfo = managerName || 'Farm Manager';
       
       const mailOptions = {
         from: {
@@ -134,8 +157,16 @@ export const sendMedicalRequest = async (req, res) => {
         text: `
 URGENT MEDICAL EMERGENCY - MOUNT OLIVE FARM HOUSE
 
-Animal: ${animalName}
-ID: ${animalId}
+Animal Details:
+- Name: ${animalName}
+- ID: ${animalId}
+- Type: ${animalDetails?.type || 'Unknown'}
+- Breed: ${animalDetails?.breed || 'Not specified'}
+- Age: ${animalDetails?.age || 'Unknown'}
+- Location: ${animalDetails?.location || 'Main Farm'}
+- Batch/Group: ${animalDetails?.batchId || 'Individual'}
+- Last Checkup: ${animalDetails?.lastCheckup || 'Not recorded'}
+
 Date: ${currentDate}
 Requested by: ${managerInfo}
 
@@ -152,104 +183,343 @@ This is an automated emergency alert from Mount Olive Farm House Management Syst
         `,
         html: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical Emergency Alert</title>
     <style>
+        /* CSS Reset */
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; border-collapse: collapse !important; }
+        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        div { margin: 0; padding: 0; }
+        
+        /* Brand Colors */
+        :root {
+            --primary: #2C5530;
+            --primary-light: #3A6B40;
+            --secondary: #6A994E;
+            --accent: #F2E8CF;
+            --alert: #BC4749;
+            --white: #FFFFFF;
+            --light: #F8F9FA;
+            --gray: #6C757D;
+            --dark: #343A40;
+        }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #2C5530;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 0;
-            background-color: #f8f9fa;
+            padding: 20px 0;
+            background-color: #f5f5f5;
+            -webkit-font-smoothing: antialiased;
+            color: var(--dark);
+            line-height: 1.6;
         }
+        
         .container {
-            max-width: 600px;
+            max-width: 650px;
             margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
+            background: var(--white);
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
+        
+        /* Header Styles */
         .header {
-            background: linear-gradient(135deg, #2C5530 0%, #4CAF50 100%);
-            padding: 25px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 30px;
             text-align: center;
-            color: white;
+            color: var(--white);
         }
+        
         .logo {
-            font-size: 28px;
-            font-weight: bold;
-            margin-bottom: 10px;
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
         }
+        
+        .tagline {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 15px;
+            font-weight: 300;
+        }
+        
         .alert-badge {
-            background: #DC3545;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
+            background: var(--alert);
+            color: var(--white);
+            padding: 12px 24px;
+            border-radius: 30px;
             font-weight: bold;
             display: inline-block;
-            margin-top: 10px;
+            margin-top: 15px;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(188, 71, 73, 0.3);
         }
+        
+        /* Content Styles */
         .content {
-            padding: 30px;
+            padding: 35px;
         }
+        
         .section {
-            margin-bottom: 25px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #2C5530;
+            margin-bottom: 28px;
+            padding: 25px;
+            background: var(--light);
+            border-radius: 12px;
+            border-left: 5px solid var(--primary);
         }
+        
         .emergency-section {
-            background: #FFF3CD;
-            border-left: 4px solid #FFC107;
+            background: linear-gradient(135deg, #FFF3CD 0%, #FFEAA7 100%);
+            border-left: 5px solid #FFC107;
         }
+        
         .qr-section {
             text-align: center;
-            background: #E8F5E8;
-            border-left: 4px solid #4CAF50;
+            background: linear-gradient(135deg, #E8F5E8 0%, #D4EDDA 100%);
+            border-left: 5px solid var(--secondary);
         }
+        
         .qr-code {
             max-width: 200px;
-            margin: 15px auto;
+            margin: 20px auto;
             display: block;
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 10px;
+            background: var(--white);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+        
+        /* Footer Styles */
         .footer {
-            background: #2C5530;
-            color: white;
-            padding: 20px;
+            background: var(--primary);
+            color: var(--white);
+            padding: 25px;
             text-align: center;
-            font-size: 12px;
+            font-size: 14px;
         }
+        
         .button {
             display: inline-block;
-            padding: 12px 24px;
-            background: #DC3545;
-            color: white;
+            padding: 16px 32px;
+            background: var(--alert);
+            color: var(--white);
             text-decoration: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-weight: bold;
-            margin: 10px 0;
+            margin: 15px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(188, 71, 73, 0.3);
         }
+        
+        .button:hover {
+            background: #A53C3E;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(188, 71, 73, 0.4);
+        }
+        
+        /* Info Grid Styles */
         .info-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            gap: 20px;
+            margin: 25px 0;
+        }
+        
+        .info-item {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .info-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: var(--gray);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .id-badge {
+            background: var(--primary);
+            color: var(--white);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .urgent {
+            color: var(--alert);
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
             margin: 20px 0;
         }
-        .info-item {
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #e0e0e0;
+        
+        .instructions {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px dashed var(--secondary);
+            margin: 25px 0;
         }
-        .urgent {
-            color: #DC3545;
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        
+        .step-number {
+            background: var(--secondary);
+            color: var(--white);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
             font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 35px;
+            margin: 30px 0;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 25px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -35px;
+            top: 8px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 3px solid var(--white);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status-pending {
+            background: #FFF3CD;
+            color: #856404;
+        }
+        
+        .status-complete {
+            background: #D4EDDA;
+            color: #155724;
+        }
+        
+        /* Responsive Styles */
+        @media (max-width: 650px) {
+            .container {
+                border-radius: 0;
+                box-shadow: none;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .header {
+                padding: 25px 20px;
+            }
+            
+            .logo {
+                font-size: 28px;
+            }
+            
+            .alert-badge {
+                font-size: 16px;
+                padding: 10px 20px;
+            }
+            
+            .section {
+                padding: 20px;
+            }
+            
+            .button {
+                padding: 14px 28px;
+                font-size: 16px;
+            }
+            
+            .timeline {
+                padding-left: 25px;
+            }
+            
+            .timeline-item::before {
+                left: -25px;
+            }
+        }
+        
+        /* Animation */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
@@ -257,64 +527,166 @@ This is an automated emergency alert from Mount Olive Farm House Management Syst
     <div class="container">
         <div class="header">
             <div class="logo">MOUNT OLIVE FARM HOUSE</div>
-            <div class="alert-badge">🚨 MEDICAL EMERGENCY ALERT</div>
+            <div class="tagline">Excellence in Animal Care & Management</div>
+            <div class="alert-badge">🚨 Medical Emergency Alert</div>
         </div>
 
         <div class="content">
             <div class="section emergency-section">
-                <h2 style="margin: 0; color: #DC3545;">URGENT ATTENTION REQUIRED</h2>
-                <p style="margin: 10px 0; font-weight: bold;">Immediate veterinary assistance needed</p>
+                <h2 style="margin: 0; color: var(--alert); font-size: 24px;">URGENT VETERINARY ATTENTION REQUIRED</h2>
+                <p style="margin: 15px 0; font-weight: bold; font-size: 18px;">Immediate medical assistance needed for animal in distress</p>
             </div>
 
+            <h3 style="color: var(--primary); margin-top: 0; font-size: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Animal Identification</h3>
+            
             <div class="info-grid">
                 <div class="info-item">
-                    <strong>Animal ID:</strong><br>
-                    ${animalName}
+                    <div class="info-label">Animal Name</div>
+                    <div class="info-value">${animalName}</div>
                 </div>
                 <div class="info-item">
-                    <strong>Animal QR ID:</strong><br>
-                    ${animalId}
+                    <div class="info-label">Unique Identification</div>
+                    <div class="info-value">
+                        ${animalId} 
+                        <span class="id-badge">ID</span>
+                    </div>
                 </div>
                 <div class="info-item">
-                    <strong>Requested by:</strong><br>
-                    ${managerInfo}
+                    <div class="info-label">Animal Type</div>
+                    <div class="info-value">${animalDetails?.type || 'Unknown'}</div>
                 </div>
                 <div class="info-item">
-                    <strong>Date & Time:</strong><br>
-                    ${currentDate}
+                    <div class="info-label">Breed</div>
+                    <div class="info-value">${animalDetails?.breed || 'Not specified'}</div>
                 </div>
+                <div class="info-item">
+                    <div class="info-label">Age</div>
+                    <div class="info-value">${animalDetails?.age || 'Unknown'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Location</div>
+                    <div class="info-value">${animalDetails?.location || 'Main Farm'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Batch/Group ID</div>
+                    <div class="info-value">${animalDetails?.batchId || 'Individual'}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Last Checkup</div>
+                    <div class="info-value">${animalDetails?.lastCheckup || 'Not recorded'}</div>
+                </div>
+            </div>
+
+            <div class="info-item" style="grid-column: 1 / -1; margin-top: 10px;">
+                <div class="info-label">Reported By</div>
+                <div class="info-value">${managerInfo} • ${currentDate}</div>
             </div>
 
             <div class="section">
-                <h3 style="margin-top: 0;">📋 EMERGENCY DETAILS</h3>
-                <p style="background: white; padding: 15px; border-radius: 6px; border-left: 3px solid #DC3545;">
+                <h3 style="margin-top: 0; color: var(--primary); font-size: 20px;">📋 Emergency Details</h3>
+                <div style="background: var(--white); padding: 20px; border-radius: 10px; border-left: 4px solid var(--alert); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
                     ${message.replace(/\n/g, '<br>')}
-                </p>
+                </div>
             </div>
 
             <div class="section qr-section">
-                <h3 style="margin-top: 0;">📲 QUICK ACCESS QR CODE</h3>
-                <p>Scan this QR code to instantly access complete animal medical records and history:</p>
+                <h3 style="margin-top: 0; color: var(--primary); font-size: 20px;">📲 Quick Access QR Code</h3>
+                <p style="margin-bottom: 20px;">Scan this QR code to instantly access complete animal medical records, history, and treatment guidelines:</p>
                 ${qrCodeDataUrl ? `<img src="${qrCodeDataUrl}" alt="Animal QR Code" class="qr-code">` : ''}
-                <p style="font-size: 12px; color: #666;">
-                    <em>Scan with your phone camera or QR code reader app</em>
+                <p style="font-size: 14px; color: var(--gray); margin-top: 15px;">
+                    <em>Scan with your phone camera or QR code reader app for instant access</em>
                 </p>
             </div>
 
+            <div class="instructions">
+                <h3 style="margin-top: 0; color: var(--primary); font-size: 20px; display: flex; align-items: center;">
+                    <span style="margin-right: 10px;">🔄</span> Next Steps & Action Required
+                </h3>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <strong style="color: var(--primary);">Review Emergency Details</strong><br>
+                        Examine the symptoms and emergency information provided above
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <strong style="color: var(--primary);">Scan QR Code</strong><br>
+                        Access full medical history and previous treatments
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <strong style="color: var(--primary);">Contact Farm Manager</strong><br>
+                        Confirm arrival time and discuss immediate treatment options
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div>
+                        <strong style="color: var(--primary);">Provide Emergency Care</strong><br>
+                        Administer necessary treatment and update health records
+                    </div>
+                </div>
+            </div>
+
             <div style="text-align: center; margin: 30px 0;">
-                <p class="urgent">⚠️ THIS IS A TIME-SENSITIVE EMERGENCY ⚠️</p>
-                <p>Please respond to this alert immediately. The animal's health depends on your prompt action.</p>
-                <a href="tel:+94123456789" class="button">📞 CALL EMERGENCY LINE</a>
+                <p class="urgent">⚠️ TIME-SENSITIVE EMERGENCY - IMMEDIATE RESPONSE REQUIRED ⚠️</p>
+                <p style="margin-bottom: 20px;">The health and well-being of this animal depends on your prompt action. Please prioritize this emergency.</p>
+                <a href="tel:+94123456789" class="button pulse">📞 CALL EMERGENCY HOTLINE</a>
+                <p style="font-size: 14px; color: var(--gray); margin-top: 15px;">
+                    Estimated response time: < 30 minutes required<br>
+                    Current status: <span style="color: var(--alert); font-weight: bold;">AWAITING VETERINARIAN RESPONSE</span>
+                </p>
+            </div>
+
+            <div class="timeline">
+                <h3 style="color: var(--primary); margin-bottom: 20px; font-size: 20px;">🕒 Emergency Timeline</h3>
+                
+                <div class="timeline-item">
+                    <strong>Alert Generated</strong>
+                    <span class="status-badge status-complete">COMPLETE</span><br>
+                    <span style="color: var(--gray); font-size: 14px;">${currentDate}</span><br>
+                    Emergency alert created by farm management system
+                </div>
+                
+                <div class="timeline-item">
+                    <strong>Veterinarian Notified</strong>
+                    <span class="status-badge status-pending">PENDING</span><br>
+                    <span style="color: var(--gray); font-size: 14px;">Awaiting response</span><br>
+                    Awaiting veterinarian acknowledgment
+                </div>
+                
+                <div class="timeline-item">
+                    <strong>Treatment Initiated</strong>
+                    <span class="status-badge status-pending">PENDING</span><br>
+                    <span style="color: var(--gray); font-size: 14px;">Not started</span><br>
+                    Emergency care and treatment
+                </div>
+                
+                <div class="timeline-item">
+                    <strong>Resolution</strong>
+                    <span class="status-badge status-pending">PENDING</span><br>
+                    <span style="color: var(--gray); font-size: 14px;">Not achieved</span><br>
+                    Emergency resolved and animal stabilized
+                </div>
             </div>
         </div>
 
         <div class="footer">
-            <p>🚑 <strong>Mount Olive Farm House Medical Alert System</strong></p>
-            <p>This is an automated emergency message. Please do not reply to this email.</p>
-            <p>© ${new Date().getFullYear()} Mount Olive Farm House. All rights reserved.</p>
-            <p style="font-size: 10px; opacity: 0.8;">
+            <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">🚑 Mount Olive Farm House Medical Alert System</p>
+            <p style="margin: 0 0 15px 0; font-size: 14px; opacity: 0.9;">123 Farm Road, Agricultural District | Phone: +1 (555) 123-4567 | Email: emergency@mountolivefarm.com</p>
+            <p style="margin: 0 0 15px 0; font-size: 13px; opacity: 0.8;">This is an automated emergency message. Please do not reply to this email.</p>
+            <p style="margin: 0; font-size: 12px; opacity: 0.7;">
+                © ${new Date().getFullYear()} Mount Olive Farm House. All rights reserved.<br>
                 Sent from our automated animal health monitoring system<br>
-                If this is a mistake, please contact farm administration
+                If this is a mistake or requires update, please contact farm administration immediately
             </p>
         </div>
     </div>
@@ -327,14 +699,13 @@ This is an automated emergency alert from Mount Olive Farm House Management Syst
       const result = await transporter.sendMail(mailOptions);
       console.log('✅ Emergency email sent successfully! Message ID:', result.messageId);
       
-      // Log this emergency request in the database for tracking
-      // You can implement this based on your tracking requirements
-      
       res.json({ 
         success: true, 
         message: `Emergency medical request sent to ${toEmail}`,
         emailId: result.messageId,
-        recipient: toEmail
+        recipient: toEmail,
+        animalId: animalId,
+        animalName: animalName
       });
       
     } catch (emailError) {
@@ -399,9 +770,9 @@ export const testEmail = async (req, res) => {
       text: 'This is a test of the Mount Olive Farm House emergency email system.',
       html: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test Alert</title>
     <style>/* Same styles as above */</style>
@@ -410,6 +781,7 @@ export const testEmail = async (req, res) => {
     <div class="container">
         <div class="header">
             <div class="logo">MOUNT OLIVE FARM HOUSE</div>
+            <div class="tagline">Excellence in Animal Care & Management</div>
             <div class="alert-badge">✅ SYSTEM TEST</div>
         </div>
 
@@ -422,8 +794,8 @@ export const testEmail = async (req, res) => {
             </div>
 
             <div style="text-align: center; margin: 20px 0;">
-                <p style="color: #2C5530;">🔄 <strong>System Status:</strong> OPERATIONAL</p>
-                <p style="color: #666; font-size: 14px;">Last tested: ${new Date().toLocaleString()}</p>
+                <p style="color: var(--primary);">🔄 <strong>System Status:</strong> OPERATIONAL</p>
+                <p style="color: var(--gray); font-size: 14px;">Last tested: ${new Date().toLocaleString()}</p>
             </div>
         </div>
 
