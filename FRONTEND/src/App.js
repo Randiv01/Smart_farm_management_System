@@ -41,7 +41,7 @@ import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx'
 import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
 import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
 
-// ----------------- HEALTH MANAGEMENT (Gimani part) -----------------
+// ----------------- HEALTH MANAGEMENT -----------------
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
 import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
 
@@ -75,6 +75,20 @@ import H_FertiliserAdd from './Components/HealthManagement/PlantPathologistPart/
 import PlantPathologistAdditional from './Components/HealthManagement/PlantPathologistPart/PathologisticAdditional.js';
 import PlantPathologistProfile from './Components/HealthManagement/PlantPathologistPart/PathologisticProfile.js';
 
+// ----------------- PLANT MANAGEMENT -----------------
+import PLayout from './Components/PlantManagement/P-Layout.jsx';
+import PDashboard from './Components/PlantManagement/pages/P-Dashboard.jsx';
+import PGreenhouseManagement from './Components/PlantManagement/pages/P-GreenhouseManagement.jsx';
+import PInspectionManagement from './Components/PlantManagement/pages/P-InspectionManagement.jsx';
+import PFertilizingManagement from './Components/PlantManagement/pages/P-FertilizingManagement.jsx';
+import PPestDiseaseManagement from './Components/PlantManagement/pages/P-PestDiseaseManagement.jsx';
+import PMonitorControl from './Components/PlantManagement/pages/P-MonitorControl.jsx';
+import PProductivity from './Components/PlantManagement/pages/P-Productivity.jsx';
+import PSettings from './Components/PlantManagement/pages/P-Settings.jsx';
+import { ThemeProvider as PThemeProvider } from './Components/PlantManagement/context/ThemeContext.jsx';
+import { LanguageProvider as PLanguageProvider } from './Components/PlantManagement/context/LanguageContext.jsx';
+
+
 function App() {
   return (
     <div className="App">
@@ -89,37 +103,33 @@ function App() {
               
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
-              <ProtectedRoute allowedRoles={["animal"]}>
-                <LoaderProvider>
-                  <LanguageProvider>
-                    <AnimalThemeProvider>
-                      <UserProvider>
-                        <Layout />
-                      </UserProvider>
-                    </AnimalThemeProvider>
-                  </LanguageProvider>
-                </LoaderProvider>
-              </ProtectedRoute>
-            }>
-              {/* Static routes first */}
-              <Route index element={<Dashboard />} />
-              <Route path="feeding-scheduler" element={<FeedingScheduler />} />
-              <Route path="add-animal-type" element={<AddAnimalType />} />
-              <Route path="feed-stock" element={<FeedStock />} />
-              <Route path="animal-health" element={<AnimalHealth />} />
-              <Route path="HealthReport/:type" element={<HealthReport />} />
-              <Route path="add-animal/:type" element={<AddAnimalForm />} />
-              <Route path="AnimalProductivity/:type" element={<AnimalProductivity />} />
-              <Route path="design-plan/:type" element={<FarmDesigner />} />
-              <Route path="zones" element={<AnimalZones />} />
-              <Route path="productivity" element={<Productivity />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="alerts" element={<Alerts />} />
-              
-              {/* Dynamic catch-all last */}
-              <Route path=":type" element={<AnimalList />} />
-            </Route>
-
+                <ProtectedRoute allowedRoles={["animal"]}>
+                  <LoaderProvider>
+                    <LanguageProvider>
+                      <AnimalThemeProvider>
+                        <UserProvider>
+                          <Layout />
+                        </UserProvider>
+                      </AnimalThemeProvider>
+                    </LanguageProvider>
+                  </LoaderProvider>
+                </ProtectedRoute>
+              }>
+                <Route index element={<Dashboard />} />
+                <Route path="feeding-scheduler" element={<FeedingScheduler />} />
+                <Route path="add-animal-type" element={<AddAnimalType />} />
+                <Route path="feed-stock" element={<FeedStock />} />
+                <Route path="animal-health" element={<AnimalHealth />} />
+                <Route path="HealthReport/:type" element={<HealthReport />} />
+                <Route path="add-animal/:type" element={<AddAnimalForm />} />
+                <Route path="AnimalProductivity/:type" element={<AnimalProductivity />} />
+                <Route path="design-plan/:type" element={<FarmDesigner />} />
+                <Route path="zones" element={<AnimalZones />} />
+                <Route path="productivity" element={<Productivity />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="alerts" element={<Alerts />} />
+                <Route path=":type" element={<AnimalList />} />
+              </Route>
 
               {/* ----------------- Inventory Management Routes ----------------- */}
               <Route path="/InventoryManagement/*" element={
@@ -128,14 +138,31 @@ function App() {
                 </IThemeProvider>
               }>
                 <Route index element={<IDashboard />} />
-                {/* Add other inventory routes here as needed */}
+              </Route>
+
+              {/* ----------------- Plant Management Routes ----------------- */}
+              <Route path="/PlantManagement/*" element={
+                <PThemeProvider>
+                  <PLanguageProvider>
+                    <PLayout />
+                  </PLanguageProvider>
+                </PThemeProvider>
+              }>
+                <Route index element={<PDashboard />} />
+                <Route path="greenhouse" element={<PGreenhouseManagement />} />
+                <Route path="inspection" element={<PInspectionManagement />} />
+                <Route path="fertilizing" element={<PFertilizingManagement />} />
+                <Route path="pest-disease" element={<PPestDiseaseManagement />} />
+                <Route path="monitor-control" element={<PMonitorControl />} />
+                <Route path="productivity" element={<PProductivity />} />
+                <Route path="settings" element={<PSettings />} />
               </Route>
             </Routes>
           </CartProvider>
         </UserThemeProvider>
       </AuthProvider>
 
-      {/* ----------------- Health Management Routes (Separate like in old code) ----------------- */}
+      {/* ----------------- Health Management Routes ----------------- */}
       <HLanguageProvider>
         <HThemeProvider>
           <Routes>

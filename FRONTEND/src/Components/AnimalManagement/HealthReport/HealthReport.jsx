@@ -205,21 +205,64 @@ export default function HealthInfoDetails() {
   }
 };
 
-  const downloadHealthReport = (animal) => {
+  const downloadHealthReport = async (animal) => {
     const doc = new jsPDF();
+    
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "123 Farm Road, Agricultural District, Country";
+    const companyContact = "Phone: +1 (555) 123-4567 | Email: info@mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
     
     // Add logo
     const img = new Image();
     img.src = "/logo512.png";
     
-    img.onload = () => {
+    img.onload = async () => {
+      // Header with logo and company info
       doc.addImage(img, "PNG", 14, 10, 30, 30);
-      
-      // Title
       doc.setFontSize(16);
-      doc.text("Health Report", 50, 20);
+      doc.setFont(undefined, 'bold');
+      doc.text(companyName, 50, 15);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(companyAddress, 50, 22);
+      doc.text(companyContact, 50, 29);
+      
+      // Report title
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("ANIMAL HEALTH REPORT", 105, 45, { align: 'center' });
+      doc.setLineWidth(0.5);
+      doc.line(14, 50, 196, 50);
+      
+      // Animal information section
       doc.setFontSize(12);
-      doc.text(`${animalType.name}: ${animal.data?.name || animal.animalId || "Unknown"}`, 14, 50);
+      doc.setFont(undefined, 'bold');
+      doc.text("Animal Information:", 14, 60);
+      doc.setFont(undefined, 'normal');
+      
+      const animalInfo = [
+        ["Animal ID", animal.animalId || "N/A"],
+        ["Name", animal.data?.name || "N/A"],
+        ["Type", animalType.name],
+        ["Report Date", reportDate]
+      ];
+      
+      let yPos = 70;
+      animalInfo.forEach(([label, value]) => {
+        doc.setFont(undefined, 'bold');
+        doc.text(`${label}:`, 20, yPos);
+        doc.setFont(undefined, 'normal');
+        doc.text(value, 60, yPos);
+        yPos += 7;
+      });
+      
+      // Health data section
+      yPos += 5;
+      doc.setFont(undefined, 'bold');
+      doc.text("Health Assessment:", 14, yPos);
+      yPos += 10;
       
       // Health data table
       const tableData = healthFields.map(field => [
@@ -228,15 +271,42 @@ export default function HealthInfoDetails() {
       ]);
       
       autoTable(doc, {
-        startY: 60,
+        startY: yPos,
         head: [["Health Parameter", "Value"]],
         body: tableData,
         theme: "grid",
-        headStyles: { fillColor: [60, 141, 188], textColor: 255 },
+        headStyles: { 
+          fillColor: [60, 141, 188], 
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 3
+        },
+        margin: { left: 14, right: 14 }
       });
       
+      // Veterinarian section
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setFont(undefined, 'bold');
+      doc.text("Veterinarian Notes:", 14, finalY);
+      doc.setFont(undefined, 'normal');
+      doc.text("________________________________________________________________", 14, finalY + 5);
+      doc.text("________________________________________________________________", 14, finalY + 10);
+      doc.text("________________________________________________________________", 14, finalY + 15);
+      
+      // Footer with page number
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 290, { align: 'center' });
+      }
+      
       // Save the PDF
-      const fileName = `Health_Report_${animal.data?.name || animal.animalId || animal._id}.pdf`;
+      const fileName = `Health_Report_${animal.data?.name || animal.animalId || animal._id}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
     };
   };
@@ -478,8 +548,8 @@ const handleMedicalRequest = async () => {
   // Loading / Error
   if (loading)
     return (
-      <div className="flex justify-center items-center h-48 text-dark-gray dark:text-dark-text">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-btn-teal"></div>
+      <div className="flex justify-center items-center h-48 text-gray-700 dark:text-gray-200">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-teal-500"></div>
         <p className="ml-4">Loading health data...</p>
       </div>
     );
@@ -487,22 +557,22 @@ const handleMedicalRequest = async () => {
   if (error || !animalType)
     return (
       <div className="p-6 text-center">
-        <h2 className="text-xl font-semibold text-dark-gray dark:text-dark-text">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
           {error ? `Error Loading Health Data` : "Animal Type Not Found"}
         </h2>
-        <p className="text-red-500 dark:text-btn-red mb-4">
+        <p className="text-red-500 mb-4">
           {error || `The animal type "${type}" could not be loaded.`}
         </p>
         {error && (
           <button
-            className="px-4 py-2 rounded bg-btn-blue text-white hover:bg-blue-800 mr-2"
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 mr-2"
             onClick={fetchData}
           >
             Retry
           </button>
         )}
         <button
-            className="px-4 py-2 rounded bg-btn-gray text-white hover:bg-gray-700"
+            className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700"
             onClick={() => navigate("/AnimalManagement")}
           >
             Back
@@ -511,22 +581,18 @@ const handleMedicalRequest = async () => {
     );
 
   return (
-    <div className={`${darkMode ? "dark bg-dark-bg" : "bg-light-beige"}`}>
+    <div className={`min-h-screen ${darkMode ? "dark bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800"}`}>
       <main className="p-5">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center mb-5 gap-4">
-          <h2
-            className={`text-2xl font-semibold ${
-              darkMode ? "text-dark-text" : "text-dark-gray"
-            }`}
-          >
+          <h2 className="text-2xl font-semibold">
             {animalType.name} Health Information
             {animalType.managementType !== "individual" && 
               ` (${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} View)`}
           </h2>
           <button
             onClick={() => navigate(`/AnimalManagement/add-animal/${animalType._id}`)}
-            className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-btn-teal text-white hover:bg-teal-700"
+            className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-teal-600 text-white hover:bg-teal-700"
           >
             ➕ Add New {animalType.managementType !== "individual" 
               ? (animalType.managementType === "batch" ? "Batch" : "Hive/Farm") 
@@ -535,14 +601,14 @@ const handleMedicalRequest = async () => {
         </div>
 
         {/* Doctor Selection */}
-        <div className={`mb-4 p-3 rounded-lg ${darkMode ? "bg-dark-card" : "bg-soft-white"} shadow-md`}>
+        <div className={`mb-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md`}>
           <div className="flex flex-wrap justify-between items-center gap-4 mb-3">
             <label className="block font-medium">
               Select Doctor for Emergency Requests:
             </label>
             <button
               onClick={openAddDoctorModal}
-              className="px-3 py-1 rounded bg-btn-blue text-white hover:bg-blue-700 text-sm"
+              className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
             >
               + Add New Doctor
             </button>
@@ -554,7 +620,7 @@ const handleMedicalRequest = async () => {
               onChange={(e) => setSelectedDoctor(e.target.value)}
               className={`flex-1 p-2 rounded border ${
                 darkMode
-                  ? "bg-dark-card border-gray-600 text-dark-text"
+                  ? "bg-gray-800 border-gray-600"
                   : "border-gray-200"
               }`}
             >
@@ -591,13 +657,17 @@ const handleMedicalRequest = async () => {
         </div>
 
         {/* Modern Search Bar */}
-        <div className="flex flex-wrap gap-4 mb-4 p-3 bg-gray-100 dark:bg-dark-card rounded-lg shadow-inner items-center">
+        <div className={`flex flex-wrap gap-4 mb-4 p-3 ${darkMode ? "bg-gray-800" : "bg-gray-100"} rounded-lg shadow-inner items-center`}>
           <input
             type="text"
             placeholder="Search health records..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-dark-card dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-btn-teal focus:border-btn-teal"
+            className={`flex-1 p-2 rounded border ${
+              darkMode
+                ? "bg-gray-800 border-gray-600"
+                : "border-gray-300"
+            } focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500`}
           />
           {healthFields.slice(0, 2).map((field) => (
             <input
@@ -612,14 +682,18 @@ const handleMedicalRequest = async () => {
               placeholder={`Filter by ${field.label}`}
               value={filterValues[field.name] || ""}
               onChange={(e) => handleFilterChange(field.name, e.target.value)}
-              className="p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-dark-card dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-btn-teal focus:border-btn-teal"
+              className={`p-2 rounded border ${
+                darkMode
+                  ? "bg-gray-800 border-gray-600"
+                  : "border-gray-300"
+              } focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500`}
             />
           ))}
         </div>
 
         {/* Health Status Summary */}
         {healthFields.length > 0 && (
-          <div className={`mb-6 p-4 rounded-lg ${darkMode ? "bg-dark-card" : "bg-soft-white"} shadow-md`}>
+          <div className={`mb-6 p-4 rounded-lg ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md`}>
             <h3 className="text-lg font-semibold mb-3">Health Status Overview</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {healthFields.filter(f => f.type === "select" && f.options).map((field, idx) => {
@@ -633,7 +707,7 @@ const handleMedicalRequest = async () => {
                 }, {});
                 
                 return (
-                  <div key={idx} className="p-3 rounded border">
+                  <div key={idx} className={`p-3 rounded border ${darkMode ? "border-gray-600" : ""}`}>
                     <h4 className="font-medium mb-2">{field.label}</h4>
                     {Object.entries(valueCounts).map(([value, count]) => (
                       <div key={value} className="flex justify-between text-sm">
@@ -651,15 +725,15 @@ const handleMedicalRequest = async () => {
         {/* Table */}
         <div
           className={`overflow-x-auto rounded-lg shadow-md ${
-            darkMode ? "bg-dark-card shadow-cardDark" : "bg-soft-white shadow-card"
+            darkMode ? "bg-gray-800 shadow-lg" : "bg-white shadow-md"
           }`}
         >
           <table className="w-full table-auto border-separate border-spacing-0 text-sm">
             <thead
               className={
                 darkMode
-                  ? "bg-dark-gray text-dark-text sticky top-0"
-                  : "bg-gray-200 text-dark-gray font-semibold sticky top-0"
+                  ? "bg-gray-700 text-gray-100 sticky top-0"
+                  : "bg-gray-200 text-gray-800 font-semibold sticky top-0"
               }
             >
               <tr>
@@ -680,7 +754,7 @@ const handleMedicalRequest = async () => {
                 <tr>
                   <td
                     colSpan={healthFields.length + (animalType.managementType === "batch" ? 2 : 1)}
-                    className="p-4 text-center italic text-gray-500 dark:text-gray-400"
+                    className="p-4 text-center italic text-gray-500"
                   >
                     No matching health records found.
                   </td>
@@ -690,8 +764,8 @@ const handleMedicalRequest = async () => {
                   <tr
                     key={animal._id}
                     className={`${
-                      darkMode ? "bg-dark-card text-dark-text" : "bg-white"
-                    } hover:${darkMode ? "bg-dark-gray" : "bg-gray-100"}`}
+                      darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-100"
+                    }`}
                   >
                     {/* QR Code + Animal/Batch/Hive ID */}
                     <td className="p-3">
@@ -704,7 +778,7 @@ const handleMedicalRequest = async () => {
                               level="H" 
                               className="mx-auto"
                             />
-                            <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                            <div className="text-xs mt-1 text-gray-500">
                               {animalType.managementType === "batch" ? "Batch: " : "ID: "}
                               {getGroupIdentifier(animal)}
                             </div>
@@ -717,7 +791,7 @@ const handleMedicalRequest = async () => {
                               level="H" 
                               className="mx-auto"
                             />
-                            <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                            <div className="text-xs mt-1 text-gray-500">
                               {animal.animalId}
                             </div>
                           </div>
@@ -749,7 +823,7 @@ const handleMedicalRequest = async () => {
                               }
                               className={`w-full p-1 rounded border ${
                                 darkMode
-                                  ? "bg-dark-card border-gray-600 text-dark-text"
+                                  ? "bg-gray-800 border-gray-600"
                                   : "border-gray-200"
                               }`}
                             >
@@ -778,7 +852,7 @@ const handleMedicalRequest = async () => {
                               }
                               className={`w-full p-1 rounded border ${
                                 darkMode
-                                  ? "bg-dark-card border-gray-600 text-dark-text"
+                                  ? "bg-gray-800 border-gray-600"
                                   : "border-gray-200"
                               }`}
                             />
@@ -796,13 +870,13 @@ const handleMedicalRequest = async () => {
                           <>
                             <button
                               onClick={() => handleUpdate(animal._id)}
-                              className="px-2 py-1 rounded bg-btn-teal text-white hover:bg-teal-700"
+                              className="px-2 py-1 rounded bg-teal-600 text-white hover:bg-teal-700"
                             >
                               💾 Save
                             </button>
                             <button
                               onClick={() => setEditId(null)}
-                              className="px-2 py-1 rounded bg-btn-gray text-white hover:bg-gray-700"
+                              className="px-2 py-1 rounded bg-gray-600 text-white hover:bg-gray-700"
                             >
                               ✖ Cancel
                             </button>
@@ -811,7 +885,7 @@ const handleMedicalRequest = async () => {
                           <>
                             <button
                               onClick={() => handleEdit(animal)}
-                              className="px-2 py-1 rounded bg-btn-blue text-white hover:bg-blue-800"
+                              className="px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
                             >
                               ✏ Edit
                             </button>
@@ -844,16 +918,16 @@ const handleMedicalRequest = async () => {
       {popup.show && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div
-            className={`bg-white dark:bg-dark-card p-5 rounded-2xl w-80 max-w-[90%] text-center shadow-lg animate-popIn border-l-4 ${
+            className={`bg-white dark:bg-gray-800 p-5 rounded-2xl w-80 max-w-[90%] text-center shadow-lg animate-popIn border-l-4 ${
               popup.success
-                ? "border-btn-teal"
-                : "border-btn-red"
+                ? "border-teal-500"
+                : "border-red-500"
             }`}
           >
             <p className="mb-4">{popup.message}</p>
             <button
               onClick={() => setPopup({ ...popup, show: false })}
-              className="px-4 py-2 rounded bg-btn-teal text-white hover:bg-teal-700"
+              className="px-4 py-2 rounded bg-teal-600 text-white hover:bg-teal-700"
             >
               OK
             </button>
@@ -864,7 +938,7 @@ const handleMedicalRequest = async () => {
       {/* Doctor Modal */}
       {showDoctorModal && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-          <div className={`bg-white dark:bg-dark-card p-5 rounded-2xl w-96 max-w-[90%] shadow-lg ${darkMode ? "text-dark-text" : ""}`}>
+          <div className={`bg-white dark:bg-gray-800 p-5 rounded-2xl w-96 max-w-[90%] shadow-lg`}>
             <h3 className="text-xl font-semibold mb-4">
               {editingDoctor ? "Edit Doctor" : "Add New Doctor"}
             </h3>
@@ -877,7 +951,7 @@ const handleMedicalRequest = async () => {
                   onChange={(e) => setNewDoctor({...newDoctor, name: e.target.value})}
                   className={`w-full p-2 rounded border ${
                     darkMode
-                      ? "bg-dark-card border-gray-600 text-dark-text"
+                      ? "bg-gray-800 border-gray-600"
                       : "border-gray-200"
                   }`}
                   required
@@ -891,7 +965,7 @@ const handleMedicalRequest = async () => {
                   onChange={(e) => setNewDoctor({...newDoctor, email: e.target.value})}
                   className={`w-full p-2 rounded border ${
                     darkMode
-                      ? "bg-dark-card border-gray-600 text-dark-text"
+                      ? "bg-gray-800 border-gray-600"
                       : "border-gray-200"
                   }`}
                   required
@@ -905,7 +979,7 @@ const handleMedicalRequest = async () => {
                   onChange={(e) => setNewDoctor({...newDoctor, specialization: e.target.value})}
                   className={`w-full p-2 rounded border ${
                     darkMode
-                      ? "bg-dark-card border-gray-600 text-dark-text"
+                      ? "bg-gray-800 border-gray-600"
                       : "border-gray-200"
                   }`}
                   required
@@ -919,13 +993,13 @@ const handleMedicalRequest = async () => {
                     setEditingDoctor(null);
                     setNewDoctor({ name: "", email: "", specialization: "" });
                   }}
-                  className="px-4 py-2 rounded bg-btn-gray text-white hover:bg-gray-700"
+                  className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded bg-btn-teal text-white hover:bg-teal-700"
+                  className="px-4 py-2 rounded bg-teal-600 text-white hover:bg-teal-700"
                 >
                   {editingDoctor ? 'Update Doctor' : 'Add Doctor'}
                 </button>
@@ -938,7 +1012,7 @@ const handleMedicalRequest = async () => {
       {/* Medical Request Modal */}
       {medicalRequestModal.show && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-          <div className={`bg-white dark:bg-dark-card p-5 rounded-2xl w-96 max-w-[90%] shadow-lg ${darkMode ? "text-dark-text" : ""}`}>
+          <div className={`bg-white dark:bg-gray-800 p-5 rounded-2xl w-96 max-w-[90%] shadow-lg`}>
             <h3 className="text-xl font-semibold mb-4">Request Medical Support</h3>
             <p className="mb-4">
               Sending to: {doctors.find(d => d._id === selectedDoctor)?.name || "Selected Doctor"}
@@ -955,7 +1029,7 @@ const handleMedicalRequest = async () => {
                 rows="5"
                 className={`w-full p-2 rounded border ${
                   darkMode
-                    ? "bg-dark-card border-gray-600 text-dark-text"
+                    ? "bg-gray-800 border-gray-600"
                     : "border-gray-200"
                 }`}
                 required
@@ -971,7 +1045,7 @@ const handleMedicalRequest = async () => {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setMedicalRequestModal({ show: false, animal: null, message: "", sending: false, error: null })}
-                className="px-4 py-2 rounded bg-btn-gray text-white hover:bg-gray-700"
+                className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700"
                 disabled={medicalRequestModal.sending}
               >
                 Cancel
