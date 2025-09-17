@@ -1,0 +1,306 @@
+/* Greenhouse Management Container */
+.greenhouse-management {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px;
+}
+
+/* Header with Add Button */
+.greenhouse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.greenhouse-header h1 {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+/* Filter section (category + search) */
+.filter-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* Category dropdown */
+.category-filter select {
+  padding: 10px 16px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  color: var(--text);
+  font-size: 14px;
+  width: 200px;
+}
+
+/* Search box */
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+.search-box input {
+  width: 100%;
+  padding: 10px 16px;
+  padding-left: 40px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+.search-box svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-light);
+}
+
+/* Plants container */
+.plants-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.plants-container-horizontal {
+  width: 100%;
+}
+.plants-column h2,
+.plants-container-horizontal h2 {
+  margin-bottom: 16px;
+}
+
+/* Grid layout */
+.plants-grid,
+.plants-grid-horizontal {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* Plant card */
+.plant-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  background-color: var(--card-bg);
+  transition: box-shadow var(--transition-speed) ease;
+}
+.plant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Plant header with image + title */
+.plant-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.plant-image {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.plant-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.plant-title {
+  flex: 1;
+}
+.plant-title h3 {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.plant-status {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.status-active {
+  background-color: rgba(102, 187, 106, 0.2);
+  color: var(--status-active);
+}
+.status-inactive {
+  background-color: rgba(255, 167, 38, 0.2);
+  color: var(--status-inactive);
+}
+.status-maintenance {
+  background-color: rgba(239, 83, 80, 0.2);
+  color: var(--status-maintenance);
+}
+
+/* Expand/collapse details */
+.plant-actions {
+  margin-top: auto;
+}
+.expand-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease;
+}
+.expand-button:hover {
+  background-color: rgba(102, 187, 106, 0.1);
+}
+
+/* Expanded details */
+.plant-details {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.detail-item {
+  font-size: 14px;
+}
+.detail-label {
+  display: block;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Add/edit plant form */
+.add-plant-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 70vh; 
+  overflow-y: auto;
+  padding-right: 10px;
+}
+.add-plant-form input,
+.add-plant-form select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Form row for 2-column layout */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Form actions (buttons) */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Image upload */
+.image-upload {
+  margin-top: 8px;
+}
+.upload-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color var(--transition-speed) ease;
+}
+.upload-label:hover {
+  border-color: var(--secondary);
+}
+input[type="file"] {
+  display: none;
+}
+.image-preview {
+  margin-top: 12px;
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.remove-image {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Success/Error message */
+.add-plant-form p {
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media screen and (max-width: 1200px) {
+  .plants-container {
+    grid-template-columns: 1fr;
+  }
+}
+@media screen and (max-width: 768px) {
+  .filter-section {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .category-filter select,
+  .search-box {
+    width: 100%;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}

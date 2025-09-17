@@ -1,0 +1,77 @@
+/* CalendarDark.css */
+
+/* Main calendar container */
+.react-calendar {
+  width: 50%;
+  max-width: 50%;
+  background-color: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: inherit;
+  padding: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Navigation bar (month/year + arrows) */
+.react-calendar__navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.react-calendar__navigation button {
+  color: var(--text);
+  background: transparent;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.react-calendar__navigation button:hover {
+  background-color: rgba(100, 100, 100, 0.2);
+}
+
+/* Weekdays (Mon, Tue, etc.) */
+.react-calendar__month-view__weekdays {
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+/* Days */
+.react-calendar__tile {
+  padding: 10px 6px;
+  background: transparent;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  text-align: center;
+  color: var(--text);
+}
+
+/* Hover effect on days */
+.react-calendar__tile:hover {
+  background-color: rgba(100, 100, 100, 0.2);
+}
+
+/* Current day highlight */
+.react-calendar__tile--now {
+  background: var(--border);
+  color: var(--text);
+  font-weight: bold;
+}
+
+/* Selected day */
+.react-calendar__tile--active {
+  background: #66bb6a;
+  color: #fff;
+}
+
+/* Disabled days */
+.react-calendar__tile:disabled {
+  color: gray;
+  background-color: transparent;
+}

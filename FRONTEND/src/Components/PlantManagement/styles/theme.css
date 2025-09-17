@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+:root {
+  /* Light Theme */
+  --primary: #2E7D32;
+  --secondary: #66BB6A;
+  --background: #F1F8E9;
+  --card-bg: #FFFFFF;
+  --text: #212121;
+  --text-light: #757575;
+  --border: #E0E0E0;
+  --shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  --hover-shadow: 0 0 8px rgba(102, 187, 106, 0.6);
+  /* Status Colors */
+  --status-active: #66BB6A;
+  --status-inactive: #FFA726;
+  --status-maintenance: #EF5350;
+  --status-cleared: #66BB6A;
+  --status-issue: #EF5350;
+  /* Sizes */
+  --border-radius: 12px;
+  --header-height: 64px;
+  --sidebar-width: 250px;
+  --sidebar-collapsed-width: 70px;
+  --transition-speed: 0.3s;
+}
+[data-theme="dark"] {
+  --primary: #43A047;
+  --secondary: #66BB6A;
+  --background: #121212;
+  --card-bg: #1E1E1E;
+  --text: #E0E0E0;
+  --text-light: #BDBDBD;
+  --border: #333333;
+  --shadow: 0px 4px 6px rgba(0, 0, 0, 0.3);
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--background);
+  transition: background-color var(--transition-speed) ease;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 0.5em;
+}
+h1 {
+  font-size: 32px;
+}
+h2 {
+  font-size: 28px;
+}
+h3 {
+  font-size: 24px;
+}
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+button {
+  cursor: pointer;
+}
+button:focus, 
+input:focus, 
+select:focus, 
+textarea:focus {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+.text-right {
+  text-align: right;
+}
+.hidden {
+  display: none;
+}
+.w-full {
+  width: 100%;
+}
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 20px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-light);
+}

@@ -1,0 +1,16 @@
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: background-color var(--transition-speed) ease, transform var(--transition-speed) ease;
+}
+.theme-toggle:hover {
+  background-color: rgba(102, 187, 106, 0.1);
+  transform: scale(1.05);
+}
