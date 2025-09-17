@@ -405,7 +405,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="pb-10" style={{ backgroundColor: darkMode ? "#1f2937" : "#f7e9cb" }}>
+        <div className="pb-10" style={{ backgroundColor: darkMode ? "" : "light-beige" }}>
             {/* Show error message if fetch failed */}
             {fetchError && (
                 <div className={`p-4 mb-6 rounded-xl ${darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-800"} flex items-center gap-3`}>

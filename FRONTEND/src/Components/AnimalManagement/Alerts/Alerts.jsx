@@ -28,7 +28,7 @@ export default function Alerts() {
   };
 
   return (
-    <div className={`p-5 h-full ${darkMode ? "bg-gray-900" : "bg-[#f7e9cb]"}`}>
+    <div className={`p-5 h-full ${darkMode ? "bg-gray-900" : "light-beige"}`}>
       <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Alerts</h2>
       {alerts.length === 0 ? (
         <p className="text-gray-600 dark:text-gray-300">No alerts at the moment.</p>

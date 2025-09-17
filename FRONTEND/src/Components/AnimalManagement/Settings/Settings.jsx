@@ -404,7 +404,7 @@ export default function Settings() {
   };
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900" : "bg-gray-100"} p-4 md:p-6`}>
+    <div className={`h-full ${darkMode ? "bg-gray-900" : "light-beige"}`}>
       <div className="max-w-4xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 dark:text-white">User Settings</h2>
         

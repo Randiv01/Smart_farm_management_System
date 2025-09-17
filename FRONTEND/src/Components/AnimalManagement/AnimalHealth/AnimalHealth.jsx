@@ -192,7 +192,7 @@ export default function AnimalHealth() {
   };
 
   return (
-    <div className={`h-full ${darkMode ? "bg-gray-900" : "bg-[#f7e9cb]"}`}>
+    <div className={`h-full ${darkMode ? "bg-gray-900" : "light-beige"}`}>
       <div className="p-5">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800 dark:text-white">Animal Health Dashboard</h2>

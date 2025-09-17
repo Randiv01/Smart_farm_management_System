@@ -97,6 +97,13 @@ import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
 import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
 
+// Inventory Management
+import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
+import orderRoutes from "./InventoryManagement/Iroutes/orderRoutes.js";
+import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js";
+import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
+import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
+
 // ----------------------- Debug env variables -----------------------
 console.log(
   "OPENAI_API_KEY loaded:",
@@ -134,6 +141,13 @@ app.use("/api/inspections", inspectionRoutes);
 app.use("/api/plants", plantRoutes);
 app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
+
+// Inventory Management
+app.use("/api/inventory/products", productRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/animalfood", animalFoodRoutes);
+app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
+app.use("/api/suppliers", supplierRoutes);
 
 // ----------------------- Health Check -----------------------
 app.get("/health", (req, res) =>

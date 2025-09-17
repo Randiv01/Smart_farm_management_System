@@ -14,8 +14,6 @@ import {
   SearchIcon,
   ChevronRightIcon
 } from "lucide-react";
-import LanguageSelector from "../UI/UI/LanguageSelector.js";
-import { useLanguage } from "../contexts/LanguageContext.js";
 import { useTheme } from "../contexts/ThemeContext.js";
 import { useUser } from "../contexts/UserContext.js";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +24,6 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { userData, isLoading } = useUser();
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
@@ -368,7 +365,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
           <div className="flex items-center">
             <button
               onClick={onMenuClick}
-              className={`p-2 rounded-md mr-2 ${
+              className={`p-2 rounded-md mr-2 outline-none ${
                 darkMode
                   ? "hover:bg-gray-700 text-gray-200"
                   : "hover:bg-gray-100 text-gray-600"
@@ -407,7 +404,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
         <div className="flex items-center">
           <button
             onClick={onMenuClick}
-            className={`p-2 rounded-md mr-2 ${
+            className={`p-2 rounded-md mr-2 outline-none ${
               darkMode
                 ? "hover:bg-gray-700 text-gray-200"
                 : "hover:bg-gray-100 text-gray-600"
@@ -420,9 +417,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
               darkMode ? "text-white" : "text-gray-800"
             }`}
           >
-            {t("dashboard.title", {
-              defaultValue: `${formatRole(userData.role)} Dashboard`,
-            })}
+            {formatRole(userData.role)} Dashboard
           </h2>
         </div>
 
@@ -430,7 +425,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
         <div className="flex items-center space-x-2">
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-md ${
+            className={`p-2 rounded-md outline-none ${
               darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
             }`}
           >
@@ -441,11 +436,9 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
             )}
           </button>
 
-          <LanguageSelector darkMode={darkMode} />
-
           <div className="relative">
             <button
-              className={`p-2 rounded-full relative ${
+              className={`p-2 rounded-full relative outline-none ${
                 darkMode
                   ? "hover:bg-gray-700 text-gray-200"
                   : "hover:bg-gray-100 text-gray-600"
@@ -498,7 +491,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
           <div className="relative">
             <button
               onClick={() => setChatOpen(!chatOpen)}
-              className={`p-2 rounded-md relative ${
+              className={`p-2 rounded-md relative outline-none ${
                 darkMode
                   ? "hover:bg-gray-700 text-gray-200"
                   : "hover:bg-gray-100 text-gray-600"
@@ -546,7 +539,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                   <div className="flex items-center">
                     <button 
                       onClick={clearConversation}
-                      className={`p-1 rounded mr-2 ${
+                      className={`p-1 rounded mr-2 outline-none ${
                         darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-600"
                       }`}
                       title="Clear conversation"
@@ -568,7 +561,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                     </button>
                     <button 
                       onClick={() => setChatOpen(false)}
-                      className={`p-1 rounded ${
+                      className={`p-1 rounded outline-none ${
                         darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-600"
                       }`}
                     >
@@ -616,7 +609,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                             <div key={key} className="mb-4">
                               <button
                                 onClick={() => setActiveCategory(key)}
-                                className={`flex items-center justify-between w-full p-3 rounded-md text-left ${
+                                className={`flex items-center justify-between w-full p-3 rounded-md text-left outline-none ${
                                   darkMode 
                                     ? "bg-gray-700 hover:bg-gray-600 text-gray-200" 
                                     : "bg-gray-100 hover:bg-gray-200 text-gray-800"
@@ -639,7 +632,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                       <div className={`p-3 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
                         <button
                           onClick={() => setActiveCategory(null)}
-                          className={`flex items-center text-sm ${
+                          className={`flex items-center text-sm outline-none ${
                             darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-800"
                           }`}
                         >
@@ -656,7 +649,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                           <div key={index} className="mb-3">
                             <button
                               onClick={() => handleFaqClick(faq.question, faq.answer)}
-                              className={`w-full text-left p-3 rounded-md ${
+                              className={`w-full text-left p-3 rounded-md outline-none ${
                                 darkMode 
                                   ? "bg-gray-700 hover:bg-gray-600 text-gray-200" 
                                   : "bg-gray-100 hover:bg-gray-200 text-gray-800"
@@ -757,7 +750,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                     <button
                       onClick={sendMessage}
                       disabled={loading || !inputMessage.trim()}
-                      className={`px-3 py-2 rounded-r-md ${
+                      className={`px-3 py-2 rounded-r-md outline-none ${
                         loading || !inputMessage.trim()
                           ? "bg-gray-400 cursor-not-allowed"
                           : "bg-blue-600 hover:bg-blue-700"
@@ -774,7 +767,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
           {/* User Menu */}
           <div className="relative">
             <button
-              className={`flex items-center space-x-2 p-2 rounded-md ${
+              className={`flex items-center space-x-2 p-2 rounded-md outline-none ${
                 darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
               }`}
               onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -875,7 +868,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                 <div className="py-1">
                   <button
                     onClick={handleLogout}
-                    className={`flex items-center w-full text-left px-4 py-2 text-sm ${
+                    className={`flex items-center w-full text-left px-4 py-2 text-sm outline-none ${
                       darkMode
                         ? "text-gray-200 hover:bg-gray-700"
                         : "text-gray-700 hover:bg-gray-100"

@@ -353,7 +353,7 @@ export default function AnimalProductivity() {
     : animalTypes.filter(type => type.managementType === selectedManagementType);
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900" : "bg-[#f7e9cb]"}`}>
+    <div className={`h-full ${darkMode ? "bg-gray-900" : "light-beige"}`}>
       <div className="p-5">
         <h2 className="text-3xl font-bold mb-6 text-gray-800 dark:text-white">Animal Productivity Dashboard</h2>
 
