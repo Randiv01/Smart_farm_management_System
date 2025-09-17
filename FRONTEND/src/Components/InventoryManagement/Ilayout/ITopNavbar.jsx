@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Menu, Bell, Sun, Moon, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, Bell, Sun, Moon, User, LogOut, ChevronDown, Package, AlertTriangle, CheckCircle } from "lucide-react";
 import { useITheme } from '../Icontexts/IThemeContext.jsx';
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const { theme, toggleTheme } = useITheme();
@@ -9,6 +10,8 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,7 +24,86 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       profileImage: localStorage.getItem("profileImage") || null
     };
     setUserData(user);
+    
+    // Fetch notifications if user is logged in
+    if (localStorage.getItem("token")) {
+      fetchNotifications();
+      
+      // Set up interval to check for new notifications every 30 seconds
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
   }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      // Fetch low stock alerts
+      const alertsResponse = await axios.get("http://localhost:5000/api/inventory/low-stock");
+      const alerts = alertsResponse.data.map(product => ({
+        id: product._id,
+        type: "inventory",
+        title: "Low Stock Alert",
+        message: `${product.name} is ${product.status === 'Low Stock' ? 'low in stock' : 'out of stock'} (${product.stock.quantity} ${product.stock.unit} remaining)`,
+        timestamp: new Date(),
+        read: false,
+        priority: product.status === 'Out of Stock' ? 'high' : 'medium'
+      }));
+      
+      // Fetch recent orders (pending orders for admins)
+      const ordersResponse = await axios.get("http://localhost:5000/api/orders", {
+        params: { status: 'pending', limit: 5 }
+      });
+      const orders = ordersResponse.data.orders.map(order => ({
+        id: order._id,
+        type: "order",
+        title: "New Order",
+        message: `New order #${order.orderNumber} from ${order.customer.name}`,
+        timestamp: new Date(order.orderDate),
+        read: false,
+        priority: 'medium'
+      }));
+      
+      // Combine notifications
+      const allNotifications = [...alerts, ...orders].sort((a, b) => 
+        new Date(b.timestamp) - new Date(a.timestamp)
+      );
+      
+      setNotifications(allNotifications);
+      setUnreadCount(allNotifications.filter(n => !n.read).length);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+
+  const markAsRead = (id) => {
+    const updatedNotifications = notifications.map(notification =>
+      notification.id === id ? { ...notification, read: true } : notification
+    );
+    setNotifications(updatedNotifications);
+    setUnreadCount(updatedNotifications.filter(n => !n.read).length);
+  };
+
+  const markAllAsRead = () => {
+    const updatedNotifications = notifications.map(notification => ({
+      ...notification,
+      read: true
+    }));
+    setNotifications(updatedNotifications);
+    setUnreadCount(0);
+  };
+
+  const handleNotificationClick = (notification) => {
+    markAsRead(notification.id);
+    
+    // Navigate based on notification type
+    if (notification.type === "inventory") {
+      navigate("/InventoryManagement");
+    } else if (notification.type === "order") {
+      navigate("/InventoryManagement/orders");
+    }
+    
+    setNotificationsOpen(false);
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -48,6 +130,25 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     const parts = cleanPath.split("/");
     const filename = parts[parts.length - 1];
     return `http://localhost:5000/api/users/profile-image/${filename}`;
+  };
+
+  const formatTime = (timestamp) => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInMinutes = Math.floor((now - time) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "inventory": return <AlertTriangle size={16} className="text-yellow-500" />;
+      case "order": return <Package size={16} className="text-blue-500" />;
+      default: return <Bell size={16} className="text-gray-500" />;
+    }
   };
 
   if (!userData) return null;
@@ -88,14 +189,89 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
           <div className="relative">
             <button
               className={`p-2 rounded-full relative ${darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-600"}`}
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              onClick={() => {
+                setNotificationsOpen(!notificationsOpen);
+                if (!notificationsOpen) {
+                  fetchNotifications();
+                }
+              }}
             >
               <Bell size={20} />
-              <span className="absolute top-1 right-1 bg-red-500 rounded-full w-2 h-2"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </button>
+            
             {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-64 rounded-md shadow-lg py-2 z-50 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"}`}>
-                <p className="px-4 text-sm">No new notifications</p>
+              <div className={`absolute right-0 mt-2 w-80 rounded-md shadow-lg py-2 z-50 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"}`}>
+                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                  <h3 className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>Notifications</h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className={`text-xs ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.length > 0 ? (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
+                          notification.read 
+                            ? darkMode ? "bg-gray-800" : "bg-white" 
+                            : darkMode ? "bg-gray-700" : "bg-blue-50"
+                        } hover:${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 pt-0.5">
+                            {getNotificationIcon(notification.type)}
+                          </div>
+                          <div className="ml-3 flex-1">
+                            <p className={`text-sm font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>
+                              {notification.title}
+                            </p>
+                            <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                              {notification.message}
+                            </p>
+                            <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"} mt-1`}>
+                              {formatTime(notification.timestamp)}
+                            </p>
+                          </div>
+                          {!notification.read && (
+                            <div className="flex-shrink-0">
+                              <span className="bg-blue-500 rounded-full w-2 h-2"></span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-center">
+                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        No notifications
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                {notifications.length > 0 && (
+                  <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => navigate("/InventoryManagement/orders")}
+                      className={`w-full text-center text-sm ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
+                    >
+                      View all notifications
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

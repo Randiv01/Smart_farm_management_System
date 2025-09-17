@@ -1,18 +1,35 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Package, Truck, ShoppingCart, FileText, Settings } from "lucide-react";
+import { 
+  Home, 
+  Package, 
+  Layers, 
+  Calendar, 
+  Beef, 
+  Sprout, 
+  Users, 
+  ShoppingCart, 
+  Truck, 
+  CreditCard, 
+  BarChart3, 
+  Settings,
+  ClipboardList
+} from "lucide-react";
 
 export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const navItems = [
-    { path: "/dashboard", icon: Home, label: "Overview" },
-    { path: "/stock", icon: Package, label: "Stock" },
-    { path: "/suppliers", icon: Truck, label: "Suppliers" },
-    { path: "/orders", icon: ShoppingCart, label: "Orders" },
-    { path: "/reports", icon: FileText, label: "Reports" },
-    { path: "/settings", icon: Settings, label: "Settings" },
+    { path: "/InventoryManagement", icon: Home, label: "Overview" },
+    { path: "/InventoryManagement/stock", icon: Package, label: "Inventory Stock" },
+    { path: "/InventoryManagement/expiry", icon: Calendar, label: "Expiry Section" },
+    { path: "/InventoryManagement/animalfood", icon: Beef, label: "Animal Foods Stock" },
+    { path: "/InventoryManagement/export", icon: BarChart3, label: "Export Market" },
+    { path: "/InventoryManagement/fertilizerstock", icon: Sprout, label: "Fertilizer Stock" },
+    { path: "/InventoryManagement/orders", icon: ShoppingCart, label: "Orders" },
+    { path: "/InventoryManagement/isuppliers", icon: Truck, label: "Isuppliers" },
+    { path: "/InventoryManagement/settings", icon: Settings, label: "Settings" },
   ];
 
   useEffect(() => {
@@ -78,6 +95,7 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
                     ${sidebarOpen ? "justify-start px-4" : "justify-center"}
                     focus:outline-none focus:ring-1 focus:ring-white/50
                   `}
+                  title={item.label}
                 >
                   <item.icon size={20} className={sidebarOpen ? "mr-3" : ""} />
                   {sidebarOpen && (

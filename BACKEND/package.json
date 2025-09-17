@@ -1,11 +1,12 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "smart_farm",
+  "description": "Smart Farm Backend",
   "main": "app.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js"
   },
   "author": "randiv",
   "license": "ISC",
@@ -16,12 +17,17 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "express-async-handler": "^1.2.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.17.2",
     "multer": "^2.0.2",
     "nanoid": "^5.1.5",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
+    "openai": "^5.20.3",
     "path": "^0.12.7",
+    "pdfkit": "^0.17.2",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.7.1",
@@ -29,8 +35,8 @@
     "twilio": "^5.8.0",
     "uuid": "^11.1.0"
   },
-  "keywords": [],
   "devDependencies": {
     "nodemon": "^3.1.10"
-  }
+  },
+  "keywords": []
 }

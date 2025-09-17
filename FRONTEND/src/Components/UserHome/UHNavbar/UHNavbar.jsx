@@ -42,7 +42,7 @@ const Navbar = () => {
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center space-x-8">
           <Link to="/" className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors">Home</Link>
-          <Link to="/shop" className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors">Shop</Link>
+          <Link to="/InventoryManagement/catalog" className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors">Shop</Link>
           <Link to="/about" className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors">About</Link>
           <Link to="/contact" className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors">Contact</Link>
           <Link to="/blog" className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors">Blog</Link>
@@ -108,7 +108,7 @@ const Navbar = () => {
         <div className="md:hidden bg-white dark:bg-gray-900 shadow-lg">
           <div className="container mx-auto px-4 py-3 flex flex-col space-y-4">
             <Link to="/" onClick={closeMenu} className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors py-2">Home</Link>
-            <Link to="/shop" onClick={closeMenu} className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors py-2">Shop</Link>
+            <Link to="/InventoryManagement/catalog" onClick={closeMenu} className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors py-2">Shop</Link>
             <Link to="/about" onClick={closeMenu} className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors py-2">About</Link>
             <Link to="/contact" onClick={closeMenu} className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors py-2">Contact</Link>
             <Link to="/blog" onClick={closeMenu} className="text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors py-2">Blog</Link>
