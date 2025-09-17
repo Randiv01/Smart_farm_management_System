@@ -77,16 +77,16 @@ const UHFooter = () => {
                 Growing organic, sustainable produce with love and care for over 20 years.
               </p>
               <div className="flex space-x-4">
-                <a href="#" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
+                <a href="https://www.facebook.com/" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
                   <Facebook className="h-5 w-5" />
                 </a>
-                <a href="#" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
+                <a href="https://www.instagram.com/?hl=en" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
                   <Instagram className="h-5 w-5" />
                 </a>
-                <a href="#" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
+                <a href="https://x.com/" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
                   <Twitter className="h-5 w-5" />
                 </a>
-                <a href="#" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
+                <a href="https://www.youtube.com/" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
                   <Youtube className="h-5 w-5" />
                 </a>
               </div>

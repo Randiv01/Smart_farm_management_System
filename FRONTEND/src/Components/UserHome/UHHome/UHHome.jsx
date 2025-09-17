@@ -16,7 +16,6 @@ import {
   PhoneIcon,
   MailIcon
 } from 'lucide-react'
-import Navbar from '../UHNavbar/UHNavbar'
 import Footer from '../UHFooter/UHFooter'
 
 const products = [
@@ -25,7 +24,7 @@ const products = [
     name: 'Organic Chicken', 
     category: 'animal', 
     price: 12.99,
-    image: 'https://images.unsplash.com/photo-1587595431973-160d0d94add1?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
+    image: 'https://images.unsplash.com/photo-1587595431973-1600d0d94add1?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
     rating: 4.8,
     reviews: 124
   },
@@ -257,7 +256,7 @@ const BulkOrderModal = ({ isOpen, onClose }) => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-            <input type="tel" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white" />
+            <input type="tel" className="w-full px-4 py-2 border border-gray极速赛车开奖直播历史记录、澳洲幸运10开奖结果体彩、幸运飞艇官网开奖记录查询300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Order Details</label>
@@ -310,10 +309,8 @@ const Home = () => {
 
   return (
     <>
-      <Navbar />
-      <main className="w-full bg-light-beige dark:bg-gray-900 min-h-screen pt-20">
-
-       {/* Cinematic Hero Section */}
+      <main className="w-full bg-light-beige dark:bg-gray-900 min-h-screen">
+        {/* Cinematic Hero Section */}
         <section className="relative w-full h-screen overflow-hidden">
           {heroFeatures.map((feature, index) => (
             <div
