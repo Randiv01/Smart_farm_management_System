@@ -4,8 +4,16 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import H_SpecialistForm from "./H_SpecialistForm.js";
 
+// Import button icons
+import editIcon from "../../ButtonIcon/editButton.png";
+import deleteIcon from "../../ButtonIcon/deleteButton.png";
+import emailIcon from "../../ButtonIcon/emailButton.png";
+import whatsappIcon from "../../ButtonIcon/whatsappButton.png";
+
 const H_SpecialistDetails = () => {
   const [specialists, setSpecialists] = useState([]);
+  const [filteredSpecialists, setFilteredSpecialists] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -18,6 +26,7 @@ const H_SpecialistDetails = () => {
       .get("http://localhost:5000/api/specialists")
       .then((res) => {
         setSpecialists(res.data);
+        setFilteredSpecialists(res.data); // Initialize filtered list
         setLoading(false);
       })
       .catch((err) => {
@@ -31,6 +40,16 @@ const H_SpecialistDetails = () => {
     fetchSpecialists();
   }, []);
 
+  // Handle search
+  useEffect(() => {
+    const filtered = specialists.filter((s) =>
+      `${s.fullName} ${s.email} ${s.specializations.join(" ")}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
+    );
+    setFilteredSpecialists(filtered);
+  }, [searchQuery, specialists]);
+
   // Delete specialist
   const handleDelete = (id) => {
     if (window.confirm("Are you sure you want to delete this specialist?")) {
@@ -41,29 +60,28 @@ const H_SpecialistDetails = () => {
     }
   };
 
-  // Open form for edit
+  // Edit specialist
   const handleEdit = (id) => {
     setEditingId(id);
     setShowForm(true);
   };
 
-  // Open form for new specialist
+  // Add new specialist
   const handleAddNew = () => {
     setEditingId(null);
     setShowForm(true);
   };
 
-  // Generate PDF
+  // Download PDF
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
-    // Title
     doc.setFontSize(18);
     doc.text("Mount Olive Specialist Details", 14, 20);
-    // Date
+
     const today = new Date().toLocaleDateString();
     doc.setFontSize(11);
     doc.text(`Generated on: ${today}`, 14, 28);
-    // Table Columns
+
     const tableColumn = [
       "Full Name",
       "Email",
@@ -75,8 +93,8 @@ const H_SpecialistDetails = () => {
       "DOB",
       "Gender",
     ];
-    // Table Rows
-    const tableRows = specialists.map((s) => [
+
+    const tableRows = filteredSpecialists.map((s) => [
       s.fullName,
       s.email,
       s.phoneNo,
@@ -89,7 +107,7 @@ const H_SpecialistDetails = () => {
       s.dateOfBirth ? s.dateOfBirth.split("T")[0] : "",
       s.gender,
     ]);
-    // Use autoTable
+
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
@@ -97,34 +115,57 @@ const H_SpecialistDetails = () => {
       styles: { fontSize: 9 },
       headStyles: { fillColor: [22, 160, 133] },
     });
-    // Save PDF
+
     doc.save("Mount_Olive_Specialists.pdf");
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-50 p-6 font-sans">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-green-700 mb-6 text-center">Mount Olive Specialist Details</h1>
+        <h1 className="text-4xl font-extrabold text-green-700 mb-8 text-center tracking-tight">
+          Mount Olive Specialist Details
+        </h1>
 
-        {/* Buttons */}
-        <div className="flex justify-between mb-6">
-          <button
-            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
-            onClick={handleAddNew}
-          >
-            <i className="fas fa-user-plus"></i>
-            <span>Add New Specialist</span>
-          </button>
-          <button
-            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
-            onClick={handleDownloadPDF}
-          >
-            <i className="fas fa-download"></i>
-            <span>Download PDF</span>
-          </button>
+        {/* Top Buttons and Search Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 space-y-4 sm:space-y-0 sm:space-x-4">
+          {/* Search Bar with 🔍 Search Button */}
+          <div className="flex items-center w-full sm:w-auto relative">
+            <input
+              type="text"
+              placeholder="Search by name, email, or specialization..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:w-80 pl-4 pr-28 py-2 rounded-l-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-shadow shadow-sm placeholder-gray-400"
+            />
+            <button
+              className="absolute right-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-1"
+              onClick={() => {}}
+            >
+              <span>🔍</span>
+              <span>Search</span>
+            </button>
+          </div>
+
+          {/* Add New & Download Buttons */}
+          <div className="flex space-x-4">
+            <button
+              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-md"
+              onClick={handleAddNew}
+            >
+              <i className="fas fa-user-plus"></i>
+              <span>➕Add New Specialist</span>
+            </button>
+            <button
+              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-md"
+              onClick={handleDownloadPDF}
+            >
+              <i className="fas fa-download"></i>
+              <span>📄Download PDF</span>
+            </button>
+          </div>
         </div>
 
-        {/* Specialist form (add/edit) */}
+        {/* Specialist Form */}
         {showForm && (
           <H_SpecialistForm
             specialistId={editingId}
@@ -135,84 +176,114 @@ const H_SpecialistDetails = () => {
           />
         )}
 
-        {/* Specialist table */}
+        {/* Table */}
         {loading ? (
-          <p className="text-center text-gray-600">Loading specialists...</p>
+          <p className="text-center text-gray-600 text-lg">Loading specialists...</p>
         ) : error ? (
-          <p className="text-center text-red-600">{error}</p>
-        ) : specialists.length === 0 ? (
-          <p className="text-center text-gray-600">No specialists found.</p>
+          <p className="text-center text-red-600 text-lg">{error}</p>
+        ) : filteredSpecialists.length === 0 ? (
+          <p className="text-center text-gray-600 text-lg">No specialists found.</p>
         ) : (
-          <div className="overflow-x-auto bg-white rounded-lg shadow">
+          <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
             <table className="w-full table-auto">
               <thead className="bg-green-600 text-white">
                 <tr>
-                  <th className="px-4 py-3 text-left">Photo</th>
-                  <th className="px-4 py-3 text-left">Full Name</th>
-                  <th className="px-4 py-3 text-left">Email</th>
-                  <th className="px-4 py-3 text-left">Phone</th>
-                  <th className="px-4 py-3 text-left">License</th>
-                  <th className="px-4 py-3 text-left">Specializations</th>
-                  <th className="px-4 py-3 text-left">Qualifications</th>
-                  <th className="px-4 py-3 text-left">Experience</th>
-                  <th className="px-4 py-3 text-left">DOB</th>
-                  <th className="px-4 py-3 text-left">Gender</th>
-                  <th className="px-4 py-3 text-left">Actions</th>
-                  <th className="px-4 py-3 text-left">Direct Contact</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Photo</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Full Name</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">License</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Specializations</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Qualifications</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Experience</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">DOB</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Gender</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Direct Contact</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {specialists.map((s) => (
-                  <tr key={s._id} className="border-b hover:bg-gray-50">
+                {filteredSpecialists.map((s) => (
+                  <tr key={s._id} className="border-b hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <img
-                        src={`http://localhost:5000/Health_Uploads/${s.profilePhoto}`}
-                        alt={s.fullName}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
+                      {s.profilePhoto ? (
+                        <img
+                          src={`http://localhost:5000/Health_Uploads/${s.profilePhoto}`}
+                          alt={s.fullName}
+                          className="w-12 h-12 rounded-full object-cover shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gray-200" />
+                      )}
                     </td>
-                    <td className="px-4 py-3">{s.fullName}</td>
-                    <td className="px-4 py-3">{s.email}</td>
-                    <td className="px-4 py-3">{s.phoneNo}</td>
-                    <td className="px-4 py-3">{s.medicalLicenseNumber}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-gray-800">{s.fullName}</td>
+                    <td className="px-4 py-3 text-gray-800">{s.email}</td>
+                    <td className="px-4 py-3 text-gray-800">{s.phoneNo}</td>
+                    <td className="px-4 py-3 text-gray-800">{s.medicalLicenseNumber}</td>
+                    <td className="px-4 py-3 text-gray-800">
                       {Array.isArray(s.specializations)
                         ? s.specializations.join(", ")
                         : s.specializations}
                     </td>
-                    <td className="px-4 py-3">{s.qualifications}</td>
-                    <td className="px-4 py-3">{s.yearsOfExperience}</td>
-                    <td className="px-4 py-3">{s.dateOfBirth ? s.dateOfBirth.split("T")[0] : ""}</td>
-                    <td className="px-4 py-3">{s.gender}</td>
-                    <td className="px-4 py-3 flex space-x-2">
-                      <button
-                        className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition flex items-center space-x-1"
-                        onClick={() => handleEdit(s._id)}
-                      >
-                        <i className="fas fa-edit"></i>
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition flex items-center space-x-1"
-                        onClick={() => handleDelete(s._id)}
-                      >
-                        <i className="fas fa-trash"></i>
-                        <span>Delete</span>
-                      </button>
+                    <td className="px-4 py-3 text-gray-800">{s.qualifications}</td>
+                    <td className="px-4 py-3 text-gray-800">{s.yearsOfExperience}</td>
+                    <td className="px-4 py-3 text-gray-800">
+                      {s.dateOfBirth ? s.dateOfBirth.split("T")[0] : ""}
                     </td>
-                    <td className="px-4 py-3 flex space-x-2">
-                      <a href={`https://wa.me/${s.phoneNo}`} target="_blank" rel="noopener noreferrer">
-                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition flex items-center space-x-1">
-                          <i className="fab fa-whatsapp"></i>
-                          <span>WhatsApp</span>
-                        </button>
+                    <td className="px-4 py-3 text-gray-800">{s.gender}</td>
+
+                    {/* Direct Contact */}
+                    <td className="px-4 py-3 flex space-x-2 items-center">
+                      <a
+                        href={`https://wa.me/${s.phoneNo}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="WhatsApp"
+                      >
+                        <img
+                          src={whatsappIcon}
+                          alt="WhatsApp"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
                       </a>
-                      <a href={`mailto:${s.email}`} target="_blank" rel="noopener noreferrer">
-                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition flex items-center space-x-1">
-                          <i className="fas fa-envelope"></i>
-                          <span>Email</span>
-                        </button>
+                      <a
+                        href={`mailto:${s.email}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Email"
+                      >
+                        <img
+                          src={emailIcon}
+                          alt="Email"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
                       </a>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-3 flex space-x-2 items-center">
+                      <button
+                        title="Edit"
+                        onClick={() => handleEdit(s._id)}
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        <img
+                          src={editIcon}
+                          alt="Edit"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
+                      </button>
+                      <button
+                        title="Delete"
+                        onClick={() => handleDelete(s._id)}
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        <img
+                          src={deleteIcon}
+                          alt="Delete"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
+                      </button>
                     </td>
                   </tr>
                 ))}

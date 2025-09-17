@@ -11,7 +11,6 @@ const DoctorRecordForm = () => {
     "Pig",
   ]);
   const [newAnimalType, setNewAnimalType] = useState("");
-  const [loading, setLoading] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -30,24 +29,11 @@ const DoctorRecordForm = () => {
 
   // Fetch data from backend
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [doctorsRes, specialistsRes, medicinesRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/doctors"),
-          axios.get("http://localhost:5000/api/specialists"),
-          axios.get("http://localhost:5000/api/medistore"),
-        ]);
-
-        setDoctors(doctorsRes.data);
-        setSpecialists(specialistsRes.data);
-        setMedicines(medicinesRes.data);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        alert("Failed to load form data. Please refresh the page.");
-      }
-    };
-
-    fetchData();
+    axios.get("http://localhost:5000/api/doctors").then((res) => setDoctors(res.data));
+    axios
+      .get("http://localhost:5000/api/specialists")
+      .then((res) => setSpecialists(res.data));
+    axios.get("http://localhost:5000/api/medistore").then((res) => setMedicines(res.data));
   }, []);
 
   // Handle form changes
@@ -57,30 +43,7 @@ const DoctorRecordForm = () => {
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size must be less than 5MB");
-        e.target.value = "";
-        return;
-      }
-
-      // Validate file type
-      const allowedTypes = [
-        "application/pdf",
-        "image/png",
-        "image/jpg",
-        "image/jpeg",
-      ];
-      if (!allowedTypes.includes(file.type)) {
-        alert("Only PDF, PNG, JPG, and JPEG files are allowed");
-        e.target.value = "";
-        return;
-      }
-    }
-
-    setFormData((prev) => ({ ...prev, reports: file }));
+    setFormData((prev) => ({ ...prev, reports: e.target.files[0] }));
   };
 
   const handleMedicineToggle = (medicineId) => {
@@ -94,59 +57,28 @@ const DoctorRecordForm = () => {
   };
 
   const handleAddAnimalType = () => {
-    const trimmedType = newAnimalType.trim();
-    if (trimmedType && !animalTypes.includes(trimmedType)) {
-      setAnimalTypes([...animalTypes, trimmedType]);
-      setFormData((prev) => ({ ...prev, animalType: trimmedType }));
+    if (newAnimalType && !animalTypes.includes(newAnimalType)) {
+      setAnimalTypes([...animalTypes, newAnimalType]);
+      setFormData((prev) => ({ ...prev, animalType: newAnimalType }));
       setNewAnimalType("");
-    } else if (animalTypes.includes(trimmedType)) {
-      alert("Animal type already exists");
     }
-  };
-
-  const validateForm = () => {
-    if (!formData.animalType) {
-      alert("Please select an animal type");
-      return false;
-    }
-    if (!formData.animalCode.trim()) {
-      alert("Please enter an animal code");
-      return false;
-    }
-    if (!formData.doctor) {
-      alert("Please select a veterinary surgeon");
-      return false;
-    }
-    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
-
-    setLoading(true);
-
     try {
       const data = new FormData();
       data.append("animalType", formData.animalType);
-      data.append("animalCode", formData.animalCode.trim());
+      data.append("animalCode", formData.animalCode);
       data.append("doctor", formData.doctor);
-      if (formData.specialist) data.append("specialist", formData.specialist);
-      if (formData.reports) data.append("reports", formData.reports);
+      data.append("specialist", formData.specialist);
+      data.append("reports", formData.reports);
       data.append("notes", formData.notes);
+      data.append("medicines", JSON.stringify(formData.medicines));
 
-      const medicinesArray = formData.medicines.filter((id) => id && id.trim() !== "");
-      data.append("medicines", JSON.stringify(medicinesArray));
-
-      const response = await axios.post(
-        "http://localhost:5000/api/animalrecords",
-        data,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-          timeout: 30000,
-        }
-      );
+      await axios.post("http://localhost:5000/api/animalrecords", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       alert("Record saved successfully!");
       setFormData({
@@ -158,21 +90,9 @@ const DoctorRecordForm = () => {
         medicines: [],
         notes: "",
       });
-
-      const fileInput = document.querySelector('input[type="file"]');
-      if (fileInput) fileInput.value = "";
-
     } catch (err) {
-      console.error("Submit error:", err);
-      if (err.response) {
-        alert(`Error: ${err.response.data?.message || "Failed to save record"}`);
-      } else if (err.request) {
-        alert("Network error. Please check your connection and try again.");
-      } else {
-        alert("An unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+      console.error(err);
+      alert("Failed to save record.");
     }
   };
 
@@ -188,7 +108,7 @@ const DoctorRecordForm = () => {
 
         {/* Animal Type */}
         <div>
-          <label className="block font-semibold mb-2">Animal Type *</label>
+          <label className="block font-semibold mb-2">Animal Type</label>
           <div className="flex items-center space-x-2">
             <select
               name="animalType"
@@ -223,7 +143,7 @@ const DoctorRecordForm = () => {
 
         {/* Animal Code */}
         <div>
-          <label className="block font-semibold mb-2">Animal Code *</label>
+          <label className="block font-semibold mb-2">Animal Code</label>
           <input
             type="text"
             name="animalCode"
@@ -231,13 +151,12 @@ const DoctorRecordForm = () => {
             onChange={handleChange}
             required
             className="border p-2 rounded w-full"
-            placeholder="Enter unique animal code"
           />
         </div>
 
         {/* Doctor */}
         <div>
-          <label className="block font-semibold mb-2">Veterinary Surgeon *</label>
+          <label className="block font-semibold mb-2">Veterinary Surgeon</label>
           <select
             name="doctor"
             value={formData.doctor}
@@ -263,7 +182,7 @@ const DoctorRecordForm = () => {
             onChange={handleChange}
             className="border p-2 rounded w-full"
           >
-            <option value="">Select Specialist (Optional)</option>
+            <option value="">Select Specialist</option>
             {specialists.map((s) => (
               <option key={s._id} value={s._id}>
                 {s.fullName}
@@ -281,42 +200,28 @@ const DoctorRecordForm = () => {
             onChange={handleFileChange}
             className="border p-2 rounded w-full"
           />
-          <p className="text-sm text-gray-600 mt-1">
-            Accepted formats: PDF, PNG, JPG, JPEG (Max: 5MB)
-          </p>
         </div>
 
         {/* Medicines */}
         <div>
           <label className="block font-semibold mb-2">Select Medicines</label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto border p-2 rounded">
-            {medicines.length > 0 ? (
-              medicines.map((med) => (
-                <label
-                  key={med._id}
-                  className="flex items-center space-x-2 border p-1 rounded hover:bg-green-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={formData.medicines.includes(med._id)}
-                    onChange={() => handleMedicineToggle(med._id)}
-                  />
-                  <span className="text-sm">
-                    {med.medicine_name} ({med.quantity_available} left)
-                  </span>
-                </label>
-              ))
-            ) : (
-              <p className="text-gray-500 col-span-full text-center py-4">
-                No medicines available
-              </p>
-            )}
+            {medicines.map((med) => (
+              <label
+                key={med._id}
+                className="flex items-center space-x-2 border p-1 rounded hover:bg-green-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={formData.medicines.includes(med._id)}
+                  onChange={() => handleMedicineToggle(med._id)}
+                />
+                <span>
+                  {med.medicine_name} ({med.quantity_available} left)
+                </span>
+              </label>
+            ))}
           </div>
-          {formData.medicines.length > 0 && (
-            <p className="text-sm text-green-600 mt-1">
-              {formData.medicines.length} medicine(s) selected
-            </p>
-          )}
         </div>
 
         {/* Additional Notes */}
@@ -328,21 +233,15 @@ const DoctorRecordForm = () => {
             onChange={handleChange}
             className="border p-2 rounded w-full"
             rows={4}
-            placeholder="Enter any additional notes about the treatment..."
           ></textarea>
         </div>
 
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading}
-          className={`w-full font-bold px-6 py-3 rounded-md transition ${
-            loading
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-green-600 hover:bg-green-700 text-white"
-          }`}
+          className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 w-full font-bold transition"
         >
-          {loading ? "Saving..." : "Save Record"}
+          Save Record
         </button>
       </form>
     </div>

@@ -4,11 +4,19 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import H_PlantPathologistForm from "./H_PlantPathologistForm.js";
 
+// Import button icons
+import editIcon from "../../ButtonIcon/editButton.png";
+import deleteIcon from "../../ButtonIcon/deleteButton.png";
+import emailIcon from "../../ButtonIcon/emailButton.png";
+import whatsappIcon from "../../ButtonIcon/whatsappButton.png";
+
 const H_PlantPathologist = () => {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [searchInput, setSearchInput] = useState(""); // input value
+  const [searchTerm, setSearchTerm] = useState("");   // applied filter
 
   const fetchEntries = async () => {
     try {
@@ -37,8 +45,8 @@ const H_PlantPathologist = () => {
     doc.setFontSize(18);
     doc.text("Plant Pathologist Details", 14, 20);
     autoTable(doc, {
-      head: [["Full Name","Email","Phone","License","Specializations","Qualifications","Experience","DOB","Gender"]],
-      body: entries.map(e => [
+      head: [["Full Name", "Email", "Phone", "License", "Specializations", "Qualifications", "Experience", "DOB", "Gender"]],
+      body: filteredEntries.map(e => [
         e.fullName,
         e.email,
         e.phoneNo,
@@ -64,24 +72,49 @@ const H_PlantPathologist = () => {
     setShowForm(true);
   };
 
+  // Filter entries based on search term
+  const filteredEntries = entries.filter((e) => {
+    if (!searchTerm) return true;
+    return Object.values(e)
+      .join(" ")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+  });
+
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Plant Pathologist Details</h1>
 
-      {/* Buttons */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      {/* Buttons and Search */}
+      <div className="flex flex-wrap gap-3 mb-6 items-center">
         <button
           className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded shadow-md transition-transform transform hover:scale-105"
           onClick={handleAddNew}
         >
-          Add New Plant Pathologist
+          ➕Add New Plant Pathologist
         </button>
         <button
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded shadow-md transition-transform transform hover:scale-105"
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded shadow-md transition-transform transform hover:scale-105"
           onClick={handleDownloadPDF}
         >
-          Download PDF
+          📄Download PDF
         </button>
+        {/* Search Bar */}
+        <div className="flex gap-2 ml-auto">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search..."
+            className="border border-gray-300 p-2 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <button
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow-md transition-transform transform hover:scale-105"
+            onClick={() => setSearchTerm(searchInput)}
+          >
+            🔍 Search
+          </button>
+        </div>
       </div>
 
       {/* Form */}
@@ -103,7 +136,7 @@ const H_PlantPathologist = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {["Photo","Full Name","Email","Phone","License","Specializations","Qualifications","Experience","DOB","Gender","Actions","Direct Contact"].map((header) => (
+                {["Photo", "Full Name", "Email", "Phone", "License", "Specializations", "Qualifications", "Experience", "DOB", "Gender", "Actions", "Direct Contact"].map((header) => (
                   <th
                     key={header}
                     scope="col"
@@ -115,12 +148,12 @@ const H_PlantPathologist = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {entries.map((d) => (
+              {filteredEntries.map((d) => (
                 <tr key={d._id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">
                     {d.profilePhoto && (
                       <img
-                        src={`http://localhost:5000/Health_uploads/${d.profilePhoto}`}
+                        src={`http://localhost:5000/Health_Uploads/${d.profilePhoto}`}
                         alt={d.fullName}
                         className="w-12 h-12 object-cover rounded-full mx-auto"
                       />
@@ -130,37 +163,29 @@ const H_PlantPathologist = () => {
                   <td className="px-4 py-2">{d.email}</td>
                   <td className="px-4 py-2">{d.phoneNo}</td>
                   <td className="px-4 py-2">{d.licenseNumber}</td>
-                  <td className="px-4 py-2">
-                    {Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations}
-                  </td>
+                  <td className="px-4 py-2">{Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations}</td>
                   <td className="px-4 py-2">{d.qualifications}</td>
                   <td className="px-4 py-2">{d.yearsOfExperience}</td>
                   <td className="px-4 py-2">{d.dateOfBirth ? d.dateOfBirth.split("T")[0] : ""}</td>
                   <td className="px-4 py-2">{d.gender}</td>
+
+                  {/* Actions */}
                   <td className="px-4 py-2 flex gap-2 justify-center">
-                    <button
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded shadow-sm transition-all transform hover:scale-105"
-                      onClick={() => handleEdit(d._id)}
-                    >
-                      Edit
+                    <button title="Edit" onClick={() => handleEdit(d._id)} className="p-1 rounded hover:bg-gray-100 transition-colors">
+                      <img src={editIcon} alt="Edit" className="w-12 h-12 object-contain hover:scale-110 transition-transform" />
                     </button>
-                    <button
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow-sm transition-all transform hover:scale-105"
-                      onClick={() => handleDelete(d._id)}
-                    >
-                      Delete
+                    <button title="Delete" onClick={() => handleDelete(d._id)} className="p-1 rounded hover:bg-gray-100 transition-colors">
+                      <img src={deleteIcon} alt="Delete" className="w-12 h-12 object-contain hover:scale-110 transition-transform" />
                     </button>
                   </td>
+
+                  {/* Direct Contact */}
                   <td className="px-4 py-2 flex gap-2 justify-center">
-                    <a href={`https://wa.me/${d.phoneNo}`} target="_blank" rel="noreferrer">
-                      <button className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded shadow-sm transition-all transform hover:scale-105">
-                        WhatsApp
-                      </button>
+                    <a href={`https://wa.me/${d.phoneNo}`} target="_blank" rel="noreferrer" className="p-1 rounded hover:bg-gray-100 transition-colors">
+                      <img src={whatsappIcon} alt="WhatsApp" className="w-12 h-12 object-contain hover:scale-110 transition-transform" />
                     </a>
-                    <a href={`mailto:${d.email}`} target="_blank" rel="noreferrer">
-                      <button className="bg-blue-400 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition-all transform hover:scale-105">
-                        Email
-                      </button>
+                    <a href={`mailto:${d.email}`} target="_blank" rel="noreferrer" className="p-1 rounded hover:bg-gray-100 transition-colors">
+                      <img src={emailIcon} alt="Email" className="w-12 h-12 object-contain hover:scale-110 transition-transform" />
                     </a>
                   </td>
                 </tr>

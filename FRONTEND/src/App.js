@@ -49,7 +49,7 @@ import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx'
 import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
 import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
 
-// ----------------- HEALTH MANAGEMENT -----------------
+// ----------------- Health Management -----------------
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
 import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
 
@@ -83,7 +83,7 @@ import H_FertiliserAdd from './Components/HealthManagement/PlantPathologistPart/
 import PlantPathologistAdditional from './Components/HealthManagement/PlantPathologistPart/PathologisticAdditional.js';
 import PlantPathologistProfile from './Components/HealthManagement/PlantPathologistPart/PathologisticProfile.js';
 
-// ----------------- PLANT MANAGEMENT -----------------
+// ----------------- Plant Management -----------------
 import PLayout from './Components/PlantManagement/P-Layout.jsx';
 import PDashboard from './Components/PlantManagement/pages/P-Dashboard.jsx';
 import PGreenhouseManagement from './Components/PlantManagement/pages/P-GreenhouseManagement.jsx';
@@ -107,7 +107,7 @@ function App() {
               <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              
+
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
                 <ProtectedRoute allowedRoles={["animal"]}>

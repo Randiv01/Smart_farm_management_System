@@ -35,7 +35,9 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
             phoneNo: data.phoneNo || "",
             medicalLicenseNumber: data.medicalLicenseNumber || "",
             address: data.address || "",
-            specializations: Array.isArray(data.specializations) ? data.specializations.join(", ") : data.specializations || "",
+            specializations: Array.isArray(data.specializations)
+              ? data.specializations.join(", ")
+              : data.specializations || "",
             qualifications: data.qualifications || "",
             yearsOfExperience: data.yearsOfExperience || "",
             dateOfBirth: data.dateOfBirth ? data.dateOfBirth.split("T")[0] : "",
@@ -71,7 +73,10 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
       Object.keys(formData).forEach((key) => {
         if (formData[key] !== null) {
           if (key === "specializations") {
-            data.append(key, JSON.stringify(formData[key].split(",").map(s => s.trim())));
+            data.append(
+              key,
+              JSON.stringify(formData[key].split(",").map((s) => s.trim()))
+            );
           } else {
             data.append(key, formData[key]);
           }
@@ -121,14 +126,14 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-        <h2 className="text-2xl font-bold text-green-700 mb-6 text-center">
-          {specialistId ? "Edit Specialist" : "Add New Specialist"}
-        </h2>
-        {error && <p className="text-red-600 text-center mb-4">{error}</p>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+    <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center p-4 overflow-auto z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-8">
+        <div className="overflow-y-auto max-h-[90vh]">
+          <h2 className="text-2xl font-bold text-green-700 mb-6 text-center">
+            {specialistId ? "Edit Specialist" : "Add New Specialist"}
+          </h2>
+          {error && <p className="text-red-600 text-center mb-4">{error}</p>}
+          <form onSubmit={handleSubmit} className="space-y-4">
             <input
               type="text"
               name="fullName"
@@ -138,8 +143,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="email"
               name="email"
@@ -149,8 +152,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="password"
               name="password"
@@ -160,8 +161,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required={!specialistId}
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="phoneNo"
@@ -171,8 +170,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="medicalLicenseNumber"
@@ -182,8 +179,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="address"
@@ -193,8 +188,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="specializations"
@@ -204,8 +197,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="qualifications"
@@ -215,8 +206,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="number"
               name="yearsOfExperience"
@@ -227,8 +216,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="date"
               name="dateOfBirth"
@@ -237,8 +224,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <select
               name="gender"
               value={formData.gender}
@@ -251,8 +236,6 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
-          </div>
-          <div>
             <input
               type="file"
               name="profilePhoto"
@@ -261,26 +244,28 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               required={!specialistId}
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div className="flex justify-end space-x-4 mt-6">
-            <button
-              type="submit"
-              disabled={loading}
-              className={`bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <i className="fas fa-save"></i>
-              <span>{specialistId ? "Update Specialist" : "Add Specialist"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition flex items-center space-x-2"
-            >
-              <i className="fas fa-times"></i>
-              <span>Cancel</span>
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end space-x-4 mt-6">
+              <button
+                type="submit"
+                disabled={loading}
+                className={`bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2 ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <i className="fas fa-save"></i>
+                <span>{specialistId ? "Update Specialist" : "Add Specialist"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition flex items-center space-x-2"
+              >
+                <i className="fas fa-times"></i>
+                <span>Cancel</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

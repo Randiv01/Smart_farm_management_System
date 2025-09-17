@@ -17,16 +17,19 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
 
   useEffect(() => {
     if (doctorId) {
-      axios.get(`http://localhost:5000/api/doctors`)
-        .then(res => {
-          const doc = res.data.find(d => d._id === doctorId);
+      axios
+        .get(`http://localhost:5000/api/doctors`)
+        .then((res) => {
+          const doc = res.data.find((d) => d._id === doctorId);
           if (doc) {
             setDoctorData({
               fullName: doc.fullName,
               email: doc.email,
               phoneNo: doc.phoneNo,
               licenseNumber: doc.licenseNumber,
-              specializations: Array.isArray(doc.specializations) ? doc.specializations.join(", ") : doc.specializations,
+              specializations: Array.isArray(doc.specializations)
+                ? doc.specializations.join(", ")
+                : doc.specializations,
               qualifications: doc.qualifications,
               yearsOfExperience: doc.yearsOfExperience,
               dateOfBirth: doc.dateOfBirth ? doc.dateOfBirth.split("T")[0] : "",
@@ -34,7 +37,8 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               profilePhoto: null,
             });
           }
-        });
+        })
+        .catch((err) => console.error(err));
     }
   }, [doctorId]);
 
@@ -50,9 +54,12 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData();
-    Object.keys(doctorData).forEach(key => {
+    Object.keys(doctorData).forEach((key) => {
       if (key === "specializations") {
-        formData.append(key, doctorData[key].split(",").map(s => s.trim()));
+        formData.append(
+          key,
+          doctorData[key].split(",").map((s) => s.trim())
+        );
       } else {
         formData.append(key, doctorData[key]);
       }
@@ -60,9 +67,11 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
 
     try {
       if (doctorId) {
-        await axios.put(`http://localhost:5000/api/doctors/${doctorId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.put(
+          `http://localhost:5000/api/doctors/${doctorId}`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
       } else {
         await axios.post("http://localhost:5000/api/doctors", formData, {
           headers: { "Content-Type": "multipart/form-data" },
@@ -75,13 +84,13 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-        <h3 className="text-2xl font-bold text-green-700 mb-6 text-center">
-          {doctorId ? "Edit Doctor" : "Add New Doctor"}
-        </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+    <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center p-4 overflow-auto z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-8">
+        <div className="overflow-y-auto max-h-[90vh]">
+          <h3 className="text-2xl font-bold text-green-700 mb-6 text-center">
+            {doctorId ? "Edit Doctor" : "Add New Doctor"}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <input
               type="text"
               name="fullName"
@@ -91,8 +100,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="email"
               name="email"
@@ -102,8 +109,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="phoneNo"
@@ -113,8 +118,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="licenseNumber"
@@ -124,8 +127,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="specializations"
@@ -135,8 +136,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="text"
               name="qualifications"
@@ -146,8 +145,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               required
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="number"
               name="yearsOfExperience"
@@ -158,8 +155,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               min="0"
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <input
               type="date"
               name="dateOfBirth"
@@ -167,8 +162,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               onChange={handleChange}
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div>
             <select
               name="gender"
               value={doctorData.gender}
@@ -179,8 +172,6 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
-          </div>
-          <div>
             <input
               type="file"
               name="profilePhoto"
@@ -188,25 +179,25 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
               accept="image/*"
               className="w-full p-3 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition"
             />
-          </div>
-          <div className="flex justify-end space-x-4 mt-6">
-            <button
-              type="submit"
-              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
-            >
-              <i className="fas fa-save"></i>
-              <span>{doctorId ? "Update" : "Add"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition flex items-center space-x-2"
-            >
-              <i className="fas fa-times"></i>
-              <span>Cancel</span>
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end space-x-4 mt-6">
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
+              >
+                <i className="fas fa-save"></i>
+                <span>{doctorId ? "Update" : "Add"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition flex items-center space-x-2"
+              >
+                <i className="fas fa-times"></i>
+                <span>Cancel</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

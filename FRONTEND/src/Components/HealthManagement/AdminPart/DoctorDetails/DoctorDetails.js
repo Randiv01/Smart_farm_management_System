@@ -4,17 +4,26 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import DoctorForm from "./DoctorForm.js";
 
+// Button icons (optional if you want image icons)
+// import editIcon from "../../ButtonIcon/editButton.png";
+// import deleteIcon from "../../ButtonIcon/deleteButton.png";
+// import emailIcon from "../../ButtonIcon/emailButton.png";
+// import whatsappIcon from "../../ButtonIcon/whatsappButton.png";
+
 const DoctorDetails = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredDoctors, setFilteredDoctors] = useState([]);
 
   // Fetch doctors from backend
   const fetchDoctors = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/doctors");
       setDoctors(res.data);
+      setFilteredDoctors(res.data);
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -40,8 +49,20 @@ const DoctorDetails = () => {
     doc.setFontSize(18);
     doc.text("Doctor Details", 14, 20);
     autoTable(doc, {
-      head: [["Full Name", "Email", "Phone", "License", "Specializations", "Qualifications", "Experience", "DOB", "Gender"]],
-      body: doctors.map(d => [
+      head: [
+        [
+          "Full Name",
+          "Email",
+          "Phone",
+          "License",
+          "Specializations",
+          "Qualifications",
+          "Experience",
+          "DOB",
+          "Gender",
+        ],
+      ],
+      body: filteredDoctors.map((d) => [
         d.fullName,
         d.email,
         d.phoneNo,
@@ -50,9 +71,9 @@ const DoctorDetails = () => {
         d.qualifications,
         d.yearsOfExperience,
         d.dateOfBirth ? d.dateOfBirth.split("T")[0] : "",
-        d.gender
+        d.gender,
       ]),
-      startY: 30
+      startY: 30,
     });
     doc.save("Doctors.pdf");
   };
@@ -69,30 +90,67 @@ const DoctorDetails = () => {
     setShowForm(true);
   };
 
+  // Handle search button click
+  const handleSearch = () => {
+    const query = searchQuery.toLowerCase();
+    const filtered = doctors.filter((d) => {
+      return (
+        d.fullName?.toLowerCase().includes(query) ||
+        d.email?.toLowerCase().includes(query) ||
+        d.phoneNo?.toLowerCase().includes(query) ||
+        d.licenseNumber?.toLowerCase().includes(query) ||
+        (Array.isArray(d.specializations)
+          ? d.specializations.join(", ").toLowerCase()
+          : d.specializations?.toLowerCase()
+        )?.includes(query)
+      );
+    });
+    setFilteredDoctors(filtered);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-green-700 mb-6 text-center">Doctor Details</h1>
+        <h1 className="text-3xl font-bold text-green-700 mb-6 text-center">
+          Doctor Details
+        </h1>
 
-        {/* Buttons */}
-        <div className="flex justify-between mb-6">
-          <button
-            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
-            onClick={handleAddNew}
-          >
-            <i className="fas fa-user-plus"></i>
-            <span>Add New Doctor</span>
-          </button>
-          <button
-            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
-            onClick={handleDownloadPDF}
-          >
-            <i className="fas fa-download"></i>
-            <span>Download Doctor Details</span>
-          </button>
+        {/* Top controls */}
+        <div className="flex flex-col md:flex-row md:justify-between items-center mb-6 space-y-3 md:space-y-0">
+          <div className="flex space-x-3">
+            <button
+              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition"
+              onClick={handleAddNew}
+            >
+              ➕ Add New Doctor
+            </button>
+            <button
+              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition"
+              onClick={handleDownloadPDF}
+            >
+              📄 Download Doctor Details
+            </button>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative w-full md:w-72">
+            <input
+              type="text"
+              placeholder="Search doctors..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full border border-gray-300 px-4 py-2 rounded-l-md focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              onClick={handleSearch}
+              className="absolute right-0 top-0 h-full bg-green-600 text-white px-4 rounded-r-md hover:bg-green-700 transition flex items-center justify-center"
+            >
+              🔍
+            </button>
+          </div>
         </div>
 
-        {/* Doctor form (add/edit) */}
+        {/* Doctor form */}
         {showForm && (
           <DoctorForm
             doctorId={editingId}
@@ -104,7 +162,7 @@ const DoctorDetails = () => {
         {/* Doctor table */}
         {loading ? (
           <p className="text-center text-gray-600">Loading doctors...</p>
-        ) : doctors.length === 0 ? (
+        ) : filteredDoctors.length === 0 ? (
           <p className="text-center text-gray-600">No doctors found.</p>
         ) : (
           <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -122,10 +180,11 @@ const DoctorDetails = () => {
                   <th className="px-4 py-3 text-left">DOB</th>
                   <th className="px-4 py-3 text-left">Gender</th>
                   <th className="px-4 py-3 text-left">Actions</th>
+                  <th className="px-4 py-3 text-left">Direct Contact</th>
                 </tr>
               </thead>
               <tbody>
-                {doctors.map(d => (
+                {filteredDoctors.map((d) => (
                   <tr key={d._id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <img
@@ -143,31 +202,33 @@ const DoctorDetails = () => {
                     <td className="px-4 py-3">{d.yearsOfExperience}</td>
                     <td className="px-4 py-3">{d.dateOfBirth ? d.dateOfBirth.split("T")[0] : ""}</td>
                     <td className="px-4 py-3">{d.gender}</td>
-                    <td className="px-4 py-3 flex space-x-2">
+
+                    {/* Actions */}
+                    <td className="px-4 py-3 flex space-x-3">
                       <button
-                        className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition flex items-center space-x-1"
+                        className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition"
                         onClick={() => handleEdit(d._id)}
                       >
-                        <i className="fas fa-edit"></i>
-                        <span>Edit</span>
+                        Edit
                       </button>
                       <button
-                        className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition flex items-center space-x-1"
+                        className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition"
                         onClick={() => handleDelete(d._id)}
                       >
-                        <i className="fas fa-trash"></i>
-                        <span>Delete</span>
+                        Delete
                       </button>
+                    </td>
+
+                    {/* Direct contact */}
+                    <td className="px-4 py-3 flex space-x-3">
                       <a href={`https://wa.me/${d.phoneNo}`} target="_blank" rel="noreferrer">
-                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition flex items-center space-x-1">
-                          <i className="fab fa-whatsapp"></i>
-                          <span>WhatsApp</span>
+                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition">
+                          WhatsApp
                         </button>
                       </a>
                       <a href={`mailto:${d.email}`} target="_blank" rel="noreferrer">
-                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition flex items-center space-x-1">
-                          <i className="fas fa-envelope"></i>
-                          <span>Email</span>
+                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition">
+                          Email
                         </button>
                       </a>
                     </td>

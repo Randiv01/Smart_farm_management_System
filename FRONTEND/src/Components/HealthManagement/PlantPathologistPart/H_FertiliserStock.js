@@ -25,6 +25,7 @@ const H_FertiliserStock = () => {
   const [stock, setStock] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(""); // 🔍 search state
   const [newFertiliser, setNewFertiliser] = useState({
     name: "",
     type: "",
@@ -69,6 +70,8 @@ const H_FertiliserStock = () => {
   const handleDownloadPDF = async () => {
     const doc = new jsPDF("p", "mm", "a4");
     doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(34, 139, 34);
     doc.text("Mount Olive Farm House - Fertiliser Stock Report", 14, 20);
 
     const img = new Image();
@@ -97,6 +100,9 @@ const H_FertiliserStock = () => {
       head: [["ID", "Fertilizer Name", "Type", "Current Stock", "Unit"]],
       body: stock.map((f) => [f._id, f.name, f.type, f.currentStock, f.unit]),
       startY: yPos,
+      theme: "grid",
+      headStyles: { fillColor: [34, 139, 34], textColor: [255, 255, 255] },
+      styles: { textColor: [51, 51, 51], fontSize: 10 },
     });
 
     doc.save("FertiliserStock_Report.pdf");
@@ -132,133 +138,186 @@ const H_FertiliserStock = () => {
     }
   };
 
+  const getStockLevelColor = (stockValue) => {
+    if (stockValue <= 10) return "bg-red-100 text-red-800";
+    if (stockValue <= 50) return "bg-yellow-100 text-yellow-800";
+    return "bg-green-100 text-green-800";
+  };
+
+  // 🔍 Filter stock by search term
+  const filteredStock = stock.filter(
+    (f) =>
+      f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-green-700">
-          Fertiliser Stock Dashboard
-        </h1>
-        <div className="flex space-x-2">
-          <button
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-            onClick={() => setShowForm(!showForm)}
-          >
-            Add New Fertiliser
-          </button>
-          <button
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-            onClick={handleDownloadPDF}
-          >
-            Download Report PDF
-          </button>
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-extrabold text-green-800 tracking-tight">
+            Fertiliser Stock Dashboard
+          </h1>
+          <div className="flex space-x-4">
+            <input
+              type="text"
+              placeholder="Search fertiliser..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            />
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
+              onClick={() => setShowForm(!showForm)}
+            >
+              {showForm ? "Close Form" : "➕Add New Fertiliser"}
+            </button>
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
+              onClick={handleDownloadPDF}
+            >
+              📄Download Report PDF
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Add Fertiliser Form */}
-      {showForm && (
-        <div className="bg-white p-6 rounded shadow mb-6">
-          <h2 className="text-lg font-semibold mb-4">Add New Fertiliser</h2>
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleAddFertiliser}>
-            {Object.keys(newFertiliser).map((key) => (
-              <div key={key} className="flex flex-col">
-                <label className="font-medium">{key}</label>
-                <input
-                  type={key === "purchasePrice" || key === "currentStock" ? "number" : key === "purchaseDate" ? "date" : "text"}
-                  name={key}
-                  value={newFertiliser[key]}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required={["name", "type", "currentStock", "unit", "supplierName", "supplierContact", "email", "purchasePrice", "purchaseDate"].includes(key)}
-                />
-              </div>
-            ))}
-            <div className="md:col-span-2">
-              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
-                Save Fertiliser
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {loading ? (
-        <p>Loading stock...</p>
-      ) : stock.length === 0 ? (
-        <p>No stock available.</p>
-      ) : (
-        <>
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div ref={barRef} className="bg-white p-4 rounded shadow-md flex justify-center">
-              <BarChart width={400} height={300} data={stock}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="currentStock" fill="#4ade80" />
-              </BarChart>
-            </div>
-
-            <div ref={lineRef} className="bg-white p-4 rounded shadow-md flex justify-center">
-              <LineChart width={400} height={300} data={stock}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="currentStock" stroke="#60a5fa" />
-              </LineChart>
-            </div>
-
-            <div ref={pieRef} className="bg-white p-4 rounded shadow-md flex justify-center col-span-1 md:col-span-2">
-              <PieChart width={400} height={300}>
-                <Pie
-                  data={stock}
-                  dataKey="currentStock"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  fill="#82ca9d"
-                  label
+        {/* Add Fertiliser Form */}
+        {showForm && (
+          <div className="bg-white p-8 rounded-xl shadow-lg mb-8">
+            <h2 className="text-2xl font-semibold text-green-700 mb-6">
+              Add New Fertiliser
+            </h2>
+            <form
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              onSubmit={handleAddFertiliser}
+            >
+              {Object.keys(newFertiliser).map((key) => (
+                <div key={key} className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700 capitalize mb-1">
+                    {key.replace(/([A-Z])/g, " $1").trim()}
+                  </label>
+                  <input
+                    type={
+                      key === "purchasePrice" || key === "currentStock"
+                        ? "number"
+                        : key === "purchaseDate"
+                        ? "date"
+                        : "text"
+                    }
+                    name={key}
+                    value={newFertiliser[key]}
+                    onChange={handleChange}
+                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    required={[
+                      "name",
+                      "type",
+                      "currentStock",
+                      "unit",
+                      "supplierName",
+                      "supplierContact",
+                      "email",
+                      "purchasePrice",
+                      "purchaseDate",
+                    ].includes(key)}
+                    placeholder={`Enter ${key.replace(/([A-Z])/g, " $1").trim()}`}
+                  />
+                </div>
+              ))}
+              <div className="md:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md"
                 >
-                  {stock.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Legend />
-                <Tooltip />
-              </PieChart>
-            </div>
+                  Save Fertiliser
+                </button>
+              </div>
+            </form>
           </div>
+        )}
 
-          {/* Table Section */}
-          <div ref={tableRef} className="bg-white p-4 rounded shadow-md overflow-x-auto">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">Fertiliser Stock Table</h2>
-            <table className="min-w-full border border-gray-300">
-              <thead className="bg-green-100">
-                <tr>
-                  <th className="py-2 px-4 border">ID</th>
-                  <th className="py-2 px-4 border">Fertilizer Name</th>
-                  <th className="py-2 px-4 border">Type</th>
-                  <th className="py-2 px-4 border">Current Stock</th>
-                  <th className="py-2 px-4 border">Unit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stock.map((f) => (
-                  <tr key={f._id}>
-                    <td className="py-2 px-4 border">{f._id}</td>
-                    <td className="py-2 px-4 border">{f.name}</td>
-                    <td className="py-2 px-4 border">{f.type}</td>
-                    <td className="py-2 px-4 border">{f.currentStock}</td>
-                    <td className="py-2 px-4 border">{f.unit}</td>
+        {loading ? (
+          <div className="text-center text-gray-600 text-lg">Loading stock...</div>
+        ) : filteredStock.length === 0 ? (
+          <div className="text-center text-gray-600 text-lg">No stock available.</div>
+        ) : (
+          <>
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+              {/* Bar Chart */}
+              <div ref={barRef} className="bg-white p-6 rounded-xl shadow-lg flex justify-center">
+                <BarChart width={500} height={350} data={filteredStock}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#374151" }} />
+                  <YAxis tick={{ fontSize: 12, fill: "#374151" }} />
+                  <Tooltip />
+                  <Bar dataKey="currentStock" fill="#4ade80" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </div>
+
+              {/* Line Chart */}
+              <div ref={lineRef} className="bg-white p-6 rounded-xl shadow-lg flex justify-center">
+                <LineChart width={500} height={350} data={filteredStock}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#374151" }} />
+                  <YAxis tick={{ fontSize: 12, fill: "#374151" }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="currentStock" stroke="#60a5fa" strokeWidth={2} />
+                </LineChart>
+              </div>
+
+              {/* Pie Chart */}
+              <div ref={pieRef} className="bg-white p-6 rounded-xl shadow-lg flex justify-center col-span-1 lg:col-span-2">
+                <PieChart width={500} height={350}>
+                  <Pie
+                    data={filteredStock}
+                    dataKey="currentStock"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  >
+                    {filteredStock.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Legend align="center" verticalAlign="bottom" />
+                  <Tooltip />
+                </PieChart>
+              </div>
+            </div>
+
+            {/* Table Section */}
+            <div ref={tableRef} className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
+              <h2 className="text-2xl font-semibold text-green-700 mb-6">
+                Fertiliser Stock Table
+              </h2>
+              <table className="min-w-full border border-gray-200 rounded-lg">
+                <thead className="bg-green-600 text-white">
+                  <tr>
+                    <th className="py-3 px-6 text-left">ID</th>
+                    <th className="py-3 px-6 text-left">Fertilizer Name</th>
+                    <th className="py-3 px-6 text-left">Type</th>
+                    <th className="py-3 px-6 text-left">Current Stock</th>
+                    <th className="py-3 px-6 text-left">Unit</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                </thead>
+                <tbody>
+                  {filteredStock.map((f) => (
+                    <tr key={f._id} className={`hover:bg-gray-50 ${getStockLevelColor(f.currentStock)}`}>
+                      <td className="py-3 px-6 border-b">{f._id}</td>
+                      <td className="py-3 px-6 border-b">{f.name}</td>
+                      <td className="py-3 px-6 border-b">{f.type}</td>
+                      <td className="py-3 px-6 border-b">{f.currentStock}</td>
+                      <td className="py-3 px-6 border-b">{f.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
