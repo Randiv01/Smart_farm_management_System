@@ -34,10 +34,10 @@ const Catalog = () => {
 
   // Image URLs inspired by the DOCUMENT themes
   const sampleImages = [
-    "https://images.unsplash.com/photo-1610832958506-aa56368176cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80", // Freshly Picked (apples)
-    "https://images.unsplash.com/photo-1566772940193-9c3ae2938d78?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80", // Farmhouse Cream (milk)
-    "https://images.unsplash.com/photo-1566842600175-97dca3dfc3c7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80", // Cottage Garden (lettuce)
-    "https://images.unsplash.com/photo-1534772356593-b7b1e43a55c6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80"  // Cider Season (apples for cider)
+    "https://t4.ftcdn.net/jpg/15/45/72/75/240_F_1545727539_4UmNbJiU2YD8KnzBso157al4JqaqvWif.jpg", // Freshly Picked (apples)
+    "https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80", // Farmhouse Cream (milk)
+    "https://t3.ftcdn.net/jpg/13/52/85/66/240_F_1352856606_53sbQC1rsJ2CFbje2rjPtxSEEg9VyEf4.jpg", // Cottage Garden (lettuce)
+    "https://as1.ftcdn.net/v2/jpg/16/11/01/64/1000_F_1611016492_IZiKVQ16kYTUmLf3pl2Sk5ttzskXUk0q.jpg"  // Cider Season (apples for cider)
   ];
 
   // Sample testimonials inspired by the DOCUMENT
@@ -306,8 +306,8 @@ const Catalog = () => {
           </div>
         </section>
 
-        {/* Search, Market Selection, Filter Button, and Cart Bar */}
-        <section className="container mx-auto px-4 py-8">
+        {/* Search, Market Selection, Filter Button, and Sticky Cart Button */}
+        <section className="container mx-auto px-4 py-8 relative">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div className="relative w-full md:max-w-2xl">
               <Search
@@ -351,22 +351,23 @@ const Catalog = () => {
                 <Filter size={24} />
                 <span className="font-semibold hidden sm:inline">Filters</span>
               </button>
-              <button
-                onClick={() => setShowCart(true)}
-                className={`relative p-3 rounded-lg flex items-center gap-2 transition-colors ${
-                  darkMode ? "bg-green-800 hover:bg-green-700" : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
-              >
-                <ShoppingCart size={24} />
-                <span className="font-semibold hidden sm:inline">Cart</span>
-                {getTotalItems() > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                    {getTotalItems()}
-                  </span>
-                )}
-              </button>
             </div>
           </div>
+          {/* Sticky Cart Button */}
+          <button
+            onClick={() => setShowCart(true)}
+            className={`fixed bottom-6 right-6 z-30 p-4 rounded-full flex items-center gap-2 transition-all duration-300 shadow-lg ${
+              darkMode ? "bg-green-800 hover:bg-green-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
+            } ${showCart || showFilterSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          >
+            <ShoppingCart size={28} />
+            <span className="font-semibold hidden sm:inline">Cart</span>
+            {getTotalItems() > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                {getTotalItems()}
+              </span>
+            )}
+          </button>
 
           {/* Filter Sidebar */}
           {showFilterSidebar && (
