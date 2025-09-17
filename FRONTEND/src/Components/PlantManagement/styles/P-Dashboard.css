@@ -1,0 +1,162 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.dashboard-actions {
+  display: flex;
+  gap: 12px;
+}
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.summary-card {
+  text-align: center;
+  padding: 24px 16px;
+  cursor: pointer;
+}
+.card-icon {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: center;
+}
+.card-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.card-label {
+  font-size: 14px;
+  color: var(--text-light);
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.issues-card, 
+.yield-card, 
+.calendar-card, 
+.issues-chart-card,
+.telemetry-card {
+  height: 100%;
+}
+.issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.issue-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--background);
+}
+.issue-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.issue-greenhouse {
+  font-weight: 600;
+}
+.issue-severity {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.severity-high {
+  background-color: rgba(239, 83, 80, 0.2);
+  color: #EF5350;
+}
+.severity-medium {
+  background-color: rgba(255, 167, 38, 0.2);
+  color: #FFA726;
+}
+.severity-low {
+  background-color: rgba(102, 187, 106, 0.2);
+  color: #66BB6A;
+}
+.issue-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.issue-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.issue-date {
+  color: var(--text-light);
+  font-size: 12px;
+}
+.calendar-widget {
+  height: 100%;
+}
+.calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.event-item {
+  padding: 12px;
+  border-left: 3px solid var(--primary);
+  background-color: var(--background);
+  border-radius: 4px;
+}
+.event-date {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+.event-title {
+  font-weight: 500;
+}
+.telemetry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+@media screen and (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media screen and (max-width: 768px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+@media screen and (max-width: 480px) {
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+}

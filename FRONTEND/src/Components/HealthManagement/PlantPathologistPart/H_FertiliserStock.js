@@ -25,7 +25,7 @@ const H_FertiliserStock = () => {
   const [stock, setStock] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // 🔍 new search state
+  const [searchTerm, setSearchTerm] = useState(""); // 🔍 search state
   const [newFertiliser, setNewFertiliser] = useState({
     name: "",
     type: "",
@@ -131,7 +131,7 @@ const H_FertiliserStock = () => {
         storageConditions: "",
         notes: "",
       });
-      fetchStock();
+      fetchStock(); // Refresh data
     } catch (err) {
       console.error(err);
       alert("Error adding fertiliser");
@@ -238,9 +238,7 @@ const H_FertiliserStock = () => {
         {loading ? (
           <div className="text-center text-gray-600 text-lg">Loading stock...</div>
         ) : filteredStock.length === 0 ? (
-          <div className="text-center text-gray-600 text-lg">
-            No stock available.
-          </div>
+          <div className="text-center text-gray-600 text-lg">No stock available.</div>
         ) : (
           <>
             {/* Charts Section */}
@@ -277,9 +275,7 @@ const H_FertiliserStock = () => {
                     cx="50%"
                     cy="50%"
                     outerRadius={120}
-                    label={({ name, percent }) =>
-                      `${name} (${(percent * 100).toFixed(0)}%)`
-                    }
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                   >
                     {filteredStock.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

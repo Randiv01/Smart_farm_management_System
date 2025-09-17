@@ -1,24 +1,19 @@
+// models/User.js
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema({
   firstName: { 
     type: String, 
-    required: function() {
-      return this.isNew;
-    },
+    required: true,
     trim: true,
-    maxLength: 50,
-    default: 'User' // Add default value
+    maxLength: 50
   },
   lastName: { 
     type: String, 
-    required: function() {
-      return this.isNew;
-    },
+    required: true,
     trim: true,
-    maxLength: 50,
-    default: 'Unknown' // Add default value
+    maxLength: 50
   },
   email: { 
     type: String, 
@@ -34,8 +29,7 @@ const userSchema = new mongoose.Schema({
   },
   phone: { 
     type: String, 
-    default: null,
-     match: [/^0[0-9]{9}$/, 'Phone number must start with 0 and be 10 digits']
+    default: null
   },
   address: {
     type: String,
@@ -117,18 +111,6 @@ const userSchema = new mongoose.Schema({
       return ret;
     }
   }
-});
-
-// Fix pre-save middleware to handle existing users properly
-userSchema.pre('save', function(next) {
-  // Only validate for new documents
-  if (this.isNew) {
-    if (!this.firstName || !this.lastName) {
-      return next(new Error('First name and last name are required for new users'));
-    }
-  }
-  
-  next();
 });
 
 // Index for better query performance

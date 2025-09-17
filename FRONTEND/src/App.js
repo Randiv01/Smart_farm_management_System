@@ -1,7 +1,7 @@
 import './App.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// ----------------- Animal Management (Randev) -----------------
+// ----------------- Animal Management -----------------
 import Dashboard from './Components/AnimalManagement/Dashboard/Dashboard.jsx';
 import AnimalList from './Components/AnimalManagement/AnimalList/AnimalList.jsx';
 import AnimalProductivity from './Components/AnimalManagement/AnimalProductivity/AnimalProductivity.jsx';
@@ -17,18 +17,31 @@ import AnimalZones from './Components/AnimalManagement/AnimalZones/AnimalZones.j
 import Productivity from './Components/AnimalManagement/Productivity/Productivity.jsx';
 import Settings from './Components/AnimalManagement/Settings/Settings.jsx';
 import Alerts from './Components/AnimalManagement/Alerts/Alerts.jsx';
+import ProtectedRoute from "./Components/AnimalManagement/ProtectedRoute/ProtectedRoute.jsx";
 
-// ----------------- Inventory Management (Kokila)-----------------
+// Animal Contexts
+import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
+import { LoaderProvider } from './Components/AnimalManagement/contexts/LoaderContext.js';
+import { ThemeProvider as AnimalThemeProvider } from './Components/AnimalManagement/contexts/ThemeContext.js';
+import { UserProvider } from './Components/AnimalManagement/contexts/UserContext.js';
+
+// ----------------- Inventory Management -----------------
 import { IThemeProvider } from './Components/InventoryManagement/Icontexts/IThemeContext.jsx';
 import ILayout from './Components/InventoryManagement/Ilayout/ILayout.jsx';
 import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 
-// ----------------- Registration & Auth -----------------
-import Register from './Components/Registration/Registration.jsx';
-import Home from './Components/Home/Home.jsx';
-import Login from './Components/Login/login.jsx';
+// ----------------- User / Frontend Pages -----------------
+import Register from './Components/UserHome/Registration/Registration.jsx';
+import Home from './Components/UserHome/UHHome/UHHome.jsx';
+import Login from './Components/UserHome/Login/login.jsx';
+import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 
-// ----------------- HEALTH MANAGEMENT (Gimani part) -----------------
+// User Contexts
+import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
+import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
+import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
+
+// ----------------- Health Management -----------------
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
 import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
 
@@ -62,49 +75,102 @@ import H_FertiliserAdd from './Components/HealthManagement/PlantPathologistPart/
 import PlantPathologistAdditional from './Components/HealthManagement/PlantPathologistPart/PathologisticAdditional.js';
 import PlantPathologistProfile from './Components/HealthManagement/PlantPathologistPart/PathologisticProfile.js';
 
+// ----------------- Plant Management -----------------
+import PLayout from './Components/PlantManagement/P-Layout.jsx';
+import PDashboard from './Components/PlantManagement/pages/P-Dashboard.jsx';
+import PGreenhouseManagement from './Components/PlantManagement/pages/P-GreenhouseManagement.jsx';
+import PInspectionManagement from './Components/PlantManagement/pages/P-InspectionManagement.jsx';
+import PFertilizingManagement from './Components/PlantManagement/pages/P-FertilizingManagement.jsx';
+import PPestDiseaseManagement from './Components/PlantManagement/pages/P-PestDiseaseManagement.jsx';
+import PMonitorControl from './Components/PlantManagement/pages/P-MonitorControl.jsx';
+import PProductivity from './Components/PlantManagement/pages/P-Productivity.jsx';
+import PSettings from './Components/PlantManagement/pages/P-Settings.jsx';
+import { ThemeProvider as PThemeProvider } from './Components/PlantManagement/context/ThemeContext.jsx';
+import { LanguageProvider as PLanguageProvider } from './Components/PlantManagement/context/LanguageContext.jsx';
+
 function App() {
   return (
     <div className="App">
-      {/* Public routes */}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      {/* ----------------- User / Frontend Routes ----------------- */}
+      <AuthProvider>
+        <UserThemeProvider>
+          <CartProvider>
+            <Routes>
+              <Route path="/" element={<><Navbar /><Home /></>} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-        {/* Animal Management */}
-        <Route element={<Layout />}>
-          <Route path="/AnimalManagement" element={<Dashboard />} />
-          <Route path="/AnimalManagement/:type" element={<AnimalList />} />
-          <Route path="/AnimalProductivity/:type" element={<AnimalProductivity />} />
-          <Route path="/add-animal/:type" element={<AddAnimalForm />} />
-          <Route path="/AnimalManagement/design-plan/:type" element={<FarmDesigner />} />
-          <Route path="/feeding-scheduler" element={<FeedingScheduler />} />
-          <Route path="/AnimalManagement/add-animal-type" element={<AddAnimalType />} />
-          <Route path="/feed-stock" element={<FeedStock />} />
-          <Route path="/animal-health" element={<AnimalHealth />} />
-          <Route path="/HealthReport/:type" element={<HealthReport />} />
-          <Route path="/zones" element={<AnimalZones />} />
-          <Route path="/Productivity" element={<Productivity />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/alerts" element={<Alerts />} />
-        </Route>
-      </Routes>
+              {/* ----------------- Animal Management / Admin Routes ----------------- */}
+              <Route path="/AnimalManagement/*" element={
+                <ProtectedRoute allowedRoles={["animal"]}>
+                  <LoaderProvider>
+                    <LanguageProvider>
+                      <AnimalThemeProvider>
+                        <UserProvider>
+                          <Layout />
+                        </UserProvider>
+                      </AnimalThemeProvider>
+                    </LanguageProvider>
+                  </LoaderProvider>
+                </ProtectedRoute>
+              }>
+                <Route index element={<Dashboard />} />
+                <Route path="feeding-scheduler" element={<FeedingScheduler />} />
+                <Route path="add-animal-type" element={<AddAnimalType />} />
+                <Route path="feed-stock" element={<FeedStock />} />
+                <Route path="animal-health" element={<AnimalHealth />} />
+                <Route path="HealthReport/:type" element={<HealthReport />} />
+                <Route path="add-animal/:type" element={<AddAnimalForm />} />
+                <Route path="AnimalProductivity/:type" element={<AnimalProductivity />} />
+                <Route path="design-plan/:type" element={<FarmDesigner />} />
+                <Route path="zones" element={<AnimalZones />} />
+                <Route path="productivity" element={<Productivity />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="alerts" element={<Alerts />} />
+                <Route path=":type" element={<AnimalList />} />
+              </Route>
 
-      {/* Inventory Management */}
-      <IThemeProvider>
-        <Routes>
-          <Route element={<ILayout />}>
-            <Route path="/InventoryManagement" element={<IDashboard />} />
-          </Route>
-        </Routes>
-      </IThemeProvider>
+              {/* ----------------- Inventory Management Routes ----------------- */}
+              <Route path="/InventoryManagement/*" element={
+                <IThemeProvider>
+                  <ILayout />
+                </IThemeProvider>
+              }>
+                <Route index element={<IDashboard />} />
+              </Route>
 
-      {/* Health Management */}
+              {/* ----------------- Plant Management Routes ----------------- */}
+              <Route path="/PlantManagement/*" element={
+                <PThemeProvider>
+                  <PLanguageProvider>
+                    <PLayout />
+                  </PLanguageProvider>
+                </PThemeProvider>
+              }>
+                <Route index element={<PDashboard />} />
+                <Route path="greenhouse" element={<PGreenhouseManagement />} />
+                <Route path="inspection" element={<PInspectionManagement />} />
+                <Route path="fertilizing" element={<PFertilizingManagement />} />
+                <Route path="pest-disease" element={<PPestDiseaseManagement />} />
+                <Route path="monitor-control" element={<PMonitorControl />} />
+                <Route path="productivity" element={<PProductivity />} />
+                <Route path="settings" element={<PSettings />} />
+              </Route>
+            </Routes>
+          </CartProvider>
+        </UserThemeProvider>
+      </AuthProvider>
+
+      {/* ----------------- Health Management Routes ----------------- */}
       <HLanguageProvider>
         <HThemeProvider>
           <Routes>
             {/* Doctor */}
-            <Route path="/doctor" element={<DoctorLayout />}>
+            <Route path="/doctor/*" element={
+              <ProtectedRoute allowedRoles={["health"]}>
+                <DoctorLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<Navigate to="home" replace />} />
               <Route path="home" element={<DoctorDashboard />} />
               <Route path="animals" element={<HealthAnimal />} />
@@ -117,7 +183,11 @@ function App() {
             </Route>
 
             {/* Plant Pathologist */}
-            <Route path="/plant-pathologist" element={<PlantPathologistLayout />}>
+            <Route path="/plant-pathologist/*" element={
+              <ProtectedRoute allowedRoles={["health"]}>
+                <PlantPathologistLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<Navigate to="home" replace />} />
               <Route path="home" element={<PlantPathologistHome />} />
               <Route path="fertiliser-stock" element={<FertiliserStock />} />
@@ -129,7 +199,11 @@ function App() {
             </Route>
 
             {/* Admin */}
-            <Route path="/admin" element={<AdminLayout />}>
+            <Route path="/admin/*" element={
+              <ProtectedRoute allowedRoles={["health"]}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<Navigate to="aaa" replace />} />
               <Route path="aaa" element={<AddminPart />} />
               <Route path="doctor-details" element={<DoctorDetails />} />
@@ -139,7 +213,6 @@ function App() {
               <Route path="treatments-details" element={<TreatmentsDetails />} />
               <Route path="treatments-payments" element={<TreatmentsPayments />} />
               <Route path="profile" element={<AdminProfile />} />
-              {/* Link H_PlantPathologist inside admin */}
               <Route path="plant-pathologist" element={<H_PlantPathologist />} />
               <Route path="*" element={<Navigate to="aaa" replace />} />
             </Route>

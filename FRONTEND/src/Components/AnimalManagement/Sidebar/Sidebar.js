@@ -18,15 +18,15 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
   const location = useLocation();
 
   const navItems = [
-    { path: "/AnimalManagement", icon: Home, label: "Overview" },
-    { path: "/feed-stock", icon: BarChart2, label: "FeedStock" },
-    { path: "/feeding-scheduler", icon: Calendar, label: "Feeding Schedule" },
-    { path: "/animal-health", icon: HeartPulse, label: "Health" },
-    { path: "/productivity", icon: Activity, label: "Productivity" },
+    { path: "/AnimalManagement", icon: Home, label: "Overview", exact: true },
+    { path: "/AnimalManagement/feed-stock", icon: BarChart2, label: "FeedStock" },
+    { path: "/AnimalManagement/feeding-scheduler", icon: Calendar, label: "Feeding Schedule" },
+    { path: "/AnimalManagement/animal-health", icon: HeartPulse, label: "Health" },
+    { path: "/AnimalManagement/productivity", icon: Activity, label: "Productivity" },
     { path: `/AnimalManagement/design-plan/${type}`, icon: Plus, label: "Design your Plan" },
-    { path: "/zones", icon: MapPin, label: "Zones / Shelters" },
-    { path: "/alerts", icon: Bell, label: "Alerts" },
-    { path: "/settings", icon: Settings, label: "Settings" },
+    { path: "/AnimalManagement/zones", icon: MapPin, label: "Zones / Shelters" },
+    { path: "/AnimalManagement/alerts", icon: Bell, label: "Alerts" },
+    { path: "/AnimalManagement/settings", icon: Settings, label: "Settings" },
   ];
 
   // Auto-close sidebar if resized to mobile
@@ -39,6 +39,15 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [sidebarOpen, toggleSidebar]);
+
+  // Function to check if a nav item is active
+  const isActive = (itemPath, exact = false) => {
+    if (exact) {
+      return location.pathname === itemPath;
+    }
+    return location.pathname.startsWith(itemPath) && 
+           location.pathname !== "/AnimalManagement"; // Exclude overview from partial matches
+  };
 
   return (
     <>
@@ -91,7 +100,7 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
                   className={`
                     flex items-center w-full p-3 rounded-lg transition-all
                     hover:bg-green-800 hover:shadow-sm
-                    ${location.pathname.startsWith(item.path) ? "bg-green-800 font-medium" : ""}
+                    ${isActive(item.path, item.exact) ? "bg-green-800 font-medium" : ""}
                     ${sidebarOpen ? "justify-start px-4" : "justify-center"}
                     focus:outline-none focus:ring-1 focus:ring-white/50
                   `}

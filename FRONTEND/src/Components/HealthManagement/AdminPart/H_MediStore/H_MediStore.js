@@ -19,8 +19,8 @@ import {
 function H_MediStore() {
   const [medicines, setMedicines] = useState([]);
   const [downloadDate, setDownloadDate] = useState("");
-  const [searchInput, setSearchInput] = useState(""); // For live input
-  const [searchTerm, setSearchTerm] = useState(""); // Applied search
+  const [searchInput, setSearchInput] = useState(""); // live input
+  const [searchTerm, setSearchTerm] = useState(""); // applied search
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [newMedicine, setNewMedicine] = useState({
@@ -35,7 +35,6 @@ function H_MediStore() {
     storage_location: "",
   });
 
-  // Refs for charts
   const barChartRef = useRef(null);
   const lineChartRef = useRef(null);
 
@@ -46,9 +45,7 @@ function H_MediStore() {
   const fetchMedicines = () => {
     axios
       .get("http://localhost:5000/api/medistore")
-      .then((res) => {
-        setMedicines(res.data);
-      })
+      .then((res) => setMedicines(res.data))
       .catch((err) => {
         console.error("Error fetching medicine data:", err);
         setError("Failed to fetch medicine data");
@@ -63,6 +60,7 @@ function H_MediStore() {
     e.preventDefault();
     const today = new Date().toISOString();
     const dataToSave = { ...newMedicine, updatedAt: today };
+
     axios
       .post("http://localhost:5000/api/medistore", dataToSave)
       .then(() => {
@@ -81,7 +79,8 @@ function H_MediStore() {
         });
         fetchMedicines();
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Error adding medicine:", err);
         alert("Failed to add medicine");
       });
   };
@@ -99,6 +98,7 @@ function H_MediStore() {
       alert("No medicines found for selected date");
       return;
     }
+
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text("Medicine Store Report", 105, 15, { align: "center" });
@@ -151,7 +151,7 @@ function H_MediStore() {
     link.click();
   };
 
-  // Filter medicines based on search term
+  // Filter medicines based on applied search
   const filteredMedicines = medicines.filter((med) => {
     if (!searchTerm) return true;
     return Object.values(med)
@@ -169,7 +169,7 @@ function H_MediStore() {
 
         {error && <p className="text-red-600 text-center mb-4">{error}</p>}
 
-        {/* Add Medicine Button */}
+        {/* Controls */}
         <div className="flex flex-wrap gap-4 mb-6 items-center">
           <button
             className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
@@ -178,7 +178,6 @@ function H_MediStore() {
             <span>{showForm ? "Close Form" : "➕Add Medicine"}</span>
           </button>
 
-          {/* Date Picker + PDF Download */}
           <input
             type="date"
             value={downloadDate}
@@ -192,7 +191,6 @@ function H_MediStore() {
             <span>📄Download PDF</span>
           </button>
 
-          {/* Search */}
           <input
             type="text"
             placeholder="Search medicines..."
@@ -215,86 +213,23 @@ function H_MediStore() {
             className="bg-white shadow-lg rounded-lg p-6 mb-8"
           >
             <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                name="medicine_name"
-                value={newMedicine.medicine_name}
-                onChange={handleChange}
-                placeholder="Medicine Name"
-                required
-                className="border p-2 rounded"
-              />
-              <input
-                type="text"
-                name="animal_types"
-                value={newMedicine.animal_types}
-                onChange={handleChange}
-                placeholder="Animal Types"
-                className="border p-2 rounded"
-              />
-              <input
-                type="text"
-                name="disease_treated"
-                value={newMedicine.disease_treated}
-                onChange={handleChange}
-                placeholder="Disease Treated"
-                className="border p-2 rounded"
-              />
-              <input
-                type="text"
-                name="pharmacy_name"
-                value={newMedicine.pharmacy_name}
-                onChange={handleChange}
-                placeholder="Pharmacy Name"
-                className="border p-2 rounded"
-              />
-              <input
-                type="date"
-                name="expiry_date"
-                value={newMedicine.expiry_date}
-                onChange={handleChange}
-                required
-                className="border p-2 rounded"
-              />
-              <input
-                type="number"
-                name="quantity_available"
-                value={newMedicine.quantity_available}
-                onChange={handleChange}
-                placeholder="Quantity"
-                className="border p-2 rounded"
-              />
-              <input
-                type="text"
-                name="unit"
-                value={newMedicine.unit}
-                onChange={handleChange}
-                placeholder="Unit (mg, ml)"
-                className="border p-2 rounded"
-              />
-              <input
-                type="number"
-                step="0.01"
-                name="price_per_unit"
-                value={newMedicine.price_per_unit}
-                onChange={handleChange}
-                placeholder="Price per Unit"
-                className="border p-2 rounded"
-              />
-              <input
-                type="text"
-                name="storage_location"
-                value={newMedicine.storage_location}
-                onChange={handleChange}
-                placeholder="Location"
-                className="border p-2 rounded"
-              />
+              {Object.keys(newMedicine).map((key) => (
+                <input
+                  key={key}
+                  type={key === "expiry_date" ? "date" : key.includes("quantity") || key.includes("price") ? "number" : "text"}
+                  step={key.includes("price") ? "0.01" : undefined}
+                  name={key}
+                  value={newMedicine[key]}
+                  onChange={handleChange}
+                  placeholder={key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                  className="border p-2 rounded"
+                  required={key === "medicine_name" || key === "expiry_date"}
+                />
+              ))}
             </div>
-
             <p className="mt-3 text-gray-600">
               <strong>Update Date:</strong> {new Date().toLocaleDateString()}
             </p>
-
             <button
               type="submit"
               className="mt-4 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition"
@@ -303,6 +238,55 @@ function H_MediStore() {
             </button>
           </form>
         )}
+
+        {/* Charts */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-green-700 mb-2">
+            Medicine Stock (Bar Chart)
+          </h2>
+          <div ref={barChartRef} className="bg-white shadow-lg rounded-lg p-4">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={filteredMedicines}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="medicine_name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="quantity_available" fill="#16a34a" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <button
+            className="mt-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
+            onClick={() => downloadChart(barChartRef, "Medicine_BarChart")}
+          >
+            <span>Download Bar Chart</span>
+          </button>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-green-700 mb-2">
+            Medicine Stock (Line Graph)
+          </h2>
+          <div ref={lineChartRef} className="bg-white shadow-lg rounded-lg p-4">
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={filteredMedicines}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="medicine_name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="quantity_available" stroke="#16a34a" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <button
+            className="mt-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2"
+            onClick={() => downloadChart(lineChartRef, "Medicine_LineChart")}
+          >
+            <span>Download Line Graph</span>
+          </button>
+        </div>
 
         {/* Medicine Table */}
         {filteredMedicines.length === 0 ? (

@@ -4,14 +4,14 @@ const plantTreatments = [
   {
     name: "Organic Pest Control",
     description: "Eco-friendly spray for crop protection",
-    cost: 150.00,
+    cost: 150.0,
     quantity: 10,
     lastPurchased: "2025-08-20",
   },
   {
     name: "Soil Nutrient Boost",
     description: "Organic compost for soil fertility",
-    cost: 200.00,
+    cost: 200.0,
     quantity: 5,
     lastPurchased: "2025-08-10",
   },
@@ -21,14 +21,14 @@ const animalTreatments = [
   {
     name: "Livestock Vaccination",
     description: "Annual vaccine for cattle and sheep",
-    cost: 300.00,
+    cost: 300.0,
     quantity: 20,
     lastPurchased: "2025-04-05",
   },
   {
     name: "Parasite Control",
     description: "Deworming treatment for farm animals",
-    cost: 120.00,
+    cost: 120.0,
     quantity: 15,
     lastPurchased: "2025-07-15",
   },
@@ -36,8 +36,9 @@ const animalTreatments = [
 
 function TreatmentsPayments() {
   const calculateTotal = (treatments) => {
-    return treatments.reduce((total, treatment) => 
-      total + (treatment.cost * treatment.quantity), 0).toFixed(2);
+    return treatments
+      .reduce((total, treatment) => total + treatment.cost * treatment.quantity, 0)
+      .toFixed(2);
   };
 
   return (
@@ -46,7 +47,7 @@ function TreatmentsPayments() {
         <h1 className="text-4xl font-bold text-center text-gray-800 mb-12">
           Farm Treatments Payment Details
         </h1>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Plant Treatments Payments */}
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -58,9 +59,7 @@ function TreatmentsPayments() {
                 key={index}
                 className="mb-6 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <h3 className="text-xl font-medium text-gray-800">
-                  {treatment.name}
-                </h3>
+                <h3 className="text-xl font-medium text-gray-800">{treatment.name}</h3>
                 <p className="text-gray-600 mt-1">{treatment.description}</p>
                 <div className="mt-3 grid grid-cols-2 gap-4">
                   <div>
@@ -101,9 +100,7 @@ function TreatmentsPayments() {
                 key={index}
                 className="mb-6 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <h3 className="text-xl font-medium text-gray-800">
-                  {treatment.name}
-                </h3>
+                <h3 className="text-xl font-medium text-gray-800">{treatment.name}</h3>
                 <p className="text-gray-600 mt-1">{treatment.description}</p>
                 <div className="mt-3 grid grid-cols-2 gap-4">
                   <div>
@@ -138,7 +135,11 @@ function TreatmentsPayments() {
         {/* Grand Total */}
         <div className="mt-8 p-6 bg-white rounded-xl shadow-lg text-center">
           <h2 className="text-2xl font-semibold text-gray-800">
-            Grand Total: ${(parseFloat(calculateTotal(plantTreatments)) + parseFloat(calculateTotal(animalTreatments))).toFixed(2)}
+            Grand Total: $
+            {(
+              parseFloat(calculateTotal(plantTreatments)) +
+              parseFloat(calculateTotal(animalTreatments))
+            ).toFixed(2)}
           </h2>
         </div>
       </div>

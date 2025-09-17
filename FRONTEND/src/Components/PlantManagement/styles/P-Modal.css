@@ -1,0 +1,76 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: modal-fade-in 0.3s ease;
+}
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+.close-button {
+  background: transparent;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+.close-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text);
+}
+.modal-content {
+  padding: 24px;
+  overflow-y: auto;
+}
+@media screen and (max-width: 480px) {
+  .modal {
+    width: 95%;
+  }
+  .modal-header {
+    padding: 12px 16px;
+  }
+  .modal-content {
+    padding: 16px;
+  }
+}

@@ -15,7 +15,6 @@ const H_PlantPathologist = () => {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
-
   const [searchInput, setSearchInput] = useState(""); // input value
   const [searchTerm, setSearchTerm] = useState("");   // applied filter
 
@@ -164,9 +163,7 @@ const H_PlantPathologist = () => {
                   <td className="px-4 py-2">{d.email}</td>
                   <td className="px-4 py-2">{d.phoneNo}</td>
                   <td className="px-4 py-2">{d.licenseNumber}</td>
-                  <td className="px-4 py-2">
-                    {Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations}
-                  </td>
+                  <td className="px-4 py-2">{Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations}</td>
                   <td className="px-4 py-2">{d.qualifications}</td>
                   <td className="px-4 py-2">{d.yearsOfExperience}</td>
                   <td className="px-4 py-2">{d.dateOfBirth ? d.dateOfBirth.split("T")[0] : ""}</td>

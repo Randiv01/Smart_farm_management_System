@@ -2,12 +2,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-// Import icon images (correct relative paths)
-import whatsappIcon from "../ButtonIcon/whatsappButton.png";
-import emailIcon from "../ButtonIcon/emailButton.png";
-import editIcon from "../ButtonIcon/editButton.png";
-import deleteIcon from "../ButtonIcon/deleteButton.png";
-
 const FertiliserCompanies = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,12 +13,17 @@ const FertiliserCompanies = () => {
     country: "",
   });
 
-  // Fetch all companies
   const fetchCompanies = async () => {
     try {
       setLoading(true);
       const res = await axios.get("http://localhost:5000/api/fertiliser-companies");
-      setCompanies(res.data);
+      // Make sure response is an array of objects
+      if (Array.isArray(res.data)) {
+        setCompanies(res.data);
+      } else {
+        console.error("API returned invalid data:", res.data);
+        setCompanies([]);
+      }
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -36,12 +35,10 @@ const FertiliserCompanies = () => {
     fetchCompanies();
   }, []);
 
-  // Handle input changes
   const handleChange = (e) => {
     setCompanyForm({ ...companyForm, [e.target.name]: e.target.value });
   };
 
-  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -67,18 +64,16 @@ const FertiliserCompanies = () => {
     }
   };
 
-  // Handle edit button click
   const handleEdit = (company) => {
     setEditingId(company._id);
     setCompanyForm({
-      name: company.name,
-      contact: company.contact,
-      email: company.email,
+      name: company.name || "",
+      contact: company.contact || "",
+      email: company.email || "",
       country: company.country || "",
     });
   };
 
-  // Handle delete button click
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this company?")) return;
     try {
@@ -93,7 +88,6 @@ const FertiliserCompanies = () => {
 
   return (
     <div className="p-6">
-      {/* Add / Edit Form */}
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-white p-4 rounded shadow"
@@ -141,7 +135,6 @@ const FertiliserCompanies = () => {
         </button>
       </form>
 
-      {/* Companies List */}
       {loading ? (
         <p>Loading companies...</p>
       ) : companies.length === 0 ? (
@@ -154,43 +147,37 @@ const FertiliserCompanies = () => {
               className="flex justify-between items-center border p-3 rounded shadow hover:bg-gray-50"
             >
               <div>
-                <p className="font-semibold">{c.name}</p>
-                <p>Contact: {c.contact}</p>
-                <p>Email: {c.email}</p>
-                <p>Country: {c.country || "-"}</p>
+                <p className="font-semibold">{String(c.name)}</p>
+                <p>Contact: {String(c.contact)}</p>
+                <p>Email: {String(c.email)}</p>
+                <p>Country: {String(c.country || "-")}</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {c.contact && (
                   <a href={`https://wa.me/${c.contact}`} target="_blank" rel="noreferrer">
-                    <img
-                      src={whatsappIcon}
-                      alt="WhatsApp"
-                      className="w-6 h-6 cursor-pointer hover:scale-110 transition"
-                    />
+                    <button className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
+                      WhatsApp
+                    </button>
                   </a>
                 )}
                 {c.email && (
                   <a href={`mailto:${c.email}`} target="_blank" rel="noreferrer">
-                    <img
-                      src={emailIcon}
-                      alt="Email"
-                      className="w-6 h-6 cursor-pointer hover:scale-110 transition"
-                    />
+                    <button className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
+                      Email
+                    </button>
                   </a>
                 )}
-                <button onClick={() => handleEdit(c)}>
-                  <img
-                    src={editIcon}
-                    alt="Edit"
-                    className="w-6 h-6 cursor-pointer hover:scale-110 transition"
-                  />
+                <button
+                  onClick={() => handleEdit(c)}
+                  className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                >
+                  Edit
                 </button>
-                <button onClick={() => handleDelete(c._id)}>
-                  <img
-                    src={deleteIcon}
-                    alt="Delete"
-                    className="w-6 h-6 cursor-pointer hover:scale-110 transition"
-                  />
+                <button
+                  onClick={() => handleDelete(c._id)}
+                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                >
+                  Delete
                 </button>
               </div>
             </div>

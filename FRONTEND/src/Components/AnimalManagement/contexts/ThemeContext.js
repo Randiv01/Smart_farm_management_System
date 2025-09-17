@@ -3,18 +3,31 @@ import React, { useEffect, useState, createContext, useContext } from 'react';
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    return savedTheme || 'light';
-  });
+  // Always start with light for first-ever visit
+  const [theme, setTheme] = useState('light');
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('theme', theme);
+    // Check if user has previously switched theme for Animal module
+    const savedTheme = localStorage.getItem('animalTheme');
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+    setInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+
+    // Apply the theme to document
     document.documentElement.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
+
+    // Save user preference
+    localStorage.setItem('animalTheme', theme);
+  }, [theme, initialized]);
 
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
   return (
@@ -26,7 +39,7 @@ export const ThemeProvider = ({ children }) => {
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;

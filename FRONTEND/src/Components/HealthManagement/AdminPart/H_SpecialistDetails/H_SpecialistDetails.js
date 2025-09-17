@@ -93,6 +93,7 @@ const H_SpecialistDetails = () => {
       "DOB",
       "Gender",
     ];
+
     const tableRows = filteredSpecialists.map((s) => [
       s.fullName,
       s.email,
@@ -232,63 +233,57 @@ const H_SpecialistDetails = () => {
                     <td className="px-4 py-3 text-gray-800">{s.gender}</td>
 
                     {/* Direct Contact */}
-                    <td className="px-4 py-3">
-                      <div className="flex space-x-2 items-center">
-                        <a
-                          href={`https://wa.me/${s.phoneNo}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 rounded hover:bg-gray-100 transition-colors"
-                          title="WhatsApp"
-                        >
-                          <img
-                            src={whatsappIcon}
-                            alt="WhatsApp"
-                            className="w-7 h-7 object-contain hover:scale-110 transition-transform"
-                          />
-                        </a>
-                        <a
-                          href={`mailto:${s.email}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 rounded hover:bg-gray-100 transition-colors"
-                          title="Email"
-                        >
-                          <img
-                            src={emailIcon}
-                            alt="Email"
-                            className="w-7 h-7 object-contain hover:scale-110 transition-transform"
-                          />
-                        </a>
-                      </div>
+                    <td className="px-4 py-3 flex space-x-2 items-center">
+                      <a
+                        href={`https://wa.me/${s.phoneNo}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="WhatsApp"
+                      >
+                        <img
+                          src={whatsappIcon}
+                          alt="WhatsApp"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
+                      </a>
+                      <a
+                        href={`mailto:${s.email}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Email"
+                      >
+                        <img
+                          src={emailIcon}
+                          alt="Email"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
+                      </a>
                     </td>
 
                     {/* Actions */}
-                    <td className="px-4 py-3">
-                      <div className="flex space-x-2 items-center">
-                        <button
-                          title="Edit"
-                          onClick={() => handleEdit(s._id)}
-                          className="p-1 rounded hover:bg-gray-100 transition-colors"
-                        >
-                          <img
-                            src={editIcon}
-                            alt="Edit"
-                            className="w-7 h-7 object-contain hover:scale-110 transition-transform"
-                          />
-                        </button>
-                        <button
-                          title="Delete"
-                          onClick={() => handleDelete(s._id)}
-                          className="p-1 rounded hover:bg-gray-100 transition-colors"
-                        >
-                          <img
-                            src={deleteIcon}
-                            alt="Delete"
-                            className="w-7 h-7 object-contain hover:scale-110 transition-transform"
-                          />
-                        </button>
-                      </div>
+                    <td className="px-4 py-3 flex space-x-2 items-center">
+                      <button
+                        title="Edit"
+                        onClick={() => handleEdit(s._id)}
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        <img
+                          src={editIcon}
+                          alt="Edit"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
+                      </button>
+                      <button
+                        title="Delete"
+                        onClick={() => handleDelete(s._id)}
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        <img
+                          src={deleteIcon}
+                          alt="Delete"
+                          className="w-7 h-7 object-contain hover:scale-110 transition-transform"
+                        />
+                      </button>
                     </td>
                   </tr>
                 ))}

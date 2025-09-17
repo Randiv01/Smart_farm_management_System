@@ -1,0 +1,49 @@
+.language-switcher {
+  position: relative;
+}
+.language-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 16px;
+  color: var(--text);
+  font-size: 14px;
+  transition: background-color var(--transition-speed) ease, transform var(--transition-speed) ease;
+}
+.language-button:hover {
+  background-color: rgba(102, 187, 106, 0.1);
+  transform: scale(1.05);
+}
+.language-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  width: 100px;
+  z-index: 100;
+  overflow: hidden;
+}
+.language-option {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  text-align: center;
+  background: none;
+  border: none;
+  color: var(--text);
+  transition: background-color var(--transition-speed) ease;
+}
+.language-option:hover {
+  background-color: rgba(102, 187, 106, 0.1);
+}
+.language-option.active {
+  background-color: rgba(102, 187, 106, 0.2);
+  font-weight: 600;
+}

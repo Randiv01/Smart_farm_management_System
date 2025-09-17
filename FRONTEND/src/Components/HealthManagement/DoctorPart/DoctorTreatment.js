@@ -35,9 +35,9 @@ const DoctorRecordForm = () => {
         const [doctorsRes, specialistsRes, medicinesRes] = await Promise.all([
           axios.get("http://localhost:5000/api/doctors"),
           axios.get("http://localhost:5000/api/specialists"),
-          axios.get("http://localhost:5000/api/medistore")
+          axios.get("http://localhost:5000/api/medistore"),
         ]);
-        
+
         setDoctors(doctorsRes.data);
         setSpecialists(specialistsRes.data);
         setMedicines(medicinesRes.data);
@@ -46,7 +46,7 @@ const DoctorRecordForm = () => {
         alert("Failed to load form data. Please refresh the page.");
       }
     };
-    
+
     fetchData();
   }, []);
 
@@ -65,16 +65,21 @@ const DoctorRecordForm = () => {
         e.target.value = "";
         return;
       }
-      
+
       // Validate file type
-      const allowedTypes = ['application/pdf', 'image/png', 'image/jpg', 'image/jpeg'];
+      const allowedTypes = [
+        "application/pdf",
+        "image/png",
+        "image/jpg",
+        "image/jpeg",
+      ];
       if (!allowedTypes.includes(file.type)) {
         alert("Only PDF, PNG, JPG, and JPEG files are allowed");
         e.target.value = "";
         return;
       }
     }
-    
+
     setFormData((prev) => ({ ...prev, reports: file }));
   };
 
@@ -117,54 +122,33 @@ const DoctorRecordForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
-    
+
     try {
       const data = new FormData();
       data.append("animalType", formData.animalType);
       data.append("animalCode", formData.animalCode.trim());
       data.append("doctor", formData.doctor);
-      
-      // Only append specialist if one is selected
-      if (formData.specialist) {
-        data.append("specialist", formData.specialist);
-      }
-      
-      // Only append file if one is selected
-      if (formData.reports) {
-        data.append("reports", formData.reports);
-      }
-      
+      if (formData.specialist) data.append("specialist", formData.specialist);
+      if (formData.reports) data.append("reports", formData.reports);
       data.append("notes", formData.notes);
-      
-      // Ensure medicines array is properly formatted
-      const medicinesArray = formData.medicines.filter(id => id && id.trim() !== '');
+
+      const medicinesArray = formData.medicines.filter((id) => id && id.trim() !== "");
       data.append("medicines", JSON.stringify(medicinesArray));
 
-      console.log("Submitting form data:", {
-        animalType: formData.animalType,
-        animalCode: formData.animalCode,
-        doctor: formData.doctor,
-        specialist: formData.specialist,
-        medicines: medicinesArray,
-        notes: formData.notes,
-        hasFile: !!formData.reports
-      });
+      const response = await axios.post(
+        "http://localhost:5000/api/animalrecords",
+        data,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 30000,
+        }
+      );
 
-      const response = await axios.post("http://localhost:5000/api/animalrecords", data, {
-        headers: { 
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 30000, // 30 second timeout
-      });
-
-      console.log("Response:", response.data);
       alert("Record saved successfully!");
-      
-      // Reset form
       setFormData({
         animalType: "",
         animalCode: "",
@@ -174,24 +158,15 @@ const DoctorRecordForm = () => {
         medicines: [],
         notes: "",
       });
-      
-      // Reset file input
+
       const fileInput = document.querySelector('input[type="file"]');
       if (fileInput) fileInput.value = "";
-      
+
     } catch (err) {
       console.error("Submit error:", err);
-      
       if (err.response) {
-        // Server responded with error
-        const message = err.response.data?.message || "Failed to save record";
-        alert(`Error: ${message}`);
-        
-        if (err.response.data?.errors) {
-          console.error("Validation errors:", err.response.data.errors);
-        }
+        alert(`Error: ${err.response.data?.message || "Failed to save record"}`);
       } else if (err.request) {
-        // Network error
         alert("Network error. Please check your connection and try again.");
       } else {
         alert("An unexpected error occurred. Please try again.");

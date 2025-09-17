@@ -4,11 +4,11 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import DoctorForm from "./DoctorForm.js";
 
-// Import button icons
-import editIcon from "../../ButtonIcon/editButton.png";
-import deleteIcon from "../../ButtonIcon/deleteButton.png";
-import emailIcon from "../../ButtonIcon/emailButton.png";
-import whatsappIcon from "../../ButtonIcon/whatsappButton.png";
+// Button icons (optional if you want image icons)
+// import editIcon from "../../ButtonIcon/editButton.png";
+// import deleteIcon from "../../ButtonIcon/deleteButton.png";
+// import emailIcon from "../../ButtonIcon/emailButton.png";
+// import whatsappIcon from "../../ButtonIcon/whatsappButton.png";
 
 const DoctorDetails = () => {
   const [doctors, setDoctors] = useState([]);
@@ -23,7 +23,7 @@ const DoctorDetails = () => {
     try {
       const res = await axios.get("http://localhost:5000/api/doctors");
       setDoctors(res.data);
-      setFilteredDoctors(res.data); // initialize filtered list
+      setFilteredDoctors(res.data);
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -62,14 +62,12 @@ const DoctorDetails = () => {
           "Gender",
         ],
       ],
-      body: doctors.map((d) => [
+      body: filteredDoctors.map((d) => [
         d.fullName,
         d.email,
         d.phoneNo,
         d.licenseNumber,
-        Array.isArray(d.specializations)
-          ? d.specializations.join(", ")
-          : d.specializations,
+        Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations,
         d.qualifications,
         d.yearsOfExperience,
         d.dateOfBirth ? d.dateOfBirth.split("T")[0] : "",
@@ -117,24 +115,24 @@ const DoctorDetails = () => {
           Doctor Details
         </h1>
 
-        {/* Top controls (Add, Download, Search) */}
+        {/* Top controls */}
         <div className="flex flex-col md:flex-row md:justify-between items-center mb-6 space-y-3 md:space-y-0">
           <div className="flex space-x-3">
             <button
               className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition"
               onClick={handleAddNew}
             >
-              ➕Add New Doctor
+              ➕ Add New Doctor
             </button>
             <button
               className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition"
               onClick={handleDownloadPDF}
             >
-              📄Download Doctor Details
+              📄 Download Doctor Details
             </button>
           </div>
 
-          {/* 🔍 Search bar with button */}
+          {/* Search bar */}
           <div className="relative w-full md:w-72">
             <input
               type="text"
@@ -147,19 +145,16 @@ const DoctorDetails = () => {
               onClick={handleSearch}
               className="absolute right-0 top-0 h-full bg-green-600 text-white px-4 rounded-r-md hover:bg-green-700 transition flex items-center justify-center"
             >
-              🔍 Search
+              🔍
             </button>
           </div>
         </div>
 
-        {/* Doctor form (add/edit) */}
+        {/* Doctor form */}
         {showForm && (
           <DoctorForm
             doctorId={editingId}
-            onSuccess={() => {
-              setShowForm(false);
-              fetchDoctors();
-            }}
+            onSuccess={() => { setShowForm(false); fetchDoctors(); }}
             onCancel={() => setShowForm(false)}
           />
         )}
@@ -202,59 +197,39 @@ const DoctorDetails = () => {
                     <td className="px-4 py-3">{d.email}</td>
                     <td className="px-4 py-3">{d.phoneNo}</td>
                     <td className="px-4 py-3">{d.licenseNumber}</td>
-                    <td className="px-4 py-3">
-                      {Array.isArray(d.specializations)
-                        ? d.specializations.join(", ")
-                        : d.specializations}
-                    </td>
+                    <td className="px-4 py-3">{Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations}</td>
                     <td className="px-4 py-3">{d.qualifications}</td>
                     <td className="px-4 py-3">{d.yearsOfExperience}</td>
-                    <td className="px-4 py-3">
-                      {d.dateOfBirth ? d.dateOfBirth.split("T")[0] : ""}
-                    </td>
+                    <td className="px-4 py-3">{d.dateOfBirth ? d.dateOfBirth.split("T")[0] : ""}</td>
                     <td className="px-4 py-3">{d.gender}</td>
 
                     {/* Actions */}
                     <td className="px-4 py-3 flex space-x-3">
-                      <button onClick={() => handleEdit(d._id)}>
-                        <img
-                          src={editIcon}
-                          alt="Edit"
-                          title="Edit"
-                          className="w-8 h-8 cursor-pointer"
-                        />
+                      <button
+                        className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition"
+                        onClick={() => handleEdit(d._id)}
+                      >
+                        Edit
                       </button>
-                      <button onClick={() => handleDelete(d._id)}>
-                        <img
-                          src={deleteIcon}
-                          alt="Delete"
-                          title="Delete"
-                          className="w-8 h-8 cursor-pointer"
-                        />
+                      <button
+                        className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition"
+                        onClick={() => handleDelete(d._id)}
+                      >
+                        Delete
                       </button>
                     </td>
 
-                    {/* Direct Contact */}
+                    {/* Direct contact */}
                     <td className="px-4 py-3 flex space-x-3">
-                      <a
-                        href={`https://wa.me/${d.phoneNo}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <img
-                          src={whatsappIcon}
-                          alt="WhatsApp"
-                          title="WhatsApp"
-                          className="w-8 h-8 cursor-pointer"
-                        />
+                      <a href={`https://wa.me/${d.phoneNo}`} target="_blank" rel="noreferrer">
+                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition">
+                          WhatsApp
+                        </button>
                       </a>
                       <a href={`mailto:${d.email}`} target="_blank" rel="noreferrer">
-                        <img
-                          src={emailIcon}
-                          alt="Email"
-                          title="Email"
-                          className="w-8 h-8 cursor-pointer"
-                        />
+                        <button className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition">
+                          Email
+                        </button>
                       </a>
                     </td>
                   </tr>

@@ -158,9 +158,7 @@ const H_MedicineCompany = () => {
                     <td className="px-4 py-3">{c.registrationNumber}</td>
                     <td className="px-4 py-3">{c.address}</td>
                     <td className="px-4 py-3">{c.contactNo || "N/A"}</td>
-                    <td className="px-4 py-3">
-                      {c.emergencyContacts?.join(", ") || "N/A"}
-                    </td>
+                    <td className="px-4 py-3">{c.emergencyContacts?.join(", ") || "N/A"}</td>
                     <td className="px-4 py-3">{c.email || "N/A"}</td>
                     <td className="px-4 py-3">
                       {c.website ? (
@@ -177,7 +175,7 @@ const H_MedicineCompany = () => {
                       )}
                     </td>
 
-                    {/* Direct Contact Column */}
+                    {/* Direct Contact */}
                     <td className="px-4 py-3">
                       <div className="flex space-x-2 items-center">
                         {c.contactNo ? (
@@ -217,7 +215,7 @@ const H_MedicineCompany = () => {
                       </div>
                     </td>
 
-                    {/* Actions Column */}
+                    {/* Actions */}
                     <td className="px-4 py-3">
                       <div className="flex space-x-2 items-center">
                         <button

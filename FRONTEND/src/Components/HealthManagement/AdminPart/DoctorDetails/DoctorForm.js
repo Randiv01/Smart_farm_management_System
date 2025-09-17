@@ -17,9 +17,10 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
 
   useEffect(() => {
     if (doctorId) {
-      axios.get(`http://localhost:5000/api/doctors`)
-        .then(res => {
-          const doc = res.data.find(d => d._id === doctorId);
+      axios
+        .get(`http://localhost:5000/api/doctors`)
+        .then((res) => {
+          const doc = res.data.find((d) => d._id === doctorId);
           if (doc) {
             setDoctorData({
               fullName: doc.fullName,
@@ -37,7 +38,7 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
             });
           }
         })
-        .catch(err => console.error(err));
+        .catch((err) => console.error(err));
     }
   }, [doctorId]);
 
@@ -53,9 +54,12 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData();
-    Object.keys(doctorData).forEach(key => {
+    Object.keys(doctorData).forEach((key) => {
       if (key === "specializations") {
-        formData.append(key, doctorData[key].split(",").map(s => s.trim()));
+        formData.append(
+          key,
+          doctorData[key].split(",").map((s) => s.trim())
+        );
       } else {
         formData.append(key, doctorData[key]);
       }
@@ -63,9 +67,11 @@ const DoctorForm = ({ doctorId, onSuccess, onCancel }) => {
 
     try {
       if (doctorId) {
-        await axios.put(`http://localhost:5000/api/doctors/${doctorId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.put(
+          `http://localhost:5000/api/doctors/${doctorId}`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
       } else {
         await axios.post("http://localhost:5000/api/doctors", formData, {
           headers: { "Content-Type": "multipart/form-data" },

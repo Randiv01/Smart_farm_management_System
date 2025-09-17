@@ -29,10 +29,9 @@ function DoctorDashboard() {
     return <p className="p-6 text-green-600">Loading data...</p>;
   }
 
-  // Helper function to fix image path - Updated to match H_SpecialistDetails.js
+  // Helper function to fix image path for specialists
   const getImageUrl = (profilePhoto) => {
     if (!profilePhoto) return "/default-profile.png";
-    // Use the same path structure as H_SpecialistDetails.js
     return `http://localhost:5000/Health_Uploads/${profilePhoto}`;
   };
 
@@ -50,17 +49,14 @@ function DoctorDashboard() {
               src={getImageUrl(spec.profilePhoto)}
               alt={spec.fullName}
               className="w-32 h-32 rounded-full mb-4 object-cover border-4 border-green-200"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "/default-profile.png";
-              }}
+              onError={(e) => { e.target.src = "/default-profile.png"; }}
             />
             <h2 className="text-xl font-semibold text-green-800 mb-4 text-center">
               {spec.fullName}
             </h2>
             <div className="flex space-x-6">
               <a
-                href={`https://wa.me/${spec.phoneNo}`}
+                href={`https://wa.me/${spec.phoneNo || spec.phone}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-green-500 hover:text-green-600 text-3xl"
@@ -76,7 +72,7 @@ function DoctorDashboard() {
                 <FaEnvelope />
               </a>
               <a
-                href={`tel:${spec.phoneNo}`}
+                href={`tel:${spec.phoneNo || spec.phone}`}
                 className="text-red-400 hover:text-red-500 text-3xl"
                 title="Call"
               >
@@ -96,11 +92,11 @@ function DoctorDashboard() {
             className="bg-green-100 shadow-lg rounded-xl p-6 flex flex-col items-center transition-transform hover:scale-105"
           >
             <h2 className="text-xl font-semibold text-green-800 mb-4 text-center">
-              {pharm.companyName || pharm.pharmacy_name || pharm.name || "Pharmacy Name"}
+              {pharm.pharmacy_name || pharm.name || pharm.companyName || "Pharmacy Name"}
             </h2>
             <div className="flex space-x-6">
               <a
-                href={`https://wa.me/${pharm.contactNo || pharm.phone}`}
+                href={`https://wa.me/${pharm.phone || pharm.contactNo}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-green-500 hover:text-green-600 text-3xl"
@@ -116,7 +112,7 @@ function DoctorDashboard() {
                 <FaEnvelope />
               </a>
               <a
-                href={`tel:${pharm.contactNo || pharm.phone}`}
+                href={`tel:${pharm.phone || pharm.contactNo}`}
                 className="text-red-400 hover:text-red-500 text-3xl"
                 title="Call"
               >

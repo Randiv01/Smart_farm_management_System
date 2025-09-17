@@ -18,10 +18,10 @@ const PlantPathologistHome = () => {
 
         {/* Fertiliser Companies Section */}
         <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 border border-gray-200 relative overflow-hidden">
-          {/* Decorative Corner Element */}
+          {/* Decorative Corner Elements */}
           <div className="absolute top-0 left-0 w-16 h-16 bg-green-200 opacity-20 rounded-full transform -translate-x-8 -translate-y-8"></div>
           <div className="absolute bottom-0 right-0 w-16 h-16 bg-green-200 opacity-20 rounded-full transform translate-x-8 translate-y-8"></div>
-          
+
           <h2 className="text-2xl font-semibold text-green-700 mb-6">
             Fertiliser Companies
           </h2>

@@ -35,7 +35,9 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
             phoneNo: data.phoneNo || "",
             medicalLicenseNumber: data.medicalLicenseNumber || "",
             address: data.address || "",
-            specializations: Array.isArray(data.specializations) ? data.specializations.join(", ") : data.specializations || "",
+            specializations: Array.isArray(data.specializations)
+              ? data.specializations.join(", ")
+              : data.specializations || "",
             qualifications: data.qualifications || "",
             yearsOfExperience: data.yearsOfExperience || "",
             dateOfBirth: data.dateOfBirth ? data.dateOfBirth.split("T")[0] : "",
@@ -71,7 +73,10 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
       Object.keys(formData).forEach((key) => {
         if (formData[key] !== null) {
           if (key === "specializations") {
-            data.append(key, JSON.stringify(formData[key].split(",").map(s => s.trim())));
+            data.append(
+              key,
+              JSON.stringify(formData[key].split(",").map((s) => s.trim()))
+            );
           } else {
             data.append(key, formData[key]);
           }
@@ -243,7 +248,9 @@ const H_SpecialistForm = ({ specialistId, onSuccess }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center space-x-2 ${
+                  loading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 <i className="fas fa-save"></i>
                 <span>{specialistId ? "Update Specialist" : "Add Specialist"}</span>

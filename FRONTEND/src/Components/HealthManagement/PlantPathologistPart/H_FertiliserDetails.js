@@ -4,18 +4,15 @@ import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// ✅ Correct icon import paths
-import whatsappIcon from "../ButtonIcon/whatsappButton.png";
-import emailIcon from "../ButtonIcon/emailButton.png";
-
 const H_FertiliserDetails = () => {
   const [fertilisers, setFertilisers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
-  const [searchTerm, setSearchTerm] = useState(""); // 🔍 filter term
+  const [searchTerm, setSearchTerm] = useState(""); // filter term
   const [searchInput, setSearchInput] = useState(""); // search input value
   const navigate = useNavigate();
 
+  // Fetch fertiliser data
   const fetchFertilisers = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/fertilisers");
@@ -47,6 +44,7 @@ const H_FertiliserDetails = () => {
     return matchesDate && matchesSearch;
   });
 
+  // Download PDF
   const downloadPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
@@ -112,18 +110,14 @@ const H_FertiliserDetails = () => {
             Fertiliser Details
           </h1>
 
-          {/* All controls on same line */}
           <div className="flex flex-wrap items-center gap-4">
-            {/* Date filter */}
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white shadow-sm"
-              placeholder="Select purchase date"
             />
 
-            {/* Search input */}
             <input
               type="text"
               value={searchInput}
@@ -132,7 +126,6 @@ const H_FertiliserDetails = () => {
               className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white shadow-sm"
             />
 
-            {/* Search button */}
             <button
               onClick={() => setSearchTerm(searchInput)}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
@@ -140,20 +133,18 @@ const H_FertiliserDetails = () => {
               🔍 Search
             </button>
 
-            {/* Download PDF button */}
             <button
               onClick={downloadPDF}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
             >
-              📄Download PDF
+              📄 Download PDF
             </button>
 
-            {/* Add fertiliser button */}
             <button
               onClick={() => navigate("/plant-pathologist/add-fertiliser")}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
             >
-              ➕Add New Fertiliser
+              ➕ Add New Fertiliser
             </button>
           </div>
         </div>
@@ -204,18 +195,10 @@ const H_FertiliserDetails = () => {
                     <td className="py-3 px-6 border-b">{f.notes}</td>
                     <td className="py-3 px-6 border-b space-x-2 flex">
                       <a href={`https://wa.me/${f.supplierContact}`} target="_blank" rel="noreferrer">
-                        <img
-                          src={whatsappIcon}
-                          alt="WhatsApp"
-                          className="w-10 h-10 cursor-pointer transform hover:scale-110 transition-transform"
-                        />
+                        <button className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">WhatsApp</button>
                       </a>
                       <a href={`mailto:${f.email}`} target="_blank" rel="noreferrer">
-                        <img
-                          src={emailIcon}
-                          alt="Email"
-                          className="w-10 h-10 cursor-pointer transform hover:scale-110 transition-transform"
-                        />
+                        <button className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Email</button>
                       </a>
                     </td>
                   </tr>

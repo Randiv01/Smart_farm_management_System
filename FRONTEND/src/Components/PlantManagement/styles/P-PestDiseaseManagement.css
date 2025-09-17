@@ -1,0 +1,227 @@
+.pest-disease-management {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.pest-disease-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+.charts-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.chart-container {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.chart-container h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+.issues-table-container,
+.specialist-section {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.table-header,
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.table-header h2,
+.section-header h2 {
+  margin: 0;
+}
+.table-actions,
+.section-actions {
+  display: flex;
+  gap: 12px;
+}
+.table-responsive {
+  overflow-x: auto;
+}
+.issues-table,
+.specialist-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.issues-table th,
+.issues-table td,
+.specialist-table th,
+.specialist-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.issues-table th,
+.specialist-table th {
+  background-color: rgba(102, 187, 106, 0.05);
+  font-weight: 600;
+}
+.issues-table tr:last-child td,
+.specialist-table tr:last-child td {
+  border-bottom: none;
+}
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.status-resolved {
+  background-color: rgba(102, 187, 106, 0.2);
+  color: var(--status-active);
+}
+.status-progress {
+  background-color: rgba(255, 167, 38, 0.2);
+  color: var(--status-inactive);
+}
+.status-assigned {
+  background-color: rgba(41, 182, 246, 0.2);
+  color: #29B6F6;
+}
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+.action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: none;
+  background-color: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease;
+}
+.action-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+.action-button.edit:hover {
+  color: #2196F3;
+}
+.action-button.delete:hover {
+  color: #EF5350;
+}
+.action-button.assign:hover {
+  color: #66BB6A;
+}
+.action-button.download:hover {
+  color: #66BB6A;
+}
+.add-issue-form,
+.assign-specialist-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  color: var(--text);
+}
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.file-input {
+  position: relative;
+}
+.file-input input[type="file"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.file-input label {
+  display: inline-block;
+  padding: 10px 16px;
+  background-color: rgba(102, 187, 106, 0.1);
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease;
+}
+.file-input:hover label {
+  background-color: rgba(102, 187, 106, 0.2);
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+@media screen and (max-width: 992px) {
+  .charts-section {
+    grid-template-columns: 1fr;
+  }
+}
+@media screen and (max-width: 768px) {
+  .pest-disease-header,
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .header-actions,
+  .section-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+@media screen and (max-width: 576px) {
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .table-actions {
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
