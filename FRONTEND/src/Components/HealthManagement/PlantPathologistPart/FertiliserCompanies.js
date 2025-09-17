@@ -13,11 +13,11 @@ const FertiliserCompanies = () => {
     country: "",
   });
 
+  // Fetch companies from API
   const fetchCompanies = async () => {
     try {
       setLoading(true);
       const res = await axios.get("http://localhost:5000/api/fertiliser-companies");
-      // Make sure response is an array of objects
       if (Array.isArray(res.data)) {
         setCompanies(res.data);
       } else {
@@ -27,6 +27,7 @@ const FertiliserCompanies = () => {
       setLoading(false);
     } catch (err) {
       console.error(err);
+      setCompanies([]);
       setLoading(false);
     }
   };
@@ -35,10 +36,12 @@ const FertiliserCompanies = () => {
     fetchCompanies();
   }, []);
 
+  // Handle form input changes
   const handleChange = (e) => {
     setCompanyForm({ ...companyForm, [e.target.name]: e.target.value });
   };
 
+  // Handle form submit (Add or Update)
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -64,16 +67,18 @@ const FertiliserCompanies = () => {
     }
   };
 
+  // Handle edit button
   const handleEdit = (company) => {
     setEditingId(company._id);
     setCompanyForm({
-      name: company.name || "",
-      contact: company.contact || "",
-      email: company.email || "",
-      country: company.country || "",
+      name: company.name ? String(company.name) : "",
+      contact: company.contact ? String(company.contact) : "",
+      email: company.email ? String(company.email) : "",
+      country: company.country ? String(company.country) : "",
     });
   };
 
+  // Handle delete button
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this company?")) return;
     try {
@@ -88,6 +93,7 @@ const FertiliserCompanies = () => {
 
   return (
     <div className="p-6">
+      {/* Add / Edit Form */}
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-white p-4 rounded shadow"
@@ -135,6 +141,7 @@ const FertiliserCompanies = () => {
         </button>
       </form>
 
+      {/* Companies List */}
       {loading ? (
         <p>Loading companies...</p>
       ) : companies.length === 0 ? (
@@ -147,10 +154,10 @@ const FertiliserCompanies = () => {
               className="flex justify-between items-center border p-3 rounded shadow hover:bg-gray-50"
             >
               <div>
-                <p className="font-semibold">{String(c.name)}</p>
-                <p>Contact: {String(c.contact)}</p>
-                <p>Email: {String(c.email)}</p>
-                <p>Country: {String(c.country || "-")}</p>
+                <p className="font-semibold">{c.name ? String(c.name) : "-"}</p>
+                <p>Contact: {c.contact ? String(c.contact) : "-"}</p>
+                <p>Email: {c.email ? String(c.email) : "-"}</p>
+                <p>Country: {c.country ? String(c.country) : "-"}</p>
               </div>
               <div className="flex gap-2">
                 {c.contact && (
