@@ -35,6 +35,7 @@ export default function AnimalProductivity() {
     date: new Date().toISOString().split('T')[0],
     notes: ""
   });
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     document.title = "Animal Productivity";
@@ -59,28 +60,28 @@ export default function AnimalProductivity() {
   // Helper function to safely get zone information
   const getZoneInfo = (animal) => {
     if (!animal) return { name: "Not assigned", id: null };
-    
+   
     if (animal.assignedZone && typeof animal.assignedZone === 'object') {
       return {
         name: animal.assignedZone.name || "Unknown",
         id: animal.assignedZone._id
       };
     }
-    
+   
     if (animal.assignedZone && typeof animal.assignedZone === 'string') {
       const foundZone = zones.find(z => z._id === animal.assignedZone);
-      return foundZone 
+      return foundZone
         ? { name: foundZone.name, id: foundZone._id }
         : { name: "Unknown", id: animal.assignedZone };
     }
-    
+   
     if (animal.zoneId) {
       const foundZone = zones.find(z => z._id === animal.zoneId);
-      return foundZone 
+      return foundZone
         ? { name: foundZone.name, id: foundZone._id }
         : { name: "Unknown", id: animal.zoneId };
     }
-    
+   
     return { name: "Not assigned", id: null };
   };
 
@@ -88,7 +89,7 @@ export default function AnimalProductivity() {
   const getHealthStatus = (animal) => {
     const status = animal.data?.healthStatus || "Unknown";
     let colorClass = "";
-    
+   
     switch(status.toLowerCase()) {
       case "healthy":
         colorClass = "text-green-600 dark:text-green-400";
@@ -105,40 +106,40 @@ export default function AnimalProductivity() {
       default:
         colorClass = "text-gray-600 dark:text-gray-400";
     }
-    
+   
     return { status, colorClass };
   };
 
   // Calculate age from birth date
   const calculateAge = (animal) => {
     const birthDate = animal.data?.dob;
-    
+   
     if (!birthDate) return "Unknown";
-    
+   
     const birth = new Date(birthDate);
     const today = new Date();
     let years = today.getFullYear() - birth.getFullYear();
     let months = today.getMonth() - birth.getMonth();
-    
+   
     if (months < 0) {
       years--;
       months += 12;
     }
-    
+   
     if (years === 0) {
       return `${months} month${months !== 1 ? 's' : ''}`;
     }
-    
+   
     return `${years} year${years !== 1 ? 's' : ''}, ${months} month${months !== 1 ? 's' : ''}`;
   };
 
   // Fetch productivity records for an animal/group
   const fetchProductivityRecords = async (id, isGroup = false) => {
     try {
-      const endpoint = isGroup 
+      const endpoint = isGroup
         ? `http://localhost:5000/productivity/batch/${id}`
         : `http://localhost:5000/productivity/animal/${id}`;
-      
+     
       const res = await fetch(endpoint);
       if (res.ok) {
         const data = await res.json();
@@ -155,40 +156,55 @@ export default function AnimalProductivity() {
   // Get latest productivity record
   const getLatestRecord = (records) => {
     if (!records || records.length === 0) return null;
-    
+   
     return records.reduce((latest, record) => {
       return new Date(record.date) > new Date(latest.date) ? record : latest;
     }, records[0]);
   };
 
-  // Calculate productivity totals
+  // Calculate productivity totals for a specific period
   const calculateProductivityTotals = (records, period = 'day') => {
     if (!records || records.length === 0) return { total: 0, average: 0 };
-    
+   
     const now = new Date();
     let startDate;
-    
+   
     switch(period) {
       case 'week':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
       case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
       default: // day
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
     }
-    
-    const recentRecords = records.filter(record => 
-      new Date(record.date) >= startDate
-    );
-    
+   
+    const recentRecords = records.filter(record => {
+      const recordDate = new Date(record.date);
+      return recordDate >= startDate && recordDate <= now;
+    });
+   
     if (recentRecords.length === 0) return { total: 0, average: 0 };
-    
-    const total = recentRecords.reduce((sum, record) => sum + (record.quantity || 0), 0);
+   
+    const total = recentRecords.reduce((sum, record) => sum + (parseFloat(record.quantity) || 0), 0);
     const average = total / recentRecords.length;
-    
+   
     return { total, average };
+  };
+
+  // Calculate productivity for all animals
+  const calculateTotalProductivity = (period = 'day') => {
+    let total = 0;
+    
+    animals.forEach(animal => {
+      const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
+      const { total: animalTotal } = calculateProductivityTotals(records, period);
+      total += animalTotal;
+    });
+    
+    return total.toFixed(1);
   };
 
   // Fetch data with productivity information
@@ -208,7 +224,7 @@ export default function AnimalProductivity() {
       );
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
       const animalsData = await animalsRes.json();
-      
+     
       // Group animals by batch for batch management types
       if (typeData.managementType === "batch") {
         const batchGroups = {};
@@ -230,10 +246,10 @@ export default function AnimalProductivity() {
           batchGroups[batchId].animals.push(animal);
           batchGroups[batchId].data.batchCount = batchGroups[batchId].animals.length;
         });
-        
+       
         const groupedAnimals = Object.values(batchGroups);
         setAnimals(groupedAnimals);
-        
+       
         // Fetch productivity records for each batch
         groupedAnimals.forEach(batch => {
           if (batch.batchId !== "ungrouped") {
@@ -248,7 +264,7 @@ export default function AnimalProductivity() {
           animals: [animal]
         }));
         setAnimals(individualAnimals);
-        
+       
         // Fetch productivity records for each animal
         individualAnimals.forEach(animal => {
           fetchProductivityRecords(animal._id, false);
@@ -310,7 +326,7 @@ export default function AnimalProductivity() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      
+     
       if (res.ok) {
         // Refresh the productivity records
         if (selectedAnimal.isGroup) {
@@ -350,7 +366,7 @@ export default function AnimalProductivity() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editedRecord),
       });
-      
+     
       if (res.ok) {
         // Refresh data
         if (selectedAnimal.isGroup) {
@@ -375,7 +391,7 @@ export default function AnimalProductivity() {
         const res = await fetch(`http://localhost:5000/productivity/${recordId}`, {
           method: "DELETE",
         });
-        
+       
         if (res.ok) {
           // Refresh data
           if (selectedAnimal.isGroup) {
@@ -393,20 +409,20 @@ export default function AnimalProductivity() {
     }
   };
 
-  const handleViewCharts = () => {
-    navigate(`/animal-analytics/${type}`);
+  const handleViewAnalytics = () => {
+    setShowAnalytics(!showAnalytics);
   };
 
   // Get product types for this animal type
   const getProductTypes = () => {
     if (!animalType) return [];
-    
+   
     const typeName = animalType.name.toLowerCase();
     if (typeName.includes('cow')) return ['Milk Production (L)'];
     if (typeName.includes('chicken')) return ['Egg Production'];
     if (typeName.includes('sheep')) return ['Wool Production (kg)', 'Milk Production (L)'];
     if (typeName.includes('goat')) return ['Milk Production (L)'];
-    
+   
     return ['Production'];
   };
 
@@ -433,29 +449,29 @@ export default function AnimalProductivity() {
       // Filter matching
       const matchesFilters = Object.keys(filterValues).every((key) => {
         if (!filterValues[key]) return true;
-        
+       
         // Special handling for zone filter (only for individual animals)
         if (key === "zone" && !animal.isGroup) {
           return getZoneInfo(animal).name.toLowerCase().includes(filterValues[key].toLowerCase());
         }
-        
+       
         // Special handling for health status (only for individual animals)
         if (key === "healthStatus" && !animal.isGroup) {
           const healthStatus = animal.data?.healthStatus || "";
           return healthStatus.toLowerCase().includes(filterValues[key].toLowerCase());
         }
-        
+       
         // Special handling for gender (only for individual animals)
         if (key === "gender" && !animal.isGroup) {
           const gender = animal.data?.gender || "";
           return gender.toLowerCase().includes(filterValues[key].toLowerCase());
         }
-        
+       
         // Special handling for age range (only for individual animals)
         if (key === "ageRange" && !animal.isGroup) {
           const ageText = calculateAge(animal);
           if (ageText === "Unknown") return false;
-          
+         
           // Convert age to months for filtering
           let ageInMonths = 0;
           if (ageText.includes('year')) {
@@ -465,56 +481,56 @@ export default function AnimalProductivity() {
           } else {
             ageInMonths = parseInt(ageText.split(' ')[0]);
           }
-          
+         
           const [min, max] = filterValues[key].split('-').map(Number);
           return ageInMonths >= min && ageInMonths <= max;
         }
-        
+       
         // Special handling for product type
         if (key === "productType") {
           const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-          return records.some(record => 
+          return records.some(record =>
             record.productType?.toLowerCase().includes(filterValues[key].toLowerCase())
           );
         }
-        
+       
         // For batch count filter
         if (key === "batchCount" && animal.isGroup) {
           const count = animal.data?.batchCount || 0;
           const [min, max] = filterValues[key].split('-').map(Number);
           return count >= min && count <= max;
         }
-        
+       
         return true;
       });
 
       // Date range filtering for productivity records
       const matchesDateRange = () => {
         if (!dateRange.start && !dateRange.end) return true;
-        
+       
         const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
         if (records.length === 0) return false;
-        
+       
         if (dateRange.start && dateRange.end) {
           return records.some(record => {
             const recordDate = new Date(record.date);
-            return recordDate >= new Date(dateRange.start) && 
+            return recordDate >= new Date(dateRange.start) &&
                    recordDate <= new Date(dateRange.end);
           });
         }
-        
+       
         if (dateRange.start) {
-          return records.some(record => 
+          return records.some(record =>
             new Date(record.date) >= new Date(dateRange.start)
           );
         }
-        
+       
         if (dateRange.end) {
-          return records.some(record => 
+          return records.some(record =>
             new Date(record.date) <= new Date(dateRange.end)
           );
         }
-        
+       
         return true;
       };
 
@@ -607,7 +623,7 @@ export default function AnimalProductivity() {
   // Record Table Component
   const RecordTable = () => {
     const records = productivityRecords[selectedAnimal.isGroup ? selectedAnimal.batchId : selectedAnimal._id] || [];
-    
+   
     return (
       <>
         {records.length > 0 ? (
@@ -661,6 +677,98 @@ export default function AnimalProductivity() {
     );
   };
 
+  // Analytics Component
+  const AnalyticsView = () => {
+    // Calculate productivity by product type
+    const productivityByType = {};
+    
+    productTypes.forEach(type => {
+      productivityByType[type] = {
+        daily: 0,
+        weekly: 0,
+        monthly: 0
+      };
+    });
+    
+    // Calculate totals for each product type
+    animals.forEach(animal => {
+      const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
+      
+      records.forEach(record => {
+        if (productivityByType[record.productType]) {
+          const recordDate = new Date(record.date);
+          const now = new Date();
+          const quantity = parseFloat(record.quantity) || 0;
+          
+          // Daily
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (recordDate >= today) {
+            productivityByType[record.productType].daily += quantity;
+          }
+          
+          // Weekly
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (recordDate >= weekAgo) {
+            productivityByType[record.productType].weekly += quantity;
+          }
+          
+          // Monthly
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          if (recordDate >= monthStart) {
+            productivityByType[record.productType].monthly += quantity;
+          }
+        }
+      });
+    });
+    
+    return (
+      <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow">
+        <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Productivity Analytics</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {Object.entries(productivityByType).map(([type, data]) => (
+            <div key={type} className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-3">{type}</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Daily:</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">{data.daily.toFixed(1)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Weekly:</span>
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">{data.weekly.toFixed(1)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Monthly:</span>
+                  <span className="font-semibold text-green-600 dark:text-green-400">{data.monthly.toFixed(1)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-3">Total Production</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-blue-100 dark:bg-blue-900 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{calculateTotalProductivity('day')}</div>
+              <div className="text-gray-700 dark:text-gray-300">Daily Production</div>
+            </div>
+            <div className="text-center p-4 bg-purple-100 dark:bg-purple-900 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-300">{calculateTotalProductivity('week')}</div>
+              <div className="text-gray-700 dark:text-gray-300">Weekly Production</div>
+            </div>
+            <div className="text-center p-4 bg-green-100 dark:bg-green-900 rounded-lg">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-300">{calculateTotalProductivity('month')}</div>
+              <div className="text-gray-700 dark:text-gray-300">Monthly Production</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Loading / Error
   if (loading)
     return (
@@ -687,12 +795,6 @@ export default function AnimalProductivity() {
             Retry
           </button>
         )}
-        <button
-            className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700"
-            onClick={() => navigate("/AnimalManagement")}
-          >
-            Back
-          </button>
       </div>
     );
 
@@ -707,24 +809,21 @@ export default function AnimalProductivity() {
           </h2>
           <div className="flex gap-2">
             <button
-              onClick={handleViewCharts}
+              onClick={handleViewAnalytics}
               className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-purple-600 text-white hover:bg-purple-700"
             >
-              📊 View Analytics
-            </button>
-            <button
-              onClick={() => navigate("/AnimalManagement")}
-              className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-gray-600 text-white hover:bg-gray-700"
-            >
-              ← Back to Management
+              {showAnalytics ? '📈 Hide Analytics' : '📊 View Analytics'}
             </button>
           </div>
         </div>
 
+        {/* Analytics View */}
+        {showAnalytics && <AnalyticsView />}
+
         {/* Filters Section */}
         <div className="mb-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Filters</h3>
-          
+         
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {/* Search */}
             <div>
@@ -739,7 +838,7 @@ export default function AnimalProductivity() {
                 className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
-            
+           
             {/* Zone Filter (only for individual animals) */}
             {animalType.managementType !== "batch" && (
               <div>
@@ -760,7 +859,7 @@ export default function AnimalProductivity() {
                 </select>
               </div>
             )}
-            
+           
             {/* Gender Filter (only for individual animals) */}
             {animalType.managementType !== "batch" && (
               <div>
@@ -779,7 +878,7 @@ export default function AnimalProductivity() {
                 </select>
               </div>
             )}
-            
+           
             {/* Health Status Filter (only for individual animals) */}
             {animalType.managementType !== "batch" && (
               <div>
@@ -799,7 +898,7 @@ export default function AnimalProductivity() {
                 </select>
               </div>
             )}
-            
+           
             {/* Age Range Filter (only for individual animals) */}
             {animalType.managementType !== "batch" && (
               <div>
@@ -821,7 +920,7 @@ export default function AnimalProductivity() {
                 </select>
               </div>
             )}
-            
+           
             {/* Batch Count Filter (only for batch animals) */}
             {animalType.managementType === "batch" && (
               <div>
@@ -842,7 +941,7 @@ export default function AnimalProductivity() {
                 </select>
               </div>
             )}
-            
+           
             {/* Product Type Filter */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
@@ -861,7 +960,7 @@ export default function AnimalProductivity() {
                 ))}
               </select>
             </div>
-            
+           
             {/* Date Range Filter */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
@@ -886,7 +985,7 @@ export default function AnimalProductivity() {
               </div>
             </div>
           </div>
-          
+         
           {/* Clear Filters Button */}
           <div className="flex justify-end">
             <button
@@ -910,37 +1009,25 @@ export default function AnimalProductivity() {
             </h3>
             <p className="text-2xl font-bold text-teal-600 dark:text-teal-400 text-center">{animals.length}</p>
           </div>
-          
+         
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Daily Production</h3>
+            <h3 className="text-lg font-semibold text-gray-909 dark:text-white text-center">Daily Production</h3>
             <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 text-center">
-              {animals.reduce((sum, animal) => {
-                const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-                const { total } = calculateProductivityTotals(records, 'day');
-                return sum + total;
-              }, 0).toFixed(1)}
+              {calculateTotalProductivity('day')}
             </p>
           </div>
-          
+         
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Weekly Production</h3>
             <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 text-center">
-              {animals.reduce((sum, animal) => {
-                const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-                const { total } = calculateProductivityTotals(records, 'week');
-                return sum + total;
-              }, 0).toFixed(1)}
+              {calculateTotalProductivity('week')}
             </p>
           </div>
-          
+         
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Monthly Production</h3>
             <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 text-center">
-              {animals.reduce((sum, animal) => {
-                const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-                const { total } = calculateProductivityTotals(records, 'month');
-                return sum + total;
-              }, 0).toFixed(1)}
+              {calculateTotalProductivity('month')}
             </p>
           </div>
         </div>
@@ -972,14 +1059,14 @@ export default function AnimalProductivity() {
                 )}
                 <th className="p-3 text-center">Weight</th>
                 <th className="p-3 text-center">Feed Type</th>
-                
+               
                 {/* Dynamic Product Columns */}
                 {productTypes.map((type, idx) => (
                   <th key={idx} className="p-3 text-center">
                     {type}
                   </th>
                 ))}
-                
+               
                 <th className="p-3 text-center">Last Record</th>
                 <th className="p-3 text-center">Actions</th>
               </tr>
@@ -999,7 +1086,7 @@ export default function AnimalProductivity() {
                   const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
                   const latestRecord = getLatestRecord(records);
                   const healthStatus = getHealthStatus(animal);
-                  
+                 
                   return (
                     <React.Fragment key={animal.isGroup ? animal.batchId : animal._id}>
                       <tr
@@ -1018,16 +1105,16 @@ export default function AnimalProductivity() {
                             {expandedRows[animal.isGroup ? animal.batchId : animal._id] ? "▼" : "►"}
                           </button>
                         </td>
-                        
+                       
                         {/* QR Code + Animal ID / Batch ID */}
                         <td className="p-2 text-center">
                           <div className="flex flex-col items-center justify-center">
                             {!animal.isGroup && animal.qrCode ? (
                               <div className="text-center">
-                                <QRCodeCanvas 
-                                  value={animal.qrCode} 
-                                  size={60} 
-                                  level="H" 
+                                <QRCodeCanvas
+                                  value={animal.qrCode}
+                                  size={60}
+                                  level="H"
                                   className="mx-auto"
                                 />
                                 <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
@@ -1083,8 +1170,8 @@ export default function AnimalProductivity() {
 
                         {/* Weight */}
                         <td className="p-2 text-center">
-                          {animal.isGroup ? 
-                            `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total` : 
+                          {animal.isGroup ?
+                            `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total` :
                             `${animal.data?.weight || "Unknown"} kg`
                           }
                         </td>
@@ -1098,7 +1185,7 @@ export default function AnimalProductivity() {
                         {productTypes.map((type, idx) => {
                           const typeRecords = records.filter(r => r.productType === type);
                           const { average } = calculateProductivityTotals(typeRecords, 'day');
-                          
+                         
                           return (
                             <td key={idx} className="p-2 text-center font-semibold">
                               {average > 0 ? average.toFixed(1) : "-"}
@@ -1135,7 +1222,7 @@ export default function AnimalProductivity() {
                           </div>
                         </td>
                       </tr>
-                      
+                     
                       {/* Expanded Row for Details */}
                       {expandedRows[animal.isGroup ? animal.batchId : animal._id] && (
                         <tr className="bg-gray-50 dark:bg-gray-700">
@@ -1168,7 +1255,7 @@ export default function AnimalProductivity() {
                                   </div>
                                   {!animal.isGroup ? (
                                     <div className="text-center">
-                                      <span className="font-medium">Health:</span> 
+                                      <span className="font-medium">Health:</span>
                                       <span className={`ml-1 font-semibold ${healthStatus.colorClass}`}>
                                         {healthStatus.status}
                                       </span>
@@ -1179,8 +1266,8 @@ export default function AnimalProductivity() {
                                     </div>
                                   )}
                                   <div className="text-center">
-                                    <span className="font-medium">Weight:</span> {animal.isGroup ? 
-                                      `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total` : 
+                                    <span className="font-medium">Weight:</span> {animal.isGroup ?
+                                      `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total` :
                                       `${animal.data?.weight || "Unknown"} kg`
                                     }
                                   </div>
@@ -1189,17 +1276,17 @@ export default function AnimalProductivity() {
                                   </div>
                                 </div>
                               </div>
-                              
+                             
                               {/* Productivity Summary */}
                               <div className="flex-1">
-                                <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">Productivity Summary</h4>
+                                <h4 className="font-semibold mb-2 text-gray-909 dark:text-white text-center">Productivity Summary</h4>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                   {productTypes.map((type, idx) => {
                                     const typeRecords = records.filter(r => r.productType === type);
                                     const daily = calculateProductivityTotals(typeRecords, 'day');
                                     const weekly = calculateProductivityTotals(typeRecords, 'week');
                                     const monthly = calculateProductivityTotals(typeRecords, 'month');
-                                    
+                                   
                                     return (
                                       <React.Fragment key={idx}>
                                         <div className="col-span-2 font-medium mt-2 first:mt-0 text-center">{type}</div>
@@ -1220,7 +1307,7 @@ export default function AnimalProductivity() {
                                   })}
                                 </div>
                               </div>
-                              
+                             
                               {/* Recent Records */}
                               <div className="flex-1">
                                 <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">Recent Records</h4>
@@ -1256,8 +1343,8 @@ export default function AnimalProductivity() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
               <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Add Productivity Record for {selectedAnimal.isGroup ? 
-                  `Batch ${selectedAnimal.batchId}` : 
+                Add Productivity Record for {selectedAnimal.isGroup ?
+                  `Batch ${selectedAnimal.batchId}` :
                   (selectedAnimal.data?.name || selectedAnimal.animalId)
                 }
               </h3>
@@ -1334,18 +1421,18 @@ export default function AnimalProductivity() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[80vh] overflow-y-auto">
               <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Productivity History for {selectedAnimal.isGroup ? 
-                  `Batch ${selectedAnimal.batchId}` : 
+                Productivity History for {selectedAnimal.isGroup ?
+                  `Batch ${selectedAnimal.batchId}` :
                   (selectedAnimal.data?.name || selectedAnimal.animalId)
                 }
               </h3>
-              
+             
               {editMode ? (
                 <EditRecordForm />
               ) : (
                 <RecordTable />
               )}
-              
+             
               <div className="flex justify-end mt-6 gap-3">
                 {editMode && (
                   <button
