@@ -1,0 +1,30 @@
+.pm-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pm-content-container {
+  flex: 1; /* fill remaining space next to sidebar */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.pm-main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background-color: var(--background);
+}
+
+/* Mobile */
+@media screen and (max-width: 768px) {
+  .pm-layout {
+    flex-direction: column;
+  }
+  .pm-content-container {
+    margin-left: 0 !important;
+  }
+}

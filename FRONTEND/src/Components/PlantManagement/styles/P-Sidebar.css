@@ -1,0 +1,112 @@
+.pm-sidebar {
+  width: 240px;
+  height: 100vh;
+  background-color: var(--card-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  z-index: 100;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.pm-sidebar.pm-collapsed {
+  width: 60px; /* collapsed width */
+}
+
+.pm-logo-container {
+  height: var(--header-height);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.pm-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.pm-toggle-button {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+}
+
+.pm-toggle-button:hover {
+  background-color: var(--border);
+}
+
+.pm-nav-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.pm-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+  border-left: 3px solid transparent;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.pm-nav-item:hover {
+  background-color: rgba(102, 187, 106, 0.1);
+  text-decoration: none;
+}
+
+.pm-nav-item.pm-active {
+  background-color: rgba(102, 187, 106, 0.15);
+  border-left-color: var(--primary);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.pm-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+}
+
+/* Mobile */
+@media screen and (max-width: 768px) {
+  .pm-sidebar {
+    position: fixed;
+    width: 100%;
+    height: auto;
+    top: 0;
+    left: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .pm-sidebar.pm-collapsed {
+    height: var(--header-height);
+  }
+  .pm-nav-menu {
+    display: none;
+  }
+  .pm-sidebar:not(.pm-collapsed) .pm-nav-menu {
+    display: flex;
+  }
+}

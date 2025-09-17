@@ -1,0 +1,383 @@
+/* =========================
+   Theme variables
+   ========================= */
+   :root {
+    --bg: #f7f9fb;
+    --card-bg: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --primary: #66bb6a;
+    --primary-weak: rgba(102, 187, 106, 0.12);
+    --danger: #ef5350;
+    --danger-weak: rgba(239, 83, 80, 0.12);
+    --info: #42a5f5;
+    --shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --radius-xs: 8px;
+    --transition: 220ms ease;
+  }
+  
+  body.dark-mode,
+  .dark-mode {
+    --bg: #0f1115;
+    --card-bg: #151922;
+    --text: #f4f7fb;
+    --muted: #a9b4c0;
+    --border: #222838;
+    --primary: #79d88e;
+    --primary-weak: rgba(121, 216, 142, 0.16);
+    --danger: #ff6b66;
+    --danger-weak: rgba(255, 107, 102, 0.16);
+    --info: #6db9ff;
+    --shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+  
+  /* =========================
+     Layout wrappers
+     ========================= */
+  .inspection-management {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    color: var(--text);
+    padding: 8px;
+  }
+  
+  .inspection-management h2 {
+    margin: 4px 0 8px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  
+  /* Header with Add New Inspection button */
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  
+  /* =========================
+     Charts
+     ========================= */
+  .charts-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  
+  .chart-container {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+  }
+  
+  .chart-container h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: var(--text);
+  }
+  
+  /* =========================
+     Calendar
+     ========================= */
+  .calendar-section {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px;
+  }
+  
+  .react-calendar {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    overflow: hidden;
+  }
+  
+  .react-calendar__navigation {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .react-calendar__navigation button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    padding: 6px 10px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  
+  .react-calendar__navigation button:hover {
+    background: var(--primary-weak);
+    border-color: var(--primary);
+  }
+  
+  .react-calendar__month-view__weekdays {
+    font-weight: 600;
+    color: var(--muted);
+    padding: 6px 0;
+  }
+  
+  .react-calendar__tile {
+    padding: 10px 6px;
+    transition: background var(--transition), color var(--transition);
+    color: var(--text);
+  }
+  
+  .react-calendar__tile--now {
+    background: rgba(66, 165, 245, 0.12);
+  }
+  
+  .react-calendar__tile--active {
+    background: var(--primary-weak);
+    color: var(--text);
+  }
+  
+  .inspection-indicator {
+    width: 6px;
+    height: 6px;
+    margin: 4px auto 0;
+    border-radius: 50%;
+    background-color: var(--primary);
+  }
+  
+  /* =========================
+     Form
+     ========================= */
+  .add-inspection-form {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  
+  .add-inspection-form input,
+  .add-inspection-form select,
+  .add-inspection-form textarea {
+    width: 100%;
+    background-color: var(--card-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+  
+  .add-inspection-form textarea {
+    grid-column: 1 / -1;
+    min-height: 90px;
+    resize: vertical;
+  }
+  
+  .add-inspection-form input::placeholder,
+  .add-inspection-form textarea::placeholder {
+    color: var(--muted);
+  }
+  
+  .add-inspection-form input:focus,
+  .add-inspection-form select:focus,
+  .add-inspection-form textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-weak);
+  }
+  
+  .add-inspection-form .form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  
+  /* =========================
+     Add Button
+     ========================= */
+  .add-toggle {
+    padding: 10px 14px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--primary);
+    background-color: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition);
+  }
+  
+  .add-toggle:hover {
+    background-color: #57a85a;
+    transform: translateY(-1px);
+  }
+  
+  .dark-mode .add-toggle {
+    background-color: #79d88e;
+    border-color: #79d88e;
+    color: #0b1116;
+  }
+  
+  .dark-mode .add-toggle:hover {
+    background-color: #68c373;
+  }
+  
+  /* =========================
+     Table
+     ========================= */
+  .inspection-table-container {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    overflow: hidden;
+  }
+  
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  .inspection-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .inspection-table th,
+  .inspection-table td {
+    padding: 12px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  
+  .inspection-table thead th {
+    background: rgba(102, 187, 106, 0.08);
+    font-weight: 700;
+    font-size: 13.5px;
+  }
+  
+  .dark-mode .inspection-table thead th {
+    background: rgba(121, 216, 142, 0.09);
+  }
+  
+  .inspection-table tbody tr:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+  .dark-mode .inspection-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  
+  /* Status chips */
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  
+  .status-cleared {
+    background-color: var(--primary-weak);
+    color: var(--primary);
+  }
+  
+  .status-issue {
+    background-color: var(--danger-weak);
+    color: var(--danger);
+  }
+  
+  /* Row action buttons */
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition), border-color var(--transition);
+  }
+  
+  .icon-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(0, 0, 0, 0.04);
+  }
+  
+  .icon-btn.edit:hover { border-color: #2196f3; }
+  .icon-btn.delete:hover { border-color: var(--danger); }
+  .icon-btn.download:hover { border-color: var(--primary); }
+  
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .pagination button {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background-color: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  
+  .pagination button:hover:not(:disabled) {
+    background-color: var(--primary-weak);
+  }
+  
+  .pagination button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  
+  /* Utilities */
+  .hidden { display: none !important; }
+  
+  /* =========================
+     Responsive
+     ========================= */
+  @media (max-width: 1100px) {
+    .charts-section { grid-template-columns: 1fr; }
+  }
+  
+  @media (max-width: 900px) {
+    .add-inspection-form { grid-template-columns: 1fr 1fr; }
+  }
+  
+  @media (max-width: 640px) {
+    .add-inspection-form { grid-template-columns: 1fr; }
+    .table-header {
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-start;
+    }
+  }
+  

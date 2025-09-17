@@ -557,7 +557,8 @@ export default function Dashboard() {
                                             </div>
                                         ) : (
                                             <div className="flex justify-between items-center mb-2">
-                                                <h5 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-dark-text">{animal.name}</h5>
+                                                <h5 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-dark-text">{animal.name.charAt(0).toUpperCase() + animal.name.slice(1).toLowerCase()}</h5>
+
                                                 <motion.button
                                                     whileHover={{ scale: 1.2 }}
                                                     whileTap={{ scale: 0.9 }}
