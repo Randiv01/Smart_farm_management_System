@@ -58,7 +58,7 @@ const LoginPage = () => {
           navigate("/EmployeeManagement"); 
           break;
         case "health": 
-          navigate("/HealthManagement"); 
+          navigate("/admin/aaa"); 
           break;
         case "owner": 
           navigate("/OwnerDashboard"); 
