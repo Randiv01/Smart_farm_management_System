@@ -31,6 +31,7 @@ const ChatBot = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [awaitingNumberResponse, setAwaitingNumberResponse] = useState(false);
   const [currentOptions, setCurrentOptions] = useState([]);
+  const [currentCategory, setCurrentCategory] = useState("");
   
   const messagesEndRef = useRef(null);
   const chatRef = useRef(null);
@@ -176,7 +177,7 @@ const ChatBot = () => {
           const selectedIndex = parseInt(numberMatch[0]) - 1;
           if (selectedIndex >= 0 && selectedIndex < currentOptions.length) {
             const selectedOption = currentOptions[selectedIndex];
-            const response = await generateResponse(selectedOption, true);
+            const response = await generateResponse(selectedOption, true, currentCategory);
             const botMessageObj = {
               id: Date.now() + 1,
               text: response.text,
@@ -187,6 +188,7 @@ const ChatBot = () => {
             setConversation(prev => [...prev, botMessageObj]);
             setAwaitingNumberResponse(false);
             setCurrentOptions([]);
+            setCurrentCategory("");
             setLoading(false);
             return;
           }
@@ -194,6 +196,7 @@ const ChatBot = () => {
         // If not a valid number, reset and respond normally
         setAwaitingNumberResponse(false);
         setCurrentOptions([]);
+        setCurrentCategory("");
       }
       
       const response = await generateResponse(userMessage, false);
@@ -210,6 +213,7 @@ const ChatBot = () => {
       if (response.options && response.options.length > 0) {
         setAwaitingNumberResponse(true);
         setCurrentOptions(response.options);
+        setCurrentCategory(response.category || "");
       }
     } catch (error) {
       console.error("Chatbot error:", error);
@@ -227,7 +231,7 @@ const ChatBot = () => {
   }
 
   // Enhanced response generation with numbered options
-  const generateResponse = async (message, isOptionSelection = false) => {
+  const generateResponse = async (message, isOptionSelection = false, category = "") => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
@@ -235,13 +239,55 @@ const ChatBot = () => {
     
     // If this is a selection from numbered options
     if (isOptionSelection) {
-      // Handle specific option selections
-      if (lowerMessage.includes("how do i place an order")) {
-        return { text: userFaqData.ordering.questions[0].answer };
-      } else if (lowerMessage.includes("what payment methods do you accept")) {
-        return { text: userFaqData.ordering.questions[1].answer };
+      // Find the matching question in the current category
+      if (category && userFaqData[category]) {
+        const categoryQuestions = userFaqData[category].questions;
+        const selectedQuestion = categoryQuestions.find(q => 
+          q.question.toLowerCase().includes(lowerMessage) || 
+          lowerMessage.includes(q.question.toLowerCase())
+        );
+        
+        if (selectedQuestion) {
+          return { text: selectedQuestion.answer };
+        }
       }
-      // Add more specific handlers as needed
+      
+      // If no category or question found, try to match across all categories
+      for (const catKey in userFaqData) {
+        const categoryQuestions = userFaqData[catKey].questions;
+        const selectedQuestion = categoryQuestions.find(q => 
+          q.question.toLowerCase().includes(lowerMessage) || 
+          lowerMessage.includes(q.question.toLowerCase())
+        );
+        
+        if (selectedQuestion) {
+          return { text: selectedQuestion.answer };
+        }
+      }
+      
+      // Handle specific option selections
+      if (lowerMessage.includes("show products") || lowerMessage.includes("products")) {
+        return { text: userFaqData.products.questions[0].answer };
+      } else if (lowerMessage.includes("today's offers") || lowerMessage.includes("offers")) {
+        return { text: userFaqData.products.questions[1].answer };
+      } else if (lowerMessage.includes("how do i place an order") || lowerMessage.includes("place order")) {
+        return { text: userFaqData.ordering.questions[0].answer };
+      } else if (lowerMessage.includes("what payment methods") || lowerMessage.includes("payment methods")) {
+        return { text: userFaqData.ordering.questions[1].answer };
+      } else if (lowerMessage.includes("shipping options") || lowerMessage.includes("shipping")) {
+        return { text: userFaqData.shipping.questions[0].answer };
+      } else if (lowerMessage.includes("ship internationally") || lowerMessage.includes("international")) {
+        return { text: userFaqData.shipping.questions[1].answer };
+      } else if (lowerMessage.includes("contact customer service") || lowerMessage.includes("customer service")) {
+        return { text: userFaqData.support.questions[0].answer };
+      } else if (lowerMessage.includes("talk to a human agent") || lowerMessage.includes("human agent")) {
+        return { text: userFaqData.support.questions[1].answer };
+      } else if (lowerMessage.includes("store location") || lowerMessage.includes("location") || lowerMessage.includes("hours")) {
+        return { text: userFaqData.general.questions[0].answer };
+      } else if (lowerMessage.includes("discounts") || lowerMessage.includes("loyalty program")) {
+        return { text: userFaqData.general.questions[1].answer };
+      }
+      
       return { text: "I've noted your selection. How else can I help you today?" };
     }
     
@@ -300,7 +346,8 @@ const ChatBot = () => {
         text: "Here's information about ordering & payment:\n\n" + 
               options.map((q, i) => `${i+1}. ${q}`).join('\n') + 
               "\n\nPlease select a number for more details:",
-        options: options
+        options: options,
+        category: "ordering"
       };
     }
     
@@ -310,7 +357,8 @@ const ChatBot = () => {
         text: "Here's information about products & shopping:\n\n" + 
               options.map((q, i) => `${i+1}. ${q}`).join('\n') + 
               "\n\nPlease select a number for more details:",
-        options: options
+        options: options,
+        category: "products"
       };
     }
     
@@ -320,7 +368,30 @@ const ChatBot = () => {
         text: "Here's information about shipping & delivery:\n\n" + 
               options.map((q, i) => `${i+1}. ${q}`).join('\n') + 
               "\n\nPlease select a number for more details:",
-        options: options
+        options: options,
+        category: "shipping"
+      };
+    }
+    
+    if (/(support|help|contact)/i.test(lowerMessage)) {
+      const options = userFaqData.support.questions.map(q => q.question);
+      return {
+        text: "Here's information about support & help:\n\n" + 
+              options.map((q, i) => `${i+1}. ${q}`).join('\n') + 
+              "\n\nPlease select a number for more details:",
+        options: options,
+        category: "support"
+      };
+    }
+    
+    if (/(general|info|information|store|location|hours)/i.test(lowerMessage)) {
+      const options = userFaqData.general.questions.map(q => q.question);
+      return {
+        text: "Here's general information:\n\n" + 
+              options.map((q, i) => `${i+1}. ${q}`).join('\n') + 
+              "\n\nPlease select a number for more details:",
+        options: options,
+        category: "general"
       };
     }
     
@@ -347,6 +418,7 @@ const ChatBot = () => {
     }]);
     setAwaitingNumberResponse(false);
     setCurrentOptions([]);
+    setCurrentCategory("");
   };
 
   // Handle quick action click
@@ -375,6 +447,7 @@ const ChatBot = () => {
       setConversation(prev => [...prev, userMessageObj, botMessageObj]);
       setAwaitingNumberResponse(true);
       setCurrentOptions(options);
+      setCurrentCategory(category);
     }
   };
 
