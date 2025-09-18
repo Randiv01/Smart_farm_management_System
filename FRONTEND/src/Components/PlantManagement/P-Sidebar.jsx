@@ -1,54 +1,120 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useLanguage } from './context/LanguageContext';
-import { LayoutDashboard, Warehouse, ClipboardCheck, Sprout, Bug, Gauge, TrendingUp, Settings, Menu, X } from 'lucide-react';
-import './styles/P-Sidebar.css';
+// P-Sidebar.jsx
+import React, { useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Warehouse,
+  ClipboardCheck,
+  Sprout,
+  Bug,
+  Gauge,
+  TrendingUp,
+  Settings,
+  Menu,
+} from "lucide-react";
 
-const Sidebar = () => {
-  const { t } = useLanguage();
+export default function PSidebar({ darkMode, sidebarOpen, toggleSidebar }) {
+  const navigate = useNavigate();
   const location = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const navItems = [
-    { path: '/PlantManagement', label: 'dashboard', icon: <LayoutDashboard size={20} /> },
-    { path: '/PlantManagement/greenhouse', label: 'greenhouseManagement', icon: <Warehouse size={20} /> },
-    { path: '/PlantManagement/inspection', label: 'inspectionManagement', icon: <ClipboardCheck size={20} /> },
-    { path: '/PlantManagement/fertilizing', label: 'fertilizingManagement', icon: <Sprout size={20} /> },
-    { path: '/PlantManagement/pest-disease', label: 'pestDiseaseManagement', icon: <Bug size={20} /> },
-    { path: '/PlantManagement/monitor-control', label: 'monitorControl', icon: <Gauge size={20} /> },
-    { path: '/PlantManagement/productivity', label: 'productivity', icon: <TrendingUp size={20} /> },
-    { path: '/PlantManagement/settings', label: 'settings', icon: <Settings size={20} /> },
+    { path: "/PlantManagement", icon: LayoutDashboard, label: "Dashboard" },
+    { path: "/PlantManagement/greenhouse", icon: Warehouse, label: "Greenhouse Management" },
+    { path: "/PlantManagement/inspection", icon: ClipboardCheck, label: "Inspection Management" },
+    { path: "/PlantManagement/fertilizing", icon: Sprout, label: "Fertilizing Management" },
+    { path: "/PlantManagement/pest-disease", icon: Bug, label: "Pest & Disease Management" },
+    { path: "/PlantManagement/monitor-control", icon: Gauge, label: "Monitor & Control" },
+    { path: "/PlantManagement/productivity", icon: TrendingUp, label: "Productivity" },
+    { path: "/PlantManagement/settings", icon: Settings, label: "Settings" },
   ];
 
-  const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
-  };
+  // Automatically collapse sidebar on small screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024 && sidebarOpen) {
+        toggleSidebar(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [sidebarOpen, toggleSidebar]);
 
   return (
-    <div className={`pm-sidebar ${isCollapsed ? 'pm-collapsed' : ''}`}>
-      <div className="pm-logo-container">
-        <div className="pm-logo">
-          <Sprout size={24} />
-          {!isCollapsed && <span>Smart Farm</span>}
-        </div>
-        <button className="pm-toggle-button" onClick={toggleSidebar}>
-          {isCollapsed ? <Menu size={20} /> : <X size={20} />}
-        </button>
-      </div>
-      <nav className="pm-nav-menu">
-        {navItems.map(item => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`pm-nav-item ${location.pathname.startsWith(item.path) ? 'pm-active' : ''}`}
-          >
-            <div className="pm-nav-icon">{item.icon}</div>
-            {!isCollapsed && <span>{t(item.label)}</span>}
-          </Link>
-        ))}
-      </nav>
-    </div>
-  );
-};
+    <>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          onClick={() => toggleSidebar(false)}
+        />
+      )}
 
-export default Sidebar;
+      <aside
+        className={`
+          fixed top-0 left-0 h-full z-40 transition-all duration-300 ease-in-out
+          ${darkMode ? "bg-green-900" : "bg-green-700"} text-white flex flex-col shadow-lg overflow-hidden
+          ${sidebarOpen ? "w-64" : "w-0"} 
+          ${sidebarOpen ? "lg:w-64" : "lg:w-20"}
+        `}
+      >
+        {/* Logo */}
+        <div
+          className="flex flex-col items-center py-4 px-2 border-b border-white/20 cursor-pointer"
+          onClick={() => navigate("/PlantManagement")}
+        >
+          <img
+            src="/logo192.png"
+            alt="Farm Logo"
+            className={`transition-all duration-300 ${sidebarOpen ? "w-14 h-14" : "w-12 h-12"} rounded-lg object-contain`}
+          />
+          {sidebarOpen && (
+            <div className="mt-2 text-center hidden lg:block">
+              <h1 className="text-lg font-bold whitespace-nowrap">Mount Olive</h1>
+              <p className="text-xs opacity-80 whitespace-nowrap">Plant Management</p>
+            </div>
+          )}
+        </div>
+
+        {/* Nav Items */}
+        <nav className="flex-1 overflow-y-auto py-4 px-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          <ul className="space-y-1">
+            {navItems.map((item) => (
+              <li key={item.path}>
+                <button
+                  onClick={() => {
+                    navigate(item.path);
+                    if (window.innerWidth < 1024) toggleSidebar(false);
+                  }}
+                  className={`
+                    flex items-center w-full p-3 rounded-lg transition-all
+                    hover:bg-green-800 hover:shadow-sm
+                    ${location.pathname.startsWith(item.path) ? "bg-green-800 font-medium" : ""}
+                    ${sidebarOpen ? "justify-start px-4" : "justify-center"}
+                    focus:outline-none focus:ring-1 focus:ring-white/50
+                  `}
+                  title={item.label}
+                >
+                  <item.icon size={20} className={sidebarOpen ? "mr-3" : ""} />
+                  {sidebarOpen && (
+                    <span className="text-sm whitespace-nowrap overflow-hidden overflow-ellipsis hidden lg:inline">
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* Footer */}
+        {sidebarOpen && (
+          <div className="p-4 border-t border-white/20 flex flex-col items-center justify-center text-center text-white/80 text-xs space-y-1">
+            <span className="font-bold text-sm text-white">PlantManage</span>
+            <span className="text-white/70 text-xs">Plant System v1.0</span>
+            <span className="text-white/50 text-xs">© 2025 Mount Olive</span>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
