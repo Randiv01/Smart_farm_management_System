@@ -17,6 +17,7 @@ import {
   PhoneIcon,
   MailIcon,
   CheckCircleIcon,
+  MessageCircleIcon,
   XIcon,
   CalendarIcon,
   SparklesIcon,
@@ -27,7 +28,9 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import Footer from '../UHFooter/UHFooter';
+import ChatBot from '../UHChatbot/UHChatbot';
 import { FaWhatsapp } from 'react-icons/fa';
+
 
 // Hero image imports
 import Heroimage1 from '../Images/Heroimage1.jpg';
@@ -44,9 +47,9 @@ const Home = () => {
 
   // Function to handle WhatsApp click
   const handleWhatsAppClick = () => {
-    // Open WhatsApp with a pre-filled message
     window.open('https://wa.me/?text=Hello%20Mount%20Olive%20Farm,%20I%20would%20like%20to%20know%20more%20about%20your%20products.', '_blank');
   };
+  
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
@@ -54,8 +57,27 @@ const Home = () => {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [activeTab, setActiveTab] = useState('featured');
   const [isScrolled, setIsScrolled] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  
+  // Refs for scroll animations
   const featuredProductsRef = useRef(null);
   const whyChooseUsRef = useRef(null);
+  const introRef = useRef(null);
+  const highlightsRef = useRef(null);
+  const testimonialsRef = useRef(null);
+  const newsletterRef = useRef(null);
+  const offersRef = useRef(null);
+  
+  // State for tracking which sections are in view
+  const [inView, setInView] = useState({
+    intro: false,
+    highlights: false,
+    featured: false,
+    whyChooseUs: false,
+    offers: false,
+    testimonials: false,
+    newsletter: false
+  });
 
   const testimonials = [
     {
@@ -205,9 +227,25 @@ const Home = () => {
     // Handle scroll for header
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
+      
+      // Check which sections are in view
+      const scrollPosition = window.scrollY + window.innerHeight;
+      
+      setInView({
+        intro: scrollPosition > (introRef.current?.offsetTop || 0) + 100,
+        highlights: scrollPosition > (highlightsRef.current?.offsetTop || 0) + 100,
+        featured: scrollPosition > (featuredProductsRef.current?.offsetTop || 0) + 100,
+        whyChooseUs: scrollPosition > (whyChooseUsRef.current?.offsetTop || 0) + 100,
+        offers: scrollPosition > (offersRef.current?.offsetTop || 0) + 100,
+        testimonials: scrollPosition > (testimonialsRef.current?.offsetTop || 0) + 100,
+        newsletter: scrollPosition > (newsletterRef.current?.offsetTop || 0) + 100
+      });
     };
     
     window.addEventListener('scroll', handleScroll);
+    // Initial check
+    handleScroll();
+    
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -273,8 +311,10 @@ const Home = () => {
   };
 
   // Product Card Component
-  const ProductCard = ({ product }) => (
-    <div className="bg-soft-white dark:bg-dark-card rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-xl group">
+  const ProductCard = ({ product, index }) => (
+    <div className={`bg-soft-white dark:bg-dark-card rounded-xl shadow-md overflow-hidden transition-all duration-700 group
+      ${inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+      style={{ transitionDelay: `${index * 100}ms` }}>
       <div className="relative h-48 overflow-hidden">
         <img 
           src={product.image} 
@@ -320,8 +360,10 @@ const Home = () => {
   );
 
   // Testimonial Card Component
-  const TestimonialCard = ({ testimonial }) => (
-    <div className="bg-soft-white dark:bg-dark-card p-6 rounded-xl shadow-md h-full">
+  const TestimonialCard = ({ testimonial, index }) => (
+    <div className={`bg-soft-white dark:bg-dark-card p-6 rounded-xl shadow-md h-full transition-all duration-700
+      ${inView.testimonials ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+      style={{ transitionDelay: `${index * 100}ms` }}>
       <div className="flex items-center mb-4">
         {[...Array(5)].map((_, i) => (
           <StarIcon 
@@ -342,8 +384,10 @@ const Home = () => {
   );
 
   // Special Offer Card
-  const OfferCard = ({ offer }) => (
-    <div className="bg-gradient-to-r from-dark-green to-green-800 text-soft-white rounded-xl overflow-hidden shadow-lg">
+  const OfferCard = ({ offer, index }) => (
+    <div className={`bg-gradient-to-r from-dark-green to-green-800 text-soft-white rounded-xl overflow-hidden shadow-lg transition-all duration-700
+      ${inView.offers ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+      style={{ transitionDelay: `${index * 100}ms` }}>
       <div className="p-6">
         <div className="mb-4">
           <span className="inline-block bg-btn-yellow text-dark-green text-xs font-bold px-2 py-1 rounded uppercase mb-2">
@@ -380,9 +424,9 @@ const Home = () => {
           </div>
         )}
 
-        {/* Floating Action Buttons - UPDATED */}
+        {/* Floating Action Buttons */}
         <div className="fixed right-6 bottom-6 z-40 flex flex-col gap-3">
-          {/* WhatsApp button instead of phone */}
+          {/* WhatsApp button */}
           <button 
             onClick={handleWhatsAppClick}
             className="bg-green-600 text-soft-white p-3 rounded-full shadow-lg hover:bg-green-700 transition-colors tooltip"
@@ -399,7 +443,20 @@ const Home = () => {
             <MailIcon className="h-6 w-6" />
             <span className="tooltiptext">Email Us</span>
           </button>
+          
+          {/* ChatBot button */}
+          <button 
+            onClick={() => setChatOpen(!chatOpen)}
+            className="bg-blue-600 text-soft-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors tooltip"
+          >
+            <MessageCircleIcon className="h-6 w-6" />
+            <span className="tooltiptext">Chat Support</span>
+          </button>
         </div>
+
+        {/* Render the ChatBot component */}
+        
+        <ChatBot />
 
         {/* 1. Hero Section */}
         <section className="relative w-full h-screen overflow-hidden">
@@ -490,12 +547,14 @@ const Home = () => {
         </section>
 
         {/* 3. Introduction Section */}
-        <section className="py-16 bg-soft-white dark:bg-dark-card">
+        <section ref={introRef} className="py-16 bg-soft-white dark:bg-dark-card overflow-hidden">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               
               {/* Text Content */}
-              <div className="flex flex-col justify-center">
+              <div className={`flex flex-col justify-center transition-all duration-1000 ${
+                inView.intro ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
+              }`}>
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-dark-text mb-8">
                   Welcome to <span className="text-dark-green">MountOlive Farm</span>
                 </h2>
@@ -530,10 +589,14 @@ const Home = () => {
                   <img 
                     src={require('../Images/mohomeimage.png')} 
                     alt="MountOlive Farm" 
-                    className="w-full h-80 md:h-[400px] lg:h-[500px] object-cover transition-transform duration-500 hover:scale-105"
+                    className={`w-full h-80 md:h-[400px] lg:h-[500px] object-cover transition-all duration-1000 ${
+                      inView.intro ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
+                    }`}
                   />
                 </div>
-                <div className="absolute -bottom-6 -left-6 bg-soft-white dark:bg-dark-bg p-6 rounded-xl shadow-lg">
+                <div className={`absolute -bottom-6 -left-6 bg-soft-white dark:bg-dark-bg p-6 rounded-xl shadow-lg transition-all duration-1000 ${
+                  inView.intro ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-dark-green dark:text-green-400">15+</div>
                     <div className="text-gray-600 dark:text-gray-300">Years of Farming Excellence</div>
@@ -546,11 +609,13 @@ const Home = () => {
         </section>
 
         {/* 4. Highlights Section */}
-        <section className="py-16 bg-light-beige dark:bg-dark-bg">
+        <section ref={highlightsRef} className="py-16 bg-light-beige dark:bg-dark-bg">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {features.map((feature, index) => (
-                <div key={index} className="bg-soft-white dark:bg-dark-card p-6 rounded-xl shadow-sm text-center transition-all duration-300 hover:scale-105 hover:shadow-lg group">
+                <div key={index} className={`bg-soft-white dark:bg-dark-card p-6 rounded-xl shadow-sm text-center transition-all duration-700 hover:scale-105 hover:shadow-lg group ${
+                  inView.highlights ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`} style={{ transitionDelay: `${index * 100}ms` }}>
                   <div className="flex justify-center mb-4">
                     <div className="p-3 bg-green-100 dark:bg-dark-bg rounded-full group-hover:bg-dark-green transition-colors">
                     {React.cloneElement(feature.icon, { 
@@ -569,7 +634,9 @@ const Home = () => {
         {/* 5. Featured Products Section */}
         <section ref={featuredProductsRef} className="py-16 bg-soft-white dark:bg-dark-card">
           <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-12">
+            <div className={`flex flex-col md:flex-row justify-between items-center mb-12 transition-all duration-700 ${
+              inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>
               <h2 className="text-3xl font-bold text-gray-800 dark:text-dark-text">Featured Products</h2>
               <div className="flex mt-4 md:mt-0 bg-light-beige dark:bg-dark-bg p-1 rounded-lg">
                 <button 
@@ -600,11 +667,13 @@ const Home = () => {
             ) : products.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                  {products.map(product => (
-                    <ProductCard key={product._id} product={product} />
+                  {products.map((product, index) => (
+                    <ProductCard key={product._id} product={product} index={index} />
                   ))}
                 </div>
-                <div className="text-center">
+                <div className={`text-center transition-all duration-700 ${
+                  inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}>
                   <a href="/InventoryManagement/catalog" className="bg-dark-green hover:bg-green-800 text-soft-white py-3 px-8 rounded-lg font-semibold transition-colors inline-flex items-center">
                     View All Products <ArrowRightIcon className="ml-2 h-5 w-5" />
                   </a>
@@ -621,7 +690,9 @@ const Home = () => {
         {/* 6. Why Choose Us Section */}
         <section ref={whyChooseUsRef} className="py-16 bg-light-beige dark:bg-dark-bg">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
+            <div className={`text-center mb-16 transition-all duration-700 ${
+              inView.whyChooseUs ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>
               <h2 className="text-3xl font-bold text-gray-800 dark:text-dark-text mb-4">Why Choose MountOlive Farm?</h2>
               <p className="text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                 We're not just another farm. Our unique approach combines traditional farming wisdom with modern technology to bring you the best possible products.
@@ -630,7 +701,9 @@ const Home = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
               {benefits.map((benefit, index) => (
-                <div key={index} className="bg-soft-white dark:bg-dark-card p-6 rounded-xl shadow-sm transition-all duration-300 hover:shadow-lg">
+                <div key={index} className={`bg-soft-white dark:bg-dark-card p-6 rounded-xl shadow-sm transition-all duration-700 hover:shadow-lg ${
+                  inView.whyChooseUs ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`} style={{ transitionDelay: `${index * 100}ms` }}>
                   <div className="flex items-start mb-4">
                     <div className="p-3 bg-green-100 dark:bg-dark-bg rounded-full mr-4 text-dark-green">
                       {benefit.icon}
@@ -644,7 +717,9 @@ const Home = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {stats.map((stat, index) => (
-                <div key={index} className="bg-soft-white dark:bg-dark-card p-6 rounded-xl text-center transition-transform duration-300 hover:scale-105">
+                <div key={index} className={`bg-soft-white dark:bg-dark-card p-6 rounded-xl text-center transition-all duration-700 hover:scale-105 ${
+                  inView.whyChooseUs ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`} style={{ transitionDelay: `${index * 100}ms` }}>
                   <div className="flex justify-center mb-4 text-dark-green dark:text-green-400">
                     {stat.icon}
                   </div>
@@ -657,35 +732,41 @@ const Home = () => {
         </section>
 
         {/* 7. Special Offers Section */}
-        <section className="py-16 bg-dark-green text-soft-white">
+        <section ref={offersRef} className="py-16 bg-dark-green text-soft-white">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12">Special Offers</h2>
+            <h2 className={`text-3xl font-bold text-center mb-12 transition-all duration-700 ${
+              inView.offers ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>Special Offers</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {specialOffers.map((offer, index) => (
-                <OfferCard key={index} offer={offer} />
+                <OfferCard key={index} offer={offer} index={index} />
               ))}
             </div>
           </div>
         </section>
 
         {/* 8. Testimonials Section */}
-        <section className="py-16 bg-soft-white dark:bg-dark-card">
+        <section ref={testimonialsRef} className="py-16 bg-soft-white dark:bg-dark-card">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-dark-text mb-12">What Our Customers Say</h2>
+            <h2 className={`text-3xl font-bold text-center text-gray-800 dark:text-dark-text mb-12 transition-all duration-700 ${
+              inView.testimonials ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>What Our Customers Say</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {testimonials.map((testimonial, index) => (
-                <TestimonialCard key={index} testimonial={testimonial} />
+                <TestimonialCard key={index} testimonial={testimonial} index={index} />
               ))}
             </div>
           </div>
         </section>
 
         {/* 9. Newsletter Section */}
-        <section className="py-16 bg-light-beige dark:bg-dark-bg">
+        <section ref={newsletterRef} className="py-16 bg-light-beige dark:bg-dark-bg">
           <div className="container mx-auto px-4 text-center">
-            <div className="max-w-2xl mx-auto">
+            <div className={`max-w-2xl mx-auto transition-all duration-700 ${
+              inView.newsletter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>
               <h2 className="text-3xl font-bold text-gray-800 dark:text-dark-text mb-4">Stay Updated with Our Farm</h2>
               <p className="text-gray-600 dark:text-gray-300 mb-8">
                 Subscribe to our newsletter to receive updates on new products, special offers, and farming tips.
