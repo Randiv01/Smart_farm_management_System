@@ -30,7 +30,6 @@ import { IThemeProvider } from './Components/InventoryManagement/Icontexts/IThem
 import ILayout from './Components/InventoryManagement/Ilayout/ILayout.jsx';
 import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 import Stock from './Components/InventoryManagement/Ipages/Stock.jsx';
-import Catalog from "./Components/InventoryManagement/Ipages/Catalog.jsx";
 import Payment from "./Components/InventoryManagement/Ipages/Payment.jsx";
 import Orders from "./Components/InventoryManagement/Ipages/Orders.jsx";
 import Expiry from './Components/InventoryManagement/Ipages/expiry.jsx';
@@ -44,6 +43,7 @@ import Home from './Components/UserHome/UHHome/UHHome.jsx';
 import Login from './Components/UserHome/Login/login.jsx';
 import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 import News from "./Components/UserHome/News/News.jsx"; 
+import Catalog from "./Components/UserHome/UHCatalog/Catalog.jsx";
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -108,7 +108,8 @@ function App() {
               <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/news" element={<News />} /> 
+              <Route path="/news" element={<News />} />
+              <Route path="/catalog" element={<Catalog /> } /> 
 
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
@@ -155,14 +156,7 @@ function App() {
                 <Route path="FertilizerStock" element={<FertilizerStock />} /> 
                 <Route path="isuppliers" element={<ISupplier />} />
               </Route>
-
-              {/* Catalog and Payment routes without ILayout but with IThemeProvider */}
-              <Route path="/InventoryManagement/catalog" element={
-                <IThemeProvider>
-                  <Catalog />
-                </IThemeProvider>
-              } />
-              
+                            
               <Route path="/InventoryManagement/payment" element={
                 <IThemeProvider>
                   <Payment />

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext.js";
 import { useLoader } from "../contexts/LoaderContext.js";
 import axios from "axios";
-import { Bar, Pie, Line, Doughnut } from "react-chartjs-2";
+import { Bar, Pie, Line, Doughnut, Radar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,12 +12,13 @@ import {
   LineElement,
   PointElement,
   ArcElement,
+  RadialLinearScale,
   Title,
   Tooltip,
   Legend,
 } from "chart.js";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // Fixed import
+import autoTable from "jspdf-autotable";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -27,7 +28,11 @@ import {
   PieChart,
   Calendar,
   AlertTriangle,
-  Info
+  Info,
+  Crown,
+  Target,
+  BarChart2,
+  Activity
 } from "lucide-react";
 
 ChartJS.register(
@@ -37,6 +42,7 @@ ChartJS.register(
   LineElement,
   PointElement,
   ArcElement,
+  RadialLinearScale,
   Title,
   Tooltip,
   Legend
@@ -60,10 +66,12 @@ export default function AnimalProductivity() {
   const [selectedManagementType, setSelectedManagementType] = useState("all");
   const [trendStats, setTrendStats] = useState([]);
   const [insights, setInsights] = useState([]);
+  const [sortBy, setSortBy] = useState("totalProductivity");
+  const [sortOrder, setSortOrder] = useState("desc");
   
-  // View toggles
-  const [showIndividualView, setShowIndividualView] = useState(false);
-  const [selectedAnimal, setSelectedAnimal] = useState(null);
+  // Performance comparison view
+  const [comparisonView, setComparisonView] = useState(false);
+  const [selectedTypes, setSelectedTypes] = useState([]);
 
   useEffect(() => {
     document.title = "Animal Productivity Dashboard";
@@ -115,18 +123,27 @@ export default function AnimalProductivity() {
         
         // Calculate productivity for each field in the productivity category
         const productivity = {};
+        let totalProductivity = 0;
+        
         if (productivityCategory) {
           productivityCategory.fields?.forEach(field => {
-            productivity[field.name] = animalsOfType.reduce(
+            const fieldValue = animalsOfType.reduce(
               (sum, a) => sum + (parseFloat(a.data?.[field.name]) || 0), 0
             );
+            productivity[field.name] = fieldValue;
+            totalProductivity += fieldValue;
           });
         }
+
+        // Calculate average productivity per animal
+        const avgProductivity = animalsOfType.length > 0 ? totalProductivity / animalsOfType.length : 0;
 
         return {
           ...type,
           totalCount: animalsOfType.length,
           productivity,
+          totalProductivity,
+          avgProductivity,
           bannerImage: type.bannerImage,
           productivityFields: productivityCategory?.fields || []
         };
@@ -190,23 +207,31 @@ export default function AnimalProductivity() {
     // Find top performing animal type
     if (types.length > 0) {
       const topType = types.reduce((prev, current) => {
-        const prevProductivity = Object.values(prev.productivity).reduce((sum, val) => sum + val, 0);
-        const currentProductivity = Object.values(current.productivity).reduce((sum, val) => sum + val, 0);
-        return prevProductivity > currentProductivity ? prev : current;
+        return prev.totalProductivity > current.totalProductivity ? prev : current;
       });
       
       if (topType) {
         newInsights.push({
           type: "success",
-          message: `${topType.name} is your highest performing animal type with total productivity of ${Object.values(topType.productivity).reduce((sum, val) => sum + val, 0)} units`
+          message: `${topType.name} is your highest performing animal type with total productivity of ${topType.totalProductivity.toLocaleString()} units`
+        });
+      }
+
+      // Find most efficient type (productivity per animal)
+      const mostEfficient = types.reduce((prev, current) => {
+        return prev.avgProductivity > current.avgProductivity ? prev : current;
+      });
+      
+      if (mostEfficient && mostEfficient.avgProductivity > 0) {
+        newInsights.push({
+          type: "info",
+          message: `${mostEfficient.name} has the highest productivity per animal (${mostEfficient.avgProductivity.toFixed(1)} units/animal)`
         });
       }
     }
     
     // Check for types with no productivity data
-    const inactiveTypes = types.filter(type => 
-      Object.values(type.productivity).reduce((sum, val) => sum + val, 0) === 0
-    );
+    const inactiveTypes = types.filter(type => type.totalProductivity === 0);
     
     if (inactiveTypes.length > 0) {
       newInsights.push({
@@ -241,12 +266,45 @@ export default function AnimalProductivity() {
     setInsights(newInsights);
   };
 
+  // Sort animal types
+  const sortedAnimalTypes = [...animalTypes].sort((a, b) => {
+    let aValue, bValue;
+    
+    switch(sortBy) {
+      case "name":
+        aValue = a.name;
+        bValue = b.name;
+        break;
+      case "count":
+        aValue = a.totalCount;
+        bValue = b.totalCount;
+        break;
+      case "avgProductivity":
+        aValue = a.avgProductivity;
+        bValue = b.avgProductivity;
+        break;
+      case "totalProductivity":
+      default:
+        aValue = a.totalProductivity;
+        bValue = b.totalProductivity;
+        break;
+    }
+    
+    if (typeof aValue === 'string') {
+      return sortOrder === 'asc' 
+        ? aValue.localeCompare(bValue) 
+        : bValue.localeCompare(aValue);
+    } else {
+      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+  });
+
   // Generate chart data based on available productivity fields
   const productivityChartData = {
-    labels: animalTypes.map(type => type.name),
+    labels: sortedAnimalTypes.map(type => type.name),
     datasets: productivityFields.slice(0, 5).map((field, index) => ({
       label: field.label,
-      data: animalTypes.map(type => type.productivity[field.name] || 0),
+      data: sortedAnimalTypes.map(type => type.productivity[field.name] || 0),
       backgroundColor: [
         "#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", 
         "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#64748b"
@@ -295,7 +353,27 @@ export default function AnimalProductivity() {
     ]
   };
 
-  // Export to PDF - Fixed autoTable usage
+  // Performance comparison data
+  const performanceComparisonData = {
+    labels: productivityFields.map(field => field.label),
+    datasets: selectedTypes.map((type, index) => ({
+      label: type.name,
+      data: productivityFields.map(field => {
+        const value = type.productivity[field.name] || 0;
+        // Normalize values for better radar chart visualization
+        const maxValue = Math.max(...selectedTypes.map(t => t.productivity[field.name] || 0));
+        return maxValue > 0 ? (value / maxValue) * 100 : 0;
+      }),
+      backgroundColor: `rgba(${index * 40}, ${index * 60}, ${index * 80}, 0.2)`,
+      borderColor: `rgba(${index * 40}, ${index * 60}, ${index * 80}, 1)`,
+      pointBackgroundColor: `rgba(${index * 40}, ${index * 60}, ${index * 80}, 1)`,
+      pointBorderColor: "#fff",
+      pointHoverBackgroundColor: "#fff",
+      pointHoverBorderColor: `rgba(${index * 40}, ${index * 60}, ${index * 80}, 1)`,
+    }))
+  };
+
+  // Export to PDF
   const exportPDF = () => {
     const doc = new jsPDF();
     const date = new Date().toLocaleDateString();
@@ -307,7 +385,7 @@ export default function AnimalProductivity() {
     doc.setTextColor(100);
     doc.text(`Generated on ${date}`, 14, 23);
     
-    // Summary table - Fixed autoTable call
+    // Summary table
     autoTable(doc, {
       startY: 30,
       head: [["Metric", "Value"]],
@@ -319,13 +397,15 @@ export default function AnimalProductivity() {
       headStyles: { fillColor: [59, 130, 246] }
     });
     
-    // Animal type productivity - Fixed autoTable call
+    // Animal type productivity
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 10,
-      head: [["Animal Type", "Count", ...productivityFields.map(f => f.label)]],
-      body: animalTypes.map(type => [
+      head: [["Animal Type", "Count", "Total Productivity", "Avg. per Animal", ...productivityFields.map(f => f.label)]],
+      body: sortedAnimalTypes.map(type => [
         type.name,
         type.totalCount,
+        type.totalProductivity,
+        type.avgProductivity.toFixed(1),
         ...productivityFields.map(field => type.productivity[field.name] || 0)
       ]),
       theme: 'grid',
@@ -347,10 +427,19 @@ export default function AnimalProductivity() {
     )).join(" | ");
   };
 
+  // Toggle animal type selection for comparison
+  const toggleTypeSelection = (type) => {
+    if (selectedTypes.some(t => t._id === type._id)) {
+      setSelectedTypes(selectedTypes.filter(t => t._id !== type._id));
+    } else {
+      setSelectedTypes([...selectedTypes, type]);
+    }
+  };
+
   // Filter animal types by management type
   const filteredAnimalTypes = selectedManagementType === "all" 
-    ? animalTypes 
-    : animalTypes.filter(type => type.managementType === selectedManagementType);
+    ? sortedAnimalTypes 
+    : sortedAnimalTypes.filter(type => type.managementType === selectedManagementType);
 
   return (
     <div className={`h-full ${darkMode ? "bg-gray-900" : "light-beige"}`}>
@@ -366,6 +455,7 @@ export default function AnimalProductivity() {
                 className={`p-4 rounded-lg flex items-start ${
                   insight.type === "success" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200" :
                   insight.type === "warning" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200" :
+                  insight.type === "info" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200" :
                   "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
                 }`}
               >
@@ -373,6 +463,8 @@ export default function AnimalProductivity() {
                   <TrendingUp className="mr-2 mt-0.5 flex-shrink-0" size={18} /> :
                   insight.type === "warning" ?
                   <AlertTriangle className="mr-2 mt-0.5 flex-shrink-0" size={18} /> :
+                  insight.type === "info" ?
+                  <Info className="mr-2 mt-0.5 flex-shrink-0" size={18} /> :
                   <TrendingDown className="mr-2 mt-0.5 flex-shrink-0" size={18} />
                 }
                 <span>{insight.message}</span>
@@ -393,19 +485,22 @@ export default function AnimalProductivity() {
             <div className="text-2xl font-bold text-gray-800 dark:text-white">{animalTypes.length}</div>
           </div>
           
-          {/* Dynamic productivity stats */}
-          {productivityFields.slice(0, 2).map((field, index) => (
-            <div key={field.name} className={`p-4 rounded-xl shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total {field.label}</div>
-              <div className={`text-2xl font-bold ${
-                index === 0 ? "text-blue-600 dark:text-blue-400" : 
-                index === 1 ? "text-yellow-500 dark:text-yellow-400" : 
-                "text-green-600 dark:text-green-400"
-              }`}>
-                {productivityStats[field.name] || 0}
-              </div>
+          <div className={`p-4 rounded-xl shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Productivity</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {Object.values(productivityStats).reduce((sum, val) => sum + val, 0).toLocaleString()}
             </div>
-          ))}
+          </div>
+          
+          <div className={`p-4 rounded-xl shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Avg. per Animal</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {animals.length > 0 
+                ? (Object.values(productivityStats).reduce((sum, val) => sum + val, 0) / animals.length).toFixed(1)
+                : 0
+              }
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -428,14 +523,23 @@ export default function AnimalProductivity() {
             </select>
             
             <select
-              value={selectedField}
-              onChange={(e) => setSelectedField(e.target.value)}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
               className="px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white dark:border-gray-600"
             >
-              <option value="">All Metrics</option>
-              {productivityFields.map(field => (
-                <option key={field.name} value={field.name}>{field.label}</option>
-              ))}
+              <option value="totalProductivity">Sort by Total Productivity</option>
+              <option value="avgProductivity">Sort by Avg. Productivity</option>
+              <option value="count">Sort by Animal Count</option>
+              <option value="name">Sort by Name</option>
+            </select>
+            
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
             </select>
             
             <div className="flex items-center gap-2">
@@ -456,6 +560,18 @@ export default function AnimalProductivity() {
             </div>
             
             <button
+              onClick={() => setComparisonView(!comparisonView)}
+              className={`flex items-center px-4 py-2 rounded-lg ${
+                comparisonView 
+                  ? "bg-purple-600 text-white" 
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white"
+              }`}
+            >
+              <BarChart2 size={16} className="mr-1" />
+              {comparisonView ? "Exit Comparison" : "Compare Types"}
+            </button>
+            
+            <button
               onClick={exportPDF}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 ml-auto"
             >
@@ -464,6 +580,85 @@ export default function AnimalProductivity() {
             </button>
           </div>
         </div>
+
+        {/* Comparison View */}
+        {comparisonView && (
+          <div className={`p-5 rounded-xl shadow-sm mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                Performance Comparison
+              </h3>
+              <Activity className="text-gray-500" size={20} />
+            </div>
+            
+            {selectedTypes.length > 1 ? (
+              <div className="h-96">
+                <Radar
+                  data={performanceComparisonData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      r: {
+                        ticks: {
+                          display: false,
+                          maxTicksLimit: 5
+                        },
+                        grid: {
+                          color: darkMode ? "#374151" : "#e5e7eb"
+                        },
+                        angleLines: {
+                          color: darkMode ? "#374151" : "#e5e7eb"
+                        },
+                        pointLabels: {
+                          color: darkMode ? "#f3f4f6" : "#111827"
+                        }
+                      }
+                    },
+                    plugins: {
+                      legend: {
+                        position: 'bottom',
+                        labels: { color: darkMode ? "#f3f4f6" : "#111827" }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Target size={48} className="mx-auto mb-4 opacity-50" />
+                <p>Select at least 2 animal types to compare their performance</p>
+              </div>
+            )}
+            
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {sortedAnimalTypes.map(type => (
+                <div
+                  key={type._id}
+                  onClick={() => toggleTypeSelection(type)}
+                  className={`p-3 rounded-lg cursor-pointer border ${
+                    selectedTypes.some(t => t._id === type._id)
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedTypes.some(t => t._id === type._id)}
+                      onChange={() => {}}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium">{type.name}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {type.totalProductivity.toLocaleString()} units
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -574,19 +769,26 @@ export default function AnimalProductivity() {
             </span>
           </div>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredAnimalTypes.map(type => (
+            {filteredAnimalTypes.map((type, index) => (
               <div
                 key={type._id}
                 onClick={() => navigate(`/AnimalManagement/AnimalProductivity/${type.name.toLowerCase()}`)}
                 className={`cursor-pointer overflow-hidden rounded-lg shadow-md transition-all hover:shadow-lg ${
                   darkMode ? "bg-gray-800 hover:bg-gray-750" : "bg-white hover:bg-gray-50"
-                }`}
+                } ${index === 0 && type.totalProductivity > 0 ? "ring-2 ring-yellow-400" : ""}`}
               >
-                <img
-                  src={type.bannerImage ? `http://localhost:5000${type.bannerImage}` : "/images/default.jpg"}
-                  alt={type.name}
-                  className="w-full h-32 object-cover"
-                />
+                <div className="relative">
+                  <img
+                    src={type.bannerImage ? `http://localhost:5000${type.bannerImage}` : "/images/default.jpg"}
+                    alt={type.name}
+                    className="w-full h-32 object-cover"
+                  />
+                  {index === 0 && type.totalProductivity > 0 && (
+                    <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 rounded-full p-1">
+                      <Crown size={16} />
+                    </div>
+                  )}
+                </div>
                 <div className="p-3">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="text-sm font-bold text-gray-800 dark:text-white truncate">{type.name}</h4>
@@ -596,6 +798,12 @@ export default function AnimalProductivity() {
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-300 mb-1">
                     Management: <span className="capitalize">{type.managementType}</span>
+                  </div>
+                  <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">
+                    Total: {type.totalProductivity.toLocaleString()} units
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mb-1">
+                    Avg: {type.avgProductivity.toFixed(1)} units/animal
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-300">
                     {getMainProductivityMetrics(type)}

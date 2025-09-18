@@ -61,7 +61,7 @@ const Navbar = () => {
   // Navigation items
   const navItems = [
     { path: '/', label: 'Home' },
-    { path: '/InventoryManagement/catalog', label: 'Shop' },
+    { path: '/catalog', label: 'Shop' },
     { path: '/about', label: 'About Us' },
     { path: '/contact', label: 'Contact' },
     { path: '/news', label: 'News' },

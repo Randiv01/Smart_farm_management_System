@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useITheme } from "../Icontexts/IThemeContext";
+import { useTheme } from "../UHContext/UHThemeContext";
 import {
   Search,
   ShoppingCart,
@@ -28,12 +28,11 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import Navbar from '../../UserHome/UHNavbar/UHNavbar';
-import Footer from '../../UserHome/UHFooter/UHFooter';
+import Navbar from '../UHNavbar/UHNavbar';
+import Footer from '../UHFooter/UHFooter';
 
 const Catalog = () => {
-  const { theme } = useITheme();
-  const darkMode = theme === "dark";
+  const { darkMode } = useTheme();
   const navigate = useNavigate();
   const catalogRef = useRef(null);
   const searchTimeoutRef = useRef(null);
