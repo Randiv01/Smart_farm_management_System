@@ -1,26 +1,24 @@
-// P-Layout.jsx
+// PLayout.jsx
 import React, { useState } from "react";
 import { Outlet } from "react-router-dom";
-import PSidebar from "./P-Sidebar";
-import PTopNavbar from "./PTopNavbar";
-import { useLanguage } from "./context/LanguageContext";
+import PSidebar from "./P-Sidebar.jsx";
+import PTopNavbar from "./PTopNavbar.jsx";
 
 const PLayout = () => {
-  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="bg-white text-black min-h-screen flex dark:bg-gray-900 dark:text-white">
       {/* Sidebar */}
-      <PSidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      <P-Sidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
       {/* Main content */}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}>
         {/* Top Navbar */}
         <PTopNavbar sidebarOpen={sidebarOpen} onMenuClick={toggleSidebar} />
 
-        {/* Page Content */}
+        {/* Main outlet */}
         <main className="flex-1 p-4 mt-16 overflow-auto">
           <Outlet />
         </main>
