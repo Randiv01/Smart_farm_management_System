@@ -16,52 +16,6 @@ import {
 const UHFooter = () => {
   return (
     <>
-      {/* Enhanced Newsletter Section */}
-      <section className="relative py-16 bg-gradient-to-r from-green-600 to-green-700 dark:from-gray-800 dark:to-gray-900 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10">
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <pattern id="leaves" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M0,0 L20,0 L20,20 Z" fill="white" opacity="0.2"/>
-              <path d="M0,0 L0,20 L20,20 Z" fill="white" opacity="0.2"/>
-            </pattern>
-            <rect x="0" y="0" width="100" height="100" fill="url(#leaves)" />
-          </svg>
-        </div>
-        
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="max-w-3xl mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl transform transition-all hover:shadow-xl">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full mb-6">
-              <MailIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
-            </div>
-            
-            <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">Stay Updated with Our Farm</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-              Subscribe to our newsletter to receive updates on new products, special offers, and exclusive farming tips directly to your inbox.
-            </p>
-            
-            <form className="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-grow">
-                <input 
-                  type="email" 
-                  placeholder="Your email address" 
-                  required
-                  className="w-full px-5 py-4 rounded-xl focus:ring-2 focus:ring-green-500 focus:outline-none border border-gray-300 dark:border-gray-700 dark:bg-gray-700 dark:text-white shadow-sm"
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="bg-green-600 text-white font-semibold px-6 py-4 rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
-              >
-                Subscribe <ArrowRight className="h-5 w-5" />
-              </button>
-            </form>
-            
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-              We respect your privacy. Unsubscribe at any time.
-            </p>
-          </div>
-        </div>
-      </section>
 
       {/* Enhanced Footer */}
       <footer className="bg-gradient-to-b from-green-800 to-green-900 dark:from-gray-900 dark:to-black text-white pt-16 pb-8">
@@ -74,7 +28,7 @@ const UHFooter = () => {
                 <span className="text-2xl font-bold">Mount Olive Farm</span>
               </div>
               <p className="text-green-200 dark:text-green-300 mb-6 max-w-xs">
-                Growing organic, sustainable produce with love and care for over 20 years.
+                Growing organic, sustainable produce with love and care for over 15 years.
               </p>
               <div className="flex space-x-4">
                 <a href="https://www.facebook.com/" className="bg-green-700 hover:bg-green-600 p-3 rounded-full transition-all duration-300">
@@ -96,27 +50,41 @@ const UHFooter = () => {
             <div>
               <h3 className="text-xl font-semibold mb-6 pb-2 border-b border-green-700 dark:border-green-800">Quick Links</h3>
               <ul className="space-y-3">
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Home</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Shop</a></li>
+                <li><a href="/" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Home</a></li>
+                <li><a href="/InventoryManagement/catalog" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Shop</a></li>
                 <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> About Us</a></li>
                 <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Farm Tours</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Recipes</a></li>
                 <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Contact</a></li>
+                <li><a href="news" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> News</a></li>
               </ul>
             </div>
 
             {/* Products */}
             <div>
-              <h3 className="text-xl font-semibold mb-6 pb-2 border-b border-green-700 dark:border-green-800">Our Products</h3>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Fresh Vegetables</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Organic Fruits</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Farm Dairy</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Honey & Jams</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Seasonal Specials</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Gift Baskets</a></li>
-              </ul>
-            </div>
+            <h3 className="text-xl font-semibold mb-6 pb-2 border-b border-green-700 dark:border-green-800">
+              Our Products
+            </h3>
+            <ul className="space-y-3">
+              <li className="text-green-200 flex items-center transition-all duration-300 hover:text-white">
+                <ArrowRight className="h-4 w-4 mr-2" /> Fresh Vegetables
+              </li>
+              <li className="text-green-200 flex items-center transition-all duration-300 hover:text-white">
+                <ArrowRight className="h-4 w-4 mr-2" /> Organic Fruits
+              </li>
+              <li className="text-green-200 flex items-center transition-all duration-300 hover:text-white">
+                <ArrowRight className="h-4 w-4 mr-2" /> Farm Dairy
+              </li>
+              <li className="text-green-200 flex items-center transition-all duration-300 hover:text-white">
+                <ArrowRight className="h-4 w-4 mr-2" /> Honey & Jams
+              </li>
+              <li className="text-green-200 flex items-center transition-all duration-300 hover:text-white">
+                <ArrowRight className="h-4 w-4 mr-2" /> Seasonal Specials
+              </li>
+              <li className="text-green-200 flex items-center transition-all duration-300 hover:text-white">
+                <ArrowRight className="h-4 w-4 mr-2" /> Gift Baskets
+              </li>
+            </ul>
+          </div>
 
             {/* Contact Info */}
             <div>

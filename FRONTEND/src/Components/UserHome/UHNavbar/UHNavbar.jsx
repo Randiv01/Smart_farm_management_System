@@ -62,7 +62,7 @@ const Navbar = () => {
   const navItems = [
     { path: '/', label: 'Home' },
     { path: '/InventoryManagement/catalog', label: 'Shop' },
-    { path: '/about', label: 'About' },
+    { path: '/about', label: 'About Us' },
     { path: '/contact', label: 'Contact' },
     { path: '/news', label: 'News' },
   ];
@@ -118,7 +118,7 @@ const Navbar = () => {
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-between">
           <div className="flex items-center mb-2 md:mb-0">
             <div className="bg-green-800 px-2 py-1 rounded mr-2 text-xs font-semibold">NEW</div>
-            <span>Free shipping on orders over $50</span>
+            <span>Free shipping on orders over $150</span>
           </div>
           <div className="flex items-center space-x-4 text-xs">
             <div className="flex items-center">

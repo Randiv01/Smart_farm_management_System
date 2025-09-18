@@ -43,6 +43,7 @@ import Register from './Components/UserHome/Registration/Registration.jsx';
 import Home from './Components/UserHome/UHHome/UHHome.jsx';
 import Login from './Components/UserHome/Login/login.jsx';
 import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
+import News from "./Components/UserHome/News/News.jsx"; 
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -107,6 +108,8 @@ function App() {
               <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/news" element={<News />} /> 
+
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
