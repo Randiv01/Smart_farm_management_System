@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
   X,
   RefreshCw,
-  BarChart3,
   AlertCircle,
   Minus,
   ChevronDown,
   ChevronUp,
   Download,
-  TrendingUp,
   Filter,
   Info,
   Calendar,
@@ -24,25 +22,24 @@ import {
 } from "lucide-react";
 import { useITheme } from "../Icontexts/IThemeContext";
 import axios from "axios";
-import { Line } from "react-chartjs-2";
+import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  BarElement,
   PointElement,
-  LineElement,
   Title,
   Tooltip,
   Legend,
 } from 'chart.js';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
+import autoTable from 'jspdf-autotable';
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  BarElement,
   PointElement,
-  LineElement,
   Title,
   Tooltip,
   Legend
@@ -51,7 +48,6 @@ ChartJS.register(
 const FertilizerStock = () => {
   const { theme } = useITheme();
   const darkMode = theme === "dark";
-  
   const [fertilizers, setFertilizers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,9 +61,7 @@ const FertilizerStock = () => {
   const [editingFertilizer, setEditingFertilizer] = useState(null);
   const [refillingFertilizer, setRefillingFertilizer] = useState(null);
   const [usingFertilizer, setUsingFertilizer] = useState(null);
-  const [showChart, setShowChart] = useState(false);
   const [selectedFertilizerForChart, setSelectedFertilizerForChart] = useState(null);
-  const [usageData, setUsageData] = useState([]);
   const [refillQuantity, setRefillQuantity] = useState("");
   const [useQuantity, setUseQuantity] = useState("");
   const [formData, setFormData] = useState({
@@ -91,6 +85,18 @@ const FertilizerStock = () => {
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  // Fetch fertilizers
+  useEffect(() => {
+    fetchFertilizers();
+  }, []);
+
+  // Set initial chart selection
+  useEffect(() => {
+    if (selectedFertilizerForChart === null && fertilizers.length > 0) {
+      setSelectedFertilizerForChart('all');
+    }
+  }, [fertilizers]);
 
   // Calculate expiry date based on shelf life
   const calculateExpiryDate = (shelfLifeMonths) => {
@@ -139,10 +145,6 @@ const FertilizerStock = () => {
   };
 
   // Fetch fertilizers from API
-  useEffect(() => {
-    fetchFertilizers();
-  }, []);
-
   const fetchFertilizers = async () => {
     try {
       setLoading(true);
@@ -157,19 +159,9 @@ const FertilizerStock = () => {
     }
   };
 
-  const fetchUsageData = async (fertilizerId) => {
-    try {
-      const response = await axios.get(`http://localhost:5000/api/Ifertilizerstock/usage/${fertilizerId}`);
-      setUsageData(response.data);
-    } catch (error) {
-      console.error("Error fetching usage data:", error);
-      setError("Failed to load usage data.");
-    }
-  };
-
   // Filter and sort fertilizers
   const filteredAndSortedFertilizers = () => {
-    let filtered = fertilizers.filter(fertilizer => 
+    let filtered = fertilizers.filter(fertilizer =>
       (fertilizer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       fertilizer.fertilizerType.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (fertilizerTypeFilter === "All Types" || fertilizer.fertilizerType === fertilizerTypeFilter)
@@ -180,7 +172,7 @@ const FertilizerStock = () => {
       filtered = filtered.filter(fertilizer => {
         const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
         const percentage = (fertilizer.remaining / fertilizer.quantity) * 100;
-        
+      
         if (activeTab === 'expired') return days < 0;
         if (activeTab === 'expiringSoon') return days >= 0 && days <= 30;
         if (activeTab === 'lowStock') return percentage <= 30;
@@ -204,22 +196,20 @@ const FertilizerStock = () => {
 
     if (sortConfig.key) {
       filtered.sort((a, b) => {
-        let aValue = sortConfig.key === 'expiryDate' ? new Date(a.expiryDate) : 
+        let aValue = sortConfig.key === 'expiryDate' ? new Date(a.expiryDate) :
                     sortConfig.key === 'remainingPercentage' ? (a.remaining / a.quantity) :
                     a[sortConfig.key];
-        let bValue = sortConfig.key === 'expiryDate' ? new Date(b.expiryDate) : 
+        let bValue = sortConfig.key === 'expiryDate' ? new Date(b.expiryDate) :
                     sortConfig.key === 'remainingPercentage' ? (b.remaining / b.quantity) :
                     b[sortConfig.key];
-        
+      
         if (typeof aValue === 'string') aValue = aValue.toLowerCase();
         if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
-
     return filtered;
   };
 
@@ -248,14 +238,13 @@ const FertilizerStock = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+  
     try {
       const expiryDate = calculateExpiryDate(formData.shelfLife);
       const payload = {
         ...formData,
         expiryDate
       };
-
       if (editingFertilizer) {
         await axios.put(`http://localhost:5000/api/Ifertilizerstock/${editingFertilizer._id}`, payload);
         setSuccess("Fertilizer updated successfully!");
@@ -263,7 +252,7 @@ const FertilizerStock = () => {
         await axios.post("http://localhost:5000/api/Ifertilizerstock", payload);
         setSuccess("Fertilizer added successfully!");
       }
-      
+    
       setShowAddForm(false);
       setEditingFertilizer(null);
       resetForm();
@@ -289,7 +278,7 @@ const FertilizerStock = () => {
     if (!window.confirm("Are you sure you want to delete this fertilizer?")) {
       return;
     }
-    
+  
     try {
       await axios.delete(`http://localhost:5000/api/Ifertilizerstock/${id}`);
       setSuccess("Fertilizer deleted successfully!");
@@ -308,17 +297,16 @@ const FertilizerStock = () => {
 
   const handleRefillSubmit = async (e) => {
     e.preventDefault();
-    
+  
     if (parseInt(refillQuantity) <= 0 || parseInt(refillQuantity) > (refillingFertilizer.quantity - refillingFertilizer.remaining)) {
       setError("Invalid refill quantity.");
       return;
     }
-
     try {
       await axios.patch(`http://localhost:5000/api/Ifertilizerstock/refill/${refillingFertilizer._id}`, {
         refillQuantity: parseInt(refillQuantity)
       });
-      
+    
       setShowRefillForm(false);
       setRefillingFertilizer(null);
       setRefillQuantity("");
@@ -338,18 +326,17 @@ const FertilizerStock = () => {
 
   const handleUseSubmit = async (e) => {
     e.preventDefault();
-    
+  
     if (parseInt(useQuantity) <= 0 || parseInt(useQuantity) > usingFertilizer.remaining) {
       setError("Invalid use quantity.");
       return;
     }
-
     try {
       await axios.patch(`http://localhost:5000/api/Ifertilizerstock/use/${usingFertilizer._id}`, {
         quantityUsed: parseInt(useQuantity),
         recordedBy: "User"
       });
-      
+    
       setShowUseForm(false);
       setUsingFertilizer(null);
       setUseQuantity("");
@@ -361,10 +348,14 @@ const FertilizerStock = () => {
     }
   };
 
-  const handleShowChart = async (fertilizer) => {
-    setSelectedFertilizerForChart(fertilizer);
-    await fetchUsageData(fertilizer._id);
-    setShowChart(true);
+  const handleChartFertilizerChange = (e) => {
+    const value = e.target.value;
+    if (value === 'all') {
+      setSelectedFertilizerForChart('all');
+    } else {
+      const fertilizer = fertilizers.find(f => f._id === value);
+      setSelectedFertilizerForChart(fertilizer);
+    }
   };
 
   const requestSort = (key) => {
@@ -380,18 +371,47 @@ const FertilizerStock = () => {
     return sortConfig.direction === 'asc' ? <ChevronUp size={16} className="inline ml-1" /> : <ChevronDown size={16} className="inline ml-1" />;
   };
 
-  const chartData = {
-    labels: usageData.map(data => data.month),
-    datasets: [
-      {
-        label: 'Usage Rate',
-        data: usageData.map(data => data.usage),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        tension: 0.1
-      }
-    ]
-  };
+  // Compute chart data for stock levels
+  const chartData = (() => {
+    if (selectedFertilizerForChart === 'all') {
+      return {
+        labels: fertilizers.map(f => f.name),
+        datasets: [
+          {
+            label: 'Remaining Stock',
+            data: fertilizers.map(f => f.remaining),
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          }
+        ]
+      };
+    } else if (selectedFertilizerForChart) {
+      const { quantity, remaining } = selectedFertilizerForChart;
+      const used = quantity - remaining;
+      return {
+        labels: ['Total Stock', 'Remaining', 'Used'],
+        datasets: [
+          {
+            label: 'Stock Level',
+            data: [quantity, remaining, used],
+            backgroundColor: [
+              'rgba(54, 162, 235, 0.6)',
+              'rgba(75, 192, 192, 0.6)',
+              'rgba(255, 99, 132, 0.6)'
+            ],
+            borderColor: [
+              'rgba(54, 162, 235, 1)',
+              'rgba(75, 192, 192, 1)',
+              'rgba(255, 99, 132, 1)'
+            ],
+            borderWidth: 1
+          }
+        ]
+      };
+    }
+    return { labels: [], datasets: [] };
+  })();
 
   const chartOptions = {
     responsive: true,
@@ -407,7 +427,9 @@ const FertilizerStock = () => {
         display: true,
         color: darkMode ? '#e5e7eb' : '#1f2937',
         font: { size: 16 },
-        text: `Monthly Usage Rate for ${selectedFertilizerForChart?.name || ''}`
+        text: selectedFertilizerForChart === 'all'
+          ? 'Stock Levels for All Fertilizers'
+          : `Stock Breakdown for ${selectedFertilizerForChart?.name || 'Selected Fertilizer'}`
       },
       tooltip: {
         backgroundColor: darkMode ? '#1f2937' : '#ffffff',
@@ -420,7 +442,7 @@ const FertilizerStock = () => {
         beginAtZero: true,
         title: {
           display: true,
-          text: 'Quantity Used',
+          text: 'Quantity',
           color: darkMode ? '#e5e7eb' : '#1f2937'
         },
         grid: {
@@ -433,7 +455,7 @@ const FertilizerStock = () => {
       x: {
         title: {
           display: true,
-          text: 'Month',
+          text: 'Fertilizer',
           color: darkMode ? '#e5e7eb' : '#1f2937'
         },
         grid: {
@@ -453,13 +475,27 @@ const FertilizerStock = () => {
         return;
       }
 
-      const doc = new jsPDF();
-      
-      doc.setFontSize(16);
-      doc.text('Fertilizer Stock Report', 14, 22);
-      
-      const headers = [['Fertilizer Name', 'Quantity', 'Remaining', 'Unit', 'Type', 'Expiry Date', 'Status']];
-      
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Adding title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Fertilizer Stock Report', 14, 20);
+
+      // Adding metadata
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+      doc.text(`Total Items: ${filteredFertilizers.length}`, 14, 34);
+
+      // Define table headers
+      const headers = [['Name', 'Quantity', 'Remaining', 'Unit', 'Type', 'Expiry Date', 'Status']];
+
+      // Prepare table data
       const data = filteredFertilizers.map(fertilizer => {
         const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
         return [
@@ -473,61 +509,77 @@ const FertilizerStock = () => {
         ];
       });
 
-      console.log("PDF Data:", data); // Debugging: Log data to verify
-
-      doc.autoTable({
+      // Generate table using the functional API
+      autoTable(doc, {
         head: headers,
         body: data,
-        startY: 30,
-        theme: 'grid',
-        styles: { 
-          fontSize: 10, 
-          cellPadding: 4,
-          textColor: darkMode ? [229, 231, 235] : [31, 41, 55],
-          fillColor: darkMode ? [31, 41, 55] : [255, 255, 255],
-          halign: 'left',
-          valign: 'middle'
-        },
+        startY: 40,
+        theme: 'striped',
         headStyles: {
-          fillColor: darkMode ? [55, 65, 81] : [249, 250, 251],
-          textColor: darkMode ? [229, 231, 235] : [31, 41, 55],
-          fontStyle: 'bold'
+          fillColor: darkMode ? [55, 65, 81] : [200, 200, 200],
+          textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
+          fontStyle: 'bold',
+          fontSize: 10
         },
-        columnStyles: { 
-          0: { cellWidth: 40 }, 
-          1: { cellWidth: 20 }, 
-          2: { cellWidth: 20 }, 
-          3: { cellWidth: 15 }, 
-          4: { cellWidth: 30 }, 
-          5: { cellWidth: 25 }, 
-          6: { cellWidth: 40 } 
+        bodyStyles: {
+          fontSize: 9,
+          textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
+          fillColor: darkMode ? [31, 41, 55] : [255, 255, 255]
+        },
+        alternateRowStyles: {
+          fillColor: darkMode ? [40, 50, 65] : [240, 240, 240]
+        },
+        columnStyles: {
+          0: { cellWidth: 40 }, // Name
+          1: { cellWidth: 25 }, // Quantity
+          2: { cellWidth: 25 }, // Remaining
+          3: { cellWidth: 20 }, // Unit
+          4: { cellWidth: 30 }, // Type
+          5: { cellWidth: 25 }, // Expiry Date
+          6: { cellWidth: 35 }  // Status
+        },
+        margin: { top: 40, left: 14, right: 14 },
+        styles: {
+          cellPadding: 2,
+          halign: 'left',
+          valign: 'middle',
+          overflow: 'linebreak'
         },
         didParseCell: (data) => {
-          // Ensure no undefined values cause issues
           if (data.cell.text && data.cell.text[0] === undefined) {
             data.cell.text = ['N/A'];
           }
         }
       });
 
-      doc.save('fertilizer_stock.pdf');
-      setSuccess("PDF exported successfully!");
+      // Add footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+      }
+
+      // Save the PDF
+      doc.save(`fertilizer_stock_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      setSuccess("PDF downloaded successfully!");
     } catch (error) {
       console.error("Error generating PDF:", error);
-      setError("Failed to generate PDF. Please try again or check console for details.");
+      setError("Failed to generate PDF. Please check the console for details and try again.");
     }
   };
 
   // Handle sending email
   const handleSendEmail = (fertilizer) => {
     try {
-      const email = 'recipient@example.com'; // Replace with actual recipient email
+      const email = 'recipient@example.com';
       const subject = `Low Stock Alert: ${fertilizer.name}`;
       const body = `The stock for ${fertilizer.name} is running low. Current stock: ${fertilizer.remaining} ${fertilizer.unit}. Please consider refilling.`;
       const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
+    
       window.location.href = mailtoLink;
-      
+    
       setSuccess(`Opening email client for ${fertilizer.name}...`);
     } catch (error) {
       console.error("Error opening email:", error);
@@ -538,12 +590,12 @@ const FertilizerStock = () => {
   // Handle sending WhatsApp message
   const handleSendWhatsApp = (fertilizer) => {
     try {
-      const phone = '1234567890'; // Replace with actual recipient phone number (without +)
+      const phone = '1234567890';
       const message = `Low Stock Alert: ${fertilizer.name} has ${fertilizer.remaining} ${fertilizer.unit} remaining. Please consider refilling.`;
       const whatsappLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      
+    
       window.open(whatsappLink, '_blank');
-      
+    
       setSuccess(`Opening WhatsApp for ${fertilizer.name}...`);
     } catch (error) {
       console.error("Error opening WhatsApp:", error);
@@ -564,7 +616,6 @@ const FertilizerStock = () => {
       const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
       return days < 0;
     }).length;
-
     return { totalFertilizers, lowStock, criticalStock, expiringSoon, expired };
   };
 
@@ -593,7 +644,6 @@ const FertilizerStock = () => {
           Efficiently manage fertilizer inventory, track usage, and monitor stock levels
         </p>
       </div>
-
       {/* Success Message */}
       {success && (
         <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-green-900/30 text-green-200" : "bg-green-100 text-green-800"} shadow-sm`}>
@@ -601,7 +651,6 @@ const FertilizerStock = () => {
           <span>{success}</span>
         </div>
       )}
-
       {/* Error Message */}
       {error && (
         <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-red-900/30 text-red-200" : "bg-red-100 text-red-800"} shadow-sm`}>
@@ -609,11 +658,42 @@ const FertilizerStock = () => {
           <span>{error}</span>
         </div>
       )}
-
+      {/* Chart Section */}
+      <div className={`p-6 rounded-xl shadow-lg mb-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            Stock Level Chart
+          </h2>
+          <select
+            value={selectedFertilizerForChart?._id || selectedFertilizerForChart || ''}
+            onChange={handleChartFertilizerChange}
+            className={`px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+          >
+            <option value="" disabled>Select a fertilizer</option>
+            <option value="all">All Fertilizers</option>
+            {fertilizers.map(fertilizer => (
+              <option key={fertilizer._id} value={fertilizer._id}>
+                {fertilizer.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="h-[400px]">
+          {chartData.labels.length > 0 ? (
+            <Bar data={chartData} options={chartOptions} />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Package size={48} className="text-gray-400 mb-4" />
+              <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No stock data available yet.</p>
+              <p className={`text-sm mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>Select a fertilizer to see stock levels here.</p>
+            </div>
+          )}
+        </div>
+      </div>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+          <div className={`${darkMode ? "bg-blue-900/30" : "bg-blue-100"} p-3 rounded-full`}>
             <Package className="text-blue-500" size={24} />
           </div>
           <div>
@@ -621,9 +701,9 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold">{summary.totalFertilizers}</p>
           </div>
         </div>
-        
+      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`p-3 rounded-full ${darkMode ? "bg-orange-900/30" : "bg-orange-100"}`}>
+          <div className={`${darkMode ? "bg-orange-900/30" : "bg-orange-100"} p-3 rounded-full`}>
             <AlertCircle className="text-orange-500" size={24} />
           </div>
           <div>
@@ -631,9 +711,9 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{summary.lowStock}</p>
           </div>
         </div>
-        
+      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`p-3 rounded-full ${darkMode ? "bg-red-900/30" : "bg-red-100"}`}>
+          <div className={`${darkMode ? "bg-red-900/30" : "bg-red-100"} p-3 rounded-full`}>
             <AlertCircle className="text-red-500" size={24} />
           </div>
           <div>
@@ -641,9 +721,9 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.criticalStock}</p>
           </div>
         </div>
-        
+      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`p-3 rounded-full ${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}>
+          <div className={`${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"} p-3 rounded-full`}>
             <Clock className="text-yellow-500" size={24} />
           </div>
           <div>
@@ -651,9 +731,9 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{summary.expiringSoon}</p>
           </div>
         </div>
-        
+      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`p-3 rounded-full ${darkMode ? "bg-red-900/30" : "bg-red-100"}`}>
+          <div className={`${darkMode ? "bg-red-900/30" : "bg-red-100"} p-3 rounded-full`}>
             <Calendar className="text-red-500" size={24} />
           </div>
           <div>
@@ -662,51 +742,49 @@ const FertilizerStock = () => {
           </div>
         </div>
       </div>
-
       {/* Quick Action Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
         <button
           onClick={() => setActiveTab("all")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "all" 
-            ? "bg-green-600 text-white" 
+          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "all"
+            ? "bg-green-600 text-white"
             : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
         >
           All Items
         </button>
         <button
           onClick={() => setActiveTab("lowStock")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "lowStock" 
-            ? "bg-orange-600 text-white" 
+          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "lowStock"
+            ? "bg-orange-600 text-white"
             : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
         >
           Low Stock
         </button>
         <button
           onClick={() => setActiveTab("criticalStock")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "criticalStock" 
-            ? "bg-red-600 text-white" 
+          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "criticalStock"
+            ? "bg-red-600 text-white"
             : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
         >
           Critical Stock
         </button>
         <button
           onClick={() => setActiveTab("expiringSoon")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "expiringSoon" 
-            ? "bg-yellow-600 text-white" 
+          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "expiringSoon"
+            ? "bg-yellow-600 text-white"
             : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
         >
           Expiring Soon
         </button>
         <button
           onClick={() => setActiveTab("expired")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "expired" 
-            ? "bg-red-600 text-white" 
+          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "expired"
+            ? "bg-red-600 text-white"
             : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
         >
           Expired
         </button>
       </div>
-
       {/* Search and Filters */}
       <div className={`p-6 rounded-xl shadow-lg mb-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
@@ -724,17 +802,15 @@ const FertilizerStock = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
-            {/* Advanced Filters Toggle */}
-            <button 
+          
+            <button
               onClick={() => setShowFilters(!showFilters)}
               className={`mt-3 flex items-center gap-2 text-sm ${darkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-800"} transition-colors`}
             >
               <Filter size={16} />
               {showFilters ? "Hide Filters" : "Show Filters"}
             </button>
-            
-            {/* Advanced Filters */}
+          
             {showFilters && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
@@ -769,7 +845,7 @@ const FertilizerStock = () => {
               </div>
             )}
           </div>
-          
+        
           <div className="flex items-center gap-3">
             <button
               onClick={fetchFertilizers}
@@ -781,7 +857,7 @@ const FertilizerStock = () => {
             <button
               onClick={exportToPDF}
               className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
-              title="Export to PDF"
+              title="Download as PDF"
             >
               <Download size={20} />
             </button>
@@ -799,7 +875,6 @@ const FertilizerStock = () => {
           </div>
         </div>
       </div>
-
       {/* Results Count */}
       <div className={`mb-4 flex justify-between items-center ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
         <p className="text-sm">
@@ -819,14 +894,13 @@ const FertilizerStock = () => {
           </button>
         )}
       </div>
-
       {/* Table View */}
       <div className={`rounded-xl shadow-lg overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
               <tr>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
                   onClick={() => requestSort('name')}
                 >
@@ -834,7 +908,7 @@ const FertilizerStock = () => {
                     Fertilizer Name {getSortIcon('name')}
                   </div>
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
                   onClick={() => requestSort('quantity')}
                 >
@@ -842,7 +916,7 @@ const FertilizerStock = () => {
                     Quantity {getSortIcon('quantity')}
                   </div>
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
                   onClick={() => requestSort('remainingPercentage')}
                 >
@@ -856,7 +930,7 @@ const FertilizerStock = () => {
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">
                   Type
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
                   onClick={() => requestSort('expiryDate')}
                 >
@@ -879,7 +953,6 @@ const FertilizerStock = () => {
                                 remainingPercentage <= 30 ? (darkMode ? 'bg-orange-900/10' : 'bg-orange-50/50') :
                                 daysLeft < 0 ? (darkMode ? 'bg-red-900/10' : 'bg-red-50/50') :
                                 daysLeft <= 30 ? (darkMode ? 'bg-yellow-900/10' : 'bg-yellow-50/50') : '';
-
                   return (
                     <tr key={fertilizer._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-all ${rowBg}`}>
                       <td className="px-6 py-4 font-medium">
@@ -892,11 +965,11 @@ const FertilizerStock = () => {
                         <div className="flex flex-col">
                           <span>{fertilizer.quantity} {fertilizer.unit}</span>
                           <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 mt-1">
-                            <div 
+                            <div
                               className={`h-1.5 rounded-full ${
-                                remainingPercentage <= 10 ? 'bg-red-500' : 
+                                remainingPercentage <= 10 ? 'bg-red-500' :
                                 remainingPercentage <= 30 ? 'bg-orange-500' : 'bg-green-500'
-                              }`} 
+                              }`}
                               style={{ width: `${remainingPercentage}%` }}
                             ></div>
                           </div>
@@ -928,49 +1001,42 @@ const FertilizerStock = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-1">
-                          <button 
-                            onClick={() => handleShowChart(fertilizer)}
-                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-green-400 hover:bg-gray-700" : "text-green-600 hover:bg-gray-100"}`}
-                            title="View Usage Chart"
-                          >
-                            <BarChart3 size={18} />
-                          </button>
-                          <button 
+                          <button
                             onClick={() => handleRefill(fertilizer)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
                             title="Refill Stock"
                           >
                             <Plus size={18} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleUse(fertilizer)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-orange-400 hover:bg-gray-700" : "text-orange-600 hover:bg-gray-100"}`}
                             title="Record Usage"
                           >
                             <Minus size={18} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleEdit(fertilizer)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-indigo-400 hover:bg-gray-700" : "text-indigo-600 hover:bg-gray-100"}`}
                             title="Edit Fertilizer"
                           >
                             <Edit size={18} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDelete(fertilizer._id)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-600 hover:bg-gray-100"}`}
                             title="Delete Fertilizer"
                           >
                             <Trash2 size={18} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleSendEmail(fertilizer)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
                             title="Send Email Notification"
                           >
                             <Mail size={18} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleSendWhatsApp(fertilizer)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-green-400 hover:bg-gray-700" : "text-green-600 hover:bg-gray-100"}`}
                             title="Send WhatsApp Notification"
@@ -1010,7 +1076,6 @@ const FertilizerStock = () => {
           </table>
         </div>
       </div>
-
       {/* Add/Edit Fertilizer Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -1045,7 +1110,7 @@ const FertilizerStock = () => {
                   placeholder="Enter fertilizer name"
                 />
               </div>
-              
+            
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -1062,7 +1127,7 @@ const FertilizerStock = () => {
                     placeholder="Total quantity"
                   />
                 </div>
-                
+              
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                     Initial Stock *
@@ -1085,7 +1150,7 @@ const FertilizerStock = () => {
                   )}
                 </div>
               </div>
-              
+            
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -1105,7 +1170,7 @@ const FertilizerStock = () => {
                     <option value="liter">liter</option>
                   </select>
                 </div>
-                
+              
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                     Fertilizer Type *
@@ -1124,7 +1189,7 @@ const FertilizerStock = () => {
                   </select>
                 </div>
               </div>
-              
+            
               <div className="mb-5">
                 <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Shelf Life *
@@ -1147,7 +1212,6 @@ const FertilizerStock = () => {
                   Expiry date will be calculated automatically from today.
                 </p>
               </div>
-
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
@@ -1170,7 +1234,6 @@ const FertilizerStock = () => {
           </div>
         </div>
       )}
-
       {/* Refill Modal */}
       {showRefillForm && refillingFertilizer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -1190,7 +1253,7 @@ const FertilizerStock = () => {
                 <X size={20} />
               </button>
             </div>
-            
+          
             <form onSubmit={handleRefillSubmit}>
               <div className="mb-5">
                 <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-100"} mb-4`}>
@@ -1205,14 +1268,14 @@ const FertilizerStock = () => {
                     </div>
                   </div>
                   <div className="w-full bg-gray-300 rounded-full h-2.5 dark:bg-gray-600 mt-3">
-                    <div 
-                      className="bg-green-500 h-2.5 rounded-full" 
+                    <div
+                      className="bg-green-500 h-2.5 rounded-full"
                       style={{ width: `${(refillingFertilizer.remaining / refillingFertilizer.quantity) * 100}%` }}
                     ></div>
                   </div>
                 </div>
               </div>
-              
+            
               <div className="mb-5">
                 <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Refill Quantity *
@@ -1231,7 +1294,6 @@ const FertilizerStock = () => {
                   Maximum you can add: {refillingFertilizer.quantity - refillingFertilizer.remaining} {refillingFertilizer.unit}
                 </p>
               </div>
-
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
@@ -1254,7 +1316,6 @@ const FertilizerStock = () => {
           </div>
         </div>
       )}
-
       {/* Use Modal */}
       {showUseForm && usingFertilizer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -1274,7 +1335,7 @@ const FertilizerStock = () => {
                 <X size={20} />
               </button>
             </div>
-            
+          
             <form onSubmit={handleUseSubmit}>
               <div className="mb-5">
                 <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-100"} mb-4`}>
@@ -1282,7 +1343,7 @@ const FertilizerStock = () => {
                   <p className="font-semibold text-2xl">{usingFertilizer.remaining} {usingFertilizer.unit}</p>
                 </div>
               </div>
-              
+            
               <div className="mb-5">
                 <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Quantity Used *
@@ -1301,7 +1362,6 @@ const FertilizerStock = () => {
                   Maximum you can use: {usingFertilizer.remaining} {usingFertilizer.unit}
                 </p>
               </div>
-
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
@@ -1321,38 +1381,6 @@ const FertilizerStock = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Chart Modal */}
-      {showChart && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-xl shadow-2xl max-w-4xl w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <BarChart3 size={24} />
-                Usage Chart - {selectedFertilizerForChart?.name}
-              </h2>
-              <button
-                onClick={() => setShowChart(false)}
-                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="h-[400px]">
-              {usageData.length > 0 ? (
-                <Line data={chartData} options={chartOptions} />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <BarChart3 size={48} className="text-gray-400 mb-4" />
-                  <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No usage data available yet.</p>
-                  <p className={`text-sm mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>Start recording usage to see data here.</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}

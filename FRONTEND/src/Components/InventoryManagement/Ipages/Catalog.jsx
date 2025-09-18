@@ -1,6 +1,31 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, ShoppingCart, Star, Truck, Plus, Minus, X, CreditCard, Filter, ChevronLeft, ChevronRight, Loader, Clock, Eye, BadgeCheck, RotateCcw, Leaf, ShieldCheck, Heart, Share, Zap, MapPin, Calendar, MessageCircle } from "lucide-react";
+import {
+  Search,
+  ShoppingCart,
+  Star,
+  Truck,
+  Plus,
+  Minus,
+  X,
+  CreditCard,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Loader,
+  Clock,
+  Eye,
+  BadgeCheck,
+  RotateCcw,
+  Leaf,
+  ShieldCheck,
+  Share,
+  Zap,
+  MapPin,
+  Calendar,
+  MessageCircle,
+  Edit,
+} from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Navbar from '../../UserHome/UHNavbar/UHNavbar';
@@ -24,10 +49,10 @@ const Catalog = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [seasonalProducts, setSeasonalProducts] = useState([]);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
-  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showRecentlyViewedDropdown, setShowRecentlyViewedDropdown] = useState(false);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const [wishlist, setWishlist] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 100]);
   const [sortBy, setSortBy] = useState("featured");
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
@@ -37,7 +62,8 @@ const Catalog = () => {
     date: "",
     name: "",
     phone: "",
-    address: ""
+    address: "",
+    email: "",
   });
   const [showDeliveryForm, setShowDeliveryForm] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -46,119 +72,74 @@ const Catalog = () => {
     rating: 0,
     comment: "",
     name: "",
-    email: ""
+    email: "",
   });
   const [reviews, setReviews] = useState({});
+  const [editingReview, setEditingReview] = useState(null);
   const categories = [
-    "All", "Fruits", "Vegetables", "Eggs", "Meat", "Honey", "Milk Product"
+    "All",
+    "Fruits",
+    "Vegetables",
+    "Eggs",
+    "Meat",
+    "Honey",
+    "Milk Product",
   ];
-  // Sample reviews data
-  const sampleReviews = {
-    "product1": [
-      { name: "Sarah L.", rating: 5, comment: "Absolutely delicious! Will buy again.", date: "2023-10-15" },
-      { name: "Mike T.", rating: 4, comment: "Good quality, fresh produce.", date: "2023-10-10" },
-      { name: "Emma R.", rating: 5, comment: "Best apples I've ever tasted!", date: "2023-10-05" }
-    ],
-    "product2": [
-      { name: "John D.", rating: 5, comment: "Creamy and fresh. Perfect for my coffee.", date: "2023-10-12" },
-      { name: "Lisa M.", rating: 4, comment: "Good quality milk, will purchase again.", date: "2023-10-08" }
-    ]
-  };
-  // Image URLs inspired by the DOCUMENT themes
   const sampleImages = [
-    "https://t4.ftcdn.net/jpg/15/45/72/75/240_F_1545727539_4UmNbJiU2YD8KnzBso157al4JqaqvWif.jpg", // Freshly Picked (apples)
-    "https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80", // Farmhouse Cream (milk)
-    "https://t3.ftcdn.net/jpg/13/52/85/66/240_F_1352856606_53sbQC1rsJ2CFbje2rjPtxSEEg9VyEf4.jpg", // Cottage Garden (lettuce)
-    "https://as1.ftcdn.net/v2/jpg/16/11/01/64/1000_F_1611016492_IZiKVQ16kYTUmLf3pl2Sk5ttzskXUk0q.jpg" // Cider Season (apples for cider)
+    "https://t4.ftcdn.net/jpg/15/45/72/75/240_F_1545727539_4UmNbJiU2YD8KnzBso157al4JqaqvWif.jpg",
+    "https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80",
+    "https://t3.ftcdn.net/jpg/13/52/85/66/240_F_1352856606_53sbQC1rsJ2CFbje2rjPtxSEEg9VyEf4.jpg",
+    "https://as1.ftcdn.net/v2/jpg/16/11/01/64/1000_F_1611016492_IZiKVQ16kYTUmLf3pl2Sk5ttzskXUk0q.jpg",
   ];
-  // Sample quotes for the splash bar
   const splashQuotes = [
     "Life be healthy with vegetables and fruits",
     "Nourish your body with nature's best",
     "Fresh from the farm to your table",
-    "Eat well, live well, naturally"
+    "Eat well, live well, naturally",
   ];
-  // Sample testimonials inspired by the DOCUMENT
-  const testimonials = [
-    {
-      name: "Sarah L.",
-      comment: "I've been a part of this farm's CSA for two seasons now, and I can't imagine going back to grocery store veggies. The quality is unbeatable, and I love supporting a local farm that truly cares about sustainability.",
-      rating: 5,
-      avatar: "https://randomuser.me/api/portraits/women/12.jpg"
-    },
-    {
-      name: "James T.",
-      comment: "Every delivery feels like a gift. The flavor, the care, the freshness — it's unlike anything at the store.",
-      rating: 5,
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg"
-    },
-    {
-      name: "Emily R.",
-      comment: "The best farm-fresh produce I've ever had! We love visiting the farm and being part of the CSA program.",
-      rating: 5,
-      avatar: "https://randomuser.me/api/portraits/women/65.jpg"
-    }
-  ];
-  // Scroll to top of catalog on page change
+
   useEffect(() => {
     if (catalogRef.current) {
-      catalogRef.current.scrollIntoView({ behavior: 'smooth' });
+      catalogRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [currentPage, selectedCategory, selectedMarket]);
-  // Fetch products from API
+
   useEffect(() => {
     fetchProducts();
   }, [selectedCategory, selectedMarket, currentPage, sortBy, priceRange]);
-  // Load cart, wishlist and recently viewed from localStorage
+
   useEffect(() => {
-    const savedCart = localStorage.getItem('farmCart');
+    const savedCart = localStorage.getItem("farmCart");
     if (savedCart) setCartItems(JSON.parse(savedCart));
-   
-    const savedViewed = localStorage.getItem('recentlyViewed');
+    const savedViewed = localStorage.getItem("recentlyViewed");
     if (savedViewed) setRecentlyViewed(JSON.parse(savedViewed));
-   
-    const savedWishlist = localStorage.getItem('farmWishlist');
-    if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
-   
-    const savedDeliveryInfo = localStorage.getItem('farmDeliveryInfo');
+    const savedDeliveryInfo = localStorage.getItem("farmDeliveryInfo");
     if (savedDeliveryInfo) {
       setDeliveryInfo(JSON.parse(savedDeliveryInfo));
     }
-   
-    // Load reviews from localStorage
-    const savedReviews = localStorage.getItem('farmReviews');
-    if (savedReviews) setReviews(JSON.parse(savedReviews));
   }, []);
-  // Save cart to localStorage
+
   useEffect(() => {
-    localStorage.setItem('farmCart', JSON.stringify(cartItems));
+    localStorage.setItem("farmCart", JSON.stringify(cartItems));
   }, [cartItems]);
-  // Save wishlist to localStorage
+
   useEffect(() => {
-    localStorage.setItem('farmWishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
-  // Save delivery info to localStorage
-  useEffect(() => {
-    if (deliveryInfo.zipcode || deliveryInfo.date) {
-      localStorage.setItem('farmDeliveryInfo', JSON.stringify(deliveryInfo));
+    if (deliveryInfo.zipcode || deliveryInfo.date || deliveryInfo.email) {
+      localStorage.setItem("farmDeliveryInfo", JSON.stringify(deliveryInfo));
     }
   }, [deliveryInfo]);
-  // Save recently viewed to localStorage
+
   useEffect(() => {
-    localStorage.setItem('recentlyViewed', JSON.stringify(recentlyViewed));
+    localStorage.setItem("recentlyViewed", JSON.stringify(recentlyViewed));
   }, [recentlyViewed]);
-  // Save reviews to localStorage
-  useEffect(() => {
-    localStorage.setItem('farmReviews', JSON.stringify(reviews));
-  }, [reviews]);
-  // Auto-slide for carousel
+
   useEffect(() => {
     const interval = setInterval(() => {
       setCarouselIndex((prev) => (prev + 1) % Math.max(seasonalProducts.length, 1));
     }, 5000);
     return () => clearInterval(interval);
   }, [seasonalProducts.length]);
-  // Debounced search
+
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     if (searchTerm !== "") {
@@ -169,6 +150,7 @@ const Catalog = () => {
     }
     return () => clearTimeout(searchTimeoutRef.current);
   }, [searchTerm]);
+
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -177,7 +159,7 @@ const Catalog = () => {
         limit: 12,
         sort: sortBy,
         minPrice: priceRange[0],
-        maxPrice: priceRange[1]
+        maxPrice: priceRange[1],
       };
       if (selectedCategory !== "All") params.category = selectedCategory;
       if (searchTerm) params.search = searchTerm;
@@ -185,6 +167,11 @@ const Catalog = () => {
       const response = await axios.get("http://localhost:5000/api/inventory/products/catalog/products", { params });
       setProducts(response.data.products);
       setTotalPages(response.data.totalPages);
+      const aggregatedReviews = response.data.products.reduce((acc, product) => {
+        acc[product._id] = product.reviews || [];
+        return acc;
+      }, {});
+      setReviews(aggregatedReviews);
       const seasonal = response.data.products
         .filter(p => p.category === 'Fruits' || p.category === 'Vegetables')
         .slice(0, 4)
@@ -200,25 +187,30 @@ const Catalog = () => {
       setSearchLoading(false);
     }
   };
+
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
     setShowSearchSuggestions(e.target.value.length > 0);
   };
+
   const clearSearch = () => {
     setSearchTerm("");
     setCurrentPage(1);
     setShowSearchSuggestions(false);
   };
+
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
     setCurrentPage(1);
-    setShowFilterSidebar(false);
+    setShowFilterDropdown(false);
   };
+
   const handleMarketChange = (e) => {
     setSelectedMarket(e.target.value);
     setCurrentPage(1);
   };
+
   const addToCart = (product) => {
     const existingItem = cartItems.find(item => item._id === product._id);
     if (existingItem) {
@@ -230,15 +222,7 @@ const Catalog = () => {
     }
     showToast(`${product.name} added to cart!`);
   };
-  const toggleWishlist = (product) => {
-    if (wishlist.find(item => item._id === product._id)) {
-      setWishlist(wishlist.filter(item => item._id !== product._id));
-      showToast(`${product.name} removed from wishlist`);
-    } else {
-      setWishlist([...wishlist, product]);
-      showToast(`${product.name} added to wishlist`);
-    }
-  };
+
   const showToast = (message) => {
     const toast = document.createElement('div');
     toast.className = `fixed top-20 right-4 z-50 px-4 py-2 rounded-md shadow-lg transition-opacity duration-300 ${
@@ -258,9 +242,11 @@ const Catalog = () => {
       setTimeout(() => document.body.removeChild(toast), 300);
     }, 2000);
   };
+
   const removeFromCart = (productId) => {
     setCartItems(cartItems.filter(item => item._id !== productId));
   };
+
   const updateQuantity = (productId, newQuantity) => {
     if (newQuantity < 1) {
       removeFromCart(productId);
@@ -270,38 +256,45 @@ const Catalog = () => {
       item._id === productId ? { ...item, quantity: newQuantity } : item
     ));
   };
+
   const incrementQuantity = (productId) => {
     updateQuantity(productId, cartItems.find(item => item._id === productId).quantity + 1);
   };
+
   const decrementQuantity = (productId) => {
     const item = cartItems.find(item => item._id === productId);
     updateQuantity(productId, item.quantity - 1);
   };
+
   const getTotalItems = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
+
   const getTotalPrice = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
   };
+
   const proceedToPayment = () => {
     if (cartItems.length === 0) {
       alert("Your cart is empty!");
       return;
     }
-   
     localStorage.setItem('farmCart', JSON.stringify(cartItems));
     navigate('/InventoryManagement/payment');
   };
+
   const trackViewedProduct = useCallback((product) => {
     setRecentlyViewed(prev => {
       const newViewed = [product, ...prev.filter(p => p._id !== product._id)];
       return newViewed.slice(0, 8);
     });
   }, []);
+
   const openQuickView = (product) => {
     setQuickViewProduct(product);
     trackViewedProduct(product);
   };
+
   const shareProduct = async (product) => {
     if (navigator.share) {
       try {
@@ -319,16 +312,19 @@ const Catalog = () => {
       showToast('Link copied to clipboard!');
     }
   };
+
   const handleSortChange = (e) => {
     setSortBy(e.target.value);
     setCurrentPage(1);
   };
+
   const handlePriceRangeChange = (e, index) => {
     const newRange = [...priceRange];
     newRange[index] = parseInt(e.target.value);
     setPriceRange(newRange);
     setCurrentPage(1);
   };
+
   const handleDeliveryInfoChange = (e) => {
     const { name, value } = e.target;
     setDeliveryInfo(prev => ({
@@ -336,52 +332,86 @@ const Catalog = () => {
       [name]: value
     }));
   };
+
   const formatPriceCalculation = (price, quantity, unit) => {
     return `$${price} × ${quantity}${unit} = $${(price * quantity).toFixed(2)}`;
   };
-  // Open review modal
+
   const openReviewModal = (product) => {
     setReviewProduct(product);
     setUserReview({
       rating: 0,
       comment: "",
-      name: "",
-      email: ""
+      name: deliveryInfo.name || "",
+      email: deliveryInfo.email || ""
     });
+    setEditingReview(null);
     setShowReviewModal(true);
   };
-  // Handle review submission
-  const handleReviewSubmit = (e) => {
+
+  const openEditReviewModal = (product, review) => {
+    setReviewProduct(product);
+    setUserReview({
+      rating: review.rating,
+      comment: review.comment,
+      name: review.name,
+      email: review.email
+    });
+    setEditingReview(review);
+    setShowReviewModal(true);
+  };
+
+  const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!userReview.rating || !userReview.comment) {
       alert("Please provide both a rating and a comment");
       return;
     }
-    const productId = reviewProduct._id;
-    const newReview = {
-      ...userReview,
-      date: new Date().toISOString().split('T')[0]
-    };
-    const updatedReviews = {
-      ...reviews,
-      [productId]: [...(reviews[productId] || []), newReview]
-    };
-    setReviews(updatedReviews);
-    setShowReviewModal(false);
-    showToast("Thank you for your review!");
+    try {
+      const reviewData = {
+        ...userReview,
+        date: editingReview ? editingReview.date : new Date().toISOString().split('T')[0]
+      };
+      if (editingReview) {
+        await axios.put(`http://localhost:5000/api/inventory/products/catalog/products/${reviewProduct._id}/reviews/${editingReview._id}`, reviewData);
+        showToast("Review updated successfully!");
+      } else {
+        await axios.post(`http://localhost:5000/api/inventory/products/catalog/products/${reviewProduct._id}/reviews`, reviewData);
+        showToast("Thank you for your review!");
+      }
+      setShowReviewModal(false);
+      setEditingReview(null);
+      if (userReview.email) {
+        setDeliveryInfo(prev => ({ ...prev, email: userReview.email }));
+      }
+      fetchProducts();
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      alert("Error submitting review. Please try again.");
+    }
   };
-  // Calculate average rating for a product
+
   const getAverageRating = (productId) => {
     if (!reviews[productId] || reviews[productId].length === 0) return 0;
-   
     const total = reviews[productId].reduce((sum, review) => sum + review.rating, 0);
-    return total / reviews[productId].length;
+    return (total / reviews[productId].length).toFixed(1);
   };
-  // Get number of reviews for a product
+
   const getReviewCount = (productId) => {
     return reviews[productId] ? reviews[productId].length : 0;
   };
-  // Render star rating
+
+  const getRatingDistribution = (productId) => {
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    if (!reviews[productId]) return distribution;
+    reviews[productId].forEach(review => {
+      if (distribution[review.rating] !== undefined) {
+        distribution[review.rating]++;
+      }
+    });
+    return distribution;
+  };
+
   const renderStars = (rating, size = 16) => {
     return (
       <div className="flex">
@@ -389,13 +419,13 @@ const Catalog = () => {
           <Star
             key={star}
             size={size}
-            className={star <= rating ? "text-yellow-400 fill-current" : "text-gray-300"}
+            className={star <= Math.round(rating) ? "text-yellow-400 fill-current" : "text-gray-300"}
           />
         ))}
       </div>
     );
   };
-  // Render interactive stars for review form
+
   const renderInteractiveStars = (rating, setRating, size = 24) => {
     return (
       <div className="flex">
@@ -403,16 +433,20 @@ const Catalog = () => {
           <Star
             key={star}
             size={size}
-            className={`cursor-pointer ${star <= rating ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+            className={`cursor-pointer transition-transform duration-200 ${star <= rating ? "text-yellow-400 fill-current" : "text-gray-300"} hover:scale-110`}
             onClick={() => setRating(star)}
-            onMouseEnter={() => document.getElementById(`star-${star}`).classList.add("scale-110")}
-            onMouseLeave={() => document.getElementById(`star-${star}`).classList.remove("scale-110")}
             id={`star-${star}`}
           />
         ))}
       </div>
     );
   };
+
+  const canEditReview = (review) => {
+    const userEmail = deliveryInfo.email || userReview.email;
+    return userEmail && review.email === userEmail;
+  };
+
   if (loading) {
     return (
       <>
@@ -427,12 +461,12 @@ const Catalog = () => {
       </>
     );
   }
+
   return (
     <>
       <Navbar />
       <div ref={catalogRef} className="pt-16"></div>
       <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
-        {/* Cinematic Seasonal Highlights Section */}
         <section className="relative w-full h-[70vh] overflow-hidden">
           {seasonalProducts.map((product, index) => (
             <div
@@ -485,7 +519,26 @@ const Catalog = () => {
             ))}
           </div>
         </section>
-        {/* Search, Market Selection, Filter Button, and Sticky Cart Button */}
+        <section className="container mx-auto px-4 py-12">
+          <div className={`flex flex-wrap justify-center gap-8 p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={32} className="text-green-600" />
+              <span className="font-semibold">Secure Payment</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Truck size={32} className="text-green-600" />
+              <span className="font-semibold">Fast Delivery</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <RotateCcw size={32} className="text-green-600" />
+              <span className="font-semibold">Easy Returns</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <BadgeCheck size={32} className="text-green-600" />
+              <span className="font-semibold">Quality Guaranteed</span>
+            </div>
+          </div>
+        </section>
         <section className="container mx-auto px-4 py-8 relative">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div className="relative w-full md:max-w-2xl">
@@ -515,8 +568,6 @@ const Catalog = () => {
                   <Loader size={16} className="animate-spin" />
                 </div>
               )}
-             
-              {/* Search Suggestions */}
               {showSearchSuggestions && (
                 <div className={`absolute top-full left-0 right-0 mt-1 rounded-lg shadow-lg z-10 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
                   {searchTerm ? (
@@ -553,106 +604,120 @@ const Catalog = () => {
                 <option value="Export Market">Export Market</option>
               </select>
               <select
-                value={sortBy}
-                onChange={handleSortChange}
+                value={selectedCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 className={`px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent`}
               >
-                <option value="featured">Featured</option>
-                <option value="priceLow">Price: Low to High</option>
-                <option value="priceHigh">Price: High to Low</option>
-                <option value="newest">Newest</option>
-                <option value="popular">Most Popular</option>
-              </select>
-              <button
-                onClick={() => setShowFilterSidebar(true)}
-                className={`p-3 rounded-lg flex items-center gap-2 transition-colors ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-100 border border-gray-300"}`}
-              >
-                <Filter size={24} />
-                <span className="font-semibold hidden sm:inline">Filters</span>
-              </button>
-            </div>
-          </div>
-         
-          {/* Recently Viewed Section */}
-          {recentlyViewed.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <Clock size={20} /> Recently Viewed
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {recentlyViewed.slice(0, 6).map((product) => (
-                  <div
-                    key={product._id}
-                    className={`rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${darkMode ? "bg-gray-800" : "bg-white border"}`}
-                    onClick={() => openQuickView(product)}
-                  >
-                    <div className="h-20 w-full mb-2">
-                      <img
-                        src={product.image || sampleImages[0]}
-                        alt={product.name}
-                        className="w-full h-full object-cover rounded"
-                      />
-                    </div>
-                    <p className="text-sm font-medium truncate">{product.name}</p>
-                    <p className="text-green-600 font-bold">${product.price}/{product.stock.unit}</p>
-                  </div>
+                {categories.map(category => (
+                  <option key={category} value={category}>{category}</option>
                 ))}
-              </div>
-            </div>
-          )}
-         
-          {/* Sticky Cart Button */}
-          <button
-            onClick={() => setShowCart(true)}
-            className={`fixed bottom-6 right-6 z-30 p-4 rounded-full flex items-center gap-2 transition-all duration-300 shadow-lg ${
-              darkMode ? "bg-green-800 hover:bg-green-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
-            } ${showCart || showFilterSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          >
-            <ShoppingCart size={28} />
-            <span className="font-semibold hidden sm:inline">Cart</span>
-            {getTotalItems() > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                {getTotalItems()}
-              </span>
-            )}
-          </button>
-          {/* Filter Sidebar */}
-          {showFilterSidebar && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-start animate-fadeIn">
-              <div className={`w-80 h-full overflow-y-auto transform transition-transform duration-300 ${darkMode ? "bg-gray-900" : "bg-white"} shadow-xl`}>
-                <div className="p-4 border-b sticky top-0 z-10 bg-inherit">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold">Filters</h2>
-                    <button
-                      onClick={() => setShowFilterSidebar(false)}
-                      className={`p-1 rounded-full ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                    >
-                      <X size={24} />
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold mb-2">Categories</h3>
-                  <div className="space-y-2">
-                    {categories.map((category) => (
+              </select>
+              <div className="relative">
+                <button
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  className={`p-3 rounded-lg flex items-center gap-2 transition-colors ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-100 border border-gray-300"} focus:ring-2 focus:ring-green-500`}
+                >
+                  <Filter size={24} />
+                  <span className="font-semibold hidden sm:inline">Filters</span>
+                </button>
+                {showFilterDropdown && (
+                  <div className={`absolute right-0 mt-2 w-80 rounded-lg shadow-xl z-20 p-4 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-300"} animate-slideDown`}>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold text-lg">Filter Products</h3>
                       <button
-                        key={category}
-                        onClick={() => handleCategoryChange(category)}
-                        className={`w-full text-left px-4 py-2 rounded-md ${
-                          selectedCategory === category
-                            ? "bg-green-600 text-white"
-                            : darkMode ? "hover:bg-gray-800" : "hover:bg-gray-100"
-                        }`}
+                        onClick={() => {
+                          setSelectedCategory("All");
+                          setPriceRange([0, 100]);
+                          setSortBy("featured");
+                          setCurrentPage(1);
+                          setShowFilterDropdown(false);
+                        }}
+                        className="text-sm text-green-600 hover:underline"
                       >
-                        {category}
+                        Clear Filters
                       </button>
-                    ))}
-                  </div>
-                 
-                  <h3 className="font-semibold mb-2 mt-6">Price Range</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm mb-2">${priceRange[0]} - ${priceRange[1]}</label>
+                    </div>
+                    <div className="mb-6">
+                      <h4 className="font-medium mb-3 text-base">Sort By</h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="featured"
+                            checked={sortBy === "featured"}
+                            onChange={handleSortChange}
+                            className="mr-2 accent-green-500"
+                          />
+                          Featured
+                        </label>
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="priceLow"
+                            checked={sortBy === "priceLow"}
+                            onChange={handleSortChange}
+                            className="mr-2 accent-green-500"
+                          />
+                          Price: Low to High
+                        </label>
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="priceHigh"
+                            checked={sortBy === "priceHigh"}
+                            onChange={handleSortChange}
+                            className="mr-2 accent-green-500"
+                          />
+                          Price: High to Low
+                        </label>
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="newest"
+                            checked={sortBy === "newest"}
+                            onChange={handleSortChange}
+                            className="mr-2 accent-green-500"
+                          />
+                          Newest
+                        </label>
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="popular"
+                            checked={sortBy === "popular"}
+                            onChange={handleSortChange}
+                            className="mr-2 accent-green-500"
+                          />
+                          Most Popular
+                        </label>
+                      </div>
+                    </div>
+                    <div className="mb-6">
+                      <h4 className="font-medium mb-3 text-base">Price Range</h4>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          value={priceRange[0]}
+                          onChange={(e) => handlePriceRangeChange(e, 0)}
+                          className={`w-20 p-2 rounded-md border text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                          min="0"
+                          max={priceRange[1]}
+                        />
+                        <span>-</span>
+                        <input
+                          type="number"
+                          value={priceRange[1]}
+                          onChange={(e) => handlePriceRangeChange(e, 1)}
+                          className={`w-20 p-2 rounded-md border text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                          min={priceRange[0]}
+                          max="100"
+                        />
+                      </div>
                       <div className="flex space-x-2">
                         <input
                           type="range"
@@ -660,7 +725,7 @@ const Catalog = () => {
                           max="100"
                           value={priceRange[0]}
                           onChange={(e) => handlePriceRangeChange(e, 0)}
-                          className="w-full"
+                          className="w-full accent-green-500"
                         />
                         <input
                           type="range"
@@ -668,28 +733,76 @@ const Catalog = () => {
                           max="100"
                           value={priceRange[1]}
                           onChange={(e) => handlePriceRangeChange(e, 1)}
-                          className="w-full"
+                          className="w-full accent-green-500"
                         />
                       </div>
                     </div>
+                    <div>
+                      <h4 className="font-medium mb-3 text-base">Availability</h4>
+                      <div className="space-y-3">
+                        <label className="flex items-center text-sm">
+                          <input type="checkbox" className="mr-2 accent-green-500" defaultChecked />
+                          In Stock
+                        </label>
+                        <label className="flex items-center text-sm">
+                          <input type="checkbox" className="mr-2 accent-green-500" />
+                          Pre-order
+                        </label>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowFilterDropdown(false)}
+                      className={`w-full mt-4 py-2 rounded-lg font-semibold transition-colors ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-900"}`}
+                    >
+                      Apply Filters
+                    </button>
                   </div>
-                 
-                  <h3 className="font-semibold mb-2 mt-6">Availability</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" defaultChecked />
-                      In Stock
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" className="mr-2" />
-                      Pre-order
-                    </label>
+                )}
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setShowRecentlyViewedDropdown(!showRecentlyViewedDropdown)}
+                  className={`p-3 rounded-lg flex items-center gap-2 transition-colors ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-100 border border-gray-300"}`}
+                >
+                  <Clock size={24} />
+                  <span className="font-semibold hidden sm:inline">Viewed</span>
+                </button>
+                {showRecentlyViewedDropdown && (
+                  <div className={`absolute right-0 mt-2 w-80 rounded-lg shadow-lg z-20 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-300"} max-h-96 overflow-y-auto`}>
+                    <div className="p-4">
+                      <h3 className="font-semibold mb-2">Recently Viewed</h3>
+                      {recentlyViewed.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          {recentlyViewed.slice(0, 6).map((product) => (
+                            <div
+                              key={product._id}
+                              className={`rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
+                              onClick={() => {
+                                openQuickView(product);
+                                setShowRecentlyViewedDropdown(false);
+                              }}
+                            >
+                              <div className="h-20 w-full mb-2">
+                                <img
+                                  src={product.image || sampleImages[0]}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                              </div>
+                              <p className="text-sm font-medium truncate">{product.name}</p>
+                              <p className="text-green-600 font-bold text-xs">${product.price}/{product.stock.unit}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No recently viewed items.</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
-          )}
-          {/* Search Results Info */}
+          </div>
           {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
             <div className={`mb-6 p-4 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               <p className="text-sm">
@@ -717,7 +830,6 @@ const Catalog = () => {
               )}
             </div>
           )}
-          {/* Product Grid */}
           <section className="container mx-auto px-4 py-8">
             <h2 className="text-3xl font-bold mb-6 text-center">Our Organic Products</h2>
             {products.length > 0 ? (
@@ -726,7 +838,6 @@ const Catalog = () => {
                   {products.map((product) => {
                     const avgRating = getAverageRating(product._id);
                     const reviewCount = getReviewCount(product._id);
-                   
                     return (
                       <div
                         key={product._id}
@@ -736,7 +847,10 @@ const Catalog = () => {
                             : `bg-white ${product.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`
                         }`}
                       >
-                        <div className="h-48 overflow-hidden relative">
+                        <div
+                          className="h-48 overflow-hidden relative cursor-pointer"
+                          onClick={() => openQuickView(product)}
+                        >
                           {product.image ? (
                             <img
                               src={product.image}
@@ -761,37 +875,11 @@ const Catalog = () => {
                           }`}>
                             {product.status}
                           </span>
-                          <div className="absolute top-2 left-2 flex flex-col gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleWishlist(product);
-                              }}
-                              className={`p-2 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-md ${
-                                wishlist.find(item => item._id === product._id)
-                                  ? 'text-red-500'
-                                  : darkMode ? 'text-gray-300' : 'text-gray-600'
-                              }`}
-                            >
-                              <Heart
-                                size={18}
-                                fill={wishlist.find(item => item._id === product._id) ? 'currentColor' : 'none'}
-                              />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                shareProduct(product);
-                              }}
-                              className={`p-2 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-md ${
-                                darkMode ? 'text-gray-300' : 'text-gray-600'
-                              }`}
-                            >
-                              <Share size={18} />
-                            </button>
-                          </div>
                           <button
-                            onClick={() => openQuickView(product)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openQuickView(product);
+                            }}
                             className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-green-600 px-4 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
                           >
                             <Eye size={16} /> Quick View
@@ -825,18 +913,28 @@ const Catalog = () => {
                               </button>
                             </div>
                           </div>
-                          <button
-                            onClick={() => addToCart(product)}
-                            disabled={product.status === 'Out of Stock'}
-                            className={`w-full py-2 rounded-lg flex items-center justify-center gap-2 transition-colors ${
-                              product.status === 'Out of Stock'
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
-                                : 'bg-green-600 text-white hover:bg-green-700'
-                            }`}
-                          >
-                            <ShoppingCart size={18} />
-                            {product.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => addToCart(product)}
+                              disabled={product.status === 'Out of Stock'}
+                              className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                                product.status === 'Out of Stock'
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
+                                  : 'bg-green-600 text-white hover:bg-green-700'
+                              }`}
+                            >
+                              <ShoppingCart size={18} />
+                              {product.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
+                            </button>
+                            <button
+                              onClick={() => shareProduct(product)}
+                              className={`p-2 rounded-lg flex items-center justify-center transition-colors ${
+                                darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-300" : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                              }`}
+                            >
+                              <Share size={18} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -898,162 +996,210 @@ const Catalog = () => {
                       setSortBy("featured");
                     }}
                     className={`mt-4 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
-                    >
+                  >
                     Clear Filters
                   </button>
                 )}
               </div>
             )}
           </section>
-          {/* Testimonials Section */}
-          <section className={`py-16 ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
-            <div className="container mx-auto px-4">
-              <h2 className="text-3xl font-bold text-center mb-12">From Our Customers</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {testimonials.map((testimonial, index) => (
-                  <div key={index} className={`p-6 rounded-xl shadow-md ${darkMode ? "bg-gray-900" : "bg-white"}`}>
-                    <div className="flex items-center mb-4">
-                      <img src={testimonial.avatar} alt={testimonial.name} className="w-12 h-12 rounded-full mr-4" />
-                      <div>
-                        <h4 className="font-semibold">{testimonial.name}</h4>
-                        <div className="flex">
-                          {[...Array(testimonial.rating)].map((_, i) => (
-                            <Star key={i} size={16} className="text-yellow-400 fill-current" />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <p className={`text-sm italic mb-4 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>"{testimonial.comment}"</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-          {/* Trust Badges */}
-          <section className="container mx-auto px-4 py-12">
-            <div className={`flex flex-wrap justify-center gap-8 p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={32} className="text-green-600" />
-                <span className="font-semibold">Secure Payment</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Truck size={32} className="text-green-600" />
-                <span className="font-semibold">Fast Delivery</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <RotateCcw size={32} className="text-green-600" />
-                <span className="font-semibold">Easy Returns</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <BadgeCheck size={32} className="text-green-600" />
-                <span className="font-semibold">Quality Guaranteed</span>
-              </div>
-            </div>
-          </section>
-          {/* Quick View Modal */}
+          <button
+            onClick={() => setShowCart(true)}
+            className={`fixed bottom-6 right-6 z-30 p-4 rounded-full flex items-center gap-2 transition-all duration-300 shadow-lg ${
+              darkMode ? "bg-green-800 hover:bg-green-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
+            } ${showCart ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          >
+            <ShoppingCart size={28} />
+            <span className="font-semibold hidden sm:inline">Cart</span>
+            {getTotalItems() > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                {getTotalItems()}
+              </span>
+            )}
+          </button>
           {quickViewProduct && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center animate-fadeIn">
-              <div className={`max-w-2xl w-full m-4 rounded-xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"}`}>
-                <div className="p-4 border-b flex justify-between items-center">
-                  <h2 className="text-xl font-bold">{quickViewProduct.name}</h2>
-                  <button onClick={() => setQuickViewProduct(null)}>
+            <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className={`max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"} max-h-[90vh] flex flex-col`}>
+                <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-green-50 to-green-100 dark:from-gray-800 dark:to-gray-900">
+                  <h2 className="text-2xl font-bold">{quickViewProduct.name}</h2>
+                  <button 
+                    onClick={() => setQuickViewProduct(null)}
+                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
                     <X size={24} />
                   </button>
                 </div>
-                <div className="p-6 grid md:grid-cols-2 gap-6">
-                  <div>
-                    <img
-                      src={quickViewProduct.image || 'placeholder.jpg'}
-                      alt={quickViewProduct.name}
-                      className="w-full h-64 object-cover rounded-lg"
-                      loading="lazy"
-                    />
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        onClick={() => toggleWishlist(quickViewProduct)}
-                        className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 ${
-                          wishlist.find(item => item._id === quickViewProduct._id)
-                            ? 'bg-red-100 text-red-600'
-                            : darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        <Heart
-                          size={18}
-                          fill={wishlist.find(item => item._id === quickViewProduct._id) ? 'currentColor' : 'none'}
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="relative rounded-lg overflow-hidden shadow-md">
+                        <img
+                          src={quickViewProduct.image || 'placeholder.jpg'}
+                          alt={quickViewProduct.name}
+                          className="w-full h-80 object-cover"
+                          loading="lazy"
                         />
-                        Wishlist
-                      </button>
-                      <button
-                        onClick={() => shareProduct(quickViewProduct)}
-                        className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 ${
-                          darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        <Share size={18} /> Share
-                      </button>
+                        <span className={`absolute top-2 right-2 px-3 py-1 text-sm rounded-full ${
+                          quickViewProduct.status === 'In Stock'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : quickViewProduct.status === 'Low Stock'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {quickViewProduct.status}
+                        </span>
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => shareProduct(quickViewProduct)}
+                          className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${
+                            darkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          <Share size={18} /> Share
+                        </button>
+                        <button
+                          onClick={() => {
+                            setQuickViewProduct(null);
+                            openReviewModal(quickViewProduct);
+                          }}
+                          className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${
+                            darkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          <MessageCircle size={18} /> Write Review
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-3xl font-bold text-green-600 mb-2">${quickViewProduct.price}/{quickViewProduct.stock.unit}</p>
+                        <p className={`text-base ${darkMode ? "text-gray-300" : "text-gray-700"} leading-relaxed`}>
+                          {quickViewProduct.description || "Fresh farm product with premium quality."}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          {renderStars(getAverageRating(quickViewProduct._id), 20)}
+                          <span className="text-lg font-semibold">{getAverageRating(quickViewProduct._id)}/5</span>
+                        </div>
+                        <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          ({getReviewCount(quickViewProduct._id)} {getReviewCount(quickViewProduct._id) === 1 ? 'review' : 'reviews'})
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {getReviewCount(quickViewProduct._id) > 0 && (
+                          [5, 4, 3, 2, 1].map((star) => {
+                            const dist = getRatingDistribution(quickViewProduct._id);
+                            const count = dist[star];
+                            const total = getReviewCount(quickViewProduct._id);
+                            const percentage = total > 0 ? (count / total) * 100 : 0;
+                            return (
+                              <div key={star} className="flex items-center gap-2">
+                                <div className="flex">{renderStars(star, 16)}</div>
+                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-yellow-400"
+                                    style={{ width: `${percentage}%` }}
+                                  ></div>
+                                </div>
+                                <span className={`w-8 text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>{count}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Truck size={20} className="text-green-600" />
+                          <span className="font-semibold">Delivery Information</span>
+                        </div>
+                        <p className="text-sm">Free delivery on orders over $50. Next day delivery available.</p>
+                      </div>
+                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Stock: {quickViewProduct.stock.quantity} {quickViewProduct.stock.unit}
+                      </p>
                       <button
                         onClick={() => {
+                          addToCart(quickViewProduct);
                           setQuickViewProduct(null);
-                          openReviewModal(quickViewProduct);
                         }}
-                        className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 ${
-                          darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
+                        disabled={quickViewProduct.status === 'Out of Stock'}
+                        className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 text-base font-semibold transition-colors ${
+                          quickViewProduct.status === 'Out of Stock'
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
+                            : 'bg-green-600 text-white hover:bg-green-700'
                         }`}
                       >
-                        <MessageCircle size={18} /> Review
+                        <ShoppingCart size={20} />
+                        {quickViewProduct.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
                       </button>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">${quickViewProduct.price}/{quickViewProduct.stock.unit}</p>
-                    <p className={`mb-4 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                      {quickViewProduct.description || "Fresh farm product with premium quality."}
-                    </p>
-                    <div className="flex items-center mb-4">
-                      <div className="flex">
-                        {renderStars(getAverageRating(quickViewProduct._id), 20)}
+                  <div className="mt-8">
+                    <h3 className="text-xl font-semibold mb-4">Customer Reviews</h3>
+                    {reviews[quickViewProduct._id]?.length > 0 ? (
+                      <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                        {reviews[quickViewProduct._id].map((review, index) => (
+                          <div
+                            key={index}
+                            className={`p-4 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-base">{review.name}</span>
+                                  {canEditReview(review) && (
+                                    <button
+                                      onClick={() => openEditReviewModal(quickViewProduct, review)}
+                                      className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+                                        darkMode ? "text-gray-300" : "text-gray-600"
+                                      }`}
+                                      title="Edit your review"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                                <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                  {new Date(review.date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex">{renderStars(review.rating, 16)}</div>
+                            </div>
+                            <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"} whitespace-pre-wrap`}>
+                              {review.comment}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                      <span className={`ml-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                        ({getReviewCount(quickViewProduct._id)} reviews)
-                      </span>
-                    </div>
-                    <div className={`mb-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Truck size={18} className="text-green-600" />
-                        <span className="font-medium">Delivery Information</span>
+                    ) : (
+                      <div className={`text-center p-6 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}>
+                        <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"} mb-3`}>
+                          No reviews yet. Be the first to review this product!
+                        </p>
+                        <button
+                          onClick={() => openReviewModal(quickViewProduct)}
+                          className="text-sm text-blue-500 hover:underline flex items-center justify-center gap-1"
+                        >
+                          <MessageCircle size={16} /> Write a Review
+                        </button>
                       </div>
-                      <p className="text-sm">Free delivery on orders over $50. Next day delivery available.</p>
-                    </div>
-                    <p className={`mb-4 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      Stock: {quickViewProduct.stock.quantity} {quickViewProduct.stock.unit}
-                    </p>
-                    <button
-                      onClick={() => {
-                        addToCart(quickViewProduct);
-                        setQuickViewProduct(null);
-                      }}
-                      disabled={quickViewProduct.status === 'Out of Stock'}
-                      className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 transition-colors ${
-                        quickViewProduct.status === 'Out of Stock'
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
-                    >
-                      <ShoppingCart size={20} />
-                      {quickViewProduct.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
-                    </button>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           )}
-          {/* Review Modal */}
           {showReviewModal && reviewProduct && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center animate-fadeIn">
               <div className={`max-w-md w-full m-4 rounded-xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"}`}>
                 <div className="p-4 border-b flex justify-between items-center">
-                  <h2 className="text-xl font-bold">Review {reviewProduct.name}</h2>
-                  <button onClick={() => setShowReviewModal(false)}>
+                  <h2 className="text-xl font-bold">{editingReview ? "Edit Review" : "Review"} {reviewProduct.name}</h2>
+                  <button onClick={() => {
+                    setShowReviewModal(false);
+                    setEditingReview(null);
+                  }}>
                     <X size={24} />
                   </button>
                 </div>
@@ -1072,19 +1218,17 @@ const Catalog = () => {
                          userReview.rating === 4 ? "Very Good" : "Excellent"}
                       </div>
                     </div>
-                   
                     <div className="mb-4">
                       <label className="block mb-2 font-medium">Your Review</label>
                       <textarea
                         value={userReview.comment}
                         onChange={(e) => setUserReview({...userReview, comment: e.target.value})}
-                        className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                        className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                         rows="4"
                         placeholder="Share your experience with this product..."
                         required
                       ></textarea>
                     </div>
-                   
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div>
                         <label className="block mb-2 font-medium">Your Name</label>
@@ -1092,7 +1236,7 @@ const Catalog = () => {
                           type="text"
                           value={userReview.name}
                           onChange={(e) => setUserReview({...userReview, name: e.target.value})}
-                          className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                          className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                           placeholder="John Doe"
                           required
                         />
@@ -1103,25 +1247,23 @@ const Catalog = () => {
                           type="email"
                           value={userReview.email}
                           onChange={(e) => setUserReview({...userReview, email: e.target.value})}
-                          className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                          className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                           placeholder="john@example.com"
                           required
                         />
                       </div>
                     </div>
-                   
                     <button
                       type="submit"
                       className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
                     >
-                      Submit Review
+                      {editingReview ? "Update Review" : "Submit Review"}
                     </button>
                   </form>
                 </div>
               </div>
             </div>
           )}
-          {/* Cart Sidebar */}
           {showCart && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end animate-fadeIn">
               <div className={`w-full max-w-md h-full overflow-y-auto transform transition-transform duration-300 ${darkMode ? "bg-gray-900" : "bg-white"} shadow-xl`}>
@@ -1207,7 +1349,6 @@ const Catalog = () => {
                       <span className="font-semibold">Total:</span>
                       <span className="text-xl font-bold text-green-600">${getTotalPrice()}</span>
                     </div>
-                   
                     <button
                       onClick={proceedToPayment}
                       className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
@@ -1234,8 +1375,21 @@ const Catalog = () => {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
+        }
+        .animate-slideDown {
+          animation: slideDown 0.2s ease-out;
         }
       `}</style>
     </>
