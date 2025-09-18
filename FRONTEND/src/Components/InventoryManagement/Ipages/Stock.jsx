@@ -28,6 +28,11 @@ const Stock = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRefillForm, setShowRefillForm] = useState(false);
   const [viewMode, setViewMode] = useState("table");
@@ -37,15 +42,15 @@ const Stock = () => {
   const [showQRCode, setShowQRCode] = useState(null);
   const [refillQuantity, setRefillQuantity] = useState("");
   const [showExportView, setShowExportView] = useState(false);
-  const [subCategory, setSubCategory] = useState("");
   const [formData, setFormData] = useState({
     name: "",
-    category: "Animal Product",
+    category: "Milk Product",
     stock: {
       quantity: "",
       unit: "kg"
     },
     price: "",
+    description: "",
     expiryDate: "",
     creationDate: new Date().toISOString().split('T')[0],
     market: "Local",
@@ -56,15 +61,22 @@ const Stock = () => {
   // Fetch products from API
   useEffect(() => {
     fetchProducts();
-  }, [showExportView]);
+  }, [categoryFilter, statusFilter, searchTerm, currentPage, showExportView]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("http://localhost:5000/api/inventory/products", {
-        params: { market: showExportView ? "Export" : undefined }
-      });
+      const params = {
+        category: categoryFilter !== "All" ? categoryFilter : undefined,
+        status: statusFilter !== "All" ? statusFilter : undefined,
+        search: searchTerm || undefined,
+        page: currentPage,
+        limit,
+        market: showExportView ? "Export" : undefined
+      };
+      const response = await axios.get("http://localhost:5000/api/inventory/products", { params });
       setInventory(response.data.products);
+      setTotalPages(response.data.totalPages);
       setError("");
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -79,13 +91,19 @@ const Stock = () => {
     const creation = new Date(creationDate);
     let daysToAdd = 0;
     switch(category) {
-      case "Animal Product":
+      case 'Milk Product':
+      case 'Meat':
         daysToAdd = 7;
         break;
-      case "Vegetables":
-        daysToAdd = 10;
+      case 'Eggs':
+        daysToAdd = 30;
         break;
-      case "Fruits":
+      case 'Honey':
+      case 'Material':
+        daysToAdd = 365;
+        break;
+      case 'Vegetables':
+      case 'Fruits':
         daysToAdd = 10;
         break;
       default:
@@ -107,26 +125,14 @@ const Stock = () => {
     if (!formData.price || formData.price < 0) {
       errors.price = "Valid price is required";
     }
-    if (formData.category === "Plant Product" && !subCategory) {
-      errors.subCategory = "Sub category is required";
-    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Filter inventory based on search term
-  const filteredInventory = inventory.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.market.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Get export products only
-  const exportProducts = inventory.filter(item => item.market === "Export");
-
-  // Helper function to display category in UI
+  // Helper function to display category group in UI
   const displayCategory = (category) => {
-    return category === "Vegetables" || category === "Fruits" ? "Plant Product" : category;
+    if (['Vegetables', 'Fruits'].includes(category)) return 'Plant Product';
+    return 'Animal Product';
   };
 
   const handleInputChange = (e) => {
@@ -162,22 +168,13 @@ const Stock = () => {
         reader.readAsDataURL(file);
       }
       return;
-    } else if (name === "subCategory") {
-      setSubCategory(value);
-      updatedFormData.expiryDate = calculateExpiryDate(value, formData.creationDate);
     } else if (name === "category" || name === "creationDate") {
       updatedFormData = {
         ...formData,
         [name]: value
       };
-      if (name === "category" && value === "Plant Product") {
-        if (!subCategory) {
-          setSubCategory("Vegetables");
-        }
-      }
-      const effectiveCategory = (name === "category" ? value : formData.category) === "Plant Product" ? subCategory || "Vegetables" : (name === "category" ? value : formData.category);
       updatedFormData.expiryDate = calculateExpiryDate(
-        effectiveCategory,
+        name === "category" ? value : formData.category,
         name === "creationDate" ? value : formData.creationDate
       );
     } else {
@@ -194,26 +191,20 @@ const Stock = () => {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
-    let category = product.category;
-    let tempSubCategory = "";
-    if (product.category === "Vegetables" || product.category === "Fruits") {
-      category = "Plant Product";
-      tempSubCategory = product.category;
-    }
     setFormData({
       name: product.name,
-      category: category,
+      category: product.category,
       stock: {
         quantity: product.stock.quantity,
         unit: product.stock.unit
       },
       price: product.price,
+      description: product.description || "",
       creationDate: product.creationDate ? product.creationDate.split('T')[0] : new Date().toISOString().split('T')[0],
       expiryDate: product.expiryDate.split('T')[0],
       market: product.market,
       image: product.image
     });
-    setSubCategory(tempSubCategory);
     setImagePreview(product.image);
     setShowAddForm(true);
   };
@@ -246,10 +237,7 @@ const Stock = () => {
       return;
     }
     try {
-      const dataToSend = {
-        ...formData,
-        category: formData.category === "Plant Product" ? subCategory : formData.category
-      };
+      const dataToSend = { ...formData };
       if (editingProduct) {
         await axios.put(`http://localhost:5000/api/inventory/products/${editingProduct._id}`, dataToSend);
       } else {
@@ -257,15 +245,15 @@ const Stock = () => {
       }
       setShowAddForm(false);
       setEditingProduct(null);
-      setSubCategory("");
       setFormData({
         name: "",
-        category: "Animal Product",
+        category: "Milk Product",
         stock: {
           quantity: "",
           unit: "kg"
         },
         price: "",
+        description: "",
         creationDate: new Date().toISOString().split('T')[0],
         expiryDate: "",
         market: showExportView ? "Export" : "Local",
@@ -328,19 +316,19 @@ Market: ${product.market}`;
 
   const handleExportClick = () => {
     setShowExportView(true);
-    setSearchTerm("");
+    setCurrentPage(1);
     fetchProducts();
   };
 
   const handleBackToMain = () => {
     setShowExportView(false);
-    setSearchTerm("");
+    setCurrentPage(1);
     fetchProducts();
   };
 
   const handleNotify = (product) => {
     let email, phone;
-    if (product.category === "Animal Product") {
+    if (['Milk Product', 'Meat', 'Eggs', 'Honey', 'Material'].includes(product.category)) {
       email = "animal.manager@example.com";
       phone = "1234567890";
     } else {
@@ -363,9 +351,6 @@ Market: ${product.market}`;
       </div>
     );
   }
-
-  // Determine which products to display
-  const displayProducts = showExportView ? exportProducts : filteredInventory;
 
   return (
     <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
@@ -399,9 +384,38 @@ Market: ${product.market}`;
                 placeholder="Search products..."
                 className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
               />
             </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+            >
+              <option value="All">All Categories</option>
+              <option value="Animal Product">Animal Products</option>
+              <option value="Plant Product">Plant Products</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+            >
+              <option value="All">All Statuses</option>
+              <option value="In Stock">In Stock</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Out of Stock">Out of Stock</option>
+              <option value="Expiring Soon">Expiring Soon</option>
+            </select>
           </div>
       
           <div className="flex items-center gap-3">
@@ -450,7 +464,7 @@ Market: ${product.market}`;
               onClick={() => {
                 setEditingProduct(null);
                 const creationDate = new Date().toISOString().split('T')[0];
-                const defaultCategory = "Animal Product";
+                const defaultCategory = "Milk Product";
                 const expiryDate = calculateExpiryDate(defaultCategory, creationDate);
             
                 setFormData({
@@ -461,12 +475,12 @@ Market: ${product.market}`;
                     unit: "kg"
                   },
                   price: "",
+                  description: "",
                   creationDate: creationDate,
                   expiryDate: expiryDate,
                   market: showExportView ? "Export" : "Local",
                   image: ""
                 });
-                setSubCategory("");
                 setImagePreview(null);
                 setFormErrors({});
                 setShowAddForm(true);
@@ -515,8 +529,8 @@ Market: ${product.market}`;
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? "divide-gray-700 bg-gray-800" : "divide-gray-200 bg-white"}`}>
-              {displayProducts.length > 0 ? (
-                displayProducts.map((item) => (
+              {inventory.length > 0 ? (
+                inventory.map((item) => (
                   <tr key={item._id} className={item.status === 'Low Stock' ? `${darkMode ? 'bg-red-900/30' : 'bg-red-100'}` : ''}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.image ? (
@@ -532,7 +546,7 @@ Market: ${product.market}`;
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
-                        {displayCategory(item.category)}
+                        {item.category}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -607,8 +621,8 @@ Market: ${product.market}`;
       {/* Grid View */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayProducts.length > 0 ? (
-            displayProducts.map((item) => (
+          {inventory.length > 0 ? (
+            inventory.map((item) => (
               <div
                 key={item._id}
                 className={`p-4 rounded-lg shadow-sm border-2 ${darkMode ? `bg-gray-800 ${item.status === 'Low Stock' ? 'border-red-700 bg-red-900/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`}`}
@@ -625,7 +639,7 @@ Market: ${product.market}`;
                     <div>
                       <h3 className="text-lg font-medium">{item.name}</h3>
                       <span className={`px-2 py-1 mt-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
-                        {displayCategory(item.category)}
+                        {item.category}
                       </span>
                     </div>
                   </div>
@@ -704,6 +718,11 @@ Market: ${product.market}`;
                       {item.status}
                     </span>
                   </div>
+                  {item.description && (
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      {item.description}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -712,6 +731,26 @@ Market: ${product.market}`;
               No products found
             </div>
           )}
+        </div>
+      )}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-6">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-300 dark:bg-gray-700 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+          >
+            Previous
+          </button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-300 dark:bg-gray-700 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+          >
+            Next
+          </button>
         </div>
       )}
       {/* Add/Edit Product Modal */}
@@ -728,7 +767,6 @@ Market: ${product.market}`;
                   setEditingProduct(null);
                   setImagePreview(null);
                   setFormErrors({});
-                  setSubCategory("");
                 }}
                 className={darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}
               >
@@ -793,6 +831,22 @@ Market: ${product.market}`;
                       <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
                     )}
                   </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
+                      Description
+                      <span title="Enter a description of the product (optional)" className="cursor-pointer">
+                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
+                      </span>
+                    </label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      placeholder="e.g., Fresh organic honey from local bees"
+                      rows={3}
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
@@ -807,8 +861,17 @@ Market: ${product.market}`;
                         onChange={handleInputChange}
                         className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       >
-                        <option value="Animal Product">Animal Product</option>
-                        <option value="Plant Product">Plant Product</option>
+                        <optgroup label="Animal Products">
+                          <option value="Milk Product">Milk Product</option>
+                          <option value="Meat">Meat</option>
+                          <option value="Eggs">Eggs</option>
+                          <option value="Honey">Honey</option>
+                          <option value="Material">Material</option>
+                        </optgroup>
+                        <optgroup label="Plant Products">
+                          <option value="Vegetables">Vegetables</option>
+                          <option value="Fruits">Fruits</option>
+                        </optgroup>
                       </select>
                     </div>
                     <div>
@@ -832,45 +895,6 @@ Market: ${product.market}`;
                       )}
                     </div>
                   </div>
-                  {formData.category === "Plant Product" && (
-                    <div>
-                      <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                        Sub Category *
-                        <span title="Select vegetable or fruit" className="cursor-pointer">
-                          <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                        </span>
-                      </label>
-                      <div className="flex gap-4">
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            id="vegetables"
-                            name="subCategory"
-                            value="Vegetables"
-                            checked={subCategory === "Vegetables"}
-                            onChange={handleInputChange}
-                            className="mr-2"
-                          />
-                          <label htmlFor="vegetables" className={darkMode ? "text-gray-300" : "text-gray-700"}>Vegetables</label>
-                        </div>
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            id="fruits"
-                            name="subCategory"
-                            value="Fruits"
-                            checked={subCategory === "Fruits"}
-                            onChange={handleInputChange}
-                            className="mr-2"
-                          />
-                          <label htmlFor="fruits" className={darkMode ? "text-gray-300" : "text-gray-700"}>Fruits</label>
-                        </div>
-                      </div>
-                      {formErrors.subCategory && (
-                        <p className="text-red-500 text-xs mt-1">{formErrors.subCategory}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
               {/* Stock and Pricing */}
@@ -994,7 +1018,6 @@ Market: ${product.market}`;
                     setEditingProduct(null);
                     setImagePreview(null);
                     setFormErrors({});
-                    setSubCategory("");
                   }}
                   className={`px-6 py-2 rounded-md ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
                 >

@@ -3,13 +3,23 @@ import Product from "../Imodels/Product.js";
 // Get all products (for inventory management)
 export const getProducts = async (req, res) => {
   try {
-    const { category, search, market, page = 1, limit = 100 } = req.query;
+    const { category, search, market, status, page = 1, limit = 100 } = req.query;
     let query = { isActive: true };
+    // Filter by category or group of categories
     if (category && category !== 'All') {
-      query.category = category;
+      if (category === 'Animal Product') {
+        query.category = { $in: ['Milk Product', 'Meat', 'Eggs', 'Honey', 'Material'] };
+      } else if (category === 'Plant Product') {
+        query.category = { $in: ['Vegetables', 'Fruits'] };
+      } else {
+        query.category = category;
+      }
     }
     if (market && market !== 'All') {
       query.market = market;
+    }
+    if (status && status !== 'All') {
+      query.status = status;
     }
     if (search) {
       query.$or = [
