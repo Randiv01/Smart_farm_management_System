@@ -673,7 +673,7 @@ const Home = () => {
                 <div className={`text-center transition-all duration-700 ${
                   inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}>
-                  <a href="/InventoryManagement/catalog" className="bg-dark-green hover:bg-green-800 text-soft-white py-3 px-8 rounded-lg font-semibold transition-colors inline-flex items-center">
+                  <a href="/catalog" className="bg-dark-green hover:bg-green-800 text-soft-white py-3 px-8 rounded-lg font-semibold transition-colors inline-flex items-center">
                     View All Products <ArrowRightIcon className="ml-2 h-5 w-5" />
                   </a>
                 </div>
