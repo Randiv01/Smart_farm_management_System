@@ -455,7 +455,6 @@ const Home = () => {
         </div>
 
         {/* Render the ChatBot component */}
-        
         <ChatBot />
 
         {/* 1. Hero Section */}
