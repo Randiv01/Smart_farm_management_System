@@ -12,16 +12,14 @@ import {
   XCircleIcon
 } from 'lucide-react';
 import { DarkModeToggle } from '../UHDarkModeToggle/UHDarkModeToggle';
-import { useCart } from '../UHContext/UHCartContext';
 import { useAuth } from '../UHContext/UHAuthContext';
 
-const Navbar = () => {
+const Navbar = ({ cartItems = [], onCartClick }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const location = useLocation();
-  const { toggleCart, totalItems } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   
   const searchRef = useRef(null);
@@ -109,6 +107,11 @@ const Navbar = () => {
   // Toggle search visibility
   const toggleSearch = () => {
     setShowSearch(!showSearch);
+  };
+
+  // Calculate total items in cart
+  const getTotalItems = () => {
+    return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
   return (
@@ -264,14 +267,14 @@ const Navbar = () => {
 
             {/* Shopping Cart */}
             <button
-              onClick={toggleCart}
+              onClick={onCartClick}
               className="p-2 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors relative rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label="Shopping cart"
             >
               <ShoppingCartIcon className="h-5 w-5" />
-              {totalItems > 0 && (
+              {getTotalItems() > 0 && (
                 <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {totalItems}
+                  {getTotalItems()}
                 </span>
               )}
             </button>
@@ -331,7 +334,7 @@ const Navbar = () => {
               className="md:hidden p-2 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={toggleMenu}
               aria-label="Menu"
-            >
+              >
               {isMenuOpen ? <XIcon className="h-6 w-6" /> : <MenuIcon className="h-6 w-6" />}
             </button>
           </div>

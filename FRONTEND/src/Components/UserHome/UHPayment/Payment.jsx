@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useITheme } from "../Icontexts/IThemeContext";
+import { useTheme } from "../UHContext/UHThemeContext";
 import { CreditCard, User, Mail, MapPin, Phone, ArrowLeft, CheckCircle, ShoppingBag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Payment = () => {
-  const { theme } = useITheme();
-  const darkMode = theme === "dark";
+const { darkMode } = useTheme();
   const navigate = useNavigate();
   
   const [cartItems, setCartItems] = useState([]);
@@ -29,7 +28,7 @@ const Payment = () => {
       setCartItems(JSON.parse(savedCart));
     } else {
       // If no cart items, redirect back to catalog
-      navigate('/InventoryManagement/catalog');
+      navigate('/catalog');
     }
   }, [navigate]);
 
@@ -105,7 +104,7 @@ const Payment = () => {
   };
 
   const continueShopping = () => {
-    navigate('/InventoryManagement/catalog');
+    navigate('/catalog');
   };
 
   if (cartItems.length === 0 && !orderSuccess) {
@@ -114,7 +113,7 @@ const Payment = () => {
         <div className="text-center">
           <p className="text-lg">No items in cart.</p>
           <button
-            onClick={() => navigate('/InventoryManagement/catalog')}
+            onClick={() => navigate('/catalog')}
             className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             Continue Shopping
@@ -205,7 +204,7 @@ const Payment = () => {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => navigate('/InventoryManagement/catalog')}
+            onClick={() => navigate('/catalog')}
             className={`flex items-center gap-2 mb-4 ${darkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"}`}
           >
             <ArrowLeft size={20} />

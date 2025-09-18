@@ -30,7 +30,6 @@ import { IThemeProvider } from './Components/InventoryManagement/Icontexts/IThem
 import ILayout from './Components/InventoryManagement/Ilayout/ILayout.jsx';
 import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 import Stock from './Components/InventoryManagement/Ipages/Stock.jsx';
-import Payment from "./Components/InventoryManagement/Ipages/Payment.jsx";
 import Orders from "./Components/InventoryManagement/Ipages/Orders.jsx";
 import Expiry from './Components/InventoryManagement/Ipages/expiry.jsx';
 import AnimalFoodStock from './Components/InventoryManagement/Ipages/AnimalFoodstock.jsx';
@@ -44,6 +43,7 @@ import Login from './Components/UserHome/Login/login.jsx';
 import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 import News from "./Components/UserHome/News/News.jsx"; 
 import Catalog from "./Components/UserHome/UHCatalog/Catalog.jsx";
+import Payment from "./Components/UserHome/UHPayment/Payment.jsx";
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -110,6 +110,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/news" element={<News />} />
               <Route path="/catalog" element={<Catalog /> } /> 
+              <Route path="/payment" element={ <Payment />} />
 
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
@@ -156,12 +157,6 @@ function App() {
                 <Route path="FertilizerStock" element={<FertilizerStock />} /> 
                 <Route path="isuppliers" element={<ISupplier />} />
               </Route>
-                            
-              <Route path="/InventoryManagement/payment" element={
-                <IThemeProvider>
-                  <Payment />
-                </IThemeProvider>
-              } />
 
               {/* ----------------- Plant Management Routes ----------------- */}
               <Route path="/PlantManagement/*" element={

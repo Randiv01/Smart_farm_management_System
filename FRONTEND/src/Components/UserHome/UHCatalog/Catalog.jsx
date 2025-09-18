@@ -25,6 +25,8 @@ import {
   Calendar,
   MessageCircle,
   Edit,
+  Heart,
+  User,
 } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -75,6 +77,8 @@ const Catalog = () => {
   });
   const [reviews, setReviews] = useState({});
   const [editingReview, setEditingReview] = useState(null);
+  const [wishlist, setWishlist] = useState([]);
+  
   const categories = [
     "All",
     "Fruits",
@@ -84,12 +88,14 @@ const Catalog = () => {
     "Honey",
     "Milk Product",
   ];
+  
   const sampleImages = [
     "https://t4.ftcdn.net/jpg/15/45/72/75/240_F_1545727539_4UmNbJiU2YD8KnzBso157al4JqaqvWif.jpg",
     "https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80",
     "https://t3.ftcdn.net/jpg/13/52/85/66/240_F_1352856606_53sbQC1rsJ2CFbje2rjPtxSEEg9VyEf4.jpg",
     "https://as1.ftcdn.net/v2/jpg/16/11/01/64/1000_F_1611016492_IZiKVQ16kYTUmLf3pl2Sk5ttzskXUk0q.jpg",
   ];
+  
   const splashQuotes = [
     "Life be healthy with vegetables and fruits",
     "Nourish your body with nature's best",
@@ -116,11 +122,17 @@ const Catalog = () => {
     if (savedDeliveryInfo) {
       setDeliveryInfo(JSON.parse(savedDeliveryInfo));
     }
+    const savedWishlist = localStorage.getItem("farmWishlist");
+    if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
   }, []);
 
   useEffect(() => {
     localStorage.setItem("farmCart", JSON.stringify(cartItems));
   }, [cartItems]);
+
+  useEffect(() => {
+    localStorage.setItem("farmWishlist", JSON.stringify(wishlist));
+  }, [wishlist]);
 
   useEffect(() => {
     if (deliveryInfo.zipcode || deliveryInfo.date || deliveryInfo.email) {
@@ -222,6 +234,16 @@ const Catalog = () => {
     showToast(`${product.name} added to cart!`);
   };
 
+  const toggleWishlist = (product) => {
+    if (wishlist.find(item => item._id === product._id)) {
+      setWishlist(wishlist.filter(item => item._id !== product._id));
+      showToast(`${product.name} removed from wishlist!`);
+    } else {
+      setWishlist([...wishlist, product]);
+      showToast(`${product.name} added to wishlist!`);
+    }
+  };
+
   const showToast = (message) => {
     const toast = document.createElement('div');
     toast.className = `fixed top-20 right-4 z-50 px-4 py-2 rounded-md shadow-lg transition-opacity duration-300 ${
@@ -279,7 +301,7 @@ const Catalog = () => {
       return;
     }
     localStorage.setItem('farmCart', JSON.stringify(cartItems));
-    navigate('/InventoryManagement/payment');
+    navigate('/payment');
   };
 
   const trackViewedProduct = useCallback((product) => {
@@ -449,7 +471,7 @@ const Catalog = () => {
   if (loading) {
     return (
       <>
-        <Navbar />
+        <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
         <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -463,10 +485,11 @@ const Catalog = () => {
 
   return (
     <>
-      <Navbar />
-      <div ref={catalogRef} className="pt-16"></div>
-      <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
-        <section className="relative w-full h-[70vh] overflow-hidden">
+        <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
+  <div ref={catalogRef} className="pt-0"></div> {/* Fixed line */}
+  <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
+        {/* Hero Carousel */}
+        <section className="relative w-full h-[60vh] md:h-[70vh] overflow-hidden">
           {seasonalProducts.map((product, index) => (
             <div
               key={index}
@@ -481,14 +504,14 @@ const Catalog = () => {
                 loading="lazy"
               />
               <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-black/40 via-black/20 to-black/70"></div>
-              <div className="absolute inset-0 flex flex-col justify-center items-start px-8 md:px-16 lg:px-24 text-white">
+              <div className="absolute inset-0 flex flex-col justify-center items-start px-6 md:px-16 lg:px-24 text-white">
                 <span className="bg-green-600 text-white px-3 py-1 rounded-full text-sm mb-2 flex items-center gap-1">
                   <Zap size={14} /> Seasonal Favorite
                 </span>
                 <p className="text-2xl md:text-4xl font-bold max-w-lg drop-shadow-md mb-4">
                   {splashQuotes[index % splashQuotes.length]}
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={() => openQuickView(product)}
                     className="bg-green-600/80 hover:bg-green-700 text-white py-2 px-6 rounded-lg font-semibold shadow-lg backdrop-blur-sm flex items-center transition-colors"
@@ -518,27 +541,31 @@ const Catalog = () => {
             ))}
           </div>
         </section>
-        <section className="container mx-auto px-4 py-12">
-          <div className={`flex flex-wrap justify-center gap-8 p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="flex items-center gap-2">
+
+        {/* Trust Badges */}
+        <section className="container mx-auto px-4 py-8 md:py-12">
+          <div className={`flex flex-wrap justify-center gap-6 md:gap-8 p-4 md:p-6 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white shadow-sm"}`}>
+            <div className="flex flex-col items-center text-center gap-2 min-w-[120px]">
               <ShieldCheck size={32} className="text-green-600" />
-              <span className="font-semibold">Secure Payment</span>
+              <span className="font-semibold text-sm md:text-base">Secure Payment</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-center text-center gap-2 min-w-[120px]">
               <Truck size={32} className="text-green-600" />
-              <span className="font-semibold">Fast Delivery</span>
+              <span className="font-semibold text-sm md:text-base">Fast Delivery</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-center text-center gap-2 min-w-[120px]">
               <RotateCcw size={32} className="text-green-600" />
-              <span className="font-semibold">Easy Returns</span>
+              <span className="font-semibold text-sm md:text-base">Easy Returns</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-center text-center gap-2 min-w-[120px]">
               <BadgeCheck size={32} className="text-green-600" />
-              <span className="font-semibold">Quality Guaranteed</span>
+              <span className="font-semibold text-sm md:text-base">Quality Guaranteed</span>
             </div>
           </div>
         </section>
-        <section className="container mx-auto px-4 py-8 relative">
+
+        {/* Search and Filters */}
+        <section className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div className="relative w-full md:max-w-2xl">
               <Search
@@ -593,7 +620,7 @@ const Catalog = () => {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-wrap justify-center">
               <select
                 value={selectedMarket}
                 onChange={handleMarketChange}
@@ -616,7 +643,7 @@ const Catalog = () => {
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                   className={`p-3 rounded-lg flex items-center gap-2 transition-colors ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-100 border border-gray-300"} focus:ring-2 focus:ring-green-500`}
                 >
-                  <Filter size={24} />
+                  <Filter size={20} />
                   <span className="font-semibold hidden sm:inline">Filters</span>
                 </button>
                 {showFilterDropdown && (
@@ -763,7 +790,7 @@ const Catalog = () => {
                   onClick={() => setShowRecentlyViewedDropdown(!showRecentlyViewedDropdown)}
                   className={`p-3 rounded-lg flex items-center gap-2 transition-colors ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-100 border border-gray-300"}`}
                 >
-                  <Clock size={24} />
+                  <Clock size={20} />
                   <span className="font-semibold hidden sm:inline">Viewed</span>
                 </button>
                 {showRecentlyViewedDropdown && (
@@ -802,6 +829,8 @@ const Catalog = () => {
               </div>
             </div>
           </div>
+          
+          {/* Filter Summary */}
           {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
             <div className={`mb-6 p-4 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               <p className="text-sm">
@@ -829,538 +858,611 @@ const Catalog = () => {
               )}
             </div>
           )}
-          <section className="container mx-auto px-4 py-8">
-            <h2 className="text-3xl font-bold mb-6 text-center">Our Organic Products</h2>
-            {products.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map((product) => {
-                    const avgRating = getAverageRating(product._id);
-                    const reviewCount = getReviewCount(product._id);
-                    return (
-                      <div
-                        key={product._id}
-                        className={`rounded-lg overflow-hidden shadow-lg transition-all hover:shadow-2xl hover:-translate-y-1 border-2 group ${
-                          darkMode
-                            ? `bg-gray-800 ${product.status === 'Low Stock' ? 'border-red-700 bg-red-900/30' : 'border-gray-700'}`
-                            : `bg-white ${product.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`
-                        }`}
-                      >
-                        <div
-                          className="h-48 overflow-hidden relative cursor-pointer"
-                          onClick={() => openQuickView(product)}
-                        >
-                          {product.image ? (
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className={`w-full h-full flex items-center justify-center ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
-                              <div className="text-center">
-                                <Truck size={32} className={darkMode ? "text-gray-500" : "text-gray-400"} />
-                                <p className={darkMode ? "text-gray-500 text-sm" : "text-gray-400 text-sm"}>No Image</p>
-                              </div>
-                            </div>
-                          )}
-                          <span className={`absolute top-2 right-2 px-2 py-1 text-xs rounded-full ${
-                            product.status === 'In Stock'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : product.status === 'Low Stock'
-                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {product.status}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openQuickView(product);
-                            }}
-                            className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white text-green-600 px-4 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
-                          >
-                            <Eye size={16} /> Quick View
-                          </button>
-                        </div>
-                        <div className="p-4">
-                          <h3 className="text-lg font-semibold mb-2 line-clamp-1">{product.name}</h3>
-                          <p className={`text-sm mb-3 h-10 overflow-hidden ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                            {product.description || "Fresh farm product with premium quality."}
-                          </p>
-                          <div className="flex justify-between items-center mb-4">
-                            <div>
-                              <p className="text-2xl font-bold text-green-600">${product.price}/{product.stock.unit}</p>
-                              <p className={`text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
-                                In stock: {product.stock.quantity} {product.stock.unit}
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-end">
-                              <div className="flex">
-                                {renderStars(avgRating)}
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openReviewModal(product);
-                                }}
-                                className="text-xs mt-1 flex items-center text-blue-500 hover:underline"
-                              >
-                                <MessageCircle size={12} className="mr-1" />
-                                {reviewCount} review{reviewCount !== 1 ? 's' : ''}
-                              </button>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => addToCart(product)}
-                              disabled={product.status === 'Out of Stock'}
-                              className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors ${
-                                product.status === 'Out of Stock'
-                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
-                                  : 'bg-green-600 text-white hover:bg-green-700'
-                              }`}
-                            >
-                              <ShoppingCart size={18} />
-                              {product.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
-                            </button>
-                            <button
-                              onClick={() => shareProduct(product)}
-                              className={`p-2 rounded-lg flex items-center justify-center transition-colors ${
-                                darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-300" : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                              }`}
-                            >
-                              <Share size={18} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {totalPages > 1 && (
-                  <div className="flex justify-center mt-8">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        className={`p-2 rounded-md ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''} ${
-                          darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'
-                        }`}
-                      >
-                        <ChevronLeft size={20} />
-                      </button>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-1 rounded-md ${
-                            currentPage === page
-                              ? 'bg-green-600 text-white'
-                              : darkMode
-                              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                        className={`p-2 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''} ${
-                          darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'
-                        }`}
-                      >
-                        <ChevronRight size={20} />
-                      </button>
+        </section>
+
+  {/* Products Grid */}
+<section className="container mx-auto px-4 pb-16">
+  <h2 className="text-3xl font-bold mb-8 text-center relative">
+    <span className="relative inline-block">
+      Our Organic Products
+      <span className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-green-600 rounded-full"></span>
+    </span>
+  </h2>
+  
+  {products.length > 0 ? (
+    <>
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-6">
+        {products.map((product) => {
+          const avgRating = getAverageRating(product._id);
+          const reviewCount = getReviewCount(product._id);
+          const isWishlisted = wishlist.find(item => item._id === product._id);
+          const isNew = product.createdAt && (new Date() - new Date(product.createdAt)) < (7 * 24 * 60 * 60 * 1000); // Product is new if created within last 7 days
+          
+          return (
+            <div
+              key={product._id}
+              className={`relative rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 group ${
+                darkMode
+                  ? `bg-gradient-to-b from-gray-800 to-gray-900 ${product.status === 'Low Stock' ? 'ring-2 ring-red-700' : ''}`
+                  : `bg-gradient-to-b from-white to-gray-50 shadow-md ${product.status === 'Low Stock' ? 'ring-2 ring-red-500' : ''}`
+              }`}
+            >
+              {/* Product Image Container */}
+              <div
+                className="relative w-full aspect-square overflow-hidden cursor-pointer"
+                onClick={() => openQuickView(product)}
+              >
+                {product.image ? (
+                  <>
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </>
+                ) : (
+                  <div className={`w-full h-full flex items-center justify-center ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
+                    <div className="text-center">
+                      <Truck size={32} className={darkMode ? "text-gray-500" : "text-gray-400"} />
+                      <p className={darkMode ? "text-gray-500 text-sm mt-1" : "text-gray-400 text-sm mt-1"}>No Image</p>
                     </div>
                   </div>
                 )}
-              </>
-            ) : (
-              <div className={`text-center py-12 rounded-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-                <p className="text-lg mb-2">No products found.</p>
-                <p className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                  Try adjusting your search or filter criteria.
-                </p>
-                {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
-                  <button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setSelectedCategory("All");
-                      setSelectedMarket("Local Market");
-                      setPriceRange([0, 100]);
-                      setSortBy("featured");
-                    }}
-                    className={`mt-4 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
-                  >
-                    Clear Filters
-                  </button>
+                
+                {/* Status Badge */}
+                <span className={`absolute top-3 right-3 px-2.5 py-1 text-xs font-semibold rounded-full shadow-md ${
+                  product.status === 'In Stock'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/80 dark:text-green-200'
+                    : product.status === 'Low Stock'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/80 dark:text-amber-200'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-200'
+                }`}>
+                  {product.status}
+                </span>
+                
+                {/* New Badge */}
+                {isNew && (
+                  <span className="absolute top-3 left-3 px-2.5 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-200 text-xs font-semibold rounded-full shadow-md">
+                    NEW
+                  </span>
                 )}
-              </div>
-            )}
-          </section>
-          <button
-            onClick={() => setShowCart(true)}
-            className={`fixed bottom-6 right-6 z-30 p-4 rounded-full flex items-center gap-2 transition-all duration-300 shadow-lg ${
-              darkMode ? "bg-green-800 hover:bg-green-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
-            } ${showCart ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          >
-            <ShoppingCart size={28} />
-            <span className="font-semibold hidden sm:inline">Cart</span>
-            {getTotalItems() > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                {getTotalItems()}
-              </span>
-            )}
-          </button>
-          {quickViewProduct && (
-            <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fadeIn">
-              <div className={`max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"} max-h-[90vh] flex flex-col`}>
-                <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-green-50 to-green-100 dark:from-gray-800 dark:to-gray-900">
-                  <h2 className="text-2xl font-bold">{quickViewProduct.name}</h2>
-                  <button 
-                    onClick={() => setQuickViewProduct(null)}
-                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                
+                {/* Wishlist Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleWishlist(product);
+                  }}
+                  className={`absolute top-14 left-3 p-2.5 rounded-full shadow-md transition-all duration-300 ${
+                    isWishlisted 
+                      ? 'bg-red-500 text-white transform scale-110' 
+                      : 'bg-white/90 text-gray-600 hover:bg-white dark:bg-gray-800/90 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                  aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <Heart 
+                    size={18} 
+                    className={isWishlisted ? 'fill-current' : ''} 
+                  />
+                </button>
+                
+                {/* Quick View Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openQuickView(product);
+                    }}
+                    className="bg-white text-green-700 px-4 py-2 rounded-full font-medium flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
                   >
-                    <X size={24} />
+                    <Eye size={16} /> Quick View
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-6">
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <div className="relative rounded-lg overflow-hidden shadow-md">
-                        <img
-                          src={quickViewProduct.image || 'placeholder.jpg'}
-                          alt={quickViewProduct.name}
-                          className="w-full h-80 object-cover"
-                          loading="lazy"
-                        />
-                        <span className={`absolute top-2 right-2 px-3 py-1 text-sm rounded-full ${
-                          quickViewProduct.status === 'In Stock'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : quickViewProduct.status === 'Low Stock'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
-                          {quickViewProduct.status}
-                        </span>
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => shareProduct(quickViewProduct)}
-                          className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${
-                            darkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          <Share size={18} /> Share
-                        </button>
-                        <button
-                          onClick={() => {
-                            setQuickViewProduct(null);
-                            openReviewModal(quickViewProduct);
-                          }}
-                          className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${
-                            darkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          <MessageCircle size={18} /> Write Review
-                        </button>
-                      </div>
+              </div>
+              
+              {/* Product Info */}
+              <div className="p-4">
+                <h3 className="font-semibold text-lg mb-2 line-clamp-2 h-14 leading-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                  {product.name}
+                </h3>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      ${product.price}
+                      <span className="text-sm font-normal text-gray-500 dark:text-gray-400">/{product.stock.unit}</span>
+                    </p>
+                    <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      In stock: {product.stock.quantity} {product.stock.unit}
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-1">
+                      {renderStars(avgRating)}
+                      <span className="text-sm font-medium ml-1">{avgRating}</span>
                     </div>
-                    <div className="space-y-6">
-                      <div>
-                        <p className="text-3xl font-bold text-green-600 mb-2">${quickViewProduct.price}/{quickViewProduct.stock.unit}</p>
-                        <p className={`text-base ${darkMode ? "text-gray-300" : "text-gray-700"} leading-relaxed`}>
-                          {quickViewProduct.description || "Fresh farm product with premium quality."}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          {renderStars(getAverageRating(quickViewProduct._id), 20)}
-                          <span className="text-lg font-semibold">{getAverageRating(quickViewProduct._id)}/5</span>
-                        </div>
-                        <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                          ({getReviewCount(quickViewProduct._id)} {getReviewCount(quickViewProduct._id) === 1 ? 'review' : 'reviews'})
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {getReviewCount(quickViewProduct._id) > 0 && (
-                          [5, 4, 3, 2, 1].map((star) => {
-                            const dist = getRatingDistribution(quickViewProduct._id);
-                            const count = dist[star];
-                            const total = getReviewCount(quickViewProduct._id);
-                            const percentage = total > 0 ? (count / total) * 100 : 0;
-                            return (
-                              <div key={star} className="flex items-center gap-2">
-                                <div className="flex">{renderStars(star, 16)}</div>
-                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-yellow-400"
-                                    style={{ width: `${percentage}%` }}
-                                  ></div>
-                                </div>
-                                <span className={`w-8 text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>{count}</span>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                      <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Truck size={20} className="text-green-600" />
-                          <span className="font-semibold">Delivery Information</span>
-                        </div>
-                        <p className="text-sm">Free delivery on orders over $50. Next day delivery available.</p>
-                      </div>
-                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                        Stock: {quickViewProduct.stock.quantity} {quickViewProduct.stock.unit}
-                      </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openReviewModal(product);
+                      }}
+                      className="text-xs mt-1 text-blue-500 hover:underline flex items-center"
+                    >
+                      <MessageCircle size={12} className="mr-1" />
+                      {reviewCount} review{reviewCount !== 1 ? 's' : ''}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => addToCart(product)}
+                    disabled={product.status === 'Out of Stock'}
+                    className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${
+                      product.status === 'Out of Stock'
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
+                        : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+                    }`}
+                  >
+                    <ShoppingCart size={18} />
+                    <span className="font-medium">{product.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => shareProduct(product)}
+                    className={`p-3 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                      darkMode 
+                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white shadow-md" 
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 shadow-md"
+                    }`}
+                    aria-label="Share product"
+                  >
+                    <Share size={18} />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Hover Effect Border */}
+              <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-green-400/30 transition-all duration-300 pointer-events-none"></div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-12">
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl p-2 shadow-md">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`p-2.5 rounded-lg flex items-center justify-center transition-all ${
+                currentPage === 1 
+                  ? 'opacity-50 cursor-not-allowed text-gray-400' 
+                  : 'text-green-600 hover:bg-green-50 dark:hover:bg-gray-700'
+              }`}
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all font-medium ${
+                  currentPage === page
+                    ? 'bg-green-600 text-white shadow-md'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-gray-700'
+                }`}
+                aria-label={`Page ${page}`}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className={`p-2.5 rounded-lg flex items-center justify-center transition-all ${
+                currentPage === totalPages 
+                  ? 'opacity-50 cursor-not-allowed text-gray-400' 
+                  : 'text-green-600 hover:bg-green-50 dark:hover:bg-gray-700'
+              }`}
+              aria-label="Next page"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  ) : (
+    <div className={`text-center py-16 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white shadow-md"}`}>
+      <div className="max-w-md mx-auto">
+        <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+          <Search size={40} className="text-gray-400 dark:text-gray-500" />
+        </div>
+        <h3 className="text-xl font-semibold mb-2">No products found</h3>
+        <p className={darkMode ? "text-gray-400 mb-6" : "text-gray-500 mb-6"}>
+          Try adjusting your search or filter criteria to find what you're looking for.
+        </p>
+        {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setSelectedCategory("All");
+              setSelectedMarket("Local Market");
+              setPriceRange([0, 100]);
+              setSortBy("featured");
+            }}
+            className={`px-6 py-3 rounded-xl font-medium transition-colors ${
+              darkMode 
+                ? "bg-gray-700 hover:bg-gray-600 text-white" 
+                : "bg-green-600 hover:bg-green-700 text-white"
+            }`}
+          >
+            Clear All Filters
+          </button>
+        )}
+      </div>
+    </div>
+  )}
+        </section>
+
+        {/* Quick View Modal */}
+        {quickViewProduct && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className={`max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"} max-h-[90vh] flex flex-col`}>
+              <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-green-50 to-green-100 dark:from-gray-800 dark:to-gray-900">
+                <h2 className="text-2xl font-bold">{quickViewProduct.name}</h2>
+                <button 
+                  onClick={() => setQuickViewProduct(null)}
+                  className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="relative rounded-lg overflow-hidden shadow-md">
+                      <img
+                        src={quickViewProduct.image || 'placeholder.jpg'}
+                        alt={quickViewProduct.name}
+                        className="w-full h-80 object-cover"
+                        loading="lazy"
+                      />
+                      <span className={`absolute top-2 right-2 px-3 py-1 text-sm rounded-full ${
+                        quickViewProduct.status === 'In Stock'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : quickViewProduct.status === 'Low Stock'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}>
+                        {quickViewProduct.status}
+                      </span>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => shareProduct(quickViewProduct)}
+                        className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${
+                          darkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Share size={18} /> Share
+                      </button>
                       <button
                         onClick={() => {
-                          addToCart(quickViewProduct);
                           setQuickViewProduct(null);
+                          openReviewModal(quickViewProduct);
                         }}
-                        disabled={quickViewProduct.status === 'Out of Stock'}
-                        className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 text-base font-semibold transition-colors ${
-                          quickViewProduct.status === 'Out of Stock'
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
-                            : 'bg-green-600 text-white hover:bg-green-700'
+                        className={`flex-1 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${
+                          darkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >
-                        <ShoppingCart size={20} />
-                        {quickViewProduct.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
+                        <MessageCircle size={18} /> Write Review
                       </button>
                     </div>
                   </div>
-                  <div className="mt-8">
-                    <h3 className="text-xl font-semibold mb-4">Customer Reviews</h3>
-                    {reviews[quickViewProduct._id]?.length > 0 ? (
-                      <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
-                        {reviews[quickViewProduct._id].map((review, index) => (
-                          <div
-                            key={index}
-                            className={`p-4 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-base">{review.name}</span>
-                                  {canEditReview(review) && (
-                                    <button
-                                      onClick={() => openEditReviewModal(quickViewProduct, review)}
-                                      className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
-                                        darkMode ? "text-gray-300" : "text-gray-600"
-                                      }`}
-                                      title="Edit your review"
-                                    >
-                                      <Edit size={16} />
-                                    </button>
-                                  )}
-                                </div>
-                                <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                                  {new Date(review.date).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <div className="flex">{renderStars(review.rating, 16)}</div>
-                            </div>
-                            <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"} whitespace-pre-wrap`}>
-                              {review.comment}
-                            </p>
-                          </div>
-                        ))}
+                  <div className="space-y-6">
+                    <div>
+                      <p className="text-3xl font-bold text-green-600 mb-2">${quickViewProduct.price}/{quickViewProduct.stock.unit}</p>
+                      <p className={`text-base ${darkMode ? "text-gray-300" : "text-gray-700"} leading-relaxed`}>
+                        {quickViewProduct.description || "Fresh farm product with premium quality."}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {renderStars(getAverageRating(quickViewProduct._id), 20)}
+                        <span className="text-lg font-semibold">{getAverageRating(quickViewProduct._id)}/5</span>
                       </div>
-                    ) : (
-                      <div className={`text-center p-6 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}>
-                        <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"} mb-3`}>
-                          No reviews yet. Be the first to review this product!
-                        </p>
-                        <button
-                          onClick={() => openReviewModal(quickViewProduct)}
-                          className="text-sm text-blue-500 hover:underline flex items-center justify-center gap-1"
+                      <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        ({getReviewCount(quickViewProduct._id)} {getReviewCount(quickViewProduct._id) === 1 ? 'review' : 'reviews'})
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {getReviewCount(quickViewProduct._id) > 0 && (
+                        [5, 4, 3, 2, 1].map((star) => {
+                          const dist = getRatingDistribution(quickViewProduct._id);
+                          const count = dist[star];
+                          const total = getReviewCount(quickViewProduct._id);
+                          const percentage = total > 0 ? (count / total) * 100 : 0;
+                          return (
+                            <div key={star} className="flex items-center gap-2">
+                              <div className="flex">{renderStars(star, 16)}</div>
+                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-yellow-400"
+                                  style={{ width: `${percentage}%` }}
+                                ></div>
+                              </div>
+                              <span className={`w-8 text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>{count}</span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Truck size={20} className="text-green-600" />
+                        <span className="font-semibold">Delivery Information</span>
+                      </div>
+                      <p className="text-sm">Free delivery on orders over $50. Next day delivery available.</p>
+                    </div>
+                    <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      Stock: {quickViewProduct.stock.quantity} {quickViewProduct.stock.unit}
+                    </p>
+                    <button
+                      onClick={() => {
+                        addToCart(quickViewProduct);
+                        setQuickViewProduct(null);
+                      }}
+                      disabled={quickViewProduct.status === 'Out of Stock'}
+                      className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 text-base font-semibold transition-colors ${
+                        quickViewProduct.status === 'Out of Stock'
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      <ShoppingCart size={20} />
+                      {quickViewProduct.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-8">
+                  <h3 className="text-xl font-semibold mb-4">Customer Reviews</h3>
+                  {reviews[quickViewProduct._id]?.length > 0 ? (
+                    <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                      {reviews[quickViewProduct._id].map((review, index) => (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}
                         >
-                          <MessageCircle size={16} /> Write a Review
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          {showReviewModal && reviewProduct && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center animate-fadeIn">
-              <div className={`max-w-md w-full m-4 rounded-xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"}`}>
-                <div className="p-4 border-b flex justify-between items-center">
-                  <h2 className="text-xl font-bold">{editingReview ? "Edit Review" : "Review"} {reviewProduct.name}</h2>
-                  <button onClick={() => {
-                    setShowReviewModal(false);
-                    setEditingReview(null);
-                  }}>
-                    <X size={24} />
-                  </button>
-                </div>
-                <div className="p-6">
-                  <form onSubmit={handleReviewSubmit}>
-                    <div className="mb-6">
-                      <label className="block mb-2 font-medium">Your Rating</label>
-                      <div className="flex justify-center mb-2">
-                        {renderInteractiveStars(userReview.rating, (rating) => setUserReview({...userReview, rating}))}
-                      </div>
-                      <div className="text-center text-sm text-gray-500">
-                        {userReview.rating === 0 ? "Select your rating" :
-                         userReview.rating === 1 ? "Poor" :
-                         userReview.rating === 2 ? "Fair" :
-                         userReview.rating === 3 ? "Good" :
-                         userReview.rating === 4 ? "Very Good" : "Excellent"}
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <label className="block mb-2 font-medium">Your Review</label>
-                      <textarea
-                        value={userReview.comment}
-                        onChange={(e) => setUserReview({...userReview, comment: e.target.value})}
-                        className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                        rows="4"
-                        placeholder="Share your experience with this product..."
-                        required
-                      ></textarea>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                      <div>
-                        <label className="block mb-2 font-medium">Your Name</label>
-                        <input
-                          type="text"
-                          value={userReview.name}
-                          onChange={(e) => setUserReview({...userReview, name: e.target.value})}
-                          className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                          placeholder="John Doe"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block mb-2 font-medium">Email</label>
-                        <input
-                          type="email"
-                          value={userReview.email}
-                          onChange={(e) => setUserReview({...userReview, email: e.target.value})}
-                          className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                          placeholder="john@example.com"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
-                    >
-                      {editingReview ? "Update Review" : "Submit Review"}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
-          )}
-          {showCart && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end animate-fadeIn">
-              <div className={`w-full max-w-md h-full overflow-y-auto transform transition-transform duration-300 ${darkMode ? "bg-gray-900" : "bg-white"} shadow-xl`}>
-                <div className="p-4 border-b sticky top-0 z-10 bg-inherit">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold">Your Cart</h2>
-                    <button
-                      onClick={() => setShowCart(false)}
-                      className={`p-1 rounded-full ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                    >
-                      <X size={24} />
-                    </button>
-                  </div>
-                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    {getTotalItems()} item{getTotalItems() !== 1 ? 's' : ''} in cart
-                  </p>
-                </div>
-                <div className="p-4">
-                  {cartItems.length === 0 ? (
-                    <div className="text-center py-8">
-                      <ShoppingCart size={48} className="mx-auto mb-4 text-gray-400" />
-                      <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No products in the cart.</p>
-                      <button
-                        onClick={() => setShowCart(false)}
-                        className={`mt-4 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
-                      >
-                        Continue Shopping
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {cartItems.map((item) => (
-                        <div key={item._id} className={`flex gap-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}>
-                          <div className="w-16 h-16 flex-shrink-0">
-                            {item.image ? (
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="w-full h-full object-cover rounded"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className={`w-full h-full flex items-center justify-center rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
-                                <Truck size={20} className={darkMode ? "text-gray-500" : "text-gray-400"} />
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-base">{review.name}</span>
+                                {canEditReview(review) && (
+                                  <button
+                                    onClick={() => openEditReviewModal(quickViewProduct, review)}
+                                    className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+                                      darkMode ? "text-gray-300" : "text-gray-600"
+                                    }`}
+                                    title="Edit your review"
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{item.name}</h3>
-                            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                              {formatPriceCalculation(item.price, item.quantity, item.stock.unit)}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <button
-                                onClick={() => decrementQuantity(item._id)}
-                                className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                              >
-                                <Minus size={16} />
-                              </button>
-                              <span className="px-2 py-1 bg-white border rounded min-w-[2rem] text-center">{item.quantity}{item.stock.unit}</span>
-                              <button
-                                onClick={() => incrementQuantity(item._id)}
-                                className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                              >
-                                <Plus size={16} />
-                              </button>
+                              <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                {new Date(review.date).toLocaleDateString()}
+                              </span>
                             </div>
+                            <div className="flex">{renderStars(review.rating, 16)}</div>
                           </div>
-                          <button
-                            onClick={() => removeFromCart(item._id)}
-                            className={`p-1 self-start ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-500 hover:bg-gray-200"} rounded`}
-                          >
-                            <X size={18} />
-                          </button>
+                          <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"} whitespace-pre-wrap`}>
+                            {review.comment}
+                          </p>
                         </div>
                       ))}
+                    </div>
+                  ) : (
+                    <div className={`text-center p-6 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}>
+                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"} mb-3`}>
+                        No reviews yet. Be the first to review this product!
+                      </p>
+                      <button
+                        onClick={() => openReviewModal(quickViewProduct)}
+                        className="text-sm text-blue-500 hover:underline flex items-center justify-center gap-1"
+                      >
+                        <MessageCircle size={16} /> Write a Review
+                      </button>
                     </div>
                   )}
                 </div>
-                {cartItems.length > 0 && (
-                  <div className={`p-4 border-t sticky bottom-0 bg-inherit ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="font-semibold">Total:</span>
-                      <span className="text-xl font-bold text-green-600">${getTotalPrice()}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Review Modal */}
+        {showReviewModal && reviewProduct && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center animate-fadeIn">
+            <div className={`max-w-md w-full m-4 rounded-xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"}`}>
+              <div className="p-4 border-b flex justify-between items-center">
+                <h2 className="text-xl font-bold">{editingReview ? "Edit Review" : "Review"} {reviewProduct.name}</h2>
+                <button onClick={() => {
+                  setShowReviewModal(false);
+                  setEditingReview(null);
+                }}>
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6">
+                <form onSubmit={handleReviewSubmit}>
+                  <div className="mb-6">
+                    <label className="block mb-2 font-medium">Your Rating</label>
+                    <div className="flex justify-center mb-2">
+                      {renderInteractiveStars(userReview.rating, (rating) => setUserReview({...userReview, rating}))}
                     </div>
+                    <div className="text-center text-sm text-gray-500">
+                      {userReview.rating === 0 ? "Select your rating" :
+                       userReview.rating === 1 ? "Poor" :
+                       userReview.rating === 2 ? "Fair" :
+                       userReview.rating === 3 ? "Good" :
+                       userReview.rating === 4 ? "Very Good" : "Excellent"}
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-2 font-medium">Your Review</label>
+                    <textarea
+                      value={userReview.comment}
+                      onChange={(e) => setUserReview({...userReview, comment: e.target.value})}
+                      className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      rows="4"
+                      placeholder="Share your experience with this product..."
+                      required
+                    ></textarea>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label className="block mb-2 font-medium">Your Name</label>
+                      <input
+                        type="text"
+                        value={userReview.name}
+                        onChange={(e) => setUserReview({...userReview, name: e.target.value})}
+                        className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                        placeholder="John Doe"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-2 font-medium">Email</label>
+                      <input
+                        type="email"
+                        value={userReview.email}
+                        onChange={(e) => setUserReview({...userReview, email: e.target.value})}
+                        className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                        placeholder="john@example.com"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                  >
+                    {editingReview ? "Update Review" : "Submit Review"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cart Sidebar */}
+        {showCart && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end animate-fadeIn">
+            <div className={`w-full max-w-md h-full overflow-y-auto transform transition-transform duration-300 ${darkMode ? "bg-gray-900" : "bg-white"} shadow-xl`}>
+              <div className="p-4 border-b sticky top-0 z-10 bg-inherit">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">Your Cart</h2>
+                  <button
+                    onClick={() => setShowCart(false)}
+                    className={`p-1 rounded-full ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  {getTotalItems()} item{getTotalItems() !== 1 ? 's' : ''} in cart
+                </p>
+              </div>
+              <div className="p-4">
+                {cartItems.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShoppingCart size={48} className="mx-auto mb-4 text-gray-400" />
+                    <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No products in the cart.</p>
                     <button
-                      onClick={proceedToPayment}
-                      className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
+                      onClick={() => setShowCart(false)}
+                      className={`mt-4 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
                     >
-                      <CreditCard size={20} />
-                      Proceed to Payment
+                      Continue Shopping
                     </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {cartItems.map((item) => (
+                      <div key={item._id} className={`flex gap-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}>
+                        <div className="w-16 h-16 flex-shrink-0">
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-cover rounded"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
+                              <Truck size={20} className={darkMode ? "text-gray-500" : "text-gray-400"} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold">{item.name}</h3>
+                          <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            {formatPriceCalculation(item.price, item.quantity, item.stock.unit)}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              onClick={() => decrementQuantity(item._id)}
+                              className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <span className="px-2 py-1 bg-white border rounded min-w-[2rem] text-center">{item.quantity}{item.stock.unit}</span>
+                            <button
+                              onClick={() => incrementQuantity(item._id)}
+                              className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromCart(item._id)}
+                          className={`p-1 self-start ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-500 hover:bg-gray-200"} rounded`}
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
+              {cartItems.length > 0 && (
+                <div className={`p-4 border-t sticky bottom-0 bg-inherit ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-semibold">Total:</span>
+                    <span className="text-xl font-bold text-green-600">${getTotalPrice()}</span>
+                  </div>
+                  <button
+                    onClick={proceedToPayment}
+                    className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
+                  >
+                    <CreditCard size={20} />
+                    Proceed to Payment
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </div>
+        )}
       </div>
       <Footer />
       <style jsx>{`
