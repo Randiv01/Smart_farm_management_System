@@ -48,11 +48,14 @@ import PrivacyPolicy from "./Components/UserHome/UHFooter/PrivacyPolicy.jsx";
 import TermsofService from "./Components/UserHome/UHFooter/TermsofService.jsx";
 import ShippingPolicy from "./Components/UserHome/UHFooter/ShippingPolicy.jsx";
 import RefundPolicy from "./Components/UserHome/UHFooter/RefundPolicy.jsx";
+import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  // about us page
+import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  // contact us page
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
 import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
 import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
+
 
 // ----------------- Health Management -----------------
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
@@ -119,7 +122,8 @@ function App() {
               <Route path="/termsofservice" element={ <TermsofService />} />
               <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
               <Route path="/refundPolicy" element={ <RefundPolicy />} />
-
+              <Route path="/about" element={<><Navbar /><AboutUs /></>} /> {/* Added About Us route */}
+              <Route path="/contact" element={<><Navbar /><ContactUs /></>} /> {/* Added Contact Us route */}
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
