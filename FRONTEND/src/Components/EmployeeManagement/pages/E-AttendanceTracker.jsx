@@ -1,6 +1,6 @@
 // Frontend: E-AttendanceTracker.jsx
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Plus, Trash2, Edit, FileDown, Clock, UserCheck, UserX, Calendar } from "lucide-react";
+import { Search, Filter, Plus, Trash2, Edit, FileDown, Clock, UserCheck, UserX, Calendar, X } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -20,6 +20,27 @@ import autoTable from "jspdf-autotable";
 
 // Set base URL for API calls
 const API_BASE_URL = "http://localhost:5000";
+
+// Custom notification component
+const Notification = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === "success" ? "bg-green-500" : "bg-red-500";
+  
+  return (
+    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-white ${bgColor} flex items-center justify-between min-w-80`}>
+      <span>{message}</span>
+      <button onClick={onClose} className="ml-4">
+        <X size={16} />
+      </button>
+    </div>
+  );
+};
 
 export const AttendanceTracker = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState("daily");
@@ -41,13 +62,22 @@ export const AttendanceTracker = ({ darkMode }) => {
   const [formErrors, setFormErrors] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [notification, setNotification] = useState({ show: false, message: "", type: "" });
 
   // Configure axios base URL
   useEffect(() => {
     axios.defaults.baseURL = API_BASE_URL;
   }, []);
+
+  // Show notification function
+  const showNotification = (message, type = "success") => {
+    setNotification({ show: true, message, type });
+  };
+
+  // Close notification function
+  const closeNotification = () => {
+    setNotification({ show: false, message: "", type: "" });
+  };
 
   // Fetch attendance data
   const fetchAttendanceData = async () => {
@@ -60,7 +90,7 @@ export const AttendanceTracker = ({ darkMode }) => {
       setAttendanceData(response.data);
     } catch (error) {
       console.error("Error fetching attendance data:", error);
-      setErrorMessage("Error fetching attendance data. Make sure the server is running on port 5000.");
+      showNotification("Error fetching attendance data. Make sure the server is running on port 5000.", "error");
     } finally {
       setLoading(false);
     }
@@ -90,7 +120,7 @@ export const AttendanceTracker = ({ darkMode }) => {
       });
     } catch (error) {
       console.error("Error fetching report data:", error);
-      setErrorMessage("Error fetching report data. Make sure the server is running on port 5000.");
+      showNotification("Error fetching report data. Make sure the server is running on port 5000.", "error");
     } finally {
       setLoading(false);
     }
@@ -145,77 +175,66 @@ export const AttendanceTracker = ({ darkMode }) => {
     return Object.keys(errors).length === 0;
   };
 
-  // Determine status based on check-in time
-  const determineStatus = (checkInTime) => {
-    if (!checkInTime || checkInTime === "-") return "Absent";
+  // Convert time format from "HH:MM" to "H:MM AM/PM" for display
+  const convertToDisplayTime = (timeStr) => {
+    if (timeStr === "-" || !timeStr) return "-";
     
-    const [time, modifier] = checkInTime.split(" ");
-    let [hours, minutes] = time.split(":").map(Number);
+    // Check if it's already in display format (contains AM/PM)
+    if (timeStr.includes("AM") || timeStr.includes("PM")) return timeStr;
     
-    if (modifier === "PM" && hours !== 12) hours += 12;
-    if (modifier === "AM" && hours === 12) hours = 0;
+    // Convert from "HH:MM" to "H:MM AM/PM"
+    let [hours, minutes] = timeStr.split(":").map(Number);
+    const modifier = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12; // Convert to 12-hour format
     
-    // After 10:00 AM is absent
-    if (hours > 10 || (hours === 10 && minutes > 0)) return "Absent";
-    
-    // After 8:00 AM is late
-    if (hours > 8 || (hours === 8 && minutes > 0)) return "Late";
-    
-    // Before 8:00 AM is present
-    return "Present";
+    return `${hours}:${minutes.toString().padStart(2, '0')} ${modifier}`;
   };
 
   // Handle form submission
-  // Frontend: E-AttendanceTracker.jsx - Update the handleSubmit function
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setErrorMessage("");
-  setSuccessMessage("");
-  
-  if (!validateForm()) return;
-  
-  try {
-    // Convert time formats for backend (don't determine status here - backend will do it)
-    const submitData = {
-      employeeId: formData.employeeId,
-      name: formData.name,
-      date: formData.date,
-      checkIn: formData.checkIn ? convertToDisplayTime(formData.checkIn) : "-",
-      checkOut: formData.checkOut ? convertToDisplayTime(formData.checkOut) : "-",
-      // Remove the status field - backend will calculate it
-    };
-
-    if (editingId) {
-      await axios.patch(`/api/attendance/${editingId}`, submitData);
-      setSuccessMessage("Attendance record updated successfully!");
-    } else {
-      await axios.post("/api/attendance", submitData);
-      setSuccessMessage("Attendance record added successfully!");
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    // Rest of the function remains the same...
-  } catch (error) {
-    console.error("Error saving attendance:", error);
-    const errorMsg = error.response?.data?.message || "Error saving attendance record. Make sure the server is running.";
-    setErrorMessage(errorMsg);
-  }
-};
+    if (!validateForm()) return;
+    
+    try {
+      // Convert time formats for backend
+      const submitData = {
+        employeeId: formData.employeeId,
+        name: formData.name,
+        date: formData.date,
+        checkIn: formData.checkIn ? convertToDisplayTime(formData.checkIn) : "-",
+        checkOut: formData.checkOut ? convertToDisplayTime(formData.checkOut) : "-",
+      };
 
-  // Convert time format from "HH:MM" to "H:MM AM/PM" for display
-  // Frontend: E-AttendanceTracker.jsx - Update the convertToDisplayTime function
-const convertToDisplayTime = (timeStr) => {
-  if (timeStr === "-" || !timeStr) return "-";
-  
-  // Check if it's already in display format (contains AM/PM)
-  if (timeStr.includes("AM") || timeStr.includes("PM")) return timeStr;
-  
-  // Convert from "HH:MM" to "H:MM AM/PM"
-  let [hours, minutes] = timeStr.split(":").map(Number);
-  const modifier = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12; // Convert to 12-hour format
-  
-  return `${hours}:${minutes.toString().padStart(2, '0')} ${modifier}`;
-};
+      if (editingId) {
+        await axios.patch(`/api/attendance/${editingId}`, submitData);
+        showNotification("Attendance record updated successfully!");
+      } else {
+        await axios.post("/api/attendance", submitData);
+        showNotification("Attendance record added successfully!");
+      }
+      
+      // Close form and refresh data
+      setShowForm(false);
+      setEditingId(null);
+      setFormData({
+        employeeId: "",
+        name: "",
+        date: new Date().toISOString().split("T")[0],
+        checkIn: "",
+        checkOut: "",
+      });
+      
+      // Refresh data
+      fetchAttendanceData();
+      fetchSummaryData();
+      if (activeTab === "reports") fetchReportData();
+    } catch (error) {
+      console.error("Error saving attendance:", error);
+      const errorMsg = error.response?.data?.message || "Error saving attendance record. Make sure the server is running.";
+      showNotification(errorMsg, "error");
+    }
+  };
 
   // Handle delete
   const handleDelete = async (id) => {
@@ -223,46 +242,41 @@ const convertToDisplayTime = (timeStr) => {
     
     try {
       await axios.delete(`/api/attendance/${id}`);
-      setSuccessMessage("Attendance record deleted successfully!");
+      showNotification("Attendance record deleted successfully!");
       fetchAttendanceData();
       fetchSummaryData();
       if (activeTab === "reports") fetchReportData();
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
       console.error("Error deleting attendance:", error);
-      setErrorMessage("Error deleting attendance record");
+      showNotification("Error deleting attendance record", "error");
     }
   };
 
   // Handle edit
-// Frontend: E-AttendanceTracker.jsx - Update the handleEdit function
-const handleEdit = (record) => {
-  // Convert display time back to input time format
-  const convertToTimeInput = (timeStr) => {
-    if (timeStr === "-" || !timeStr) return "";
-    
-    const [time, modifier] = timeStr.split(" ");
-    let [hours, minutes] = time.split(":").map(Number);
-    
-    if (modifier === "PM" && hours !== 12) hours += 12;
-    if (modifier === "AM" && hours === 12) hours = 0;
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  };
+  const handleEdit = (record) => {
+    // Convert display time back to input time format
+    const convertToTimeInput = (timeStr) => {
+      if (timeStr === "-" || !timeStr) return "";
+      
+      const [time, modifier] = timeStr.split(" ");
+      let [hours, minutes] = time.split(":").map(Number);
+      
+      if (modifier === "PM" && hours !== 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    };
 
-  setFormData({
-    employeeId: record.employeeId,
-    name: record.name,
-    date: new Date(record.date).toISOString().split("T")[0],
-    checkIn: record.checkIn !== "-" ? convertToTimeInput(record.checkIn) : "",
-    checkOut: record.checkOut !== "-" ? convertToTimeInput(record.checkOut) : "",
-    // Remove status field
-  });
-  setEditingId(record._id);
-  setShowForm(true);
-};
+    setFormData({
+      employeeId: record.employeeId,
+      name: record.name,
+      date: new Date(record.date).toISOString().split("T")[0],
+      checkIn: record.checkIn !== "-" ? convertToTimeInput(record.checkIn) : "",
+      checkOut: record.checkOut !== "-" ? convertToTimeInput(record.checkOut) : "",
+    });
+    setEditingId(record._id);
+    setShowForm(true);
+  };
 
   // Generate PDF report
   const generatePDF = () => {
@@ -328,22 +342,29 @@ const handleEdit = (record) => {
     { name: 'Late', value: summaryData.late, color: '#eab308' }
   ];
 
-  return (
-    <div className={`font-sans min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-light-beige text-gray-800"}`}>
-      {/* Success Message */}
-      {successMessage && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
-          <strong className="font-bold">Success: </strong>
-          <span className="block sm:inline">{successMessage}</span>
-        </div>
-      )}
+  // Close form and reset
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setFormData({
+      employeeId: "",
+      name: "",
+      date: new Date().toISOString().split("T")[0],
+      checkIn: "",
+      checkOut: "",
+    });
+    setFormErrors({});
+  };
 
-      {/* Error Message */}
-      {errorMessage && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{errorMessage}</span>
-        </div>
+  return (
+    <div className={`font-sans min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"}`}>
+      {/* Notification */}
+      {notification.show && (
+        <Notification 
+          message={notification.message} 
+          type={notification.type} 
+          onClose={closeNotification} 
+        />
       )}
 
       {/* Tabs */}
@@ -352,7 +373,7 @@ const handleEdit = (record) => {
           onClick={() => setActiveTab("daily")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
             activeTab === "daily"
-              ? "border-b-2 border-dark-green text-dark-green dark:text-dark-green"
+              ? "border-b-2 border-green-600 text-green-600 dark:text-green-400"
               : "text-inherit"
           }`}
         >
@@ -363,7 +384,7 @@ const handleEdit = (record) => {
           onClick={() => setActiveTab("reports")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
             activeTab === "reports"
-              ? "border-b-2 border-dark-green text-dark-green dark:text-dark-green"
+              ? "border-b-2 border-green-600 text-green-600 dark:text-green-400"
               : "text-inherit"
           }`}
         >
@@ -378,7 +399,7 @@ const handleEdit = (record) => {
           {/* Toolbar */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-              <div className={`flex items-center px-3 py-2 rounded-md ${darkMode ? "bg-gray-700" : "bg-soft-white shadow-card"}`}>
+              <div className={`flex items-center px-3 py-2 rounded-md ${darkMode ? "bg-gray-700" : "bg-white shadow-sm border"}`}>
                 <Search size={18} className="text-gray-400" />
                 <input
                   type="text"
@@ -389,7 +410,7 @@ const handleEdit = (record) => {
                 />
               </div>
               <button 
-                className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-700 text-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-700 text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => setSearchTerm("")}
               >
                 <Filter size={18} />
@@ -401,11 +422,11 @@ const handleEdit = (record) => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className={`px-3 py-2 border rounded-md text-sm ${darkMode ? "bg-gray-800 border-gray-600" : "bg-soft-white border-gray-300"}`}
+                className={`px-3 py-2 border rounded-md text-sm ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"}`}
               />
               <button
                 onClick={() => setShowForm(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-md bg-dark-green text-soft-white hover:bg-green-700 transition-colors shadow-btn"
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-md"
               >
                 <Plus size={18} />
                 <span>Add Attendance</span>
@@ -415,7 +436,7 @@ const handleEdit = (record) => {
 
           {/* Summary Cards */}
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
-            <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-full bg-green-100 dark:bg-green-800">
                   <UserCheck size={20} className="text-green-500 dark:text-green-300" />
@@ -427,7 +448,7 @@ const handleEdit = (record) => {
                 <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
               </div>
             </div>
-            <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-full bg-red-100 dark:bg-red-800">
                   <UserX size={20} className="text-red-500 dark:text-red-300" />
@@ -439,7 +460,7 @@ const handleEdit = (record) => {
                 <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
               </div>
             </div>
-            <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-800">
                   <Calendar size={20} className="text-orange-500 dark:text-orange-300" />
@@ -451,7 +472,7 @@ const handleEdit = (record) => {
                 <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
               </div>
             </div>
-            <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-full bg-yellow-100 dark:bg-yellow-800">
                   <Clock size={20} className="text-yellow-500 dark:text-yellow-300" />
@@ -469,9 +490,9 @@ const handleEdit = (record) => {
           {loading ? (
             <div className="text-center py-8">Loading attendance data...</div>
           ) : (
-            <div className={`rounded-lg overflow-hidden shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+            <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
               <table className="w-full border-collapse">
-                <thead className={darkMode ? "bg-gray-800" : "bg-gray-100"}>
+                <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
                   <tr>
                     <th className="text-left px-4 py-3 text-xs uppercase font-semibold">No</th>
                     <th className="text-left px-4 py-3 text-xs uppercase font-semibold">EmpId</th>
@@ -488,7 +509,7 @@ const handleEdit = (record) => {
                     attendanceData.map((record, index) => (
                       <tr
                         key={record._id}
-                        className={`border-t ${darkMode ? "border-gray-700 hover:bg-gray-800" : "border-gray-200 hover:bg-gray-50"}`}
+                        className={`border-t ${darkMode ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"}`}
                       >
                         <td className="px-4 py-3">{index + 1}</td>
                         <td className="px-4 py-3 font-medium">{record.employeeId}</td>
@@ -510,14 +531,14 @@ const handleEdit = (record) => {
                           <div className="flex gap-2">
                             <button 
                               onClick={() => handleEdit(record)}
-                              className="p-2 bg-btn-blue text-white rounded-full hover:bg-blue-600 transition-colors"
+                              className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
                               title="Edit"
                             >
                               <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleDelete(record._id)}
-                              className="p-2 bg-btn-red text-white rounded-full hover:bg-red-600 transition-colors"
+                              className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
                               title="Delete"
                             >
                               <Trash2 size={14} />
@@ -541,11 +562,16 @@ const handleEdit = (record) => {
           {/* Add/Edit Attendance Modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className={`p-6 rounded-lg w-full max-w-md max-h-screen overflow-y-auto ${darkMode ? "bg-dark-card" : "bg-soft-white"} shadow-xl`}>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  {editingId ? <Edit size={20} /> : <Plus size={20} />}
-                  {editingId ? "Edit Attendance" : "Add Attendance"}
-                </h3>
+              <div className={`p-6 rounded-lg w-full max-w-md max-h-screen overflow-y-auto ${darkMode ? "bg-gray-800" : "bg-white"} shadow-xl`}>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    {editingId ? <Edit size={20} /> : <Plus size={20} />}
+                    {editingId ? "Edit Attendance" : "Add Attendance"}
+                  </h3>
+                  <button onClick={closeForm} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <X size={20} />
+                  </button>
+                </div>
                 <form className="space-y-4" onSubmit={handleSubmit}>
                   <div>
                     <label className="block text-sm font-medium mb-1">Employee ID *</label>
@@ -553,7 +579,7 @@ const handleEdit = (record) => {
                       type="text" 
                       name="employeeId"
                       placeholder="Enter Employee ID" 
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} ${formErrors.employeeId ? "border-red-500" : ""}`}
+                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.employeeId ? "border-red-500" : ""}`}
                       value={formData.employeeId}
                       onChange={handleInputChange}
                     />
@@ -566,7 +592,7 @@ const handleEdit = (record) => {
                       type="text" 
                       name="name"
                       placeholder="Enter Name" 
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} ${formErrors.name ? "border-red-500" : ""}`}
+                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.name ? "border-red-500" : ""}`}
                       value={formData.name}
                       onChange={handleInputChange}
                     />
@@ -578,7 +604,7 @@ const handleEdit = (record) => {
                     <input 
                       type="date" 
                       name="date"
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} ${formErrors.date ? "border-red-500" : ""}`}
+                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.date ? "border-red-500" : ""}`}
                       value={formData.date}
                       onChange={handleInputChange}
                     />
@@ -591,7 +617,7 @@ const handleEdit = (record) => {
                       <input 
                         type="time" 
                         name="checkIn"
-                        className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} ${formErrors.checkIn ? "border-red-500" : ""}`}
+                        className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.checkIn ? "border-red-500" : ""}`}
                         value={formData.checkIn}
                         onChange={handleInputChange}
                       />
@@ -603,7 +629,7 @@ const handleEdit = (record) => {
                       <input 
                         type="time" 
                         name="checkOut"
-                        className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} ${formErrors.checkOut ? "border-red-500" : ""}`}
+                        className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.checkOut ? "border-red-500" : ""}`}
                         value={formData.checkOut}
                         onChange={handleInputChange}
                       />
@@ -611,30 +637,17 @@ const handleEdit = (record) => {
                     </div>
                   </div>
                   
-                  
                   <div className="flex justify-end gap-3 pt-4">
                     <button 
                       type="button" 
-                      onClick={() => {
-                        setShowForm(false);
-                        setEditingId(null);
-                        setFormData({
-                          employeeId: "",
-                          name: "",
-                          date: new Date().toISOString().split("T")[0],
-                          checkIn: "",
-                          checkOut: "",
-                          status: "Present"
-                        });
-                        setFormErrors({});
-                      }} 
-                      className="px-4 py-2 rounded bg-btn-gray text-white hover:bg-gray-600 transition-colors"
+                      onClick={closeForm}
+                      className="px-4 py-2 rounded bg-gray-500 text-white hover:bg-gray-600 transition-colors"
                     >
                       Cancel
                     </button>
                     <button 
                       type="submit" 
-                      className="px-4 py-2 rounded bg-dark-green text-white hover:bg-green-700 transition-colors"
+                      className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
                     >
                       {editingId ? "Update" : "Save"}
                     </button>
@@ -656,7 +669,7 @@ const handleEdit = (record) => {
             </h3>
             <div className="flex flex-col md:flex-row items-start md:items-center gap-2 w-full md:w-auto">
               <select 
-                className={`px-3 py-2 border rounded-md text-sm ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"}`}
+                className={`px-3 py-2 border rounded-md text-sm ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
                 value={reportPeriod}
                 onChange={(e) => setReportPeriod(e.target.value)}
               >
@@ -667,7 +680,7 @@ const handleEdit = (record) => {
               </select>
               <button
                 onClick={generatePDF}
-                className="flex items-center gap-2 px-4 py-2 rounded-md bg-btn-blue text-white hover:bg-blue-600 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors"
               >
                 <FileDown size={16} />
                 <span>Generate PDF</span>
@@ -679,7 +692,7 @@ const handleEdit = (record) => {
             <div className="text-center py-8">Loading report data...</div>
           ) : (
             <>
-              <div className={`p-6 rounded-lg mb-6 shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+              <div className={`p-6 rounded-lg mb-6 shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
                 <h4 className="mb-4 font-medium">Attendance Summary - {reportPeriod}</h4>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
@@ -705,7 +718,7 @@ const handleEdit = (record) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className={`p-6 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+                <div className={`p-6 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
                   <h4 className="font-medium mb-2">Today's Attendance Distribution</h4>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -736,7 +749,7 @@ const handleEdit = (record) => {
                 </div>
                 
                 <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 rounded-full bg-green-100 dark:bg-green-800">
                         <UserCheck size={20} className="text-green-500 dark:text-green-300" />
@@ -747,7 +760,7 @@ const handleEdit = (record) => {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Average for selected period</p>
                   </div>
                   
-                  <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 rounded-full bg-yellow-100 dark:bg-yellow-800">
                         <Clock size={20} className="text-yellow-500 dark:text-yellow-300" />
@@ -758,7 +771,7 @@ const handleEdit = (record) => {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Selected period</p>
                   </div>
                   
-                  <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 rounded-full bg-red-100 dark:bg-red-800">
                         <UserX size={20} className="text-red-500 dark:text-red-300" />
@@ -769,7 +782,7 @@ const handleEdit = (record) => {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Today</p>
                   </div>
                   
-                  <div className={`p-4 rounded-lg shadow-card ${darkMode ? "bg-dark-card" : "bg-soft-white"}`}>
+                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-800">
                         <Calendar size={20} className="text-orange-500 dark:text-orange-300" />

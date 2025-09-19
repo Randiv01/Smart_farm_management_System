@@ -119,6 +119,7 @@ import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
 import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
+import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
 // ----------------------- Ensure uploads folder exists for employee manager -----------------------
 if (!fs.existsSync("uploads")) {
@@ -179,6 +180,7 @@ app.use("/api/suppliers", supplierRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
+app.use("/api/overtime", overtimeRoutes);
 
 // ----------------------- Health Check -----------------------
 app.get("/health", (req, res) =>
