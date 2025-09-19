@@ -122,8 +122,9 @@ function App() {
               <Route path="/termsofservice" element={ <TermsofService />} />
               <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
               <Route path="/refundPolicy" element={ <RefundPolicy />} />
-              <Route path="/about" element={<><Navbar /><AboutUs /></>} /> {/* Added About Us route */}
-              <Route path="/contact" element={<><Navbar /><ContactUs /></>} /> {/* Added Contact Us route */}
+              <Route path="/about" element={<AboutUs />} /> 
+              <Route path="/contact" element={<ContactUs />} />
+
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={

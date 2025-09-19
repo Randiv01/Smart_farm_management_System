@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "../UHContext/UHThemeContext";
+import ChatBot from '../UHChatbot/UHChatbot';
 import {
   Search,
   ShoppingCart,
@@ -528,6 +529,7 @@ const openQuickView = (product) => {
     return (
       <>
         <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
+         
         <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -542,6 +544,7 @@ const openQuickView = (product) => {
   return (
     <>
       <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
+         <ChatBot/>
       <div ref={catalogRef} className="pt-0"></div>
       
       <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}>

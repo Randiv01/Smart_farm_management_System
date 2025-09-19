@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../UHNavbar/UHNavbar';
 import Footer from '../UHFooter/UHFooter';
+import ChatBot from '../UHChatbot/UHChatbot';
 import { 
   CalendarIcon, 
   ArrowRightIcon, 
@@ -325,6 +326,7 @@ const News = () => {
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-dark-bg text-dark-text' : 'bg-gray-50 text-gray-900'}`}>
       <Header />
+      <ChatBot/>
       
       {/* Hero Section with Parallax Effect */}
       <section className={`relative py-24 ${darkMode ? 'bg-dark-gray' : 'bg-green-900'} text-white overflow-hidden`}>

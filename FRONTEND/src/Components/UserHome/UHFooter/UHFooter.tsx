@@ -51,11 +51,10 @@ const UHFooter = () => {
               <h3 className="text-xl font-semibold mb-6 pb-2 border-b border-green-700 dark:border-green-800">Quick Links</h3>
               <ul className="space-y-3">
                 <li><a href="/" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Home</a></li>
-                <li><a href="/InventoryManagement/catalog" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Shop</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> About Us</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Farm Tours</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Contact</a></li>
-                <li><a href="news" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> News</a></li>
+                <li><a href="/catalog" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Shop</a></li>
+                <li><a href="/about" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> About Us</a></li>
+                <li><a href="/contact" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Contact</a></li>
+                <li><a href="/news" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> News</a></li>
               </ul>
             </div>
 

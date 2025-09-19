@@ -129,7 +129,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
               <span>Call us: +94 81 249 2134</span>
             </div>
             <span className="hidden sm:inline">|</span>
-            <a href="#" className="flex items-center hover:text-green-200 transition-colors">
+            <a href="/contact" className="flex items-center hover:text-green-200 transition-colors">
               <HelpCircleIcon className="h-3.5 w-3.5 mr-1" />
               <span className="hidden sm:inline">Help & Support</span>
             </a>

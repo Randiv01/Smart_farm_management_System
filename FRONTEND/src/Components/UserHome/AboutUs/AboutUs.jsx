@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
+import Navbar from '../UHNavbar/UHNavbar'; // Import the Navbar component
 import Footer from '../UHFooter/UHFooter';
+import { useTheme } from "../UHContext/UHThemeContext"; // Import the theme context
+import ChatBot from '../UHChatbot/UHChatbot';
 
 // Hero images (update paths or use URLs)
 import hero1 from "../Images/AboutUs1.jpg";
@@ -13,6 +16,8 @@ import ctoImg from "../Images/CtoAboutUs.webp";
 import pmImg from "../Images/projectManagerAboutUs.jpeg";
 
 const AboutUs = () => {
+  const { darkMode } = useTheme(); // Get dark mode state from context
+
   // Reveal on scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -37,6 +42,7 @@ const AboutUs = () => {
   const slides = [hero1, hero2, hero3, hero4];
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [cartItems] = useState([]); // Initialize empty cart for the navbar
 
   // Preload images
   useEffect(() => {
@@ -57,17 +63,30 @@ const AboutUs = () => {
   const prevSlide = () => setCurrent((i) => (i - 1 + slides.length) % slides.length);
   const nextSlide = () => setCurrent((i) => (i + 1) % slides.length);
 
+  // Function to handle cart click (if needed)
+  const handleCartClick = () => {
+    // You might want to navigate to the cart page or show a modal
+    console.log("Cart clicked");
+  };
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-emerald-50 via-green-50 to-white">
+    <div className={`relative min-h-screen overflow-hidden ${darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-b from-emerald-50 via-green-50 to-white text-gray-900"}`}>
+      {/* Navbar */}
+      <Navbar cartItems={cartItems} onCartClick={handleCartClick} />
+      <ChatBot/>
       {/* Decorative background blobs */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-green-300/30 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-0 h-80 w-80 rounded-full bg-emerald-200/40 blur-3xl"
-      />
+      {!darkMode && (
+        <>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-green-300/30 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 left-0 h-80 w-80 rounded-full bg-emerald-200/40 blur-3xl"
+          />
+        </>
+      )}
 
       {/* Full-width hero slideshow with overlay text */}
       <section
@@ -148,13 +167,13 @@ const AboutUs = () => {
         <div className="mt-4 grid w-full max-w-7xl grid-cols-1 gap-6 md:grid-cols-3">
           {/* Card 1 */}
           <div className="group relative animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 delay-100">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/25 via-emerald-400/20 to-green-500/25 opacity-70 blur-sm transition group-hover:opacity-100" />
-            <div className="relative rounded-3xl bg-white/80 p-8 shadow-lg ring-1 ring-green-100 backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:ring-green-300">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700">
+            <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/25 via-emerald-400/20 to-green-500/25 opacity-70 blur-sm transition group-hover:opacity-100 ${darkMode ? "from-green-700/25 via-emerald-600/20 to-green-700/25" : ""}`} />
+            <div className={`relative rounded-3xl ${darkMode ? "bg-gray-800/80 text-white" : "bg-white/80 text-gray-900"} p-8 shadow-lg ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl ${darkMode ? "group-hover:ring-green-600" : "group-hover:ring-green-300"}`}>
+              <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${darkMode ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-700"}`}>
                 <span className="text-2xl">🎯</span>
               </div>
-              <h2 className="text-3xl font-bold text-green-700 mb-3">Our Mission</h2>
-              <p className="text-gray-600 leading-relaxed">
+              <h2 className={`text-3xl font-bold ${darkMode ? "text-green-300" : "text-green-700"} mb-3`}>Our Mission</h2>
+              <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} leading-relaxed`}>
                 Revolutionize farming with smart solutions for sustainable growth.
               </p>
             </div>
@@ -162,13 +181,13 @@ const AboutUs = () => {
 
           {/* Card 2 */}
           <div className="group relative animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 delay-200">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/25 via-emerald-400/20 to-green-500/25 opacity-70 blur-sm transition group-hover:opacity-100" />
-            <div className="relative rounded-3xl bg-white/80 p-8 shadow-lg ring-1 ring-green-100 backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:ring-green-300">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700">
+            <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/25 via-emerald-400/20 to-green-500/25 opacity-70 blur-sm transition group-hover:opacity-100 ${darkMode ? "from-green-700/25 via-emerald-600/20 to-green-700/25" : ""}`} />
+            <div className={`relative rounded-3xl ${darkMode ? "bg-gray-800/80 text-white" : "bg-white/80 text-gray-900"} p-8 shadow-lg ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl ${darkMode ? "group-hover:ring-green-600" : "group-hover:ring-green-300"}`}>
+              <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${darkMode ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-700"}`}>
                 <span className="text-2xl">🔭</span>
               </div>
-              <h2 className="text-3xl font-bold text-green-700 mb-3">Our Vision</h2>
-              <p className="text-gray-600 leading-relaxed">
+              <h2 className={`text-3xl font-bold ${darkMode ? "text-green-300" : "text-green-700"} mb-3`}>Our Vision</h2>
+              <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} leading-relaxed`}>
                 Lead as a smart farm platform for 100+ farms with data-driven insights.
               </p>
             </div>
@@ -176,13 +195,13 @@ const AboutUs = () => {
 
           {/* Card 3 */}
           <div className="group relative animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 delay-300">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/25 via-emerald-400/20 to-green-500/25 opacity-70 blur-sm transition group-hover:opacity-100" />
-            <div className="relative rounded-3xl bg-white/80 p-8 shadow-lg ring-1 ring-green-100 backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:ring-green-300">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700">
+            <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/25 via-emerald-400/20 to-green-500/25 opacity-70 blur-sm transition group-hover:opacity-100 ${darkMode ? "from-green-700/25 via-emerald-600/20 to-green-700/25" : ""}`} />
+            <div className={`relative rounded-3xl ${darkMode ? "bg-gray-800/80 text-white" : "bg-white/80 text-gray-900"} p-8 shadow-lg ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl ${darkMode ? "group-hover:ring-green-600" : "group-hover:ring-green-300"}`}>
+              <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${darkMode ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-700"}`}>
                 <span className="text-2xl">🌿</span>
               </div>
-              <h2 className="text-3xl font-bold text-green-700 mb-3">Our Values</h2>
-              <p className="text-gray-600 leading-relaxed">
+              <h2 className={`text-3xl font-bold ${darkMode ? "text-green-300" : "text-green-700"} mb-3`}>Our Values</h2>
+              <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} leading-relaxed`}>
                 Innovation, sustainability, trust, and farmer dedication.
               </p>
             </div>
@@ -192,7 +211,7 @@ const AboutUs = () => {
         {/* Quality Assurance */}
         <div className="w-full max-w-7xl mt-16 animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 ease-out will-change-transform">
           <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-8">
-            <span className="bg-gradient-to-r from-green-800 to-emerald-600 bg-clip-text text-transparent">
+            <span className={`bg-gradient-to-r ${darkMode ? "from-green-400 to-emerald-300" : "from-green-800 to-emerald-600"} bg-clip-text text-transparent`}>
               Quality Assurance in Sri Lanka
             </span>
           </h2>
@@ -209,11 +228,11 @@ const AboutUs = () => {
             ].map((item) => (
               <div
                 key={item.title}
-                className="group relative overflow-hidden rounded-2xl bg-white/85 p-6 shadow-md ring-1 ring-green-100 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-green-300"
+                className={`group relative overflow-hidden rounded-2xl ${darkMode ? "bg-gray-800/85 text-white" : "bg-white/85 text-gray-900"} p-6 shadow-md ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${darkMode ? "hover:ring-green-600" : "hover:ring-green-300"}`}
               >
-                <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-green-100/60 blur-2xl" aria-hidden="true" />
-                <h3 className="text-xl font-semibold text-green-700 mb-2">{item.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{item.text}</p>
+                <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full ${darkMode ? "bg-green-900/30" : "bg-green-100/60"} blur-2xl`} aria-hidden="true" />
+                <h3 className={`text-xl font-semibold ${darkMode ? "text-green-300" : "text-green-700"} mb-2`}>{item.title}</h3>
+                <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} leading-relaxed`}>{item.text}</p>
               </div>
             ))}
           </div>
@@ -222,31 +241,31 @@ const AboutUs = () => {
         {/* Our Company Milestones */}
         <div className="w-full max-w-7xl mt-16 animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 ease-out will-change-transform">
           <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-3">
-            <span className="bg-gradient-to-r from-green-800 to-emerald-600 bg-clip-text text-transparent">
+            <span className={`bg-gradient-to-r ${darkMode ? "from-green-400 to-emerald-300" : "from-green-800 to-emerald-600"} bg-clip-text text-transparent`}>
               Our Company Milestones
             </span>
           </h2>
-          <p className="text-center text-gray-600 mb-10">Wow! What a journey so far...</p>
+          <p className={`text-center ${darkMode ? "text-gray-400" : "text-gray-600"} mb-10`}>Wow! What a journey so far...</p>
 
           <div className="relative mx-auto w-full max-w-4xl">
             {/* center line */}
-            <div className="absolute left-1/2 -ml-[1px] h-full w-0.5 bg-gradient-to-b from-green-200 via-emerald-300 to-green-200" />
+            <div className={`absolute left-1/2 -ml-[1px] h-full w-0.5 bg-gradient-to-b ${darkMode ? "from-green-800 via-emerald-700 to-green-800" : "from-green-200 via-emerald-300 to-green-200"}`} />
 
             <ul className="space-y-14">
               {/* 1995-2005 - Left */}
               <li className="relative md:grid md:grid-cols-9 md:items-center">
                 <div className="md:col-span-4">
                   <div className="flex justify-center md:justify-end md:pr-8">
-                    <div className="w-full md:w-3/4 rounded-xl bg-white/90 p-4 shadow-md ring-1 ring-green-100 backdrop-blur-sm">
-                      <p className="text-gray-600">
+                    <div className={`w-full md:w-3/4 rounded-xl ${darkMode ? "bg-gray-800/90 text-white" : "bg-white/90 text-gray-900"} p-4 shadow-md ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm`}>
+                      <p className={darkMode ? "text-gray-300" : "text-gray-600"}>
                         Started as a farm equipment supplier in 1995, building values of quality and support.
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md ring-4 ring-green-100 md:col-span-1 md:mx-0">
+                <div className={`relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md ring-4 ${darkMode ? "ring-green-800" : "ring-green-100"}`}>
                   <svg
-                    className="h-5 w-5 text-green-600"
+                    className={`h-5 w-5 ${darkMode ? "text-green-400" : "text-green-600"}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -261,9 +280,9 @@ const AboutUs = () => {
               {/* 2005-2015 - Right */}
               <li className="relative md:grid md:grid-cols-9 md:items-center">
                 <div className="hidden md:col-span-4 md:block" />
-                <div className="relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md ring-4 ring-green-100 md:col-span-1 md:mx-0">
+                <div className={`relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md ring-4 ${darkMode ? "ring-green-800" : "ring-green-100"}`}>
                   <svg
-                    className="h-5 w-5 text-green-600"
+                    className={`h-5 w-5 ${darkMode ? "text-green-400" : "text-green-600"}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -274,8 +293,8 @@ const AboutUs = () => {
                 </div>
                 <div className="md:col-span-4">
                   <div className="flex justify-center md:justify-start md:pl-8">
-                    <div className="w-full md:w-3/4 rounded-xl bg-white/90 p-4 shadow-md ring-1 ring-green-100 backdrop-blur-sm">
-                      <p className="text-gray-600">
+                    <div className={`w-full md:w-3/4 rounded-xl ${darkMode ? "bg-gray-800/90 text-white" : "bg-white/90 text-gray-900"} p-4 shadow-md ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm`}>
+                      <p className={darkMode ? "text-gray-300" : "text-gray-600"}>
                         Expanded nationwide in 2005, earning ISO and HACCP certifications.
                       </p>
                     </div>
@@ -287,16 +306,16 @@ const AboutUs = () => {
               <li className="relative md:grid md:grid-cols-9 md:items-center">
                 <div className="md:col-span-4">
                   <div className="flex justify-center md:justify-end md:pr-8">
-                    <div className="w-full md:w-3/4 rounded-xl bg-white/90 p-4 shadow-md ring-1 ring-green-100 backdrop-blur-sm">
-                      <p className="text-gray-600">
+                    <div className={`w-full md:w-3/4 rounded-xl ${darkMode ? "bg-gray-800/90 text-white" : "bg-white/90 text-gray-900"} p-4 shadow-md ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm`}>
+                      <p className={darkMode ? "text-gray-300" : "text-gray-600"}>
                         Launched Smart Farm Management System in 2015 for digital farm control.
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md ring-4 ring-green-100 md:col-span-1 md:mx-0">
+                <div className={`relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md ring-4 ${darkMode ? "ring-green-800" : "ring-green-100"}`}>
                   <svg
-                    className="h-5 w-5 text-green-600"
+                    className={`h-5 w-5 ${darkMode ? "text-green-400" : "text-green-600"}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -311,9 +330,9 @@ const AboutUs = () => {
               {/* 2025+ - Right */}
               <li className="relative md:grid md:grid-cols-9 md:items-center">
                 <div className="hidden md:col-span-4 md:block" />
-                <div className="relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md ring-4 ring-green-100 md:col-span-1 md:mx-0">
+                <div className={`relative z-10 mx-auto my-4 flex h-10 w-10 items-center justify-center rounded-full ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md ring-4 ${darkMode ? "ring-green-800" : "ring-green-100"}`}>
                   <svg
-                    className="h-5 w-5 text-green-600"
+                    className={`h-5 w-5 ${darkMode ? "text-green-400" : "text-green-600"}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -324,8 +343,8 @@ const AboutUs = () => {
                 </div>
                 <div className="md:col-span-4">
                   <div className="flex justify-center md:justify-start md:pl-8">
-                    <div className="w-full md:w-3/4 rounded-xl bg-white/90 p-4 shadow-md ring-1 ring-green-100 backdrop-blur-sm">
-                      <p className="text-gray-600">
+                    <div className={`w-full md:w-3/4 rounded-xl ${darkMode ? "bg-gray-800/90 text-white" : "bg-white/90 text-gray-900"} p-4 shadow-md ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm`}>
+                      <p className={darkMode ? "text-gray-300" : "text-gray-600"}>
                         Embracing IoT and AI from 2025 for automated farming globally.
                       </p>
                     </div>
@@ -339,7 +358,7 @@ const AboutUs = () => {
         {/* Awards Section */}
         <div className="w-full max-w-7xl mt-16 animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 ease-out will-change-transform">
           <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-8">
-            <span className="bg-gradient-to-r from-green-800 to-emerald-600 bg-clip-text text-transparent">
+            <span className={`bg-gradient-to-r ${darkMode ? "from-green-400 to-emerald-300" : "from-green-800 to-emerald-600"} bg-clip-text text-transparent`}>
               Our Awards & Recognition
             </span>
           </h2>
@@ -364,13 +383,13 @@ const AboutUs = () => {
             ].map((award) => (
               <div
                 key={award.title}
-                className="group rounded-3xl bg-gradient-to-br from-green-300/50 via-green-100/60 to-emerald-200/60 p-0.5 transition-all duration-300 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)]"
+                className={`group rounded-3xl bg-gradient-to-br ${darkMode ? "from-green-700/50 via-green-600/60 to-emerald-700/60" : "from-green-300/50 via-green-100/60 to-emerald-200/60"} p-0.5 transition-all duration-300 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)]`}
               >
-                <div className="rounded-3xl bg-white p-8 shadow-lg transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
+                <div className={`rounded-3xl ${darkMode ? "bg-gray-800" : "bg-white"} p-8 shadow-lg transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl`}>
                   <div className="text-6xl mb-4">🏆</div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-1">{award.title}</h3>
-                  <p className="text-green-700 font-semibold mb-3">{award.subtitle}</p>
-                  <p className="text-gray-600 text-sm leading-relaxed">{award.text}</p>
+                  <h3 className={`text-xl font-bold ${darkMode ? "text-white" : "text-gray-800"} mb-1`}>{award.title}</h3>
+                  <p className={`${darkMode ? "text-green-300" : "text-green-700"} font-semibold mb-3`}>{award.subtitle}</p>
+                  <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} text-sm leading-relaxed`}>{award.text}</p>
                 </div>
               </div>
             ))}
@@ -380,7 +399,7 @@ const AboutUs = () => {
         {/* Team Section */}
         <div className="w-full max-w-7xl mt-16 animate-on-scroll opacity-0 translate-y-10 scale-95 transition-all duration-1000 ease-out will-change-transform">
           <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-8">
-            <span className="bg-gradient-to-r from-green-800 to-emerald-600 bg-clip-text text-transparent">
+            <span className={`bg-gradient-to-r ${darkMode ? "from-green-400 to-emerald-300" : "from-green-800 to-emerald-600"} bg-clip-text text-transparent`}>
               Meet Our Team
             </span>
           </h2>
@@ -408,20 +427,20 @@ const AboutUs = () => {
             ].map((person) => (
               <div
                 key={person.name}
-                className="group rounded-3xl bg-white/80 p-8 text-center shadow-lg ring-1 ring-green-100 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-green-300"
+                className={`group rounded-3xl ${darkMode ? "bg-gray-800/80 text-white" : "bg-white/80 text-gray-900"} p-8 text-center shadow-lg ring-1 ${darkMode ? "ring-green-800" : "ring-green-100"} backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${darkMode ? "hover:ring-green-600" : "hover:ring-green-300"}`}
               >
                 <div className="relative mx-auto mb-4 h-40 w-40">
-                  <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-green-300 via-emerald-200 to-green-300 opacity-60 blur-md transition group-hover:opacity-90" />
+                  <div className={`absolute -inset-1 rounded-full bg-gradient-to-tr ${darkMode ? "from-green-700 via-emerald-600 to-green-700" : "from-green-300 via-emerald-200 to-green-300"} opacity-60 blur-md transition group-hover:opacity-90`} />
                   <img
                     src={person.img}
                     alt={person.name}
-                    className="relative h-40 w-40 rounded-full object-cover ring-4 ring-green-300/30 transition group-hover:ring-green-400/60"
+                    className={`relative h-40 w-40 rounded-full object-cover ring-4 ${darkMode ? "ring-green-700/30 group-hover:ring-green-500/60" : "ring-green-300/30 group-hover:ring-green-400/60"} transition`}
                     loading="lazy"
                   />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-800">{person.name}</h3>
-                <p className="text-green-700 font-medium">{person.role}</p>
-                <p className="text-gray-600 mt-2">{person.desc}</p>
+                <h3 className={`text-xl font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>{person.name}</h3>
+                <p className={`${darkMode ? "text-green-300" : "text-green-700"} font-medium`}>{person.role}</p>
+                <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} mt-2`}>{person.desc}</p>
               </div>
             ))}
           </div>
@@ -429,7 +448,7 @@ const AboutUs = () => {
 
         {/* Footer Accent */}
         <div className="mt-16 w-full">
-          <div className="mx-auto h-1 w-36 rounded-full bg-gradient-to-r from-green-400 via-emerald-500 to-green-400" />
+          <div className={`mx-auto h-1 w-36 rounded-full bg-gradient-to-r ${darkMode ? "from-green-500 via-emerald-400 to-green-500" : "from-green-400 via-emerald-500 to-green-400"}`} />
         </div>
       </div>
 
