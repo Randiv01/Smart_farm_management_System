@@ -61,6 +61,9 @@ import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHCont
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
 import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
 
+// Health Theme Provider
+import { ThemeProvider as HealthThemeProvider } from './Components/HealthManagement/ThemeProvider/ThemeProvider.js';
+
 // Layouts (Health)
 import AdminLayout from './Components/HealthManagement/H_layouts/H_AdminLayout.js';
 import DoctorLayout from './Components/HealthManagement/H_layouts/H_DoctorLayout.js';
@@ -217,63 +220,66 @@ function App() {
       </AuthProvider>
 
       {/* ----------------- Health Management Routes ----------------- */}
-      <HLanguageProvider>
-        <HThemeProvider>
-          <Routes>
-            {/* Doctor */}
-            <Route path="/doctor/*" element={
-              <ProtectedRoute allowedRoles={["health"]}>
-                <DoctorLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="home" replace />} />
-              <Route path="home" element={<DoctorDashboard />} />
-              <Route path="animals" element={<HealthAnimal />} />
-              <Route path="medicine-stock" element={<MediStore />} />
-              <Route path="pharmacy" element={<MedicineCompany />} />
-              <Route path="vet-specialist" element={<SpecialistDetails />} />
-              <Route path="treatment-details" element={<DoctorTreatment />} />
-              <Route path="help" element={<DoctorAdditional />} />
-              <Route path="*" element={<Navigate to="home" replace />} />
-            </Route>
+        <HLanguageProvider>
+          <HThemeProvider>
+            {/* Health Theme Provider now handles both dark mode and sidebar state */}
+            <HealthThemeProvider>
+              <Routes>
+                {/* Doctor */}
+                <Route path="/doctor/*" element={
+                  <ProtectedRoute allowedRoles={["health"]}>
+                    <DoctorLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Navigate to="home" replace />} />
+                  <Route path="home" element={<DoctorDashboard />} />
+                  <Route path="animals" element={<HealthAnimal />} />
+                  <Route path="medicine-stock" element={<MediStore />} />
+                  <Route path="pharmacy" element={<MedicineCompany />} />
+                  <Route path="vet-specialist" element={<SpecialistDetails />} />
+                  <Route path="treatment-details" element={<DoctorTreatment />} />
+                  <Route path="help" element={<DoctorAdditional />} />
+                  <Route path="*" element={<Navigate to="home" replace />} />
+                </Route>
 
-            {/* Plant Pathologist */}
-            <Route path="/plant-pathologist/*" element={
-              <ProtectedRoute allowedRoles={["health"]}>
-                <PlantPathologistLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="home" replace />} />
-              <Route path="home" element={<PlantPathologistHome />} />
-              <Route path="fertiliser-stock" element={<FertiliserStock />} />
-              <Route path="fertiliser-details" element={<FertiliserDetails />} />
-              <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
-              <Route path="help" element={<PlantPathologistAdditional />} />
-              <Route path="profile" element={<PlantPathologistProfile />} />
-              <Route path="*" element={<Navigate to="home" replace />} />
-            </Route>
+                {/* Plant Pathologist */}
+                <Route path="/plant-pathologist/*" element={
+                  <ProtectedRoute allowedRoles={["health"]}>
+                    <PlantPathologistLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Navigate to="home" replace />} />
+                  <Route path="home" element={<PlantPathologistHome />} />
+                  <Route path="fertiliser-stock" element={<FertiliserStock />} />
+                  <Route path="fertiliser-details" element={<FertiliserDetails />} />
+                  <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
+                  <Route path="help" element={<PlantPathologistAdditional />} />
+                  <Route path="profile" element={<PlantPathologistProfile />} />
+                  <Route path="*" element={<Navigate to="home" replace />} />
+                </Route>
 
-            {/* Admin */}
-            <Route path="/admin/*" element={
-              <ProtectedRoute allowedRoles={["health"]}>
-                <AdminLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="aaa" replace />} />
-              <Route path="aaa" element={<AddminPart />} />
-              <Route path="doctor-details" element={<DoctorDetails />} />
-              <Route path="specialist-details" element={<SpecialistDetails />} />
-              <Route path="medicine-company" element={<MedicineCompany />} />
-              <Route path="medistore" element={<MediStore />} />
-              <Route path="treatments-details" element={<TreatmentsDetails />} />
-              <Route path="treatments-payments" element={<TreatmentsPayments />} />
-              <Route path="profile" element={<AdminProfile />} />
-              <Route path="plant-pathologist" element={<H_PlantPathologist />} />
-              <Route path="*" element={<Navigate to="aaa" replace />} />
-            </Route>
-          </Routes>
-        </HThemeProvider>
-      </HLanguageProvider>
+                {/* Admin */}
+                <Route path="/admin/*" element={
+                  <ProtectedRoute allowedRoles={["health"]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                  <Route path="dashboard" element={<AddminPart />} />
+                  <Route path="doctor-details" element={<DoctorDetails />} />
+                  <Route path="specialist-details" element={<SpecialistDetails />} />
+                  <Route path="medicine-company" element={<MedicineCompany />} />
+                  <Route path="medistore" element={<MediStore />} />
+                  <Route path="treatments-details" element={<TreatmentsDetails />} />
+                  <Route path="treatments-payments" element={<TreatmentsPayments />} />
+                  <Route path="profile" element={<AdminProfile />} />
+                  <Route path="plant-pathologist" element={<H_PlantPathologist />} />
+                  <Route path="*" element={<Navigate to="dashboard" replace />} />
+                </Route>
+              </Routes>
+            </HealthThemeProvider>
+          </HThemeProvider>
+        </HLanguageProvider>
     </div>
   );
 }

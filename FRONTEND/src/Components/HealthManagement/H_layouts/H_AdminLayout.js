@@ -1,31 +1,39 @@
-import React, { useState } from "react";
+import React from "react";
 import { Outlet } from "react-router-dom";
-import NavBar from "../NavBar/NavBar.js";
+import NavBar from "../Sidebar/Sidebar.js";
 import H_TopNavbar from "../H_TopNavbar/H_TopNavbar.js";
+import { useTheme } from '../H_contexts/H_ThemeContext.js';
 
 const SIDEBAR_COLLAPSED_WIDTH = 80;   // px, matches w-20
 const SIDEBAR_EXPANDED_WIDTH = 256;   // px, matches w-64
 const TOPBAR_HEIGHT = 64;             // px, matches h-16
 
 const AdminLayout = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Use the theme context for sidebar and dark mode state
+  const { darkMode, toggleTheme, sidebarOpen, toggleSidebar } = useTheme();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${darkMode ? "bg-gray-900" : "bg-gray-50"}`}>
       {/* Fixed Sidebar */}
-      <NavBar isCollapsed={isCollapsed} />
+      <NavBar 
+        sidebarOpen={sidebarOpen}  // Changed from isCollapsed to sidebarOpen
+        darkMode={darkMode}
+        toggleSidebar={toggleSidebar}  // Added toggleSidebar prop
+      />
 
       {/* Fixed Top Navbar */}
       <H_TopNavbar
-        isCollapsed={isCollapsed}
-        onMenuClick={() => setIsCollapsed((prev) => !prev)}
+        sidebarOpen={sidebarOpen}  // Changed from isCollapsed to sidebarOpen
+        onMenuClick={toggleSidebar}
+        darkMode={darkMode}
+        toggleTheme={toggleTheme}
       />
 
       {/* Content area offset by sidebar width + topbar height */}
       <main
-        className="p-6"
+        className="p-6 transition-all duration-300"
         style={{
-          marginLeft: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH,
+          marginLeft: sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
           marginTop: TOPBAR_HEIGHT,
         }}
       >

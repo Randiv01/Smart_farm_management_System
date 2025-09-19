@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 
 const ThemeContext = createContext();
 
@@ -15,9 +15,10 @@ export const ThemeProvider = ({ children }) => {
     return localStorage.getItem('healthDarkMode') === 'true';
   });
   
-  // Modified to default to true (expanded) when no value is saved
+  // Change the initial state to default to true (expanded)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('healthSidebarOpen');
+    // Default to true if no value is saved
     return saved === null ? true : saved === 'true';
   });
 
@@ -33,6 +34,7 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
+  // Add function to toggle sidebar
   const toggleSidebar = () => {
     const newSidebarState = !sidebarOpen;
     setSidebarOpen(newSidebarState);
@@ -58,5 +60,3 @@ export const ThemeProvider = ({ children }) => {
     </ThemeContext.Provider>
   );
 };
-
-export { ThemeContext };
