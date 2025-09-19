@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Footer from '../UHFooter/UHFooter';
 
 // Hero images (update paths or use URLs)
 import hero1 from "../Images/AboutUs1.jpg";
@@ -431,6 +432,9 @@ const AboutUs = () => {
           <div className="mx-auto h-1 w-36 rounded-full bg-gradient-to-r from-green-400 via-emerald-500 to-green-400" />
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

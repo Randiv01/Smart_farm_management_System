@@ -42,17 +42,14 @@ import Home from './Components/UserHome/UHHome/UHHome.jsx';
 import Login from './Components/UserHome/Login/login.jsx';
 import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 import News from "./Components/UserHome/News/News.jsx"; 
-<<<<<<< Updated upstream
 import Catalog from "./Components/UserHome/UHCatalog/Catalog.jsx";
 import Payment from "./Components/UserHome/UHPayment/Payment.jsx";
 import PrivacyPolicy from "./Components/UserHome/UHFooter/PrivacyPolicy.jsx";
 import TermsofService from "./Components/UserHome/UHFooter/TermsofService.jsx";
 import ShippingPolicy from "./Components/UserHome/UHFooter/ShippingPolicy.jsx";
 import RefundPolicy from "./Components/UserHome/UHFooter/RefundPolicy.jsx";
-=======
-import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  //about us page
-import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  //cantact  us page
->>>>>>> Stashed changes
+import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  // about us page
+import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  // contact us page
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -118,7 +115,6 @@ function App() {
               <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-<<<<<<< Updated upstream
               <Route path="/news" element={<News />} />
               <Route path="/catalog" element={<Catalog /> } /> 
               <Route path="/payment" element={ <Payment />} />
@@ -126,12 +122,8 @@ function App() {
               <Route path="/termsofservice" element={ <TermsofService />} />
               <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
               <Route path="/refundPolicy" element={ <RefundPolicy />} />
-=======
-              <Route path="/news" element={<News />} /> 
               <Route path="/about" element={<><Navbar /><AboutUs /></>} /> {/* Added About Us route */}
-              <Route path="/contact" element={<><Navbar /><ContactUs /></>} /> {/*  Fixed */}
->>>>>>> Stashed changes
-
+              <Route path="/contact" element={<><Navbar /><ContactUs /></>} /> {/* Added Contact Us route */}
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={

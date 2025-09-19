@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ContactForm from "./ContactForm.jsx";
+import Footer from '../UHFooter/UHFooter';
 
 // Slideshow images (adjust paths if needed)
 import slide1 from "../Images/ContactUs1.jpg";
@@ -82,7 +83,7 @@ const ContactUs = () => {
               How can I help you?
             </h1>
             <p className="mt-2 max-w-3xl text-sm md:text-lg text-white/95 drop-shadow">
-              We’re here to help. Reach out to Mount Olive Farm House for support, partnerships, or general inquiries.
+              We're here to help. Reach out to Mount Olive Farm House for support, partnerships, or general inquiries.
             </p>
           </div>
 
@@ -137,7 +138,7 @@ const ContactUs = () => {
                     <br />
                     No. 45, Green Valley Road,
                     <br />
-                    Boragasketiya,Nuwaraeliya, Sri Lanka
+                    Boragasketiya,Nuwaraeliya, Sri Lanka
                   </p>
                 </div>
               </div>
@@ -259,6 +260,9 @@ const ContactUs = () => {
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
