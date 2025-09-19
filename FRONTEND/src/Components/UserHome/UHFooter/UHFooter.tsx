@@ -119,10 +119,10 @@ const UHFooter = () => {
             </p>
             
             <div className="flex flex-wrap justify-center gap-6 text-sm text-green-300">
-              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-white transition-colors">Shipping Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Refund Policy</a>
+              <a href="privacyPolicy" className="hover:text-white transition-colors">Privacy Policy</a>
+              <a href="termsofservice" className="hover:text-white transition-colors">Terms of Service</a>
+              <a href="shippingPolicy" className="hover:text-white transition-colors">Shipping Policy</a>
+              <a href="refundPolicy" className="hover:text-white transition-colors">Refund Policy</a>
             </div>
           </div>
           

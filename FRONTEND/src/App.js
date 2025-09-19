@@ -44,6 +44,10 @@ import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 import News from "./Components/UserHome/News/News.jsx"; 
 import Catalog from "./Components/UserHome/UHCatalog/Catalog.jsx";
 import Payment from "./Components/UserHome/UHPayment/Payment.jsx";
+import PrivacyPolicy from "./Components/UserHome/UHFooter/PrivacyPolicy.jsx";
+import TermsofService from "./Components/UserHome/UHFooter/TermsofService.jsx";
+import ShippingPolicy from "./Components/UserHome/UHFooter/ShippingPolicy.jsx";
+import RefundPolicy from "./Components/UserHome/UHFooter/RefundPolicy.jsx";
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -111,6 +115,10 @@ function App() {
               <Route path="/news" element={<News />} />
               <Route path="/catalog" element={<Catalog /> } /> 
               <Route path="/payment" element={ <Payment />} />
+              <Route path="/privacyPolicy" element={ <PrivacyPolicy />} />
+              <Route path="/termsofservice" element={ <TermsofService />} />
+              <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
+              <Route path="/refundPolicy" element={ <RefundPolicy />} />
 
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
