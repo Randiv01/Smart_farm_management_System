@@ -92,11 +92,11 @@ const UHFooter = () => {
               <ul className="space-y-4">
                 <li className="flex items-start">
                   <MapPinIcon className="h-5 w-5 mr-3 mt-0.5 text-green-300 dark:text-green-400 flex-shrink-0" />
-                  <span>123 Farm Road, Mount Olive, CA 90210</span>
+                  <span>No. 45, Green Valley Road,Boragasketiya,Nuwaraeliya, Sri Lanka</span>
                 </li>
                 <li className="flex items-center">
                   <PhoneIcon className="h-5 w-5 mr-3 text-green-300 dark:text-green-400 flex-shrink-0" />
-                  <span>(555) 123-4567</span>
+                  <span>+94 81 249 2134</span>
                 </li>
                 <li className="flex items-center">
                   <MailIcon className="h-5 w-5 mr-3 text-green-300 dark:text-green-400 flex-shrink-0" />

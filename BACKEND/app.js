@@ -91,6 +91,9 @@ import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologist
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
 
+//Contact us
+import contact from "./ContactUs/routes/contactRoutes.js";
+
 // Plant Management
 import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
 import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
@@ -135,6 +138,10 @@ app.use("/api/medistore", mediStoreRoutes);
 app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
+
+//Contact us
+app.use("/api/contact", contact);
+
 
 // Plant Management
 app.use("/api/inspections", inspectionRoutes);

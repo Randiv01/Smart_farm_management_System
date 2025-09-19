@@ -126,7 +126,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
           <div className="flex items-center space-x-4 text-xs">
             <div className="flex items-center">
               <PhoneIcon className="h-3.5 w-3.5 mr-1" />
-              <span>Call us: (123) 456-7890</span>
+              <span>Call us: +94 81 249 2134</span>
             </div>
             <span className="hidden sm:inline">|</span>
             <a href="#" className="flex items-center hover:text-green-200 transition-colors">
