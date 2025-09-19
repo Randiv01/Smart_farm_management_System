@@ -119,7 +119,7 @@ const ShippingPolicy = () => {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-dark-bg text-dark-text' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-dark-bg text-dark-text' : 'light-beige'}`}>
       <Header />
       
       {/* Scroll-triggered Popup */}
@@ -137,22 +137,6 @@ const ShippingPolicy = () => {
           </div>
         </div>
       )}
-
-      {/* Breadcrumb Navigation */}
-      <div className={`py-4 ${darkMode ? 'bg-dark-card' : 'bg-white'} border-b ${darkMode ? 'border-dark-gray' : 'border-gray-200'}`}>
-        <div className="container mx-auto px-6">
-          <nav className="flex items-center space-x-2 text-sm">
-            <a 
-              href="/" 
-              className={`hover:text-green-600 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}
-            >
-              Home
-            </a>
-            <span className={darkMode ? 'text-gray-600' : 'text-gray-300'}>/</span>
-            <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Shipping Policy</span>
-          </nav>
-        </div>
-      </div>
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
