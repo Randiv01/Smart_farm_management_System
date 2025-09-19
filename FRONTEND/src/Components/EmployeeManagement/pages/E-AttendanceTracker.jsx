@@ -1,4 +1,3 @@
-// Frontend: E-AttendanceTracker.jsx
 import React, { useState, useEffect } from "react";
 import { Search, Filter, Plus, Trash2, Edit, FileDown, Clock, UserCheck, UserX, Calendar, X } from "lucide-react";
 import {
@@ -801,3 +800,5 @@ export const AttendanceTracker = ({ darkMode }) => {
     </div>
   );
 };
+
+export default AttendanceTracker;
