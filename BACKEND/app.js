@@ -35,6 +35,7 @@ const healthUploadsDir = path.join(
   "HealthManagement",
   "Health_uploads"
 );
+const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -46,8 +47,15 @@ if (!fs.existsSync(healthUploadsDir)) {
   console.log("📁 Created Health_uploads directory");
 }
 
+if (!fs.existsSync(plantUploadsDir)) {
+  fs.mkdirSync(plantUploadsDir, { recursive: true });
+  console.log("📁 Created PlantManagement Uploads directory");
+}
+
+// Serve static folders
 app.use("/uploads", express.static(uploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
+app.use("/plant-uploads", express.static(plantUploadsDir));
 
 // Multer setup (optional if you handle uploads in individual routes)
 const storage = multer.diskStorage({
@@ -107,6 +115,18 @@ import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js"
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
 
+// ----------------------- Employee Management -----------------------
+import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
+import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
+import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
+
+// ----------------------- Ensure uploads folder exists for employee manager -----------------------
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+  console.log("📁 Created uploads directory for employee manager");
+}
+app.use("/uploads", express.static("uploads"));
+
 // ----------------------- Debug env variables -----------------------
 console.log(
   "OPENAI_API_KEY loaded:",
@@ -142,7 +162,6 @@ app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 //Contact us
 app.use("/api/contact", contact);
 
-
 // Plant Management
 app.use("/api/inspections", inspectionRoutes);
 app.use("/api/plants", plantRoutes);
@@ -155,6 +174,11 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
+
+// Employee Management
+app.use("/api/employees", employeeRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/leaves", leaveRoutes);
 
 // ----------------------- Health Check -----------------------
 app.get("/health", (req, res) =>
@@ -178,6 +202,12 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
+
+// ----------------------- Error Handling Middleware -----------------------
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+  res.status(500).json({ error: "Internal server error", stack: err.stack });
+});
 
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {

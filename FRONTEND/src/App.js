@@ -104,6 +104,17 @@ import PSettings from './Components/PlantManagement/pages/P-Settings.jsx';
 import { ThemeProvider as PThemeProvider } from './Components/PlantManagement/context/ThemeContext.jsx';
 import { LanguageProvider as PLanguageProvider } from './Components/PlantManagement/context/LanguageContext.jsx';
 
+// ----------------- Employee Management (NEW) -----------------
+import EmployeeLayoutWrapper from './Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx';
+import { Dashboard as EDashboard } from './Components/EmployeeManagement/pages/E-Dashboard.js';
+import { StaffHub as EStaffHub } from './Components/EmployeeManagement/pages/E-StaffHub.js';
+import { AttendanceTracker as EAttendanceTracker } from './Components/EmployeeManagement/pages/E-AttendanceTracker.jsx';
+import { ELeavePlanner } from './Components/EmployeeManagement/pages/E-LeavePlanner.jsx';
+import { OvertimeMonitor as EOvertimeMonitor } from './Components/EmployeeManagement/pages/E-OvertimeMonitor.js';
+import { SalaryDesk as ESalaryDesk } from './Components/EmployeeManagement/pages/E-SalaryDesk.js';
+import { EEmployeeReportCenter } from './Components/EmployeeManagement/pages/E-EmployeeReportCenter.js';
+import { SystemSettings as ESystemSettings } from './Components/EmployeeManagement/pages/E-SystemSettings.js';
+
 function App() {
   return (
     <div className="App">
@@ -169,6 +180,18 @@ function App() {
                 <Route path="animalfood" element={<AnimalFoodStock />} /> 
                 <Route path="FertilizerStock" element={<FertilizerStock />} /> 
                 <Route path="isuppliers" element={<ISupplier />} />
+              </Route>
+
+              {/* ----------------- Employee Management Routes (NEW) ----------------- */}
+              <Route path="/EmployeeManagement/*" element={<EmployeeLayoutWrapper />}>
+                <Route index element={<EDashboard />} />
+                <Route path="staff" element={<EStaffHub />} />
+                <Route path="attendance" element={<EAttendanceTracker />} />
+                <Route path="leave" element={<ELeavePlanner />} />
+                <Route path="overtime" element={<EOvertimeMonitor />} />
+                <Route path="salary" element={<ESalaryDesk />} />
+                <Route path="reports" element={<EEmployeeReportCenter />} />
+                <Route path="settings" element={<ESystemSettings />} />
               </Route>
 
               {/* ----------------- Plant Management Routes ----------------- */}
