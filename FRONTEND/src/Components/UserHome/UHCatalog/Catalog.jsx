@@ -583,11 +583,10 @@ const Catalog = () => {
 
   return (
     <>
-      <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
-      
-      {/* Gift Bucket Icon - Moved to right side */}
-      <div className="fixed right-6 bottom-6 z-40">
-        <button className="relative p-4 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition-colors">
+      <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />   
+      {/* Gift Bucket Icon - Positioned just above ChatBot */}
+      <div className="fixed right-5 bottom-20 z-40">
+        <button className="relative p-4 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-colors">
           <Gift size={24} />
           {giftBucket.length > 0 && (
             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
@@ -596,8 +595,13 @@ const Catalog = () => {
           )}
         </button>
       </div>
-      
-      <ChatBot/>
+
+      {/* ChatBot - Keep at bottom */}
+      <div className="fixed right-6 bottom-6 z-40">
+        <ChatBot />
+      </div>
+
+
       <div ref={catalogRef} className="pt-0"></div>
       
       <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}>
