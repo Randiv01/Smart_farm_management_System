@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw } from "lucide-react";
+import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard } from "lucide-react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-
-// Import the top navigation bar components
-import { FiTrendingUp, FiTrendingDown, FiDownload, FiAlertTriangle, FiBox, FiShoppingCart, FiGlobe, FiDollarSign } from "react-icons/fi";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Orders = () => {
   const { theme } = useITheme();
   const darkMode = theme === "dark";
-  const navigate = useNavigate();
   
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +17,8 @@ const Orders = () => {
   const [stats, setStats] = useState({});
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [emailSearch, setEmailSearch] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const statusOptions = [
     { value: "all", label: "All Orders" },
@@ -142,6 +139,16 @@ const Orders = () => {
     }
   };
 
+  const viewOrderDetails = (order) => {
+    setSelectedOrder(order);
+    setShowOrderModal(true);
+  };
+
+  const closeOrderModal = () => {
+    setShowOrderModal(false);
+    setSelectedOrder(null);
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pending': return <Clock size={16} className="text-yellow-500" />;
@@ -186,7 +193,7 @@ const Orders = () => {
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
       {/* Header */}
       <div className="max-w-7xl mx-auto p-6">
         <div className="mb-8">
@@ -364,7 +371,7 @@ const Orders = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex flex-col gap-2">
                             <button
-                              onClick={() => navigate(`/InventoryManagement/orders/${order._id}`)}
+                              onClick={() => viewOrderDetails(order)}
                               className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-left"
                             >
                               View Details
@@ -467,6 +474,149 @@ const Orders = () => {
           </div>
         )}
       </div>
+
+      {/* Order Details Modal */}
+      <AnimatePresence>
+        {showOrderModal && selectedOrder && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-full p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black bg-opacity-50"
+                onClick={closeOrderModal}
+              />
+              
+              {/* Modal */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className={`relative z-50 w-full max-w-4xl p-6 rounded-lg shadow-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}
+              >
+                <button
+                  onClick={closeOrderModal}
+                  className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                >
+                  <X size={24} />
+                </button>
+                
+                <h2 className="text-2xl font-bold mb-6">Order Details - #{selectedOrder.orderNumber}</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  {/* Customer Information */}
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <User size={20} className="mr-2" />
+                      Customer Information
+                    </h3>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Name:</span> {selectedOrder.customer.name}</p>
+                      <p><span className="font-medium">Email:</span> {selectedOrder.customer.email}</p>
+                      <p><span className="font-medium">Phone:</span> {selectedOrder.customer.phone || "Not provided"}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Shipping Information */}
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <MapPin size={20} className="mr-2" />
+                      Shipping Address
+                    </h3>
+                    <div className="space-y-2">
+                      <p>{selectedOrder.shippingAddress?.street || "Not provided"}</p>
+                      <p>{selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} {selectedOrder.shippingAddress?.zipCode}</p>
+                      <p>{selectedOrder.shippingAddress?.country}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Order Items */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Order Items</h3>
+                  <div className={`rounded-lg overflow-hidden ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <table className="w-full">
+                      <thead className={darkMode ? "bg-gray-600" : "bg-gray-200"}>
+                        <tr>
+                          <th className="px-4 py-2 text-left">Product</th>
+                          <th className="px-4 py-2 text-left">Quantity</th>
+                          <th className="px-4 py-2 text-left">Price</th>
+                          <th className="px-4 py-2 text-left">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.items.map((item, index) => (
+                          <tr key={index} className={darkMode ? "border-b border-gray-600" : "border-b border-gray-200"}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center">
+                                <div className="ml-3">
+                                  <p className="font-medium">{item.name}</p>
+                                  {item.sku && <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {item.sku}</p>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">{item.quantity}</td>
+                            <td className="px-4 py-3">${item.price?.toFixed(2)}</td>
+                            <td className="px-4 py-3">${(item.quantity * item.price)?.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                
+                {/* Order Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <CreditCard size={20} className="mr-2" />
+                      Payment Information
+                    </h3>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Payment Method:</span> {selectedOrder.paymentMethod || "Not specified"}</p>
+                      <p><span className="font-medium">Payment Status:</span> {selectedOrder.paymentStatus || "Not specified"}</p>
+                      <p><span className="font-medium">Transaction ID:</span> {selectedOrder.transactionId || "Not available"}</p>
+                    </div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>${selectedOrder.subtotal?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Shipping:</span>
+                        <span>${selectedOrder.shippingCost?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tax:</span>
+                        <span>${selectedOrder.tax?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg pt-2 border-t dark:border-gray-600 border-gray-200">
+                        <span>Total:</span>
+                        <span>${selectedOrder.totalAmount?.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={closeOrderModal}
+                    className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

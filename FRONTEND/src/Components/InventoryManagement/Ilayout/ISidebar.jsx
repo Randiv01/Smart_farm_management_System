@@ -1,17 +1,17 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
-  Home, 
-  Package, 
-  Layers, 
-  Calendar, 
-  Beef, 
-  Sprout, 
-  Users, 
-  ShoppingCart, 
-  Truck, 
-  CreditCard, 
-  BarChart3, 
+import {
+  Home,
+  Package,
+  Layers,
+  Calendar,
+  Beef,
+  Sprout,
+  Users,
+  ShoppingCart,
+  Truck,
+  CreditCard,
+  BarChart3,
   Bell,
   Settings,
   ClipboardList
@@ -53,12 +53,11 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
           onClick={() => toggleSidebar(false)}
         />
       )}
-
       <aside
         className={`
           fixed top-0 left-0 h-full z-40 transition-all duration-300 ease-in-out
           ${darkMode ? "bg-green-900" : "bg-green-700"} text-white flex flex-col shadow-lg overflow-hidden
-          ${sidebarOpen ? "w-64" : "w-0"} 
+          ${sidebarOpen ? "w-64" : "w-0"}
           ${sidebarOpen ? "lg:w-64" : "lg:w-20"}
         `}
       >
@@ -79,7 +78,6 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
             </div>
           )}
         </div>
-
         {/* Nav Items */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
           <ul className="space-y-1">
@@ -93,7 +91,7 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
                   className={`
                     flex items-center w-full p-3 rounded-lg transition-all
                     hover:bg-green-800 hover:shadow-sm
-                    ${location.pathname.startsWith(item.path) ? "bg-green-800 font-medium" : ""}
+                    ${location.pathname === item.path ? "bg-green-800 font-medium" : ""}
                     ${sidebarOpen ? "justify-start px-4" : "justify-center"}
                     focus:outline-none focus:ring-1 focus:ring-white/50
                   `}
@@ -110,7 +108,6 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
             ))}
           </ul>
         </nav>
-
         {/* Footer */}
         {sidebarOpen && (
           <div className="p-4 border-t border-white/20 flex flex-col items-center justify-center text-center text-white/80 text-xs space-y-1">
