@@ -51,8 +51,8 @@ import PrivacyPolicy from "./Components/UserHome/UHFooter/PrivacyPolicy.jsx";
 import TermsofService from "./Components/UserHome/UHFooter/TermsofService.jsx";
 import ShippingPolicy from "./Components/UserHome/UHFooter/ShippingPolicy.jsx";
 import RefundPolicy from "./Components/UserHome/UHFooter/RefundPolicy.jsx";
-import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  // about us page
-import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  // contact us page
+import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  
+import ContactUs from './Components/UserHome/ContactUs/ContactUs.jsx';  
 
 // User Contexts
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -124,63 +124,71 @@ import { SystemSettings as ESystemSettings } from './Components/EmployeeManageme
 function App() {
   return (
     <div className="App">
+      <ScrollToTop />
       
-       <ScrollToTop />
-      {/* ----------------- User / Frontend Routes ----------------- */}
-      <AuthProvider>
-        <UserThemeProvider>
-          <CartProvider>
-            <Routes>
-              <Route path="/" element={<><Navbar /><Home /></>} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/news" element={<News />} />
-              <Route path="/catalog" element={<Catalog /> } /> 
-              <Route path="/payment" element={ <Payment />} />
-              <Route path="/privacyPolicy" element={ <PrivacyPolicy />} />
-              <Route path="/termsofservice" element={ <TermsofService />} />
-              <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
-              <Route path="/refundPolicy" element={ <RefundPolicy />} />
-              <Route path="/about" element={<AboutUs />} /> 
-              <Route path="/contact" element={<ContactUs />} />
+      {/* Wrap all routes in a single Routes component */}
+      <Routes>
+        {/* ----------------- User / Frontend Routes ----------------- */}
+        <Route path="/*" element={
+          <AuthProvider>
+            <UserThemeProvider>
+              <CartProvider>
+                <Routes>
+                  <Route path="/" element={<><Navbar /><Home /></>} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/news" element={<News />} />
+                  <Route path="/catalog" element={<Catalog /> } /> 
+                  <Route path="/payment" element={ <Payment />} />
+                  <Route path="/privacyPolicy" element={ <PrivacyPolicy />} />
+                  <Route path="/termsofservice" element={ <TermsofService />} />
+                  <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
+                  <Route path="/refundPolicy" element={ <RefundPolicy />} />
+                  <Route path="/about" element={<AboutUs />} /> 
+                  <Route path="/contact" element={<ContactUs />} />
+                </Routes>
+              </CartProvider>
+            </UserThemeProvider>
+          </AuthProvider>
+        } />
 
+        {/* ----------------- Animal Management / Admin Routes ----------------- */}
+        <Route path="/AnimalManagement/*" element={
+          <ProtectedRoute allowedRoles={["animal"]}>
+            <LoaderProvider>
+              <LanguageProvider>
+                <AnimalThemeProvider>
+                  <UserProvider>
+                    <Layout>
+                      <Routes>
+                        <Route index element={<Dashboard />} />
+                        <Route path="feeding-scheduler" element={<FeedingScheduler />} />
+                        <Route path="add-animal-type" element={<AddAnimalType />} />
+                        <Route path="feed-stock" element={<FeedStock />} />
+                        <Route path="animal-health" element={<AnimalHealth />} />
+                        <Route path="HealthReport/:type" element={<HealthReport />} />
+                        <Route path="add-animal/:type" element={<AddAnimalForm />} />
+                        <Route path="AnimalProductivity/:type" element={<AnimalProductivity />} />
+                        <Route path="design-plan/:type" element={<FarmDesigner />} />
+                        <Route path="zones" element={<AnimalZones />} />
+                        <Route path="productivity" element={<Productivity />} />
+                        <Route path="settings" element={<Settings />} />
+                        <Route path="alerts" element={<Alerts />} />
+                        <Route path=":type" element={<AnimalList />} />
+                      </Routes>
+                    </Layout>
+                  </UserProvider>
+                </AnimalThemeProvider>
+              </LanguageProvider>
+            </LoaderProvider>
+          </ProtectedRoute>
+        } />
 
-              {/* ----------------- Animal Management / Admin Routes ----------------- */}
-              <Route path="/AnimalManagement/*" element={
-                <ProtectedRoute allowedRoles={["animal"]}>
-                  <LoaderProvider>
-                    <LanguageProvider>
-                      <AnimalThemeProvider>
-                        <UserProvider>
-                          <Layout />
-                        </UserProvider>
-                      </AnimalThemeProvider>
-                    </LanguageProvider>
-                  </LoaderProvider>
-                </ProtectedRoute>
-              }>
-                <Route index element={<Dashboard />} />
-                <Route path="feeding-scheduler" element={<FeedingScheduler />} />
-                <Route path="add-animal-type" element={<AddAnimalType />} />
-                <Route path="feed-stock" element={<FeedStock />} />
-                <Route path="animal-health" element={<AnimalHealth />} />
-                <Route path="HealthReport/:type" element={<HealthReport />} />
-                <Route path="add-animal/:type" element={<AddAnimalForm />} />
-                <Route path="AnimalProductivity/:type" element={<AnimalProductivity />} />
-                <Route path="design-plan/:type" element={<FarmDesigner />} />
-                <Route path="zones" element={<AnimalZones />} />
-                <Route path="productivity" element={<Productivity />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="alerts" element={<Alerts />} />
-                <Route path=":type" element={<AnimalList />} />
-              </Route>
-
-              {/* ----------------- Inventory Management Routes ----------------- */}
-              <Route path="/InventoryManagement/*" element={
-                <IThemeProvider>
-                  <ILayout />
-                </IThemeProvider>
-              }>
+        {/* ----------------- Inventory Management Routes ----------------- */}
+        <Route path="/InventoryManagement/*" element={
+          <IThemeProvider>
+            <ILayout>
+              <Routes>
                 <Route index element={<IDashboard />} />
                 <Route path="stock" element={<Stock />} />
                 <Route path="orders" element={<Orders />} />
@@ -188,103 +196,116 @@ function App() {
                 <Route path="animalfood" element={<AnimalFoodStock />} /> 
                 <Route path="FertilizerStock" element={<FertilizerStock />} /> 
                 <Route path="isuppliers" element={<ISupplier />} />
-              </Route>
-
-              {/* ----------------- Employee Management Routes (NEW) ----------------- */}
-              <Route path="/EmployeeManagement/*" element={<EmployeeLayoutWrapper />}>
-                <Route index element={<EDashboard />} />
-                <Route path="staff" element={<EStaffHub />} />
-                <Route path="attendance" element={<EAttendanceTracker />} />
-                <Route path="leave" element={<ELeavePlanner />} />
-                <Route path="overtime" element={<EOvertimeMonitor />} />
-                <Route path="salary" element={<ESalaryDesk />} />
-                <Route path="reports" element={<EEmployeeReportCenter />} />
-                <Route path="settings" element={<ESystemSettings />} />
-              </Route>
-
-              {/* ----------------- Plant Management Routes ----------------- */}
-              <Route path="/PlantManagement/*" element={
-                <PThemeProvider>
-                  <PLanguageProvider>
-                    <PLayout />
-                  </PLanguageProvider>
-                </PThemeProvider>
-              }>
-                <Route index element={<PDashboard />} />
-                <Route path="greenhouse" element={<PGreenhouseManagement />} />
-                <Route path="inspection" element={<PInspectionManagement />} />
-                <Route path="fertilizing" element={<PFertilizingManagement />} />
-                <Route path="pest-disease" element={<PPestDiseaseManagement />} />
-                <Route path="monitor-control" element={<PMonitorControl />} />
-                <Route path="productivity" element={<PProductivity />} />
-                <Route path="settings" element={<PSettings />} />
-              </Route>
-            </Routes>
-          </CartProvider>
-        </UserThemeProvider>
-      </AuthProvider>
-
-      {/* ----------------- Health Management Routes ----------------- */}
-        <HLanguageProvider>
-          <HThemeProvider>
-            {/* Health Theme Provider now handles both dark mode and sidebar state */}
-            <HealthThemeProvider>
-              <Routes>
-                {/* Doctor */}
-                <Route path="/doctor/*" element={
-                  <ProtectedRoute allowedRoles={["health"]}>
-                    <DoctorLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Navigate to="home" replace />} />
-                  <Route path="home" element={<DoctorDashboard />} />
-                  <Route path="animals" element={<HealthAnimal />} />
-                  <Route path="medicine-stock" element={<MediStore />} />
-                  <Route path="pharmacy" element={<MedicineCompany />} />
-                  <Route path="vet-specialist" element={<SpecialistDetails />} />
-                  <Route path="treatment-details" element={<DoctorTreatment />} />
-                  <Route path="help" element={<DoctorAdditional />} />
-                  <Route path="*" element={<Navigate to="home" replace />} />
-                </Route>
-
-                {/* Plant Pathologist */}
-                <Route path="/plant-pathologist/*" element={
-                  <ProtectedRoute allowedRoles={["health"]}>
-                    <PlantPathologistLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Navigate to="home" replace />} />
-                  <Route path="home" element={<PlantPathologistHome />} />
-                  <Route path="fertiliser-stock" element={<FertiliserStock />} />
-                  <Route path="fertiliser-details" element={<FertiliserDetails />} />
-                  <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
-                  <Route path="help" element={<PlantPathologistAdditional />} />
-                  <Route path="profile" element={<PlantPathologistProfile />} />
-                  <Route path="*" element={<Navigate to="home" replace />} />
-                </Route>
-
-                {/* Admin */}
-                <Route path="/admin/*" element={
-                  <ProtectedRoute allowedRoles={["health"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Navigate to="dashboard" replace />} />
-                  <Route path="dashboard" element={<AddminPart />} />
-                  <Route path="doctor-details" element={<DoctorDetails />} />
-                  <Route path="specialist-details" element={<SpecialistDetails />} />
-                  <Route path="medicine-company" element={<MedicineCompany />} />
-                  <Route path="medistore" element={<MediStore />} />
-                  <Route path="treatments-details" element={<TreatmentsDetails />} />
-                  <Route path="treatments-payments" element={<TreatmentsPayments />} />
-                  <Route path="profile" element={<AdminProfile />} />
-                  <Route path="plant-pathologist" element={<H_PlantPathologist />} />
-                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                </Route>
               </Routes>
-            </HealthThemeProvider>
-          </HThemeProvider>
-        </HLanguageProvider>
+            </ILayout>
+          </IThemeProvider>
+        } />
+
+        {/* ----------------- Employee Management Routes (NEW) ----------------- */}
+        <Route path="/EmployeeManagement/*" element={
+          <EmployeeLayoutWrapper>
+            <Routes>
+              <Route index element={<EDashboard />} />
+              <Route path="staff" element={<EStaffHub />} />
+              <Route path="attendance" element={<EAttendanceTracker />} />
+              <Route path="leave" element={<ELeavePlanner />} />
+              <Route path="overtime" element={<EOvertimeMonitor />} />
+              <Route path="salary" element={<ESalaryDesk />} />
+              <Route path="reports" element={<EEmployeeReportCenter />} />
+              <Route path="settings" element={<ESystemSettings />} />
+            </Routes>
+          </EmployeeLayoutWrapper>
+        } />
+
+        {/* ----------------- Plant Management Routes ----------------- */}
+        <Route path="/PlantManagement/*" element={
+          <PThemeProvider>
+            <PLanguageProvider>
+              <PLayout>
+                <Routes>
+                  <Route index element={<PDashboard />} />
+                  <Route path="greenhouse" element={<PGreenhouseManagement />} />
+                  <Route path="inspection" element={<PInspectionManagement />} />
+                  <Route path="fertilizing" element={<PFertilizingManagement />} />
+                  <Route path="pest-disease" element={<PPestDiseaseManagement />} />
+                  <Route path="monitor-control" element={<PMonitorControl />} />
+                  <Route path="productivity" element={<PProductivity />} />
+                  <Route path="settings" element={<PSettings />} />
+                </Routes>
+              </PLayout>
+            </PLanguageProvider>
+          </PThemeProvider>
+        } />
+      
+        {/* ----------------- Health Management Routes ----------------- */}
+        <Route path="/*" element={
+          <HLanguageProvider>
+            <HThemeProvider>
+              <HealthThemeProvider>
+                <Routes>
+                  {/* Doctor */}
+                  <Route path="/doctor/*" element={
+                    <ProtectedRoute allowedRoles={["health"]}>
+                      <DoctorLayout>
+                        <Routes>
+                          <Route index element={<Navigate to="home" replace />} />
+                          <Route path="home" element={<DoctorDashboard />} />
+                          <Route path="animals" element={<HealthAnimal />} />
+                          <Route path="medicine-stock" element={<MediStore />} />
+                          <Route path="pharmacy" element={<MedicineCompany />} />
+                          <Route path="vet-specialist" element={<SpecialistDetails />} />
+                          <Route path="treatment-details" element={<DoctorTreatment />} />
+                          <Route path="help" element={<DoctorAdditional />} />
+                          <Route path="*" element={<Navigate to="home" replace />} />
+                        </Routes>
+                      </DoctorLayout>
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Plant Pathologist */}
+                  <Route path="/plant-pathologist/*" element={
+                    <ProtectedRoute allowedRoles={["health"]}>
+                      <PlantPathologistLayout>
+                        <Routes>
+                          <Route index element={<Navigate to="home" replace />} />
+                          <Route path="home" element={<PlantPathologistHome />} />
+                          <Route path="fertiliser-stock" element={<FertiliserStock />} />
+                          <Route path="fertiliser-details" element={<FertiliserDetails />} />
+                          <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
+                          <Route path="help" element={<PlantPathologistAdditional />} />
+                          <Route path="profile" element={<PlantPathologistProfile />} />
+                          <Route path="*" element={<Navigate to="home" replace />} />
+                        </Routes>
+                      </PlantPathologistLayout>
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Admin */}
+                  <Route path="/admin/*" element={
+                    <ProtectedRoute allowedRoles={["health"]}>
+                      <AdminLayout>
+                        <Routes>
+                          <Route index element={<Navigate to="dashboard" replace />} />
+                          <Route path="dashboard" element={<AddminPart />} />
+                          <Route path="doctor-details" element={<DoctorDetails />} />
+                          <Route path="specialist-details" element={<SpecialistDetails />} />
+                          <Route path="medicine-company" element={<MedicineCompany />} />
+                          <Route path="medistore" element={<MediStore />} />
+                          <Route path="treatments-details" element={<TreatmentsDetails />} />
+                          <Route path="treatments-payments" element={<TreatmentsPayments />} />
+                          <Route path="profile" element={<AdminProfile />} />
+                          <Route path="plant-pathologist" element={<H_PlantPathologist />} />
+                          <Route path="*" element={<Navigate to="dashboard" replace />} />
+                        </Routes>
+                      </AdminLayout>
+                    </ProtectedRoute>
+                  } />
+                </Routes>
+              </HealthThemeProvider>
+            </HThemeProvider>
+          </HLanguageProvider>
+        } />
+      </Routes>
     </div>
   );
 }
