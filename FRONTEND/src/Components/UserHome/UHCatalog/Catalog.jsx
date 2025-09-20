@@ -38,25 +38,24 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Navbar from '../UHNavbar/UHNavbar';
 import Footer from '../UHFooter/UHFooter';
-
 const Catalog = () => {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
   const catalogRef = useRef(null);
   const searchTimeoutRef = useRef(null);
-  
+ 
   // Use the cart context instead of local state
-  const { 
-  cartItems, 
-  addToCart, 
-  removeFromCart, 
+  const {
+  cartItems,
+  addToCart,
+  removeFromCart,
   updateQuantity,
   getTotalItems,
   getTotalPrice,
   toggleCart,
   isCartOpen // Add this line
 } = useCart();
-  
+ 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -99,7 +98,7 @@ const Catalog = () => {
   const [showGiftModal, setShowGiftModal] = useState(false); // Add this line
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImage, setCurrentImage] = useState('');
-  
+ 
   const categories = [
     "All",
     "Fruits",
@@ -109,25 +108,23 @@ const Catalog = () => {
     "Honey",
     "Milk Product",
   ];
-  
+ 
   useEffect(() => {
     document.title = "Shop | Mount Olive Farm";
   }, []);
-
   const sampleImages = [
     "https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     "https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     "https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     "https://images.unsplash.com/photo-1566842600175-97dca3dfc3c7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
   ];
-  
+ 
   const splashQuotes = [
     "Life be healthy with vegetables and fruits",
     "Nourish your body with nature's best",
     "Fresh from the farm to your table",
     "Eat well, live well, naturally",
   ];
-
   // Default seasonal products for hero section
   const defaultSeasonalProducts = [
     {
@@ -163,17 +160,14 @@ const Catalog = () => {
       category: "Eggs"
     }
   ];
-
   useEffect(() => {
     if (catalogRef.current) {
       catalogRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [currentPage, selectedCategory, selectedMarket]);
-
   useEffect(() => {
     fetchProducts();
   }, [selectedCategory, selectedMarket, currentPage, sortBy, priceRange]);
-
   useEffect(() => {
     const savedViewed = localStorage.getItem("recentlyViewed");
     if (savedViewed) setRecentlyViewed(JSON.parse(savedViewed));
@@ -186,32 +180,26 @@ const Catalog = () => {
     const savedGiftBucket = localStorage.getItem("farmGiftBucket");
     if (savedGiftBucket) setGiftBucket(JSON.parse(savedGiftBucket));
   }, []);
-
   useEffect(() => {
     localStorage.setItem("farmWishlist", JSON.stringify(wishlist));
   }, [wishlist]);
-
   useEffect(() => {
     localStorage.setItem("farmGiftBucket", JSON.stringify(giftBucket));
   }, [giftBucket]);
-
   useEffect(() => {
     if (deliveryInfo.zipcode || deliveryInfo.date || deliveryInfo.email) {
       localStorage.setItem("farmDeliveryInfo", JSON.stringify(deliveryInfo));
     }
   }, [deliveryInfo]);
-
   useEffect(() => {
     localStorage.setItem("recentlyViewed", JSON.stringify(recentlyViewed));
   }, [recentlyViewed]);
-
   useEffect(() => {
     const interval = setInterval(() => {
       setCarouselIndex((prev) => (prev + 1) % Math.max(seasonalProducts.length, 1));
     }, 5000);
     return () => clearInterval(interval);
   }, [seasonalProducts.length]);
-
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     if (searchTerm !== "") {
@@ -222,7 +210,6 @@ const Catalog = () => {
     }
     return () => clearTimeout(searchTimeoutRef.current);
   }, [searchTerm]);
-
   useEffect(() => {
     const productsToUse = seasonalProducts.length > 0 ? seasonalProducts : defaultSeasonalProducts;
     const interval = setInterval(() => {
@@ -230,7 +217,6 @@ const Catalog = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [seasonalProducts.length]);
-
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -252,7 +238,7 @@ const Catalog = () => {
         return acc;
       }, {});
       setReviews(aggregatedReviews);
-      
+     
       // Only update seasonal products if we have actual products
       if (response.data.products.length > 0) {
         const seasonal = response.data.products
@@ -276,35 +262,29 @@ const Catalog = () => {
       setSearchLoading(false);
     }
   };
-
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
     setShowSearchSuggestions(e.target.value.length > 0);
   };
-
   const clearSearch = () => {
     setSearchTerm("");
     setCurrentPage(1);
     setShowSearchSuggestions(false);
   };
-
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
     setCurrentPage(1);
     setShowFilterDropdown(false);
   };
-
   const handleMarketChange = (e) => {
     setSelectedMarket(e.target.value);
     setCurrentPage(1);
   };
-
   const handleAddToCart = (product) => {
     addToCart(product);
     showToast(`${product.name} added to cart!`);
   };
-
   const showToast = (message) => {
     const toast = document.createElement('div');
     toast.className = `fixed top-20 right-4 z-50 px-4 py-2 rounded-md shadow-lg transition-opacity duration-300 ${
@@ -324,7 +304,6 @@ const Catalog = () => {
       setTimeout(() => document.body.removeChild(toast), 300);
     }, 2000);
   };
-
   const toggleWishlist = (product) => {
     if (wishlist.find(item => item._id === product._id)) {
       setWishlist(wishlist.filter(item => item._id !== product._id));
@@ -334,7 +313,6 @@ const Catalog = () => {
       showToast(`${product.name} added to wishlist!`);
     }
   };
-
   const toggleGiftBucket = (product) => {
   if (giftBucket.find(item => item._id === product._id)) {
     setGiftBucket(giftBucket.filter(item => item._id !== product._id));
@@ -344,7 +322,6 @@ const Catalog = () => {
     showToast(`${product.name} added to gift bucket!`);
   }
 };
-
   const proceedToPayment = () => {
     if (cartItems.length === 0) {
       alert("Your cart is empty!");
@@ -352,14 +329,12 @@ const Catalog = () => {
     }
     navigate('/payment');
   };
-
   const trackViewedProduct = useCallback((product) => {
     setRecentlyViewed(prev => {
       const newViewed = [product, ...prev.filter(p => p._id !== product._id)];
       return newViewed.slice(0, 8);
     });
   }, []);
-
   const openQuickView = (product) => {
     // Only track real products, not default ones
     if (!product._id.startsWith('default-')) {
@@ -367,12 +342,10 @@ const Catalog = () => {
     }
     setQuickViewProduct(product);
   };
-
   const openImageModal = (imageUrl) => {
     setCurrentImage(imageUrl);
     setShowImageModal(true);
   };
-
   const downloadImage = () => {
     const link = document.createElement('a');
     link.href = currentImage;
@@ -381,7 +354,6 @@ const Catalog = () => {
     link.click();
     document.body.removeChild(link);
   };
-
   const shareProduct = async (product) => {
     if (navigator.share) {
       try {
@@ -399,19 +371,16 @@ const Catalog = () => {
       showToast('Link copied to clipboard!');
     }
   };
-
   const handleSortChange = (e) => {
     setSortBy(e.target.value);
     setCurrentPage(1);
   };
-
   const handlePriceRangeChange = (e, index) => {
     const newRange = [...priceRange];
     newRange[index] = parseInt(e.target.value);
     setPriceRange(newRange);
     setCurrentPage(1);
   };
-
   const handleDeliveryInfoChange = (e) => {
     const { name, value } = e.target;
     setDeliveryInfo(prev => ({
@@ -419,11 +388,9 @@ const Catalog = () => {
       [name]: value
     }));
   };
-
   const formatPriceCalculation = (price, quantity, unit) => {
     return `$${price} × ${quantity}${unit} = $${(price * quantity).toFixed(2)}`;
   };
-
   const openReviewModal = (product) => {
     setReviewProduct(product);
     setUserReview({
@@ -435,7 +402,6 @@ const Catalog = () => {
     setEditingReview(null);
     setShowReviewModal(true);
   };
-
   const openEditReviewModal = (product, review) => {
     setReviewProduct(product);
     setUserReview({
@@ -447,7 +413,6 @@ const Catalog = () => {
     setEditingReview(review);
     setShowReviewModal(true);
   };
-
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!userReview.rating || !userReview.comment) {
@@ -477,17 +442,14 @@ const Catalog = () => {
       alert("Error submitting review. Please try again.");
     }
   };
-
   const getAverageRating = (productId) => {
     if (!reviews[productId] || reviews[productId].length === 0) return 0;
     const total = reviews[productId].reduce((sum, review) => sum + review.rating, 0);
     return (total / reviews[productId].length).toFixed(1);
   };
-
   const getReviewCount = (productId) => {
     return reviews[productId] ? reviews[productId].length : 0;
   };
-
   const getRatingDistribution = (productId) => {
     const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     if (!reviews[productId]) return distribution;
@@ -498,7 +460,6 @@ const Catalog = () => {
     });
     return distribution;
   };
-
   const renderStars = (rating, size = 16) => {
     return (
       <div className="flex">
@@ -512,7 +473,6 @@ const Catalog = () => {
       </div>
     );
   };
-
   const renderInteractiveStars = (rating, setRating, size = 24) => {
     return (
       <div className="flex">
@@ -528,17 +488,15 @@ const Catalog = () => {
       </div>
     );
   };
-
   const canEditReview = (review) => {
     const userEmail = deliveryInfo.email || userReview.email;
     return userEmail && review.email === userEmail;
   };
-
   if (loading) {
     return (
       <>
         <Navbar onCartClick={toggleCart} />
-         
+        
         <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -549,13 +507,12 @@ const Catalog = () => {
       </>
     );
   }
-
   return (
     <>
-      <Navbar onCartClick={toggleCart} />   
+      <Navbar onCartClick={toggleCart} />
       {/* Gift Bucket Icon - Positioned just above ChatBot */}
       <div className="fixed right-5 bottom-20 z-40">
-  <button 
+  <button
     onClick={() => setShowGiftModal(true)} // Change this line
     className="relative p-4 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-colors"
   >
@@ -567,15 +524,12 @@ const Catalog = () => {
     )}
   </button>
 </div>
-
       {/* ChatBot - Keep at bottom */}
       <div className="fixed right-6 bottom-6 z-40">
         <ChatBot />
       </div>
-
-
       <div ref={catalogRef} className="pt-0"></div>
-      
+     
       <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}>
         {/* Hero Carousel */}
         <section className="relative w-full h-[50vh] md:h-[60vh] overflow-hidden">
@@ -630,7 +584,6 @@ const Catalog = () => {
             ))}
           </div>
         </section>
-
         {/* Trust Badges */}
         <section className="container mx-auto px-4 py-8 md:py-12">
           <div className={`grid grid-cols-2 md:grid-cols-4 gap-6 p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
@@ -660,7 +613,6 @@ const Catalog = () => {
             </div>
           </div>
         </section>
-
         {/* Search and Filters */}
         <section className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -926,7 +878,7 @@ const Catalog = () => {
               </div>
             </div>
           </div>
-          
+         
           {/* Filter Summary */}
           {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
             <div className={`mb-6 p-4 rounded-xl ${darkMode ? "bg-gray-800" : "bg-green-50"}`}>
@@ -956,7 +908,6 @@ const Catalog = () => {
             </div>
           )}
         </section>
-
         {/* Products Grid */}
         <section className="container mx-auto px-10 pb-16">
           <h2 className="text-3xl font-bold mb-8 text-center relative">
@@ -965,7 +916,7 @@ const Catalog = () => {
               <span className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-green-600 rounded-full"></span>
             </span>
           </h2>
-          
+         
           {products.length > 0 ? (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -975,7 +926,7 @@ const Catalog = () => {
                   const isWishlisted = wishlist.find(item => item._id === product._id);
                   const isGiftBucketed = giftBucket.find(item => item._id === product._id);
                   const isNew = product.createdAt && (new Date() - new Date(product.createdAt)) < (7 * 24 * 60 * 60 * 1000);
-                  
+                 
                   return (
                     <div
                       key={product._id}
@@ -1008,7 +959,7 @@ const Catalog = () => {
                             </div>
                           </div>
                         )}
-                        
+                       
                         {/* Status Badge */}
                         <span className={`absolute top-3 right-3 px-2.5 py-1 text-xs font-semibold rounded-full shadow-md ${
                           product.status === 'In Stock'
@@ -1019,14 +970,14 @@ const Catalog = () => {
                         }`}>
                           {product.status}
                         </span>
-                        
+                       
                         {/* New Badge */}
                         {isNew && (
                           <span className="absolute top-3 left-3 px-2.5 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-200 text-xs font-semibold rounded-full shadow-md">
                             NEW
                           </span>
                         )}
-                        
+                       
                         {/* Quick View Overlay */}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40">
                           <div className="flex gap-2">
@@ -1056,8 +1007,8 @@ const Catalog = () => {
                                 toggleGiftBucket(product);
                               }}
                               className={`p-2 rounded-full font-medium flex items-center transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 ${
-                                isGiftBucketed 
-                                  ? 'bg-pink-600 text-white' 
+                                isGiftBucketed
+                                  ? 'bg-pink-600 text-white'
                                   : 'bg-white text-pink-600'
                               }`}
                               title="Add to Gift Bucket"
@@ -1067,13 +1018,13 @@ const Catalog = () => {
                           </div>
                         </div>
                       </div>
-                      
+                     
                       {/* Product Info */}
                       <div className="p-4">
                         <h3 className="font-semibold text-lg mb-2 line-clamp-2 h-14 leading-tight group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
                           {product.name}
                         </h3>
-                        
+                       
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex flex-col">
                             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
@@ -1084,7 +1035,7 @@ const Catalog = () => {
                               In stock: {product.stock.quantity} {product.stock.unit}
                             </p>
                           </div>
-                          
+                         
                           <div className="flex flex-col items-end">
                             <div className="flex items-center gap-1">
                               {renderStars(avgRating)}
@@ -1102,7 +1053,7 @@ const Catalog = () => {
                             </button>
                           </div>
                         </div>
-                        
+                       
                         {/* Action Buttons */}
                         <div className="flex gap-2 mt-4">
                           <button
@@ -1117,12 +1068,12 @@ const Catalog = () => {
                             <ShoppingCart size={18} />
                             <span className="font-medium">{product.status === 'Out of Stock' ? 'Out of Stock' : 'Add to Cart'}</span>
                           </button>
-                          
+                         
                           <button
                             onClick={() => shareProduct(product)}
                             className={`p-3 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                              darkMode 
-                                ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white shadow-md" 
+                              darkMode
+                                ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white shadow-md"
                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 shadow-md"
                             }`}
                             aria-label="Share product"
@@ -1135,7 +1086,7 @@ const Catalog = () => {
                   );
                 })}
               </div>
-              
+             
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex justify-center mt-12">
@@ -1144,15 +1095,15 @@ const Catalog = () => {
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                       className={`p-2.5 rounded-lg flex items-center justify-center transition-all ${
-                        currentPage === 1 
-                          ? 'opacity-50 cursor-not-allowed text-gray-400' 
+                        currentPage === 1
+                          ? 'opacity-50 cursor-not-allowed text-gray-400'
                           : 'text-green-600 hover:bg-green-50 dark:hover:bg-gray-700'
                       }`}
                       aria-label="Previous page"
                     >
                       <ChevronLeft size={20} />
                     </button>
-                    
+                   
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                       <button
                         key={page}
@@ -1167,13 +1118,13 @@ const Catalog = () => {
                         {page}
                       </button>
                     ))}
-                    
+                   
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
                       className={`p-2.5 rounded-lg flex items-center justify-center transition-all ${
-                        currentPage === totalPages 
-                          ? 'opacity-50 cursor-not-allowed text-gray-400' 
+                        currentPage === totalPages
+                          ? 'opacity-50 cursor-not-allowed text-gray-400'
                           : 'text-green-600 hover:bg-green-50 dark:hover:bg-gray-700'
                       }`}
                       aria-label="Next page"
@@ -1204,8 +1155,8 @@ const Catalog = () => {
                       setSortBy("featured");
                     }}
                     className={`px-6 py-3 rounded-xl font-medium transition-colors ${
-                      darkMode 
-                        ? "bg-gray-700 hover:bg-gray-600 text-white" 
+                      darkMode
+                        ? "bg-gray-700 hover:bg-gray-600 text-white"
                         : "bg-green-600 hover:bg-green-700 text-white"
                     }`}
                   >
@@ -1216,14 +1167,13 @@ const Catalog = () => {
             </div>
           )}
         </section>
-
         {/* Quick View Modal */}
         {quickViewProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fadeIn">
             <div className={`max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"} max-h-[90vh] flex flex-col`}>
               <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-green-50 to-green-100 dark:from-gray-800 dark:to-gray-900">
                 <h2 className="text-2xl font-bold">{quickViewProduct.name}</h2>
-                <button 
+                <button
                   onClick={() => setQuickViewProduct(null)}
                   className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
@@ -1392,16 +1342,14 @@ const Catalog = () => {
             </div>
           </div>
         )}
-
-        
-
+       
         {/* Image Modal */}
         {showImageModal && (
           <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 animate-fadeIn">
             <div className={`max-w-3xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"}`}>
               <div className="p-4 border-b flex justify-between items-center">
                 <h2 className="text-xl font-bold">Product Image</h2>
-                <button 
+                <button
                   onClick={() => setShowImageModal(false)}
                   className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
@@ -1419,8 +1367,8 @@ const Catalog = () => {
                 <button
                   onClick={downloadImage}
                   className={`px-6 py-3 rounded-lg flex items-center gap-2 font-semibold transition-colors ${
-                    darkMode 
-                      ? "bg-gray-700 hover:bg-gray-600 text-white" 
+                    darkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white"
                       : "bg-green-600 hover:bg-green-700 text-white"
                   }`}
                 >
@@ -1431,7 +1379,6 @@ const Catalog = () => {
             </div>
           </div>
         )}
-
         {/* Review Modal */}
         {showReviewModal && reviewProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center animate-fadeIn">
@@ -1514,11 +1461,9 @@ const Catalog = () => {
   giftItems={giftBucket}
   onUpdateGiftItems={setGiftBucket}
 />
-
-      
+     
       <Footer />
-
-      
+     
       <style jsx>{`
         .line-clamp-1 {
           display: -webkit-box;
@@ -1550,5 +1495,4 @@ const Catalog = () => {
     </>
   );
 };
-
 export default Catalog;
