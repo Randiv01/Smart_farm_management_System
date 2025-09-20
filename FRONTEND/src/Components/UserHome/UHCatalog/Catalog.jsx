@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "../UHContext/UHThemeContext";
+import { useCart } from '../UHContext/UHCartContext';
 import ChatBot from '../UHChatbot/UHChatbot';
 import UHGift from '../UHCatalog/UHGift';
 
@@ -43,6 +44,19 @@ const Catalog = () => {
   const navigate = useNavigate();
   const catalogRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  
+  // Use the cart context instead of local state
+  const { 
+  cartItems, 
+  addToCart, 
+  removeFromCart, 
+  updateQuantity,
+  getTotalItems,
+  getTotalPrice,
+  toggleCart,
+  isCartOpen // Add this line
+} = useCart();
+  
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,8 +64,6 @@ const Catalog = () => {
   const [selectedMarket, setSelectedMarket] = useState("Local Market");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [cartItems, setCartItems] = useState([]);
-  const [showCart, setShowCart] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [seasonalProducts, setSeasonalProducts] = useState([]);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
@@ -155,8 +167,6 @@ const Catalog = () => {
     fetchProducts();
   }, [selectedCategory, selectedMarket, currentPage, sortBy, priceRange]);
   useEffect(() => {
-    const savedCart = localStorage.getItem("farmCart");
-    if (savedCart) setCartItems(JSON.parse(savedCart));
     const savedViewed = localStorage.getItem("recentlyViewed");
     if (savedViewed) setRecentlyViewed(JSON.parse(savedViewed));
     const savedDeliveryInfo = localStorage.getItem("farmDeliveryInfo");
@@ -168,9 +178,11 @@ const Catalog = () => {
     const savedGiftBucket = localStorage.getItem("farmGiftBucket");
     if (savedGiftBucket) setGiftBucket(JSON.parse(savedGiftBucket));
   }, []);
+
   useEffect(() => {
     localStorage.setItem("farmCart", JSON.stringify(cartItems));
   }, [cartItems]);
+
   useEffect(() => {
     localStorage.setItem("farmWishlist", JSON.stringify(wishlist));
   }, [wishlist]);
@@ -272,6 +284,7 @@ const Catalog = () => {
     setSelectedMarket(e.target.value);
     setCurrentPage(1);
   };
+
   const addToCart = (product) => {
     const existingItem = cartItems.find(item => item._id === product._id);
     if (existingItem) {
@@ -283,6 +296,7 @@ const Catalog = () => {
     }
     showToast(`${product.name} added to cart!`);
   };
+
   const toggleWishlist = (product) => {
     if (wishlist.find(item => item._id === product._id)) {
       setWishlist(wishlist.filter(item => item._id !== product._id));
@@ -292,6 +306,7 @@ const Catalog = () => {
       showToast(`${product.name} added to wishlist!`);
     }
   };
+
   const toggleGiftBucket = (product) => {
     if (giftBucket.find(item => item._id === product._id)) {
       setGiftBucket(giftBucket.filter(item => item._id !== product._id));
@@ -301,6 +316,7 @@ const Catalog = () => {
       showToast(`${product.name} added to gift bucket!`);
     }
   };
+
   const showToast = (message) => {
     const toast = document.createElement('div');
     toast.className = `fixed top-20 right-4 z-50 px-4 py-2 rounded-md shadow-lg transition-opacity duration-300 ${
@@ -320,9 +336,11 @@ const Catalog = () => {
       setTimeout(() => document.body.removeChild(toast), 300);
     }, 2000);
   };
+
   const removeFromCart = (productId) => {
     setCartItems(cartItems.filter(item => item._id !== productId));
   };
+
   const updateQuantity = (productId, newQuantity) => {
     if (newQuantity < 1) {
       removeFromCart(productId);
@@ -332,16 +350,20 @@ const Catalog = () => {
       item._id === productId ? { ...item, quantity: newQuantity } : item
     ));
   };
+
   const incrementQuantity = (productId) => {
     updateQuantity(productId, cartItems.find(item => item._id === productId).quantity + 1);
   };
+
   const decrementQuantity = (productId) => {
     const item = cartItems.find(item => item._id === productId);
     updateQuantity(productId, item.quantity - 1);
   };
+
   const getTotalItems = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
+
   const getTotalPrice = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
   };
@@ -350,7 +372,6 @@ const Catalog = () => {
       alert("Your cart is empty!");
       return;
     }
-    localStorage.setItem('farmCart', JSON.stringify(cartItems));
     navigate('/payment');
   };
   const trackViewedProduct = useCallback((product) => {
@@ -524,7 +545,7 @@ const Catalog = () => {
     return (
       <>
         <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
-       
+         
         <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -537,7 +558,7 @@ const Catalog = () => {
   }
   return (
     <>
-      <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
+      <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />   
       {/* Gift Bucket Icon - Positioned just above ChatBot */}
       <div className="fixed right-5 bottom-20 z-40">
         <button 
@@ -590,7 +611,7 @@ const Catalog = () => {
                     <Eye size={20} className="mr-2" /> View Product
                   </button>
                   <button
-                    onClick={() => addToCart(product)}
+                    onClick={() => handleAddToCart(product)}
                     className="bg-green-600/90 hover:bg-green-700 text-white py-3 px-8 rounded-full font-semibold shadow-lg flex items-center transition-all border border-white/30"
                   >
                     <ShoppingCart size={20} className="mr-2" /> Add to Cart
@@ -1085,7 +1106,7 @@ const Catalog = () => {
                         {/* Action Buttons */}
                         <div className="flex gap-2 mt-4">
                           <button
-                            onClick={() => addToCart(product)}
+                            onClick={() => handleAddToCart(product)}
                             disabled={product.status === 'Out of Stock'}
                             className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${
                               product.status === 'Out of Stock'
@@ -1300,7 +1321,7 @@ const Catalog = () => {
                     </p>
                     <button
                       onClick={() => {
-                        addToCart(quickViewProduct);
+                        handleAddToCart(quickViewProduct);
                         setQuickViewProduct(null);
                       }}
                       disabled={quickViewProduct.status === 'Out of Stock'}
@@ -1480,6 +1501,7 @@ const Catalog = () => {
             </div>
           </div>
         )}
+
         {/* Cart Sidebar */}
         {showCart && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end animate-fadeIn">
