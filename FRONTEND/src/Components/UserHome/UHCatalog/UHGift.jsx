@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
   const [giftProducts, setGiftProducts] = useState([]);
   const [totalPrice, setTotalPrice] = useState(0);
-  const [selectedDesign, setSelectedDesign] = useState('basket');
+  const [selectedDesign, setSelectedDesign] = useState('bag');
   const [isDragging, setIsDragging] = useState(false);
   const [dragItem, setDragItem] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -12,41 +12,41 @@ const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
   // Design options with images
   const designOptions = [
     {
-      id: 'basket',
-      name: 'Basket',
-      image: 'https://t3.ftcdn.net/jpg/06/66/05/18/240_F_666051871_moJjcGBlNSnODh4b7NE8R4EwsOqcHKE8.jpg',
+      id: 'bag',
+      name: 'Bag',
+      image: 'https://t4.ftcdn.net/jpg/16/18/04/13/240_F_1618041307_8VQ1C6g5C6587Ibiour3VpwOsFv9J9JH.jpg',
       price: 0
     },
     {
       id: 'box',
       name: 'Box',
-      image: 'https://images.unsplash.com/photo-1557170335-a3c971b5a3d8?w=200&h=200&fit=crop',
-      price: 0
+      image: 'https://t3.ftcdn.net/jpg/06/06/30/94/240_F_606309473_Hm1AlIKf3MDku8QrSRzqna0XJvp14CzW.jpg',
+      price: 2
     },
     {
-      id: 'bag',
-      name: 'Bag',
-      image: 'https://images.unsplash.com/photo-1554342872-034a06541bad?w=200&h=200&fit=crop',
-      price: 0
+      id: 'basket',
+      name: 'Basket',
+      image: 'https://media.istockphoto.com/id/2163598081/photo/wicker-basket-against-white-background.jpg?s=612x612&w=0&k=20&c=IUL6NxfQBI4jt6PffOahwaa_5Bg9-XRGPssGpCEXjA4=',
+      price: 2
     },
     {
       id: 'premium',
       name: 'Premium Box',
-      image: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=200&h=200&fit=crop',
-      price: 5.99
+      image: 'https://t4.ftcdn.net/jpg/15/52/75/23/240_F_1552752302_h47u9MAYM3qch7Du0mhFgYxrAK4GT8s.jpg',
+      price: 5
     }
   ];
 
   useEffect(() => {
     setGiftProducts(giftItems);
-    calculateTotalPrice(giftItems);
-  }, [giftItems]);
+    calculateTotalPrice(giftItems, selectedDesign);
+  }, [giftItems, selectedDesign]);
 
-  const calculateTotalPrice = (products) => {
+  const calculateTotalPrice = (products, designId) => {
     const productsTotal = products.reduce((sum, product) => 
       sum + (product.price * (product.quantity || 1)), 0);
     
-    const designPrice = designOptions.find(d => d.id === selectedDesign)?.price || 0;
+    const designPrice = designOptions.find(d => d.id === designId)?.price || 0;
     setTotalPrice(productsTotal + designPrice);
   };
 
@@ -81,7 +81,7 @@ const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
     );
     
     setGiftProducts(updatedProducts);
-    calculateTotalPrice(updatedProducts);
+    calculateTotalPrice(updatedProducts, selectedDesign);
     
     if (onUpdateGiftItems) {
       onUpdateGiftItems(updatedProducts);
@@ -91,7 +91,7 @@ const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
   const removeFromGift = (productId) => {
     const updatedProducts = giftProducts.filter(product => product._id !== productId);
     setGiftProducts(updatedProducts);
-    calculateTotalPrice(updatedProducts);
+    calculateTotalPrice(updatedProducts, selectedDesign);
     
     if (onUpdateGiftItems) {
       onUpdateGiftItems(updatedProducts);
@@ -100,11 +100,10 @@ const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
 
   const handleDesignChange = (designId) => {
     setSelectedDesign(designId);
-    calculateTotalPrice(giftProducts); // Recalculate with new design price
+    calculateTotalPrice(giftProducts, designId);
   };
 
   const handleCheckout = () => {
-    // Implement checkout logic here
     alert(`Proceeding to checkout with ${giftProducts.length} items. Total: $${totalPrice.toFixed(2)}`);
   };
 
@@ -445,8 +444,10 @@ const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
               <div>
                 <p style={{ margin: 0, fontSize: '16px', color: '#2e7d32', fontWeight: 'bold' }}>
                   🎁 Special Advantage: {designOptions.find(d => d.id === selectedDesign)?.price === 0 ? 
-                    `Free ${selectedDesign} design included!` : 
-                    `Premium ${selectedDesign} design for only $${designOptions.find(d => d.id === selectedDesign)?.price}!`
+                    `Free ${designOptions.find(d => d.id === selectedDesign)?.name} design included!` : 
+                    selectedDesign === 'premium' ? 
+                    `Premium Box design for only $${designOptions.find(d => d.id === selectedDesign)?.price}!` : 
+                    `Standard ${designOptions.find(d => d.id === selectedDesign)?.name} design for $${designOptions.find(d => d.id === selectedDesign)?.price}!`
                   }
                 </p>
                 <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#388e3c' }}>
