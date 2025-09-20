@@ -10,7 +10,6 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import multer from "multer";
-
 import { createServer } from "http";
 import { Server } from "socket.io";
 
@@ -64,27 +63,19 @@ const uploadsDir = path.join(__dirname, "uploads");
 const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log("📁 Created uploads directory");
-}
-
-if (!fs.existsSync(healthUploadsDir)) {
-  fs.mkdirSync(healthUploadsDir, { recursive: true });
-  console.log("📁 Created Health_uploads directory");
-}
-
-if (!fs.existsSync(plantUploadsDir)) {
-  fs.mkdirSync(plantUploadsDir, { recursive: true });
-  console.log("📁 Created PlantManagement Uploads directory");
-}
+[uploadsDir, healthUploadsDir, plantUploadsDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`📁 Created directory: ${dir}`);
+  }
+});
 
 // Serve static folders
 app.use("/uploads", express.static(uploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
 
-// Multer setup
+// ----------------------- Multer setup -----------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
@@ -92,12 +83,14 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
+
 const fileFilter = (req, file, cb) => {
   const allowed = /jpeg|jpg|png|gif/;
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowed.test(ext)) cb(null, true);
   else cb(new Error("Only images are allowed"));
 };
+
 const upload = multer({ storage, fileFilter });
 
 // ----------------------- Import Routes -----------------------
@@ -109,10 +102,7 @@ import chatbotRoutes from "./AnimalManagement/routes/chatbotRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
 import { doctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
-import {
-  sendMedicalRequest,
-  testEmail,
-} from "./AnimalManagement/controllers/medicalRequestController.js";
+import { sendMedicalRequest, testEmail } from "./AnimalManagement/controllers/medicalRequestController.js";
 import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
@@ -148,13 +138,6 @@ import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
-// ----------------------- Ensure uploads folder exists for employee manager -----------------------
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-  console.log("📁 Created uploads directory for employee manager");
-}
-app.use("/uploads", express.static("uploads"));
-
 // ----------------------- Debug env variables -----------------------
 console.log("OPENAI_API_KEY loaded:", process.env.OPENAI_API_KEY ? "YES" : "NO");
 console.log("EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
@@ -184,7 +167,7 @@ app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 
-// Contact us
+// Contact Us
 app.use("/api/contact", contact);
 
 // Plant Management
@@ -207,12 +190,26 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 
+// Customer Profile Image Upload
+app.use(
+  "/api/customers/profile-upload",
+  upload.single("profileImage"),
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    res.json({
+      message: "Profile image uploaded successfully",
+      path: `/uploads/${req.file.filename}`,
+    });
+  }
+);
+
 // ----------------------- Health Check -----------------------
 app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
 app.get("/", (req, res) => res.send("Backend is running!"));
 
 // ----------------------- MongoDB Connection -----------------------
 const MONGO_URI =
+  process.env.MONGO_URI ||
   "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
 
 const connectDB = async () => {
@@ -236,7 +233,8 @@ app.use((err, req, res, next) => {
 
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
-  server.listen(5000, () => console.log("🚀 Server running on port 5000"));
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 });
 
 export default app;

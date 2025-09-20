@@ -1,7 +1,7 @@
 import './App.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Import ScrollToTop component
+// ----------------- Scroll -----------------
 import ScrollToTop from './Components/UserHome/ScrollToTop/ScrollToTop.jsx';
 
 // ----------------- Animal Management -----------------
@@ -20,10 +20,13 @@ import AnimalZones from './Components/AnimalManagement/AnimalZones/AnimalZones.j
 import Productivity from './Components/AnimalManagement/Productivity/Productivity.jsx';
 import Settings from './Components/AnimalManagement/Settings/Settings.jsx';
 import Alerts from './Components/AnimalManagement/Alerts/Alerts.jsx';
-import ProtectedRoute from "./Components/AnimalManagement/ProtectedRoute/ProtectedRoute.jsx";
 
-// Animal Contexts
-import { LanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
+// ----------------- Protected Routes -----------------
+import UserProtectedRoute from "./Components/UserHome/ProtectedRoute.jsx";
+import AdminProtectedRoute from "./Components/AnimalManagement/ProtectedRoute/ProtectedRoute.jsx";
+
+// ----------------- Animal Contexts -----------------
+import { LanguageProvider as AnimalLanguageProvider } from './Components/AnimalManagement/contexts/LanguageContext.js';
 import { LoaderProvider } from './Components/AnimalManagement/contexts/LoaderContext.js';
 import { ThemeProvider as AnimalThemeProvider } from './Components/AnimalManagement/contexts/ThemeContext.js';
 import { UserProvider } from './Components/AnimalManagement/contexts/UserContext.js';
@@ -53,26 +56,25 @@ import ShippingPolicy from "./Components/UserHome/UHFooter/ShippingPolicy.jsx";
 import RefundPolicy from "./Components/UserHome/UHFooter/RefundPolicy.jsx";
 import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  
 import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  
+import CustomerProfile from './Components/UserHome/CustomerProfile/CustomerProfile.jsx';
+import MyOrders from './Components/Orders/MyOrders.jsx';
 
-// User Contexts
+// ----------------- User Contexts -----------------
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
 import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
 import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
 
-
 // ----------------- Health Management -----------------
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
 import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
-
-// Health Theme Provider
 import { ThemeProvider as HealthThemeProvider } from './Components/HealthManagement/ThemeProvider/ThemeProvider.js';
 
-// Layouts (Health)
+// Health Layouts
 import AdminLayout from './Components/HealthManagement/H_layouts/H_AdminLayout.js';
 import DoctorLayout from './Components/HealthManagement/H_layouts/H_DoctorLayout.js';
 import PlantPathologistLayout from './Components/HealthManagement/H_layouts/H_PlantPathologistLayout.js';
 
-// ADMIN COMPONENTS (Health)
+// Health Admin Components
 import AddminPart from './Components/HealthManagement/AdminPart/HealthAddminPart.js';
 import DoctorDetails from './Components/HealthManagement/AdminPart/DoctorDetails/DoctorDetails.js';
 import SpecialistDetails from './Components/HealthManagement/AdminPart/H_SpecialistDetails/H_SpecialistDetails.js';
@@ -83,13 +85,13 @@ import TreatmentsPayments from './Components/HealthManagement/AdminPart/Treatmen
 import AdminProfile from './Components/HealthManagement/AdminPart/AdminProfile/AdminProfile.js';
 import H_PlantPathologist from './Components/HealthManagement/AdminPart/H_PlantPathologist/H_PlantPathologist.js';
 
-// DOCTOR COMPONENTS (Health)
+// Health Doctor Components
 import DoctorDashboard from './Components/HealthManagement/DoctorPart/DoctorDashBoard.js';
 import HealthAnimal from './Components/HealthManagement/DoctorPart/HealthAnimal.js';
 import DoctorTreatment from './Components/HealthManagement/DoctorPart/DoctorTreatment.js';
 import DoctorAdditional from './Components/HealthManagement/DoctorPart/DoctorAdditional.js';
 
-// PLANT PATHOLOGIST COMPONENTS (Health)
+// Plant Pathologist Components
 import PlantPathologistHome from "./Components/HealthManagement/PlantPathologistPart/PlantPathologistHome.js";
 import FertiliserStock from './Components/HealthManagement/PlantPathologistPart/H_FertiliserStock.js';
 import FertiliserDetails from './Components/HealthManagement/PlantPathologistPart/H_FertiliserDetails.js';
@@ -110,7 +112,7 @@ import PSettings from './Components/PlantManagement/pages/P-Settings.jsx';
 import { ThemeProvider as PThemeProvider } from './Components/PlantManagement/context/ThemeContext.jsx';
 import { LanguageProvider as PLanguageProvider } from './Components/PlantManagement/context/LanguageContext.jsx';
 
-// ----------------- Employee Management (NEW) -----------------
+// ----------------- Employee Management -----------------
 import EmployeeLayoutWrapper from './Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx';
 import { Dashboard as EDashboard } from './Components/EmployeeManagement/pages/E-Dashboard.js';
 import { StaffHub as EStaffHub } from './Components/EmployeeManagement/pages/E-StaffHub.js';
@@ -124,40 +126,47 @@ import { SystemSettings as ESystemSettings } from './Components/EmployeeManageme
 function App() {
   return (
     <div className="App">
-      
-       <ScrollToTop />
-      {/* ----------------- User / Frontend Routes ----------------- */}
+      <ScrollToTop />
       <AuthProvider>
         <UserThemeProvider>
           <CartProvider>
+            {/* ----------------- Routes Start ----------------- */}
             <Routes>
+              {/* ----------------- Public Routes ----------------- */}
               <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/news" element={<News />} />
-              <Route path="/catalog" element={<Catalog /> } /> 
-              <Route path="/payment" element={ <Payment />} />
-              <Route path="/privacyPolicy" element={ <PrivacyPolicy />} />
-              <Route path="/termsofservice" element={ <TermsofService />} />
-              <Route path="/shippingPolicy" element={ <ShippingPolicy />} />
-              <Route path="/refundPolicy" element={ <RefundPolicy />} />
+              <Route path="/catalog" element={<Catalog />} />
+              <Route path="/payment" element={<Payment />} />
+              <Route path="/privacyPolicy" element={<PrivacyPolicy />} />
+              <Route path="/termsofservice" element={<TermsofService />} />
+              <Route path="/shippingPolicy" element={<ShippingPolicy />} />
+              <Route path="/refundPolicy" element={<RefundPolicy />} />
               <Route path="/about" element={<AboutUs />} /> 
               <Route path="/contact" element={<ContactUs />} />
 
+              {/* ----------------- Customer Protected Routes ----------------- */}
+              <Route path="/profile" element={<UserProtectedRoute><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
+              <Route path="/orders" element={<UserProtectedRoute><><Navbar /><MyOrders /></></UserProtectedRoute>} />
+
+              {/* Legacy redirects */}
+              <Route path="/customer/profile" element={<Navigate to="/profile" replace />} />
+              <Route path="/customer/orders" element={<Navigate to="/orders" replace />} />
 
               {/* ----------------- Animal Management / Admin Routes ----------------- */}
               <Route path="/AnimalManagement/*" element={
-                <ProtectedRoute allowedRoles={["animal"]}>
+                <AdminProtectedRoute allowedRoles={["animal"]}>
                   <LoaderProvider>
-                    <LanguageProvider>
+                    <AnimalLanguageProvider>
                       <AnimalThemeProvider>
                         <UserProvider>
                           <Layout />
                         </UserProvider>
                       </AnimalThemeProvider>
-                    </LanguageProvider>
+                    </AnimalLanguageProvider>
                   </LoaderProvider>
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }>
                 <Route index element={<Dashboard />} />
                 <Route path="feeding-scheduler" element={<FeedingScheduler />} />
@@ -177,9 +186,11 @@ function App() {
 
               {/* ----------------- Inventory Management Routes ----------------- */}
               <Route path="/InventoryManagement/*" element={
-                <IThemeProvider>
-                  <ILayout />
-                </IThemeProvider>
+                <AdminProtectedRoute allowedRoles={["inv"]}>
+                  <IThemeProvider>
+                    <ILayout />
+                  </IThemeProvider>
+                </AdminProtectedRoute>
               }>
                 <Route index element={<IDashboard />} />
                 <Route path="stock" element={<Stock />} />
@@ -190,7 +201,7 @@ function App() {
                 <Route path="isuppliers" element={<ISupplier />} />
               </Route>
 
-              {/* ----------------- Employee Management Routes (NEW) ----------------- */}
+              {/* ----------------- Employee Management Routes ----------------- */}
               <Route path="/EmployeeManagement/*" element={<EmployeeLayoutWrapper />}>
                 <Route index element={<EDashboard />} />
                 <Route path="staff" element={<EStaffHub />} />
@@ -204,11 +215,13 @@ function App() {
 
               {/* ----------------- Plant Management Routes ----------------- */}
               <Route path="/PlantManagement/*" element={
-                <PThemeProvider>
-                  <PLanguageProvider>
-                    <PLayout />
-                  </PLanguageProvider>
-                </PThemeProvider>
+                <AdminProtectedRoute allowedRoles={["plant"]}>
+                  <PThemeProvider>
+                    <PLanguageProvider>
+                      <PLayout />
+                    </PLanguageProvider>
+                  </PThemeProvider>
+                </AdminProtectedRoute>
               }>
                 <Route index element={<PDashboard />} />
                 <Route path="greenhouse" element={<PGreenhouseManagement />} />
@@ -219,23 +232,11 @@ function App() {
                 <Route path="productivity" element={<PProductivity />} />
                 <Route path="settings" element={<PSettings />} />
               </Route>
-            </Routes>
-          </CartProvider>
-        </UserThemeProvider>
-      </AuthProvider>
 
-      {/* ----------------- Health Management Routes ----------------- */}
-        <HLanguageProvider>
-          <HThemeProvider>
-            {/* Health Theme Provider now handles both dark mode and sidebar state */}
-            <HealthThemeProvider>
-              <Routes>
+              {/* ----------------- Health Management Routes ----------------- */}
+              <Route element={<HLanguageProvider><HThemeProvider><HealthThemeProvider></HealthThemeProvider></HThemeProvider></HLanguageProvider>}>
                 {/* Doctor */}
-                <Route path="/doctor/*" element={
-                  <ProtectedRoute allowedRoles={["health"]}>
-                    <DoctorLayout />
-                  </ProtectedRoute>
-                }>
+                <Route path="/doctor/*" element={<AdminProtectedRoute allowedRoles={["health"]}><DoctorLayout /></AdminProtectedRoute>}>
                   <Route index element={<Navigate to="home" replace />} />
                   <Route path="home" element={<DoctorDashboard />} />
                   <Route path="animals" element={<HealthAnimal />} />
@@ -248,11 +249,7 @@ function App() {
                 </Route>
 
                 {/* Plant Pathologist */}
-                <Route path="/plant-pathologist/*" element={
-                  <ProtectedRoute allowedRoles={["health"]}>
-                    <PlantPathologistLayout />
-                  </ProtectedRoute>
-                }>
+                <Route path="/plant-pathologist/*" element={<AdminProtectedRoute allowedRoles={["health"]}><PlantPathologistLayout /></AdminProtectedRoute>}>
                   <Route index element={<Navigate to="home" replace />} />
                   <Route path="home" element={<PlantPathologistHome />} />
                   <Route path="fertiliser-stock" element={<FertiliserStock />} />
@@ -264,11 +261,7 @@ function App() {
                 </Route>
 
                 {/* Admin */}
-                <Route path="/admin/*" element={
-                  <ProtectedRoute allowedRoles={["health"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }>
+                <Route path="/admin/*" element={<AdminProtectedRoute allowedRoles={["health"]}><AdminLayout /></AdminProtectedRoute>}>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<AddminPart />} />
                   <Route path="doctor-details" element={<DoctorDetails />} />
@@ -281,10 +274,14 @@ function App() {
                   <Route path="plant-pathologist" element={<H_PlantPathologist />} />
                   <Route path="*" element={<Navigate to="dashboard" replace />} />
                 </Route>
-              </Routes>
-            </HealthThemeProvider>
-          </HThemeProvider>
-        </HLanguageProvider>
+              </Route>
+
+              {/* Catch-all */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </CartProvider>
+        </UserThemeProvider>
+      </AuthProvider>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // src/Components/UserHome/UHContext/UHAuthContext.jsx
-import React, { useEffect, useState, createContext, useContext } from 'react';
+import React, { useEffect, useState, createContext, useContext } from "react";
 
 const AuthContext = createContext();
 
@@ -9,81 +9,62 @@ export const AuthProvider = ({ children }) => {
 
   // Load user from localStorage on mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       const userData = {
         token,
-        role: localStorage.getItem('role'),
-        firstName: localStorage.getItem('firstName'),
-        lastName: localStorage.getItem('lastName'),
-        email: localStorage.getItem('email'),
-        name: localStorage.getItem('name')
+        role: localStorage.getItem("role"),
+        firstName: localStorage.getItem("firstName"),
+        lastName: localStorage.getItem("lastName"),
+        email: localStorage.getItem("email"),
+        name: localStorage.getItem("name"),
+        profileImage: localStorage.getItem("profileImage") || "",
       };
       setUser(userData);
       setIsAuthenticated(true);
     }
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (userData) => {
     try {
-      if (email && password) {
-        const userData = {
-          token: 'simulated-token',
-          role: 'customer',
-          firstName: email.split('@')[0],
-          lastName: '',
-          email,
-          name: email.split('@')[0]
-        };
-
-        // Save to localStorage
+      if (userData?.email && userData?.token) {
         localStorage.setItem("token", userData.token);
-        localStorage.setItem("role", userData.role);
-        localStorage.setItem("firstName", userData.firstName);
-        localStorage.setItem("lastName", userData.lastName);
+        localStorage.setItem("role", userData.role || "customer");
+        localStorage.setItem("firstName", userData.firstName || "");
+        localStorage.setItem("lastName", userData.lastName || "");
         localStorage.setItem("email", userData.email);
-        localStorage.setItem("name", userData.name);
+        localStorage.setItem("name", userData.name || userData.firstName || "");
+        localStorage.setItem("profileImage", userData.profileImage || "");
 
-        // Update state immediately
         setUser(userData);
         setIsAuthenticated(true);
-
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       return false;
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (userData) => {
     try {
-      if (name && email && password) {
-        const userData = {
-          token: 'simulated-token',
-          role: 'customer',
-          firstName: name,
-          lastName: '',
-          email,
-          name
-        };
-
+      if (userData?.email && userData?.token) {
         localStorage.setItem("token", userData.token);
-        localStorage.setItem("role", userData.role);
-        localStorage.setItem("firstName", userData.firstName);
-        localStorage.setItem("lastName", userData.lastName);
+        localStorage.setItem("role", userData.role || "customer");
+        localStorage.setItem("firstName", userData.firstName || "");
+        localStorage.setItem("lastName", userData.lastName || "");
         localStorage.setItem("email", userData.email);
-        localStorage.setItem("name", userData.name);
+        localStorage.setItem("name", userData.name || userData.firstName || "");
+        localStorage.setItem("profileImage", userData.profileImage || "");
 
         setUser(userData);
         setIsAuthenticated(true);
-
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error("Registration error:", error);
       return false;
     }
   };
@@ -95,13 +76,27 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("lastName");
     localStorage.removeItem("email");
     localStorage.removeItem("name");
+    localStorage.removeItem("profileImage");
 
     setUser(null);
     setIsAuthenticated(false);
   };
 
+  // Update user info (used for profile changes)
+  const updateUser = (updatedData) => {
+    const newUser = { ...user, ...updatedData };
+    setUser(newUser);
+
+    // persist updated fields
+    Object.keys(updatedData).forEach((key) => {
+      localStorage.setItem(key, updatedData[key]);
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated, login, register, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -109,6 +104,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
