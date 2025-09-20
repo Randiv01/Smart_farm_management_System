@@ -47,10 +47,10 @@ export default function FeedingScheduler() {
         setLoading(true);
         setApiError(false);
         
-        // Fetch animals and feeds (like FeedStocks does)
+        // Fetch animals and feeds
         const [animalsRes, feedsRes] = await Promise.all([
           fetch("http://localhost:5000/animal-types"),
-          fetch("http://localhost:5000/feed-stocks")
+          fetch("http://localhost:5000/api/animalfood")
         ]);
 
         if (!animalsRes.ok || !feedsRes.ok) {
@@ -292,6 +292,12 @@ export default function FeedingScheduler() {
     }
   };
 
+  // Get food name safely - handles both name and foodName properties
+  const getFoodName = (foodItem) => {
+    if (!foodItem) return "Unknown";
+    return foodItem.name || foodItem.foodName || "Unknown";
+  };
+
   return (
     <div className={`p-4 sm:p-6 rounded-xl transition-all duration-300 ${
       darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"
@@ -473,7 +479,7 @@ export default function FeedingScheduler() {
             ) : (
               feeds.map((f) => (
                 <option key={f._id} value={f._id} disabled={f.remaining <= 0}>
-                  {f.foodName} ({f.remaining} {f.unit || feedUnit} remaining)
+                  {getFoodName(f)} ({f.remaining} {f.unit || feedUnit} remaining)
                   {f.remaining <= 0 && " - OUT OF STOCK"}
                 </option>
               ))
@@ -788,7 +794,7 @@ export default function FeedingScheduler() {
                       {feedingHistory.map((h) => (
                         <tr key={h._id} className={`border-t ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
                           <td className="p-3">{h.animalId?.name || "Unknown"}</td>
-                          <td className="p-3">{h.foodId?.foodName || "Unknown"}</td>
+                          <td className="p-3">{getFoodName(h.foodId)}</td>
                           <td className="p-3">{h.quantity} {h.foodId?.unit || feedUnit}</td>
                           <td className="p-3">
                             {h.feedingTime ? new Date(h.feedingTime).toLocaleString() : "-"}

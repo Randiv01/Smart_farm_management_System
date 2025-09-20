@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Menu, Bell, Sun, Moon, User, LogOut, ChevronDown, Package, AlertTriangle, CheckCircle } from "lucide-react";
+import { Menu, Bell, Sun, Moon, User, LogOut, ChevronDown, Package, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 import { useITheme } from '../Icontexts/IThemeContext.jsx';
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import io from 'socket.io-client';
 
 export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const { theme, toggleTheme } = useITheme();
@@ -12,6 +13,8 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const [userData, setUserData] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [socket, setSocket] = useState(null);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,74 +24,110 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       firstName: localStorage.getItem("firstName"),
       lastName: localStorage.getItem("lastName"),
       role: localStorage.getItem("role") || "admin",
-      profileImage: localStorage.getItem("profileImage") || null
+      profileImage: localStorage.getItem("profileImage") || null,
+      userId: localStorage.getItem("userId")
     };
     setUserData(user);
     
-    // Fetch notifications if user is logged in
-    if (localStorage.getItem("token")) {
-      fetchNotifications();
-      
-      // Set up interval to check for new notifications every 30 seconds
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
+    // Initialize Socket.io connection
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+    
+    // Join user room for personalized notifications
+    if (user.userId) {
+      newSocket.emit('join-user-room', user.userId);
     }
+    
+    // Listen for real-time notifications
+    newSocket.on('refillRequest', (data) => {
+      addNotification(data);
+    });
+    
+    newSocket.on('refillRequestUpdate', (data) => {
+      addNotification(data);
+    });
+    
+    // Fetch initial notifications
+    fetchNotifications();
+    
+    // Set up interval to check for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    
+    return () => {
+      newSocket.disconnect();
+      clearInterval(interval);
+    };
   }, []);
+
+  const addNotification = (notification) => {
+    setNotifications(prev => {
+      // Check if notification already exists
+      const exists = prev.some(n => n.id === notification.id);
+      if (!exists) {
+        const newNotification = {
+          ...notification,
+          read: false
+        };
+        return [newNotification, ...prev].slice(0, 20); // Keep only latest 20
+      }
+      return prev;
+    });
+    
+    setUnreadCount(prev => prev + 1);
+  };
 
   const fetchNotifications = async () => {
     try {
-      // Fetch low stock alerts
-      const alertsResponse = await axios.get("http://localhost:5000/api/inventory/low-stock");
-      const alerts = alertsResponse.data.map(product => ({
-        id: product._id,
-        type: "inventory",
-        title: "Low Stock Alert",
-        message: `${product.name} is ${product.status === 'Low Stock' ? 'low in stock' : 'out of stock'} (${product.stock.quantity} ${product.stock.unit} remaining)`,
-        timestamp: new Date(),
-        read: false,
-        priority: product.status === 'Out of Stock' ? 'high' : 'medium'
-      }));
+      setLoadingNotifications(true);
+      const token = localStorage.getItem("token");
       
-      // Fetch recent orders (pending orders for admins)
-      const ordersResponse = await axios.get("http://localhost:5000/api/orders", {
-        params: { status: 'pending', limit: 5 }
+      if (!token) return;
+      
+      const response = await axios.get("http://localhost:5000/api/refill-requests/notifications", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { limit: 10 }
       });
-      const orders = ordersResponse.data.orders.map(order => ({
-        id: order._id,
-        type: "order",
-        title: "New Order",
-        message: `New order #${order.orderNumber} from ${order.customer.name}`,
-        timestamp: new Date(order.orderDate),
-        read: false,
-        priority: 'medium'
-      }));
       
-      // Combine notifications
-      const allNotifications = [...alerts, ...orders].sort((a, b) => 
-        new Date(b.timestamp) - new Date(a.timestamp)
-      );
+      // Merge with existing notifications, avoiding duplicates
+      setNotifications(prev => {
+        const existingIds = new Set(prev.map(n => n.id));
+        const newNotifications = response.data.filter(n => !existingIds.has(n.id));
+        return [...newNotifications, ...prev].slice(0, 20); // Keep only latest 20
+      });
       
-      setNotifications(allNotifications);
-      setUnreadCount(allNotifications.filter(n => !n.read).length);
+      // Update unread count
+      setUnreadCount(response.data.filter(n => !n.read).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
+    } finally {
+      setLoadingNotifications(false);
     }
   };
 
-  const markAsRead = (id) => {
-    const updatedNotifications = notifications.map(notification =>
-      notification.id === id ? { ...notification, read: true } : notification
-    );
-    setNotifications(updatedNotifications);
-    setUnreadCount(updatedNotifications.filter(n => !n.read).length);
+  const markAsRead = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      
+      setNotifications(prev => 
+        prev.map(notification =>
+          notification.id === id ? { ...notification, read: true } : notification
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
   };
 
   const markAllAsRead = () => {
-    const updatedNotifications = notifications.map(notification => ({
-      ...notification,
-      read: true
-    }));
-    setNotifications(updatedNotifications);
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, read: true }))
+    );
     setUnreadCount(0);
   };
 
@@ -96,16 +135,22 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     markAsRead(notification.id);
     
     // Navigate based on notification type
-    if (notification.type === "inventory") {
+    if (notification.type === "refillRequest" || notification.type === "lowStock") {
       navigate("/InventoryManagement");
     } else if (notification.type === "order") {
       navigate("/InventoryManagement/orders");
+    } else if (notification.type === "refillRequestUpdate") {
+      // Navigate to refill requests page if available
+      navigate("/InventoryManagement/refill-requests");
     }
     
     setNotificationsOpen(false);
   };
 
   const handleLogout = () => {
+    if (socket) {
+      socket.disconnect();
+    }
     localStorage.clear();
     navigate("/login");
   };
@@ -145,9 +190,19 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case "inventory": return <AlertTriangle size={16} className="text-yellow-500" />;
-      case "order": return <Package size={16} className="text-blue-500" />;
+      case "refillRequest": return <Package size={16} className="text-blue-500" />;
+      case "refillRequestUpdate": return <CheckCircle size={16} className="text-green-500" />;
+      case "lowStock": return <AlertTriangle size={16} className="text-yellow-500" />;
+      case "order": return <Package size={16} className="text-purple-500" />;
       default: return <Bell size={16} className="text-gray-500" />;
+    }
+  };
+
+  const getNotificationPriorityClass = (priority) => {
+    switch (priority) {
+      case "high": return "bg-red-100 border-l-4 border-red-500";
+      case "medium": return "bg-yellow-100 border-l-4 border-yellow-500";
+      default: return "bg-blue-100 border-l-4 border-blue-500";
     }
   };
 
@@ -205,17 +260,26 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
             </button>
             
             {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-80 rounded-md shadow-lg py-2 z-50 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"}`}>
+              <div className={`absolute right-0 mt-2 w-96 rounded-md shadow-lg py-2 z-50 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"}`}>
                 <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                   <h3 className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>Notifications</h3>
-                  {unreadCount > 0 && (
+                  <div className="flex items-center space-x-2">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className={`text-xs ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
                     <button
-                      onClick={markAllAsRead}
-                      className={`text-xs ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
+                      onClick={fetchNotifications}
+                      disabled={loadingNotifications}
+                      className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                     >
-                      Mark all as read
+                      <RefreshCw size={14} className={loadingNotifications ? "animate-spin" : ""} />
                     </button>
-                  )}
+                  </div>
                 </div>
                 
                 <div className="max-h-96 overflow-y-auto">
@@ -226,7 +290,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                         className={`px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
                           notification.read 
                             ? darkMode ? "bg-gray-800" : "bg-white" 
-                            : darkMode ? "bg-gray-700" : "bg-blue-50"
+                            : darkMode ? "bg-gray-700" : getNotificationPriorityClass(notification.priority)
                         } hover:${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
                         onClick={() => handleNotificationClick(notification)}
                       >
@@ -265,7 +329,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                 {notifications.length > 0 && (
                   <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
                     <button
-                      onClick={() => navigate("/InventoryManagement/orders")}
+                      onClick={() => navigate("/InventoryManagement")}
                       className={`w-full text-center text-sm ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
                     >
                       View all notifications

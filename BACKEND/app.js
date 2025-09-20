@@ -11,12 +11,43 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import multer from "multer";
 
+import { createServer } from "http";
+import { Server } from "socket.io";
+
 // ----------------------- Fix __dirname for ES modules -----------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ----------------------- Initialize Express -----------------------
 const app = express();
+
+// ----------------------- Create HTTP server -----------------------
+const server = createServer(app);
+
+// ----------------------- Initialize Socket.io -----------------------
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Store socket.io instance in app
+app.set("io", io);
+
+// Socket.io connection handling
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+
+  // Join user to specific room based on their role
+  socket.on("join-user-room", (userId) => {
+    socket.join(`user-${userId}`);
+  });
+});
 
 // ----------------------- Middleware -----------------------
 app.use(
@@ -30,11 +61,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ----------------------- Uploads Setup -----------------------
 const uploadsDir = path.join(__dirname, "uploads");
-const healthUploadsDir = path.join(
-  __dirname,
-  "HealthManagement",
-  "Health_uploads"
-);
+const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
 if (!fs.existsSync(uploadsDir)) {
@@ -57,12 +84,11 @@ app.use("/uploads", express.static(uploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
 
-// Multer setup (optional if you handle uploads in individual routes)
+// Multer setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
-    const uniqueSuffix =
-      Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
@@ -99,7 +125,7 @@ import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologist
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
 
-//Contact us
+// Contact Us
 import contact from "./ContactUs/routes/contactRoutes.js";
 
 // Plant Management
@@ -114,8 +140,9 @@ import orderRoutes from "./InventoryManagement/Iroutes/orderRoutes.js";
 import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js";
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
+import refillRequestRoutes from "./InventoryManagement/Iroutes/refillRequestRoutes.js";
 
-// ----------------------- Employee Management -----------------------
+// Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
 import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
@@ -129,10 +156,7 @@ if (!fs.existsSync("uploads")) {
 app.use("/uploads", express.static("uploads"));
 
 // ----------------------- Debug env variables -----------------------
-console.log(
-  "OPENAI_API_KEY loaded:",
-  process.env.OPENAI_API_KEY ? "YES" : "NO"
-);
+console.log("OPENAI_API_KEY loaded:", process.env.OPENAI_API_KEY ? "YES" : "NO");
 console.log("EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
 
 // ----------------------- Routes Setup -----------------------
@@ -160,7 +184,7 @@ app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 
-//Contact us
+// Contact us
 app.use("/api/contact", contact);
 
 // Plant Management
@@ -175,6 +199,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
+app.use("/api/refill-requests", refillRequestRoutes);
 
 // Employee Management
 app.use("/api/employees", employeeRoutes);
@@ -183,9 +208,7 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 
 // ----------------------- Health Check -----------------------
-app.get("/health", (req, res) =>
-  res.json({ status: "OK", message: "Server is running" })
-);
+app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
 app.get("/", (req, res) => res.send("Backend is running!"));
 
 // ----------------------- MongoDB Connection -----------------------
@@ -213,9 +236,7 @@ app.use((err, req, res, next) => {
 
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
-  app.listen(5000, () =>
-    console.log("🚀 Server running on port 5000")
-  );
+  server.listen(5000, () => console.log("🚀 Server running on port 5000"));
 });
 
 export default app;
