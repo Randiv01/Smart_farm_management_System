@@ -10,6 +10,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import multer from "multer";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 // ----------------------- Fix __dirname for ES modules -----------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +19,34 @@ const __dirname = path.dirname(__filename);
 
 // ----------------------- Initialize Express -----------------------
 const app = express();
+
+// ----------------------- Create HTTP server -----------------------
+const server = createServer(app);
+
+// ----------------------- Initialize Socket.io -----------------------
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Store socket.io instance in app
+app.set("io", io);
+
+// Socket.io connection handling
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+
+  // Join user to specific room based on their role
+  socket.on("join-user-room", (userId) => {
+    socket.join(`user-${userId}`);
+  });
+});
 
 // ----------------------- Middleware -----------------------
 app.use(
@@ -100,6 +130,7 @@ import orderRoutes from "./InventoryManagement/Iroutes/orderRoutes.js";
 import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js";
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
+import refillRequestRoutes from "./InventoryManagement/Iroutes/refillRequestRoutes.js";
 
 // Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
@@ -151,6 +182,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
+app.use("/api/refill-requests", refillRequestRoutes);
 
 // Employee Management
 app.use("/api/employees", employeeRoutes);
@@ -176,7 +208,9 @@ app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is ru
 app.get("/", (req, res) => res.send("Backend is running!"));
 
 // ----------------------- MongoDB Connection -----------------------
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
 
 const connectDB = async () => {
   try {
@@ -200,7 +234,7 @@ app.use((err, req, res, next) => {
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 });
 
 export default app;

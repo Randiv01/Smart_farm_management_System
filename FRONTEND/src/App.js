@@ -191,22 +191,21 @@ function App() {
                             </Route>
 
                             {/* ----------------- Inventory Management ----------------- */}
-<Route path="/InventoryManagement/*" element={
-  <AdminProtectedRoute allowedRoles={['inv']}>
-    <IThemeProvider>   {/* ✅ Added provider here */}
-      <ILayout />
-    </IThemeProvider>
-  </AdminProtectedRoute>
-}>
-  <Route index element={<IDashboard />} />
-  <Route path="stock" element={<Stock />} />
-  <Route path="orders" element={<Orders />} />
-  <Route path="expiry" element={<Expiry />} />
-  <Route path="animalfood" element={<AnimalFoodStock />} />
-  <Route path="FertilizerStock" element={<FertilizerStock />} />
-  <Route path="isuppliers" element={<ISupplier />} />
-</Route>
-
+                            <Route path="/InventoryManagement/*" element={
+                              <AdminProtectedRoute allowedRoles={['inv']}>
+                                <IThemeProvider>
+                                  <ILayout />
+                                </IThemeProvider>
+                              </AdminProtectedRoute>
+                            }>
+                              <Route index element={<IDashboard />} />
+                              <Route path="stock" element={<Stock />} />
+                              <Route path="orders" element={<Orders />} />
+                              <Route path="expiry" element={<Expiry />} />
+                              <Route path="animalfood" element={<AnimalFoodStock />} />
+                              <Route path="FertilizerStock" element={<FertilizerStock />} />
+                              <Route path="isuppliers" element={<ISupplier />} />
+                            </Route>
 
                             {/* ----------------- Employee Management ----------------- */}
                             <Route path="/EmployeeManagement/*" element={<EmployeeLayoutWrapper />}>
@@ -244,10 +243,16 @@ function App() {
                             {/* Admin */}
                             <Route path="/admin/*" element={
                               <AdminProtectedRoute allowedRoles={['health']}>
-                                <AdminLayout />
+                                <HLanguageProvider>
+                                  <HThemeProvider>
+                                    <HealthThemeProvider>
+                                      <AdminLayout />
+                                    </HealthThemeProvider>
+                                  </HThemeProvider>
+                                </HLanguageProvider>
                               </AdminProtectedRoute>
                             }>
-                              <Route index element={<AddminPart />} />
+                              <Route index element={<Navigate to="dashboard" replace />} />
                               <Route path="dashboard" element={<AddminPart />} />
                               <Route path="doctor-details" element={<DoctorDetails />} />
                               <Route path="specialist-details" element={<SpecialistDetails />} />
@@ -263,10 +268,16 @@ function App() {
                             {/* Doctor */}
                             <Route path="/doctor/*" element={
                               <AdminProtectedRoute allowedRoles={['health']}>
-                                <DoctorLayout />
+                                <HLanguageProvider>
+                                  <HThemeProvider>
+                                    <HealthThemeProvider>
+                                      <DoctorLayout />
+                                    </HealthThemeProvider>
+                                  </HThemeProvider>
+                                </HLanguageProvider>
                               </AdminProtectedRoute>
                             }>
-                              <Route index element={<DoctorDashboard />} />
+                              <Route index element={<Navigate to="home" replace />} />
                               <Route path="home" element={<DoctorDashboard />} />
                               <Route path="animals" element={<HealthAnimal />} />
                               <Route path="medicine-stock" element={<MediStore />} />
@@ -280,10 +291,16 @@ function App() {
                             {/* Plant Pathologist */}
                             <Route path="/plant-pathologist/*" element={
                               <AdminProtectedRoute allowedRoles={['health']}>
-                                <PlantPathologistLayout />
+                                <HLanguageProvider>
+                                  <HThemeProvider>
+                                    <HealthThemeProvider>
+                                      <PlantPathologistLayout />
+                                    </HealthThemeProvider>
+                                  </HThemeProvider>
+                                </HLanguageProvider>
                               </AdminProtectedRoute>
                             }>
-                              <Route index element={<PlantPathologistHome />} />
+                              <Route index element={<Navigate to="home" replace />} />
                               <Route path="home" element={<PlantPathologistHome />} />
                               <Route path="fertiliser-stock" element={<FertiliserStock />} />
                               <Route path="fertiliser-details" element={<FertiliserDetails />} />
