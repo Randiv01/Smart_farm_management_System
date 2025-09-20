@@ -53,6 +53,10 @@ const AboutUs = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    document.title = "About | Mount Olive Farm";
+  }, []);
+
   // Auto-rotate
   useEffect(() => {
     if (paused) return;
@@ -444,11 +448,6 @@ const AboutUs = () => {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Footer Accent */}
-        <div className="mt-16 w-full">
-          <div className={`mx-auto h-1 w-36 rounded-full bg-gradient-to-r ${darkMode ? "from-green-500 via-emerald-400 to-green-500" : "from-green-400 via-emerald-500 to-green-400"}`} />
         </div>
       </div>
 

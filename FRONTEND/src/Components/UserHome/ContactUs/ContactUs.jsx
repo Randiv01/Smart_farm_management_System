@@ -28,6 +28,10 @@ const ContactUs = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    document.title = "Contact Us | Mount Olive Farm";
+  }, []);
+
   // Auto-rotate every 5s
   useEffect(() => {
     if (paused) return;

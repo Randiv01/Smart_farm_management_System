@@ -96,6 +96,10 @@ const Catalog = () => {
     "Milk Product",
   ];
   
+  useEffect(() => {
+    document.title = "Shop | Mount Olive Farm";
+  }, []);
+
   const sampleImages = [
     "https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     "https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
