@@ -30,8 +30,8 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar }) {
     { path: "/InventoryManagement/export", icon: BarChart3, label: "Export Market" },
     { path: "/InventoryManagement/orders", icon: ShoppingCart, label: "Orders" },
     { path: "/InventoryManagement/isuppliers", icon: Truck, label: "Isuppliers" },
-    { path: "/InventoryManagement/settings", icon: Bell, label: "Notification" },
-    { path: "/InventoryManagement/settings", icon: Settings, label: "Settings" },
+    { path: "/InventoryManagement/notification", icon: Bell, label: "Notification" },
+    { path: "/InventoryManagement/isettings", icon: Settings, label: "Settings" },
   ];
 
   useEffect(() => {
