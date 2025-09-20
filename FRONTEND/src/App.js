@@ -1,6 +1,9 @@
 import './App.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
+// ScrollToTop for page scroll reset
+import ScrollToTop from './Components/UserHome/ScrollToTop/ScrollToTop.jsx';
+
 // ----------------- Animal Management -----------------
 import Dashboard from './Components/AnimalManagement/Dashboard/Dashboard.jsx';
 import AnimalList from './Components/AnimalManagement/AnimalList/AnimalList.jsx';
@@ -33,8 +36,6 @@ import { IThemeProvider } from './Components/InventoryManagement/Icontexts/IThem
 import ILayout from './Components/InventoryManagement/Ilayout/ILayout.jsx';
 import IDashboard from './Components/InventoryManagement/Ipages/IDashboard.jsx';
 import Stock from './Components/InventoryManagement/Ipages/Stock.jsx';
-import Catalog from "./Components/InventoryManagement/Ipages/Catalog.jsx";
-import Payment from "./Components/InventoryManagement/Ipages/Payment.jsx";
 import Orders from "./Components/InventoryManagement/Ipages/Orders.jsx";
 import Expiry from './Components/InventoryManagement/Ipages/expiry.jsx';
 import AnimalFoodStock from './Components/InventoryManagement/Ipages/AnimalFoodstock.jsx';
@@ -47,6 +48,14 @@ import Home from './Components/UserHome/UHHome/UHHome.jsx';
 import Login from './Components/UserHome/Login/login.jsx';
 import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
 import News from "./Components/UserHome/News/News.jsx"; 
+import Catalog from "./Components/UserHome/UHCatalog/Catalog.jsx";
+import Payment from "./Components/UserHome/UHPayment/Payment.jsx";
+import PrivacyPolicy from "./Components/UserHome/UHFooter/PrivacyPolicy.jsx";
+import TermsofService from "./Components/UserHome/UHFooter/TermsofService.jsx";
+import ShippingPolicy from "./Components/UserHome/UHFooter/ShippingPolicy.jsx";
+import RefundPolicy from "./Components/UserHome/UHFooter/RefundPolicy.jsx";
+import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  
+import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  
 import CustomerProfile from './Components/UserHome/CustomerProfile/CustomerProfile.jsx';
 import MyOrders from './Components/Orders/MyOrders.jsx';
 
@@ -58,13 +67,14 @@ import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHCont
 // ----------------- Health Management -----------------
 import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
 import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
+import { ThemeProvider as HealthThemeProvider } from './Components/HealthManagement/ThemeProvider/ThemeProvider.js';
 
-// Layouts (Health)
+// Health Layouts
 import AdminLayout from './Components/HealthManagement/H_layouts/H_AdminLayout.js';
 import DoctorLayout from './Components/HealthManagement/H_layouts/H_DoctorLayout.js';
 import PlantPathologistLayout from './Components/HealthManagement/H_layouts/H_PlantPathologistLayout.js';
 
-// ADMIN COMPONENTS (Health)
+// Health Admin Components
 import AddminPart from './Components/HealthManagement/AdminPart/HealthAddminPart.js';
 import DoctorDetails from './Components/HealthManagement/AdminPart/DoctorDetails/DoctorDetails.js';
 import SpecialistDetails from './Components/HealthManagement/AdminPart/H_SpecialistDetails/H_SpecialistDetails.js';
@@ -75,13 +85,13 @@ import TreatmentsPayments from './Components/HealthManagement/AdminPart/Treatmen
 import AdminProfile from './Components/HealthManagement/AdminPart/AdminProfile/AdminProfile.js';
 import H_PlantPathologist from './Components/HealthManagement/AdminPart/H_PlantPathologist/H_PlantPathologist.js';
 
-// DOCTOR COMPONENTS (Health)
+// Health Doctor Components
 import DoctorDashboard from './Components/HealthManagement/DoctorPart/DoctorDashBoard.js';
 import HealthAnimal from './Components/HealthManagement/DoctorPart/HealthAnimal.js';
 import DoctorTreatment from './Components/HealthManagement/DoctorPart/DoctorTreatment.js';
 import DoctorAdditional from './Components/HealthManagement/DoctorPart/DoctorAdditional.js';
 
-// PLANT PATHOLOGIST COMPONENTS (Health)
+// Plant Pathologist Components
 import PlantPathologistHome from "./Components/HealthManagement/PlantPathologistPart/PlantPathologistHome.js";
 import FertiliserStock from './Components/HealthManagement/PlantPathologistPart/H_FertiliserStock.js';
 import FertiliserDetails from './Components/HealthManagement/PlantPathologistPart/H_FertiliserDetails.js';
@@ -102,10 +112,23 @@ import PSettings from './Components/PlantManagement/pages/P-Settings.jsx';
 import { ThemeProvider as PThemeProvider } from './Components/PlantManagement/context/ThemeContext.jsx';
 import { LanguageProvider as PLanguageProvider } from './Components/PlantManagement/context/LanguageContext.jsx';
 
+// ----------------- Employee Management -----------------
+import EmployeeLayoutWrapper from './Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx';
+import { Dashboard as EDashboard } from './Components/EmployeeManagement/pages/E-Dashboard.js';
+import { StaffHub as EStaffHub } from './Components/EmployeeManagement/pages/E-StaffHub.js';
+import { AttendanceTracker as EAttendanceTracker } from './Components/EmployeeManagement/pages/E-AttendanceTracker.jsx';
+import { ELeavePlanner } from './Components/EmployeeManagement/pages/E-LeavePlanner.jsx';
+import { OvertimeMonitor as EOvertimeMonitor } from './Components/EmployeeManagement/pages/E-OvertimeMonitor.js';
+import { SalaryDesk as ESalaryDesk } from './Components/EmployeeManagement/pages/E-SalaryDesk.js';
+import { EEmployeeReportCenter } from './Components/EmployeeManagement/pages/E-EmployeeReportCenter.js';
+import { SystemSettings as ESystemSettings } from './Components/EmployeeManagement/pages/E-SystemSettings.js';
+
 function App() {
   return (
     <div className="App">
-      {/* Main App wrapped in User Contexts */}
+      <ScrollToTop />
+
+      {/* ----------------- User / Frontend Contexts ----------------- */}
       <AuthProvider>
         <UserThemeProvider>
           <CartProvider>
@@ -114,22 +137,29 @@ function App() {
               <Route path="/" element={<><Navbar /><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/news" element={<><News /></>} />
+              <Route path="/news" element={<News />} />
+              <Route path="/catalog" element={<Catalog />} />
+              <Route path="/payment" element={<Payment />} />
+              <Route path="/privacyPolicy" element={<PrivacyPolicy />} />
+              <Route path="/termsofservice" element={<TermsofService />} />
+              <Route path="/shippingPolicy" element={<ShippingPolicy />} />
+              <Route path="/refundPolicy" element={<RefundPolicy />} />
+              <Route path="/about" element={<AboutUs />} /> 
+              <Route path="/contact" element={<ContactUs />} />
 
-              {/* ----------------- Customer Routes ----------------- */}
+              {/* ----------------- Customer Protected Routes ----------------- */}
               <Route path="/profile" element={
                 <UserProtectedRoute>
                   <><Navbar /><CustomerProfile /></>
                 </UserProtectedRoute>
               } />
-              
               <Route path="/orders" element={
                 <UserProtectedRoute>
                   <><Navbar /><MyOrders /></>
                 </UserProtectedRoute>
               } />
 
-              {/* Legacy customer routes - redirect to new paths */}
+              {/* Legacy redirects */}
               <Route path="/customer/profile" element={<Navigate to="/profile" replace />} />
               <Route path="/customer/orders" element={<Navigate to="/orders" replace />} />
 
@@ -180,20 +210,17 @@ function App() {
                 <Route path="isuppliers" element={<ISupplier />} />
               </Route>
 
-              {/* Catalog and Payment routes - accessible to customers */}
-              <Route path="/InventoryManagement/catalog" element={
-                <IThemeProvider>
-                  <><Catalog /></>
-                </IThemeProvider>
-              } />
-              
-              <Route path="/InventoryManagement/payment" element={
-                <UserProtectedRoute>
-                  <IThemeProvider>
-                    <><Payment /></>
-                  </IThemeProvider>
-                </UserProtectedRoute>
-              } />
+              {/* ----------------- Employee Management Routes ----------------- */}
+              <Route path="/EmployeeManagement/*" element={<EmployeeLayoutWrapper />}>
+                <Route index element={<EDashboard />} />
+                <Route path="staff" element={<EStaffHub />} />
+                <Route path="attendance" element={<EAttendanceTracker />} />
+                <Route path="leave" element={<ELeavePlanner />} />
+                <Route path="overtime" element={<EOvertimeMonitor />} />
+                <Route path="salary" element={<ESalaryDesk />} />
+                <Route path="reports" element={<EEmployeeReportCenter />} />
+                <Route path="settings" element={<ESystemSettings />} />
+              </Route>
 
               {/* ----------------- Plant Management Routes ----------------- */}
               <Route path="/PlantManagement/*" element={
@@ -216,71 +243,55 @@ function App() {
               </Route>
 
               {/* ----------------- Health Management Routes ----------------- */}
-              {/* Doctor Routes */}
-              <Route path="/doctor/*" element={
-                <AdminProtectedRoute allowedRoles={["health"]}>
-                  <HLanguageProvider>
-                    <HThemeProvider>
-                      <DoctorLayout />
-                    </HThemeProvider>
-                  </HLanguageProvider>
-                </AdminProtectedRoute>
-              }>
-                <Route index element={<Navigate to="home" replace />} />
-                <Route path="home" element={<DoctorDashboard />} />
-                <Route path="animals" element={<HealthAnimal />} />
-                <Route path="medicine-stock" element={<MediStore />} />
-                <Route path="pharmacy" element={<MedicineCompany />} />
-                <Route path="vet-specialist" element={<SpecialistDetails />} />
-                <Route path="treatment-details" element={<DoctorTreatment />} />
-                <Route path="help" element={<DoctorAdditional />} />
-                <Route path="*" element={<Navigate to="home" replace />} />
-              </Route>
+              <HLanguageProvider>
+                <HThemeProvider>
+                  <HealthThemeProvider>
+                    <Routes>
+                      {/* Doctor */}
+                      <Route path="/doctor/*" element={<AdminProtectedRoute allowedRoles={["health"]}><DoctorLayout /></AdminProtectedRoute>}>
+                        <Route index element={<Navigate to="home" replace />} />
+                        <Route path="home" element={<DoctorDashboard />} />
+                        <Route path="animals" element={<HealthAnimal />} />
+                        <Route path="medicine-stock" element={<MediStore />} />
+                        <Route path="pharmacy" element={<MedicineCompany />} />
+                        <Route path="vet-specialist" element={<SpecialistDetails />} />
+                        <Route path="treatment-details" element={<DoctorTreatment />} />
+                        <Route path="help" element={<DoctorAdditional />} />
+                        <Route path="*" element={<Navigate to="home" replace />} />
+                      </Route>
 
-              {/* Plant Pathologist Routes */}
-              <Route path="/plant-pathologist/*" element={
-                <AdminProtectedRoute allowedRoles={["health"]}>
-                  <HLanguageProvider>
-                    <HThemeProvider>
-                      <PlantPathologistLayout />
-                    </HThemeProvider>
-                  </HLanguageProvider>
-                </AdminProtectedRoute>
-              }>
-                <Route index element={<Navigate to="home" replace />} />
-                <Route path="home" element={<PlantPathologistHome />} />
-                <Route path="fertiliser-stock" element={<FertiliserStock />} />
-                <Route path="fertiliser-details" element={<FertiliserDetails />} />
-                <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
-                <Route path="help" element={<PlantPathologistAdditional />} />
-                <Route path="profile" element={<PlantPathologistProfile />} />
-                <Route path="*" element={<Navigate to="home" replace />} />
-              </Route>
+                      {/* Plant Pathologist */}
+                      <Route path="/plant-pathologist/*" element={<AdminProtectedRoute allowedRoles={["health"]}><PlantPathologistLayout /></AdminProtectedRoute>}>
+                        <Route index element={<Navigate to="home" replace />} />
+                        <Route path="home" element={<PlantPathologistHome />} />
+                        <Route path="fertiliser-stock" element={<FertiliserStock />} />
+                        <Route path="fertiliser-details" element={<FertiliserDetails />} />
+                        <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
+                        <Route path="help" element={<PlantPathologistAdditional />} />
+                        <Route path="profile" element={<PlantPathologistProfile />} />
+                        <Route path="*" element={<Navigate to="home" replace />} />
+                      </Route>
 
-              {/* Admin Routes */}
-              <Route path="/admin/*" element={
-                <AdminProtectedRoute allowedRoles={["health"]}>
-                  <HLanguageProvider>
-                    <HThemeProvider>
-                      <AdminLayout />
-                    </HThemeProvider>
-                  </HLanguageProvider>
-                </AdminProtectedRoute>
-              }>
-                <Route index element={<Navigate to="aaa" replace />} />
-                <Route path="aaa" element={<AddminPart />} />
-                <Route path="doctor-details" element={<DoctorDetails />} />
-                <Route path="specialist-details" element={<SpecialistDetails />} />
-                <Route path="medicine-company" element={<MedicineCompany />} />
-                <Route path="medistore" element={<MediStore />} />
-                <Route path="treatments-details" element={<TreatmentsDetails />} />
-                <Route path="treatments-payments" element={<TreatmentsPayments />} />
-                <Route path="profile" element={<AdminProfile />} />
-                <Route path="plant-pathologist" element={<H_PlantPathologist />} />
-                <Route path="*" element={<Navigate to="aaa" replace />} />
-              </Route>
+                      {/* Admin */}
+                      <Route path="/admin/*" element={<AdminProtectedRoute allowedRoles={["health"]}><AdminLayout /></AdminProtectedRoute>}>
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<AddminPart />} />
+                        <Route path="doctor-details" element={<DoctorDetails />} />
+                        <Route path="specialist-details" element={<SpecialistDetails />} />
+                        <Route path="medicine-company" element={<MedicineCompany />} />
+                        <Route path="medistore" element={<MediStore />} />
+                        <Route path="treatments-details" element={<TreatmentsDetails />} />
+                        <Route path="treatments-payments" element={<TreatmentsPayments />} />
+                        <Route path="profile" element={<AdminProfile />} />
+                        <Route path="plant-pathologist" element={<H_PlantPathologist />} />
+                        <Route path="*" element={<Navigate to="dashboard" replace />} />
+                      </Route>
+                    </Routes>
+                  </HealthThemeProvider>
+                </HThemeProvider>
+              </HLanguageProvider>
 
-              {/* Catch-all route */}
+              {/* Catch-all */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </CartProvider>

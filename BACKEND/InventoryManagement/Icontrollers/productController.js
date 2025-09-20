@@ -1,3 +1,4 @@
+// productController.js
 import Product from "../Imodels/Product.js";
 
 // Get all products (for inventory management)
@@ -38,17 +39,17 @@ export const getProducts = async (req, res) => {
     const updatedProducts = await Promise.all(
       products.map(async (product) => {
         const oldStatus = product.status;
-    
+
         // Update status based on current conditions
         product.status = 'In Stock';
-    
+
         // Check stock levels
         if (product.stock.quantity <= 0) {
           product.status = 'Out of Stock';
         } else if (product.stock.quantity < product.minStockLevel) {
           product.status = 'Low Stock';
         }
-    
+
         // Check expiry (only if not already out of stock or low stock)
         if (product.status === 'In Stock') {
           if (product.expiryDate <= twoDaysFromNow && product.expiryDate >= now) {
@@ -57,12 +58,12 @@ export const getProducts = async (req, res) => {
             product.status = 'Out of Stock';
           }
         }
-    
+
         // Only update if status changed
         if (oldStatus !== product.status) {
           await product.save();
         }
-    
+
         return product;
       })
     );
@@ -81,7 +82,7 @@ export const getProducts = async (req, res) => {
 // Get products for catalog (with filtering for customer view)
 export const getCatalogProducts = async (req, res) => {
   try {
-    const { category, search, market, page = 1, limit = 12 } = req.query;
+    const { category, search, market, page = 1, limit = 12, sort = 'createdAt', minPrice, maxPrice } = req.query;
     let query = { isActive: true };
     // Filter by category or group of categories
     if (category && category !== 'All') {
@@ -105,12 +106,36 @@ export const getCatalogProducts = async (req, res) => {
         { market: { $regex: search, $options: 'i' } }
       ];
     }
+    // Price range filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+    // Sorting
+    let sortOptions = { createdAt: -1 };
+    switch (sort) {
+      case 'priceLow':
+        sortOptions = { price: 1 };
+        break;
+      case 'priceHigh':
+        sortOptions = { price: -1 };
+        break;
+      case 'newest':
+        sortOptions = { createdAt: -1 };
+        break;
+      case 'popular':
+        sortOptions = { 'reviews.0': -1 }; // Rough sort by review count
+        break;
+      default:
+        sortOptions = { createdAt: -1 };
+    }
     // Get products with pagination - only include fields needed for catalog
     const products = await Product.find(query)
-      .select('name category price image description stock status expiryDate market')
+      .select('name category price image description stock status expiryDate market reviews')
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+      .sort(sortOptions);
     const total = await Product.countDocuments(query);
     res.status(200).json({
       products,
@@ -118,6 +143,35 @@ export const getCatalogProducts = async (req, res) => {
       currentPage: page,
       total
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Add review to product
+export const addReviewToProduct = async (req, res) => {
+  try {
+    const { name, email, rating, comment, date } = req.body;
+    if (!name || !email || !rating || !comment) {
+      return res.status(400).json({ message: 'All review fields are required' });
+    }
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    const newReview = {
+      name: name.trim(),
+      email: email.trim(),
+      rating: parseInt(rating),
+      comment: comment.trim(),
+      date: new Date(date)
+    };
+    product.reviews.push(newReview);
+    await product.save();
+    res.status(201).json({ message: 'Review added successfully', review: newReview });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -158,7 +212,8 @@ export const createProduct = async (req, res) => {
       expiryDate,
       market,
       image: image || '',
-      description: description || ''
+      description: description || '',
+      reviews: []
     };
     const product = new Product(productData);
     // Generate QR code
@@ -309,35 +364,35 @@ export const updateAllStatuses = async (req, res) => {
     const results = await Promise.all(
       products.map(async (product) => {
         const oldStatus = product.status;
-    
+
         // Update status based on current conditions
         product.status = 'In Stock';
-    
+
         // Check stock levels
         if (product.stock.quantity <= 0) {
           product.status = 'Out of Stock';
         } else if (product.stock.quantity < product.minStockLevel) {
           product.status = 'Low Stock';
         }
-    
+
         // Check expiry (only if not already out of stock or low stock)
         if (product.status === 'In Stock') {
           const now = new Date();
           const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-      
+
           if (product.expiryDate <= twoDaysFromNow && product.expiryDate >= now) {
             product.status = 'Expiring Soon';
           } else if (product.expiryDate < now) {
             product.status = 'Out of Stock';
           }
         }
-    
+
         // Only save if status changed
         if (oldStatus !== product.status) {
           await product.save();
           return { id: product._id, updated: true, oldStatus, newStatus: product.status };
         }
-    
+
         return { id: product._id, updated: false };
       })
     );

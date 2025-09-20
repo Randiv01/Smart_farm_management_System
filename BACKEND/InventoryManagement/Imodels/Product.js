@@ -1,3 +1,4 @@
+// Product.js
 import mongoose from "mongoose";
 import QRCode from 'qrcode';
 
@@ -69,7 +70,34 @@ const productSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
-  }
+  },
+  reviews: [{
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    email: {
+      type: String,
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+    comment: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    date: {
+      type: Date,
+      required: true,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });

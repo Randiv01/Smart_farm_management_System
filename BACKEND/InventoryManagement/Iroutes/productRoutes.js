@@ -1,3 +1,4 @@
+// productRouter.js
 import express from "express";
 import {
   getProducts,
@@ -9,7 +10,8 @@ import {
   getExpiringProducts,
   updateAllStatuses,
   getCatalogProducts,
-  refillProduct
+  refillProduct,
+  addReviewToProduct
 } from "../Icontrollers/productController.js";
 
 const router = express.Router();
@@ -27,5 +29,6 @@ router.patch("/refill/:id", refillProduct); // Add refill route
 
 // Catalog routes (for customers)
 router.get("/catalog/products", getCatalogProducts); // Gets products for catalog view
+router.post("/catalog/products/:id/reviews", addReviewToProduct); // Add review to product
 
 export default router;

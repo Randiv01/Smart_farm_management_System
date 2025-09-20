@@ -2,6 +2,21 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext.js";
 import { QRCodeCanvas } from "qrcode.react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell
+} from "recharts";
 
 export default function AnimalProductivity() {
   const { type } = useParams();
@@ -36,10 +51,27 @@ export default function AnimalProductivity() {
     notes: ""
   });
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState(null);
 
   useEffect(() => {
     document.title = "Animal Productivity";
   }, []);
+
+  // Set up auto-refresh for live data
+  useEffect(() => {
+    if (showAnalytics) {
+      const interval = setInterval(() => {
+        fetchData();
+      }, 30000); // Refresh every 30 seconds
+      setRefreshInterval(interval);
+      
+      return () => clearInterval(interval);
+    } else if (refreshInterval) {
+      clearInterval(refreshInterval);
+      setRefreshInterval(null);
+    }
+  }, [showAnalytics]);
 
   // Fetch zones
   useEffect(() => {
@@ -207,6 +239,163 @@ export default function AnimalProductivity() {
     return total.toFixed(1);
   };
 
+  // Prepare analytics data
+  const prepareAnalyticsData = () => {
+    if (!animals.length) return null;
+    
+    // Calculate productivity by date for trend chart
+    const productivityByDate = {};
+    const allRecords = [];
+    
+    // Collect all records
+    animals.forEach(animal => {
+      const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
+      records.forEach(record => {
+        allRecords.push({
+          ...record,
+          date: new Date(record.date).toISOString().split('T')[0],
+          animalName: animal.data?.name || animal.animalId || animal.batchId
+        });
+      });
+    });
+    
+    // Group by date
+    allRecords.forEach(record => {
+      if (!productivityByDate[record.date]) {
+        productivityByDate[record.date] = {
+          date: record.date,
+          total: 0,
+          count: 0
+        };
+      }
+      productivityByDate[record.date].total += parseFloat(record.quantity) || 0;
+      productivityByDate[record.date].count += 1;
+    });
+    
+    // Convert to array and sort by date
+    const trendData = Object.values(productivityByDate)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(item => ({
+        ...item,
+        date: new Date(item.date).toLocaleDateString()
+      }));
+    
+    // Calculate productivity by product type
+    const productivityByType = {};
+    
+    allRecords.forEach(record => {
+      if (!productivityByType[record.productType]) {
+        productivityByType[record.productType] = 0;
+      }
+      productivityByType[record.productType] += parseFloat(record.quantity) || 0;
+    });
+    
+    const typeData = Object.entries(productivityByType).map(([name, value]) => ({
+      name,
+      value
+    }));
+    
+    // Calculate productivity by animal/zone
+    const productivityByAnimal = {};
+    const productivityByZone = {};
+    
+    animals.forEach(animal => {
+      const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
+      const total = records.reduce((sum, record) => sum + (parseFloat(record.quantity) || 0), 0);
+      
+      const animalName = animal.isGroup ? `Batch ${animal.batchId}` : (animal.data?.name || animal.animalId);
+      productivityByAnimal[animalName] = total;
+      
+      // For zone-based productivity
+      if (!animal.isGroup) {
+        const zoneName = getZoneInfo(animal).name;
+        if (!productivityByZone[zoneName]) {
+          productivityByZone[zoneName] = 0;
+        }
+        productivityByZone[zoneName] += total;
+      } else {
+        // For batches, distribute productivity across zones
+        const zoneCount = {};
+        animal.animals?.forEach(a => {
+          const zoneName = getZoneInfo(a).name;
+          zoneCount[zoneName] = (zoneCount[zoneName] || 0) + 1;
+        });
+        
+        const totalAnimals = animal.animals?.length || 1;
+        Object.keys(zoneCount).forEach(zoneName => {
+          const proportion = zoneCount[zoneName] / totalAnimals;
+          if (!productivityByZone[zoneName]) {
+            productivityByZone[zoneName] = 0;
+          }
+          productivityByZone[zoneName] += total * proportion;
+        });
+      }
+    });
+    
+    const animalData = Object.entries(productivityByAnimal)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Top 10 animals
+    
+    const zoneData = Object.entries(productivityByZone)
+      .map(([name, value]) => ({ name, value }));
+    
+    // Weekly/Monthly comparison
+    const weeklyData = [];
+    const monthlyData = [];
+    
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    
+    // Last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayRecords = allRecords.filter(r => r.date === dateStr);
+      const total = dayRecords.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+      
+      weeklyData.push({
+        name: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: dateStr,
+        productivity: total
+      });
+    }
+    
+    // Last 30 days grouped by week
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(weekStart.getDate() - (i + 1) * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      const weekRecords = allRecords.filter(r => {
+        const recordDate = new Date(r.date);
+        return recordDate >= weekStart && recordDate <= weekEnd;
+      });
+      
+      const total = weekRecords.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
+      
+      monthlyData.push({
+        name: `Week ${4-i}`,
+        range: `${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`,
+        productivity: total
+      });
+    }
+    
+    return {
+      trendData,
+      typeData,
+      animalData,
+      zoneData,
+      weeklyData,
+      monthlyData,
+      lastUpdated: new Date().toLocaleTimeString()
+    };
+  };
+
   // Fetch data with productivity information
   const fetchData = async () => {
     try {
@@ -289,6 +478,13 @@ export default function AnimalProductivity() {
   useEffect(() => {
     fetchData();
   }, [type]);
+
+  // Update analytics data when animals or productivity records change
+  useEffect(() => {
+    if (showAnalytics) {
+      setAnalyticsData(prepareAnalyticsData());
+    }
+  }, [animals, productivityRecords, showAnalytics]);
 
   // Toggle row expansion
   const toggleRowExpansion = (id) => {
@@ -411,6 +607,9 @@ export default function AnimalProductivity() {
 
   const handleViewAnalytics = () => {
     setShowAnalytics(!showAnalytics);
+    if (!showAnalytics) {
+      setAnalyticsData(prepareAnalyticsData());
+    }
   };
 
   // Get product types for this animal type
@@ -677,91 +876,207 @@ export default function AnimalProductivity() {
     );
   };
 
-  // Analytics Component
-  const AnalyticsView = () => {
-    // Calculate productivity by product type
-    const productivityByType = {};
-    
-    productTypes.forEach(type => {
-      productivityByType[type] = {
-        daily: 0,
-        weekly: 0,
-        monthly: 0
-      };
-    });
-    
-    // Calculate totals for each product type
-    animals.forEach(animal => {
-      const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-      
-      records.forEach(record => {
-        if (productivityByType[record.productType]) {
-          const recordDate = new Date(record.date);
-          const now = new Date();
-          const quantity = parseFloat(record.quantity) || 0;
-          
-          // Daily
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (recordDate >= today) {
-            productivityByType[record.productType].daily += quantity;
-          }
-          
-          // Weekly
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          if (recordDate >= weekAgo) {
-            productivityByType[record.productType].weekly += quantity;
-          }
-          
-          // Monthly
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          if (recordDate >= monthStart) {
-            productivityByType[record.productType].monthly += quantity;
-          }
-        }
-      });
-    });
-    
-    return (
-      <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow">
-        <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Productivity Analytics</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {Object.entries(productivityByType).map(([type, data]) => (
-            <div key={type} className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-3">{type}</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-700 dark:text-gray-300">Daily:</span>
-                  <span className="font-semibold text-blue-600 dark:text-blue-400">{data.daily.toFixed(1)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700 dark:text-gray-300">Weekly:</span>
-                  <span className="font-semibold text-purple-600 dark:text-purple-400">{data.weekly.toFixed(1)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700 dark:text-gray-300">Monthly:</span>
-                  <span className="font-semibold text-green-600 dark:text-green-400">{data.monthly.toFixed(1)}</span>
-                </div>
-              </div>
-            </div>
+  // Colors for charts
+  const CHART_COLORS = [
+    '#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', 
+    '#FFBB28', '#FF8042', '#A4DE6C', '#D0ED57', '#FFC0CB', '#8A2BE2'
+  ];
+
+  // Custom Tooltip for charts
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-gray-800 p-3 border border-gray-300 dark:border-gray-700 rounded shadow-lg">
+          <p className="label text-gray-900 dark:text-white">{`${label}`}</p>
+          {payload.map((entry, index) => (
+            <p key={index} className="intro" style={{ color: entry.color }}>
+              {`${entry.name}: ${entry.value}`}
+            </p>
           ))}
         </div>
+      );
+    }
+    return null;
+  };
+
+  // Analytics Component with Charts
+  const AnalyticsView = () => {
+    if (!analyticsData) {
+      return (
+        <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow text-center">
+          <p className="text-gray-500 dark:text-gray-400">Loading analytics data...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Productivity Analytics</h3>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Last updated: {analyticsData.lastUpdated}
+            <button 
+              onClick={fetchData}
+              className="ml-3 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
         
+        {/* Productivity Trend Chart */}
+        <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow mb-6">
+          <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+            Productivity Trend Over Time
+          </h4>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={analyticsData.trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="date" stroke="#888" />
+                <YAxis stroke="#888" />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="total" 
+                  name="Total Production" 
+                  stroke={CHART_COLORS[0]} 
+                  strokeWidth={2} 
+                  dot={{ r: 4 }} 
+                  activeDot={{ r: 6 }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Productivity by Type */}
+          <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+            <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+              Productivity by Type
+            </h4>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={analyticsData.typeData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {analyticsData.typeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Top Producers */}
+          <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+            <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+              Top Producers
+            </h4>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analyticsData.animalData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" stroke="#888" angle={-45} textAnchor="end" height={80} />
+                  <YAxis stroke="#888" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar dataKey="value" name="Production" fill={CHART_COLORS[1]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Weekly Productivity */}
+          <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+            <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+              Last 7 Days Productivity
+            </h4>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analyticsData.weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" stroke="#888" />
+                  <YAxis stroke="#888" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar dataKey="productivity" name="Daily Production" fill={CHART_COLORS[2]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Monthly Productivity */}
+          <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+            <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+              Last 4 Weeks Productivity
+            </h4>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analyticsData.monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" stroke="#888" />
+                  <YAxis stroke="#888" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar dataKey="productivity" name="Weekly Production" fill={CHART_COLORS[3]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        
+        {/* Productivity by Zone */}
         <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
-          <h4 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-3">Total Production</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{calculateTotalProductivity('day')}</div>
-              <div className="text-gray-700 dark:text-gray-300">Daily Production</div>
-            </div>
-            <div className="text-center p-4 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-300">{calculateTotalProductivity('week')}</div>
-              <div className="text-gray-700 dark:text-gray-300">Weekly Production</div>
-            </div>
-            <div className="text-center p-4 bg-green-100 dark:bg-green-900 rounded-lg">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-300">{calculateTotalProductivity('month')}</div>
-              <div className="text-gray-700 dark:text-gray-300">Monthly Production</div>
+          <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+            Productivity by Zone
+          </h4>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analyticsData.zoneData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="name" stroke="#888" />
+                <YAxis stroke="#888" />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Bar dataKey="value" name="Production" fill={CHART_COLORS[4]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+          <div className="text-center p-4 bg-blue-100 dark:bg-blue-900 rounded-lg">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{calculateTotalProductivity('day')}</div>
+            <div className="text-gray-700 dark:text-gray-300">Daily Production</div>
+          </div>
+          <div className="text-center p-4 bg-purple-100 dark:bg-purple-900 rounded-lg">
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-300">{calculateTotalProductivity('week')}</div>
+            <div className="text-gray-700 dark:text-gray-300">Weekly Production</div>
+          </div>
+          <div className="text-center p-4 bg-green-100 dark:bg-green-900 rounded-lg">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-300">{calculateTotalProductivity('month')}</div>
+            <div className="text-gray-700 dark:text-gray-300">Monthly Production</div>
+          </div>
+          <div className="text-center p-4 bg-orange-100 dark:bg-orange-900 rounded-lg">
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-300">{animals.length}</div>
+            <div className="text-gray-700 dark:text-gray-300">
+              {animalType.managementType === "batch" ? "Total Batches" : "Total Animals"}
             </div>
           </div>
         </div>

@@ -51,11 +51,10 @@ const UHFooter = () => {
               <h3 className="text-xl font-semibold mb-6 pb-2 border-b border-green-700 dark:border-green-800">Quick Links</h3>
               <ul className="space-y-3">
                 <li><a href="/" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Home</a></li>
-                <li><a href="/InventoryManagement/catalog" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Shop</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> About Us</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Farm Tours</a></li>
-                <li><a href="#" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Contact</a></li>
-                <li><a href="news" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> News</a></li>
+                <li><a href="/catalog" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Shop</a></li>
+                <li><a href="/about" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> About Us</a></li>
+                <li><a href="/contact" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> Contact</a></li>
+                <li><a href="/news" className="text-green-200 hover:text-white flex items-center transition-all duration-300"><ArrowRight className="h-4 w-4 mr-2" /> News</a></li>
               </ul>
             </div>
 
@@ -92,11 +91,11 @@ const UHFooter = () => {
               <ul className="space-y-4">
                 <li className="flex items-start">
                   <MapPinIcon className="h-5 w-5 mr-3 mt-0.5 text-green-300 dark:text-green-400 flex-shrink-0" />
-                  <span>123 Farm Road, Mount Olive, CA 90210</span>
+                  <span>No. 45, Green Valley Road,Boragasketiya,Nuwaraeliya, Sri Lanka</span>
                 </li>
                 <li className="flex items-center">
                   <PhoneIcon className="h-5 w-5 mr-3 text-green-300 dark:text-green-400 flex-shrink-0" />
-                  <span>(555) 123-4567</span>
+                  <span>+94 81 249 2134</span>
                 </li>
                 <li className="flex items-center">
                   <MailIcon className="h-5 w-5 mr-3 text-green-300 dark:text-green-400 flex-shrink-0" />
@@ -119,10 +118,10 @@ const UHFooter = () => {
             </p>
             
             <div className="flex flex-wrap justify-center gap-6 text-sm text-green-300">
-              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-white transition-colors">Shipping Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Refund Policy</a>
+              <a href="privacyPolicy" className="hover:text-white transition-colors">Privacy Policy</a>
+              <a href="termsofservice" className="hover:text-white transition-colors">Terms of Service</a>
+              <a href="shippingPolicy" className="hover:text-white transition-colors">Shipping Policy</a>
+              <a href="refundPolicy" className="hover:text-white transition-colors">Refund Policy</a>
             </div>
           </div>
           

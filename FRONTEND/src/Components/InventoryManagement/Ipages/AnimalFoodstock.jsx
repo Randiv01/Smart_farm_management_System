@@ -6,7 +6,6 @@ import {
   Trash2, 
   X,
   RefreshCw,
-  BarChart3,
   AlertCircle,
   Minus,
   ChevronDown,
@@ -19,12 +18,13 @@ import {
   Package,
   Zap,
   Clock,
-  Mail, // Added for email button
-  MessageSquare // Added for WhatsApp button
+  Mail,
+  MessageSquare,
+  PieChart
 } from "lucide-react";
 import { useITheme } from "../Icontexts/IThemeContext";
 import axios from "axios";
-import { Line } from "react-chartjs-2";
+import { Line, Pie } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,9 +34,10 @@ import {
   Title,
   Tooltip,
   Legend,
+  ArcElement
 } from 'chart.js';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 ChartJS.register(
   CategoryScale,
@@ -45,7 +46,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement
 );
 
 const AnimalFoodStock = () => {
@@ -65,10 +67,9 @@ const AnimalFoodStock = () => {
   const [editingFood, setEditingFood] = useState(null);
   const [refillingFood, setRefillingFood] = useState(null);
   const [usingFood, setUsingFood] = useState(null);
-  const [showChart, setShowChart] = useState(false);
+  const [showPieChart, setShowPieChart] = useState(false);
   const [showStockChart, setShowStockChart] = useState(false);
   const [selectedFoodForChart, setSelectedFoodForChart] = useState(null);
-  const [consumptionData, setConsumptionData] = useState([]);
   const [stockData, setStockData] = useState([]);
   const [refillQuantity, setRefillQuantity] = useState("");
   const [useQuantity, setUseQuantity] = useState("");
@@ -159,16 +160,6 @@ const AnimalFoodStock = () => {
     }
   };
 
-  const fetchConsumptionData = async (foodId) => {
-    try {
-      const response = await axios.get(`http://localhost:5000/api/animalfood/consumption/${foodId}`);
-      setConsumptionData(response.data);
-    } catch (error) {
-      console.error("Error fetching consumption data:", error);
-      setError("Failed to load consumption data.");
-    }
-  };
-
   const fetchStockData = async (foodId) => {
     try {
       const response = await axios.get(`http://localhost:5000/api/animalfood/stock/${foodId}`);
@@ -182,7 +173,7 @@ const AnimalFoodStock = () => {
   // Handle sending email
   const handleSendEmail = (food) => {
     try {
-      const email = 'recipient@example.com'; // Replace with actual recipient email
+      const email = 'recipient@example.com';
       const subject = `Low Stock Alert: ${food.name}`;
       const body = `The stock for ${food.name} is running low. Current stock: ${food.remaining} ${food.unit}. Please consider refilling.`;
       const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -199,7 +190,7 @@ const AnimalFoodStock = () => {
   // Handle sending WhatsApp message
   const handleSendWhatsApp = (food) => {
     try {
-      const phone = '1234567890'; // Replace with actual recipient phone number (without +)
+      const phone = '1234567890';
       const message = `Low Stock Alert: ${food.name} has ${food.remaining} ${food.unit} remaining. Please consider refilling.`;
       const whatsappLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
       
@@ -406,10 +397,8 @@ const AnimalFoodStock = () => {
     }
   };
 
-  const handleShowChart = async (food) => {
-    setSelectedFoodForChart(food);
-    await fetchConsumptionData(food._id);
-    setShowChart(true);
+  const handleShowPieChart = () => {
+    setShowPieChart(true);
   };
 
   const handleShowStockChart = async (food) => {
@@ -431,17 +420,31 @@ const AnimalFoodStock = () => {
     return sortConfig.direction === 'asc' ? <ChevronUp size={16} className="inline ml-1" /> : <ChevronDown size={16} className="inline ml-1" />;
   };
 
-  const consumptionChartData = {
-    labels: consumptionData.map(data => data.month),
+  const pieChartData = {
+    labels: filteredAnimalFoods.map(food => food.name),
     datasets: [
       {
-        label: 'Consumption Rate',
-        data: consumptionData.map(data => data.consumption),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        tension: 0.1
-      }
-    ]
+        label: 'Stock Distribution',
+        data: filteredAnimalFoods.map(food => food.remaining),
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.6)',
+          'rgba(54, 162, 235, 0.6)',
+          'rgba(255, 206, 86, 0.6)',
+          'rgba(75, 192, 192, 0.6)',
+          'rgba(153, 102, 255, 0.6)',
+          'rgba(255, 159, 64, 0.6)',
+        ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(54, 162, 235, 1)',
+          'rgba(255, 206, 86, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(153, 102, 255, 1)',
+          'rgba(255, 159, 64, 1)',
+        ],
+        borderWidth: 1,
+      },
+    ],
   };
 
   const stockChartData = {
@@ -477,6 +480,28 @@ const AnimalFoodStock = () => {
         titleColor: darkMode ? '#e5e7eb' : '#1f2937',
         bodyColor: darkMode ? '#e5e7eb' : '#1f2937'
       }
+    }
+  };
+
+  const pieChartOptions = {
+    ...baseChartOptions,
+    plugins: {
+      ...baseChartOptions.plugins,
+      title: {
+        ...baseChartOptions.plugins.title,
+        text: 'Animal Food Stock Distribution'
+      }
+    }
+  };
+
+  const stockChartOptions = {
+    ...baseChartOptions,
+    plugins: {
+      ...baseChartOptions.plugins,
+      title: {
+        ...baseChartOptions.plugins.title,
+        text: `Stock Levels for ${selectedFoodForChart?.name || ''}`
+      }
     },
     scales: {
       y: {
@@ -496,7 +521,7 @@ const AnimalFoodStock = () => {
       x: {
         title: {
           display: true,
-          text: 'Date/Month',
+          text: 'Date',
           color: darkMode ? '#e5e7eb' : '#1f2937'
         },
         grid: {
@@ -509,77 +534,99 @@ const AnimalFoodStock = () => {
     }
   };
 
-  const consumptionChartOptions = {
-    ...baseChartOptions,
-    plugins: {
-      ...baseChartOptions.plugins,
-      title: {
-        ...baseChartOptions.plugins.title,
-        text: `Monthly Consumption Rate for ${selectedFoodForChart?.name || ''}`
-      }
-    }
-  };
-
-  const stockChartOptions = {
-    ...baseChartOptions,
-    plugins: {
-      ...baseChartOptions.plugins,
-      title: {
-        ...baseChartOptions.plugins.title,
-        text: `Stock Levels for ${selectedFoodForChart?.name || ''}`
-      }
-    }
-  };
-
   const exportToPDF = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(16);
-    doc.text('Animal Food Stock Report', 14, 22);
-    
-    const headers = [['Food Name', 'Quantity', 'Remaining', 'Unit', 'Target Animal', 'Expiry Date', 'Status']];
-    
-    const data = filteredAnimalFoods.map(food => {
-      const days = calculateDaysUntilExpiry(food.expiryDate);
-      return [
-        food.name,
-        food.quantity,
-        food.remaining,
-        food.unit,
-        food.targetAnimal,
-        new Date(food.expiryDate).toLocaleDateString(),
-        getDaysLeftText(days)
-      ];
-    });
-
-    doc.autoTable({
-      head: headers,
-      body: data,
-      startY: 30,
-      theme: 'grid',
-      styles: { 
-        fontSize: 10, 
-        cellPadding: 4,
-        textColor: darkMode ? [229, 231, 235] : [31, 41, 55],
-        fillColor: darkMode ? [31, 41, 55] : [255, 255, 255]
-      },
-      headStyles: {
-        fillColor: darkMode ? [55, 65, 81] : [249, 250, 251],
-        textColor: darkMode ? [229, 231, 235] : [31, 41, 55]
-      },
-      columnStyles: { 
-        0: { cellWidth: 40 }, 
-        1: { cellWidth: 20 }, 
-        2: { cellWidth: 20 }, 
-        3: { cellWidth: 15 }, 
-        4: { cellWidth: 30 }, 
-        5: { cellWidth: 25 }, 
-        6: { cellWidth: 40 } 
+    try {
+      if (filteredAnimalFoods.length === 0) {
+        setError("No data available to export to PDF.");
+        return;
       }
-    });
 
-    doc.save('animal_food_stock.pdf');
-    setSuccess("PDF exported successfully!");
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Animal Food Stock Report', 14, 20);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+      doc.text(`Total Items: ${filteredAnimalFoods.length}`, 14, 34);
+
+      const headers = [['Food Name', 'Quantity', 'Remaining', 'Unit', 'Target Animal', 'Expiry Date', 'Status']];
+
+      const data = filteredAnimalFoods.map(food => {
+        const days = calculateDaysUntilExpiry(food.expiryDate);
+        return [
+          String(food.name || 'N/A'),
+          String(food.quantity || 0),
+          String(food.remaining || 0),
+          String(food.unit || 'N/A'),
+          String(food.targetAnimal || 'N/A'),
+          food.expiryDate ? new Date(food.expiryDate).toLocaleDateString() : 'N/A',
+          String(getDaysLeftText(days))
+        ];
+      });
+
+      autoTable(doc, {
+        head: headers,
+        body: data,
+        startY: 40,
+        theme: 'striped',
+        headStyles: {
+          fillColor: darkMode ? [55, 65, 81] : [200, 200, 200],
+          textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
+          fontStyle: 'bold',
+          fontSize: 10
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
+          fillColor: darkMode ? [31, 41, 55] : [255, 255, 255]
+        },
+        alternateRowStyles: {
+          fillColor: darkMode ? [40, 50, 65] : [240, 240, 240]
+        },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 35 }
+        },
+        margin: { top: 40, left: 14, right: 14 },
+        styles: {
+          cellPadding: 2,
+          halign: 'left',
+          valign: 'middle',
+          overflow: 'linebreak'
+        },
+        didParseCell: (data) => {
+          if (data.cell.text && data.cell.text[0] === undefined) {
+            data.cell.text = ['N/A'];
+          }
+        }
+      });
+
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+      }
+
+      doc.save(`animal_food_stock_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      setSuccess("PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setError("Failed to generate PDF. Please check the console for details and try again.");
+    }
   };
 
   // Calculate summary stats
@@ -756,7 +803,6 @@ const AnimalFoodStock = () => {
               />
             </div>
             
-            {/* Advanced Filters Toggle */}
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className={`mt-3 flex items-center gap-2 text-sm ${darkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-800"} transition-colors`}
@@ -765,7 +811,6 @@ const AnimalFoodStock = () => {
               {showFilters ? "Hide Filters" : "Show Filters"}
             </button>
             
-            {/* Advanced Filters */}
             {showFilters && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
@@ -815,6 +860,13 @@ const AnimalFoodStock = () => {
               title="Export to PDF"
             >
               <Download size={20} />
+            </button>
+            <button
+              onClick={handleShowPieChart}
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title="View Stock Distribution"
+            >
+              <PieChart size={20} />
             </button>
             <button
               onClick={() => {
@@ -959,13 +1011,6 @@ const AnimalFoodStock = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-1">
-                          <button 
-                            onClick={() => handleShowChart(food)}
-                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-green-400 hover:bg-gray-700" : "text-green-600 hover:bg-gray-100"}`}
-                            title="View Consumption Chart"
-                          >
-                            <BarChart3 size={18} />
-                          </button>
                           <button 
                             onClick={() => handleRefill(food)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
@@ -1357,17 +1402,17 @@ const AnimalFoodStock = () => {
         </div>
       )}
 
-      {/* Consumption Chart Modal */}
-      {showChart && (
+      {/* Pie Chart Modal */}
+      {showPieChart && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className={`rounded-xl shadow-2xl max-w-4xl w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
-                <BarChart3 size={24} />
-                Consumption Chart - {selectedFoodForChart?.name}
+                <PieChart size={24} />
+                Stock Distribution
               </h2>
               <button
-                onClick={() => setShowChart(false)}
+                onClick={() => setShowPieChart(false)}
                 className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
               >
                 <X size={20} />
@@ -1375,13 +1420,13 @@ const AnimalFoodStock = () => {
             </div>
             
             <div className="h-[400px]">
-              {consumptionData.length > 0 ? (
-                <Line data={consumptionChartData} options={consumptionChartOptions} />
+              {filteredAnimalFoods.length > 0 ? (
+                <Pie data={pieChartData} options={pieChartOptions} />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                  <BarChart3 size={48} className="text-gray-400 mb-4" />
-                  <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No consumption data available yet.</p>
-                  <p className={`text-sm mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>Start recording usage to see data here.</p>
+                  <PieChart size={48} className="text-gray-400 mb-4" />
+                  <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No stock data available yet.</p>
+                  <p className={`text-sm mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>Add food items to see the distribution here.</p>
                 </div>
               )}
             </div>
