@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "../UHContext/UHThemeContext";
+import { useCart } from '../UHContext/UHCartContext';
 import ChatBot from '../UHChatbot/UHChatbot';
 import {
   Search,
@@ -42,6 +43,19 @@ const Catalog = () => {
   const navigate = useNavigate();
   const catalogRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  
+  // Use the cart context instead of local state
+  const { 
+  cartItems, 
+  addToCart, 
+  removeFromCart, 
+  updateQuantity,
+  getTotalItems,
+  getTotalPrice,
+  toggleCart,
+  isCartOpen // Add this line
+} = useCart();
+  
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,8 +63,6 @@ const Catalog = () => {
   const [selectedMarket, setSelectedMarket] = useState("Local Market");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [cartItems, setCartItems] = useState([]);
-  const [showCart, setShowCart] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [seasonalProducts, setSeasonalProducts] = useState([]);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
@@ -161,8 +173,6 @@ const Catalog = () => {
   }, [selectedCategory, selectedMarket, currentPage, sortBy, priceRange]);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("farmCart");
-    if (savedCart) setCartItems(JSON.parse(savedCart));
     const savedViewed = localStorage.getItem("recentlyViewed");
     if (savedViewed) setRecentlyViewed(JSON.parse(savedViewed));
     const savedDeliveryInfo = localStorage.getItem("farmDeliveryInfo");
@@ -174,10 +184,6 @@ const Catalog = () => {
     const savedGiftBucket = localStorage.getItem("farmGiftBucket");
     if (savedGiftBucket) setGiftBucket(JSON.parse(savedGiftBucket));
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem("farmCart", JSON.stringify(cartItems));
-  }, [cartItems]);
 
   useEffect(() => {
     localStorage.setItem("farmWishlist", JSON.stringify(wishlist));
@@ -292,36 +298,9 @@ const Catalog = () => {
     setCurrentPage(1);
   };
 
-  const addToCart = (product) => {
-    const existingItem = cartItems.find(item => item._id === product._id);
-    if (existingItem) {
-      setCartItems(cartItems.map(item =>
-        item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      setCartItems([...cartItems, { ...product, quantity: 1 }]);
-    }
+  const handleAddToCart = (product) => {
+    addToCart(product);
     showToast(`${product.name} added to cart!`);
-  };
-
-  const toggleWishlist = (product) => {
-    if (wishlist.find(item => item._id === product._id)) {
-      setWishlist(wishlist.filter(item => item._id !== product._id));
-      showToast(`${product.name} removed from wishlist!`);
-    } else {
-      setWishlist([...wishlist, product]);
-      showToast(`${product.name} added to wishlist!`);
-    }
-  };
-
-  const toggleGiftBucket = (product) => {
-    if (giftBucket.find(item => item._id === product._id)) {
-      setGiftBucket(giftBucket.filter(item => item._id !== product._id));
-      showToast(`${product.name} removed from gift bucket!`);
-    } else {
-      setGiftBucket([...giftBucket, product]);
-      showToast(`${product.name} added to gift bucket!`);
-    }
   };
 
   const showToast = (message) => {
@@ -344,35 +323,24 @@ const Catalog = () => {
     }, 2000);
   };
 
-  const removeFromCart = (productId) => {
-    setCartItems(cartItems.filter(item => item._id !== productId));
-  };
-
-  const updateQuantity = (productId, newQuantity) => {
-    if (newQuantity < 1) {
-      removeFromCart(productId);
-      return;
+  const toggleWishlist = (product) => {
+    if (wishlist.find(item => item._id === product._id)) {
+      setWishlist(wishlist.filter(item => item._id !== product._id));
+      showToast(`${product.name} removed from wishlist!`);
+    } else {
+      setWishlist([...wishlist, product]);
+      showToast(`${product.name} added to wishlist!`);
     }
-    setCartItems(cartItems.map(item =>
-      item._id === productId ? { ...item, quantity: newQuantity } : item
-    ));
   };
 
-  const incrementQuantity = (productId) => {
-    updateQuantity(productId, cartItems.find(item => item._id === productId).quantity + 1);
-  };
-
-  const decrementQuantity = (productId) => {
-    const item = cartItems.find(item => item._id === productId);
-    updateQuantity(productId, item.quantity - 1);
-  };
-
-  const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
+  const toggleGiftBucket = (product) => {
+    if (giftBucket.find(item => item._id === product._id)) {
+      setGiftBucket(giftBucket.filter(item => item._id !== product._id));
+      showToast(`${product.name} removed from gift bucket!`);
+    } else {
+      setGiftBucket([...giftBucket, product]);
+      showToast(`${product.name} added to gift bucket!`);
+    }
   };
 
   const proceedToPayment = () => {
@@ -380,7 +348,6 @@ const Catalog = () => {
       alert("Your cart is empty!");
       return;
     }
-    localStorage.setItem('farmCart', JSON.stringify(cartItems));
     navigate('/payment');
   };
 
@@ -568,7 +535,7 @@ const Catalog = () => {
   if (loading) {
     return (
       <>
-        <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
+        <Navbar onCartClick={toggleCart} />
          
         <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
           <div className="text-center">
@@ -583,7 +550,7 @@ const Catalog = () => {
 
   return (
     <>
-      <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />   
+      <Navbar onCartClick={toggleCart} />   
       {/* Gift Bucket Icon - Positioned just above ChatBot */}
       <div className="fixed right-5 bottom-20 z-40">
         <button className="relative p-4 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-colors">
@@ -636,7 +603,7 @@ const Catalog = () => {
                     <Eye size={20} className="mr-2" /> View Product
                   </button>
                   <button
-                    onClick={() => addToCart(product)}
+                    onClick={() => handleAddToCart(product)}
                     className="bg-green-600/90 hover:bg-green-700 text-white py-3 px-8 rounded-full font-semibold shadow-lg flex items-center transition-all border border-white/30"
                   >
                     <ShoppingCart size={20} className="mr-2" /> Add to Cart
@@ -1134,7 +1101,7 @@ const Catalog = () => {
                         {/* Action Buttons */}
                         <div className="flex gap-2 mt-4">
                           <button
-                            onClick={() => addToCart(product)}
+                            onClick={() => handleAddToCart(product)}
                             disabled={product.status === 'Out of Stock'}
                             className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${
                               product.status === 'Out of Stock'
@@ -1350,7 +1317,7 @@ const Catalog = () => {
                     </p>
                     <button
                       onClick={() => {
-                        addToCart(quickViewProduct);
+                        handleAddToCart(quickViewProduct);
                         setQuickViewProduct(null);
                       }}
                       disabled={quickViewProduct.status === 'Out of Stock'}
@@ -1529,105 +1496,6 @@ const Catalog = () => {
                   </button>
                 </form>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cart Sidebar */}
-        {showCart && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end animate-fadeIn">
-            <div className={`w-full max-w-md h-full overflow-y-auto transform transition-transform duration-300 ${darkMode ? "bg-gray-900" : "bg-white"} shadow-xl`}>
-              <div className="p-4 border-b sticky top-0 z-10 bg-inherit">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold">Your Cart</h2>
-                  <button
-                    onClick={() => setShowCart(false)}
-                    className={`p-1 rounded-full ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  {getTotalItems()} item{getTotalItems() !== 1 ? 's' : ''} in cart
-                </p>
-              </div>
-              <div className="p-4">
-                {cartItems.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingCart size={48} className="mx-auto mb-4 text-gray-400" />
-                    <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No products in the cart.</p>
-                    <button
-                      onClick={() => setShowCart(false)}
-                      className={`mt-4 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
-                    >
-                      Continue Shopping
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {cartItems.map((item) => (
-                      <div key={item._id} className={`flex gap-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}>
-                        <div className="w-16 h-16 flex-shrink-0">
-                          {item.image ? (
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-full h-full object-cover rounded"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className={`w-full h-full flex items-center justify-center rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
-                              <Truck size={20} className={darkMode ? "text-gray-500" : "text-gray-400"} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{item.name}</h3>
-                          <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                            {formatPriceCalculation(item.price, item.quantity, item.stock.unit)}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <button
-                              onClick={() => decrementQuantity(item._id)}
-                              className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                            >
-                              <Minus size={16} />
-                            </button>
-                            <span className="px-2 py-1 bg-white border rounded min-w-[2rem] text-center">{item.quantity}{item.stock.unit}</span>
-                            <button
-                              onClick={() => incrementQuantity(item._id)}
-                              className={`p-1 rounded ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-                            >
-                              <Plus size={16} />
-                            </button>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => removeFromCart(item._id)}
-                          className={`p-1 self-start ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-500 hover:bg-gray-200"} rounded`}
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {cartItems.length > 0 && (
-                <div className={`p-4 border-t sticky bottom-0 bg-inherit ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="font-semibold">Total:</span>
-                    <span className="text-xl font-bold text-green-600">${getTotalPrice()}</span>
-                  </div>
-                  <button
-                    onClick={proceedToPayment}
-                    className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
-                  >
-                    <CreditCard size={20} />
-                    Proceed to Payment
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}

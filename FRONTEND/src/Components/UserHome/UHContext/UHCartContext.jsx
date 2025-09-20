@@ -1,13 +1,11 @@
-// Update your CartContext to work with your product structure
-import React, { useEffect, useState, createContext, useContext } from 'react';
+// UHCartContext.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPrice, setTotalPrice] = useState(0);
 
   // Load cart from localStorage on initial render
   useEffect(() => {
@@ -17,15 +15,9 @@ export const CartProvider = ({ children }) => {
     }
   }, []);
 
-  // Save cart to localStorage and calculate totals whenever cart changes
+  // Save cart to localStorage whenever cart changes
   useEffect(() => {
     localStorage.setItem('farmCart', JSON.stringify(cartItems));
-    
-    const items = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const price = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    
-    setTotalItems(items);
-    setTotalPrice(price);
   }, [cartItems]);
 
   const addToCart = (product) => {
@@ -81,8 +73,6 @@ export const CartProvider = ({ children }) => {
         clearCart,
         isCartOpen,
         toggleCart,
-        totalItems,
-        totalPrice,
         getTotalItems,
         getTotalPrice
       }}

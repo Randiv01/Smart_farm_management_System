@@ -58,6 +58,7 @@ import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";
 import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  
 import CustomerProfile from './Components/UserHome/CustomerProfile/CustomerProfile.jsx';
 import MyOrders from './Components/Orders/MyOrders.jsx';
+import CartSidebar from './Components/UserHome/UHCartSidebar/CartSidebar.jsx';
 
 // ----------------- User Contexts -----------------
 import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
@@ -130,6 +131,7 @@ function App() {
       <AuthProvider>
         <UserThemeProvider>
           <CartProvider>
+             <CartSidebar />
             {/* ----------------- Routes Start ----------------- */}
             <Routes>
               {/* ----------------- Public Routes ----------------- */}
