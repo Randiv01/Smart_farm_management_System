@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Plus, Trash2, Edit, FileDown, Clock, UserCheck, UserX, Calendar, X } from "lucide-react";
+import { Search, Filter, Plus, Trash2, Edit, FileDown, Clock, UserCheck, UserX, Calendar, X, Download, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -11,15 +11,17 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
 } from "recharts";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
 // Set base URL for API calls
 const API_BASE_URL = "http://localhost:5000";
-
 // Custom notification component
 const Notification = ({ message, type, onClose }) => {
   useEffect(() => {
@@ -28,9 +30,8 @@ const Notification = ({ message, type, onClose }) => {
     }, 3000);
     return () => clearTimeout(timer);
   }, [onClose]);
-
   const bgColor = type === "success" ? "bg-green-500" : "bg-red-500";
-  
+ 
   return (
     <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-white ${bgColor} flex items-center justify-between min-w-80`}>
       <span>{message}</span>
@@ -40,7 +41,30 @@ const Notification = ({ message, type, onClose }) => {
     </div>
   );
 };
-
+// Custom card component for better organization
+const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
+  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 flex flex-col`}>
+    <div className="flex items-center justify-between mb-2">
+      <h4 className="font-medium text-sm">{title}</h4>
+      <div className={`p-2 rounded-full ${color.bg} ${color.text}`}>
+        <Icon size={16} />
+      </div>
+    </div>
+    <div className="mt-2">
+      <p className={`text-2xl font-bold ${color.value}`}>{value}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+    </div>
+  </div>
+);
+// Chart container for consistent styling
+const ChartContainer = ({ title, children, darkMode, className = "" }) => (
+  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 ${className}`}>
+    <h4 className="font-medium mb-4">{title}</h4>
+    <div className="h-64">
+      {children}
+    </div>
+  </div>
+);
 export const AttendanceTracker = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState("daily");
   const [showForm, setShowForm] = useState(false);
@@ -57,34 +81,33 @@ export const AttendanceTracker = ({ darkMode }) => {
     date: new Date().toISOString().split("T")[0],
     checkIn: "",
     checkOut: "",
+    status: "",
   });
   const [formErrors, setFormErrors] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: "", type: "" });
-
+  const [employeeStats, setEmployeeStats] = useState([]);
+  const [attendanceTrend, setAttendanceTrend] = useState([]);
   // Configure axios base URL
   useEffect(() => {
     axios.defaults.baseURL = API_BASE_URL;
   }, []);
-
   // Show notification function
   const showNotification = (message, type = "success") => {
     setNotification({ show: true, message, type });
   };
-
   // Close notification function
   const closeNotification = () => {
     setNotification({ show: false, message: "", type: "" });
   };
-
   // Fetch attendance data
   const fetchAttendanceData = async () => {
     setLoading(true);
     try {
       const params = { date: selectedDate };
-      if (searchTerm) params.employeeId = searchTerm;
-      
+      if (searchTerm) params.search = searchTerm;
+     
       const response = await axios.get("/api/attendance", { params });
       setAttendanceData(response.data);
     } catch (error) {
@@ -94,7 +117,6 @@ export const AttendanceTracker = ({ darkMode }) => {
       setLoading(false);
     }
   };
-
   // Fetch summary data
   const fetchSummaryData = async () => {
     try {
@@ -104,7 +126,6 @@ export const AttendanceTracker = ({ darkMode }) => {
       console.error("Error fetching summary data:", error);
     }
   };
-
   // Fetch report data
   const fetchReportData = async () => {
     setLoading(true);
@@ -112,11 +133,20 @@ export const AttendanceTracker = ({ darkMode }) => {
       const response = await axios.get("/api/attendance/reports", {
         params: { period: reportPeriod }
       });
-      setChartData(response.data.chartData || []);
+      const data = response.data;
+      setChartData(data.chartData || []);
       setReportStats({
-        attendanceRate: response.data.attendanceRate || 0,
-        lateArrivals: response.data.lateArrivals || 0
+        attendanceRate: data.attendanceRate || 0,
+        lateArrivals: data.lateArrivals || 0
       });
+      setEmployeeStats(data.employeeStats || []);
+      setAttendanceTrend((data.chartData || []).map(item => ({
+        day: new Date(item.period).toLocaleDateString('en-US', { weekday: 'short' }),
+        present: item.present,
+        absent: item.absent,
+      })));
+      // Also fetch today's summary for consistency
+      await fetchSummaryData();
     } catch (error) {
       console.error("Error fetching report data:", error);
       showNotification("Error fetching report data. Make sure the server is running on port 5000.", "error");
@@ -124,7 +154,6 @@ export const AttendanceTracker = ({ darkMode }) => {
       setLoading(false);
     }
   };
-
   // Load data on component mount and when dependencies change
   useEffect(() => {
     if (activeTab === "daily") {
@@ -134,26 +163,25 @@ export const AttendanceTracker = ({ darkMode }) => {
       fetchReportData();
     }
   }, [activeTab, selectedDate, searchTerm, reportPeriod]);
-
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+   
     // Clear error when field is updated
     if (formErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: "" }));
     }
   };
-
   // Validate form
   const validateForm = () => {
     const errors = {};
-    
+   
     if (!formData.employeeId.trim()) errors.employeeId = "Employee ID is required";
     if (!formData.name.trim()) errors.name = "Name is required";
     if (!formData.date) errors.date = "Date is required";
-    
+    if (!formData.status) errors.status = "Status is required";
+   
     // If check-in is provided, validate it
     if (formData.checkIn) {
       const [hours, minutes] = formData.checkIn.split(':').map(Number);
@@ -161,7 +189,7 @@ export const AttendanceTracker = ({ darkMode }) => {
         errors.checkIn = "Invalid time format";
       }
     }
-    
+   
     // If check-out is provided, validate it
     if (formData.checkOut) {
       const [hours, minutes] = formData.checkOut.split(':').map(Number);
@@ -169,32 +197,30 @@ export const AttendanceTracker = ({ darkMode }) => {
         errors.checkOut = "Invalid time format";
       }
     }
-    
+   
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
   // Convert time format from "HH:MM" to "H:MM AM/PM" for display
   const convertToDisplayTime = (timeStr) => {
     if (timeStr === "-" || !timeStr) return "-";
-    
+   
     // Check if it's already in display format (contains AM/PM)
     if (timeStr.includes("AM") || timeStr.includes("PM")) return timeStr;
-    
+   
     // Convert from "HH:MM" to "H:MM AM/PM"
     let [hours, minutes] = timeStr.split(":").map(Number);
     const modifier = hours >= 12 ? "PM" : "AM";
     hours = hours % 12 || 12; // Convert to 12-hour format
-    
+   
     return `${hours}:${minutes.toString().padStart(2, '0')} ${modifier}`;
   };
-
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+   
     if (!validateForm()) return;
-    
+   
     try {
       // Convert time formats for backend
       const submitData = {
@@ -203,8 +229,8 @@ export const AttendanceTracker = ({ darkMode }) => {
         date: formData.date,
         checkIn: formData.checkIn ? convertToDisplayTime(formData.checkIn) : "-",
         checkOut: formData.checkOut ? convertToDisplayTime(formData.checkOut) : "-",
+        status: formData.status,
       };
-
       if (editingId) {
         await axios.patch(`/api/attendance/${editingId}`, submitData);
         showNotification("Attendance record updated successfully!");
@@ -212,7 +238,7 @@ export const AttendanceTracker = ({ darkMode }) => {
         await axios.post("/api/attendance", submitData);
         showNotification("Attendance record added successfully!");
       }
-      
+     
       // Close form and refresh data
       setShowForm(false);
       setEditingId(null);
@@ -222,8 +248,9 @@ export const AttendanceTracker = ({ darkMode }) => {
         date: new Date().toISOString().split("T")[0],
         checkIn: "",
         checkOut: "",
+        status: "",
       });
-      
+     
       // Refresh data
       fetchAttendanceData();
       fetchSummaryData();
@@ -234,11 +261,10 @@ export const AttendanceTracker = ({ darkMode }) => {
       showNotification(errorMsg, "error");
     }
   };
-
   // Handle delete
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this attendance record?")) return;
-    
+   
     try {
       await axios.delete(`/api/attendance/${id}`);
       showNotification("Attendance record deleted successfully!");
@@ -250,49 +276,47 @@ export const AttendanceTracker = ({ darkMode }) => {
       showNotification("Error deleting attendance record", "error");
     }
   };
-
   // Handle edit
   const handleEdit = (record) => {
     // Convert display time back to input time format
     const convertToTimeInput = (timeStr) => {
       if (timeStr === "-" || !timeStr) return "";
-      
+     
       const [time, modifier] = timeStr.split(" ");
       let [hours, minutes] = time.split(":").map(Number);
-      
+     
       if (modifier === "PM" && hours !== 12) hours += 12;
       if (modifier === "AM" && hours === 12) hours = 0;
-      
+     
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     };
-
     setFormData({
       employeeId: record.employeeId,
       name: record.name,
       date: new Date(record.date).toISOString().split("T")[0],
       checkIn: record.checkIn !== "-" ? convertToTimeInput(record.checkIn) : "",
       checkOut: record.checkOut !== "-" ? convertToTimeInput(record.checkOut) : "",
+      status: record.status,
     });
     setEditingId(record._id);
     setShowForm(true);
   };
-
   // Generate PDF report
   const generatePDF = () => {
     const doc = new jsPDF();
-    
+   
     // Title
     doc.setFontSize(20);
     doc.text("Attendance Report", 14, 22);
-    
+   
     // Period
     doc.setFontSize(12);
     doc.text(`Period: ${reportPeriod}`, 14, 32);
-    
+   
     // Stats
     doc.text(`Attendance Rate: ${reportStats.attendanceRate}%`, 14, 42);
     doc.text(`Late Arrivals: ${reportStats.lateArrivals}`, 14, 52);
-    
+   
     // Chart data as table
     const tableData = chartData.map(item => [
       item.period,
@@ -301,16 +325,15 @@ export const AttendanceTracker = ({ darkMode }) => {
       item.leave,
       item.late
     ]);
-    
+   
     autoTable(doc, {
       startY: 60,
       head: [['Date', 'Present', 'Absent', 'Leave', 'Late']],
       body: tableData,
     });
-    
+   
     doc.save("attendance-report.pdf");
   };
-
   // Get status color
   const getStatusColor = (status) => {
     switch (status) {
@@ -321,7 +344,6 @@ export const AttendanceTracker = ({ darkMode }) => {
       default: return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
     }
   };
-
   // Get status icon
   const getStatusIcon = (status) => {
     switch (status) {
@@ -332,7 +354,6 @@ export const AttendanceTracker = ({ darkMode }) => {
       default: return null;
     }
   };
-
   // Data for pie chart in reports
   const pieData = [
     { name: 'Present', value: summaryData.present, color: '#22c55e' },
@@ -340,7 +361,6 @@ export const AttendanceTracker = ({ darkMode }) => {
     { name: 'On Leave', value: summaryData.onLeave, color: '#f59e0b' },
     { name: 'Late', value: summaryData.late, color: '#eab308' }
   ];
-
   // Close form and reset
   const closeForm = () => {
     setShowForm(false);
@@ -351,21 +371,45 @@ export const AttendanceTracker = ({ darkMode }) => {
       date: new Date().toISOString().split("T")[0],
       checkIn: "",
       checkOut: "",
+      status: "",
     });
     setFormErrors({});
   };
-
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label, darkMode }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className={`p-3 rounded-md shadow-md ${darkMode ? 'bg-gray-700' : 'bg-white'} border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+          <p className="font-medium">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={`item-${index}`} style={{ color: entry.color }}>
+              {entry.name}: {entry.value}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
   return (
     <div className={`font-sans min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"}`}>
       {/* Notification */}
       {notification.show && (
-        <Notification 
-          message={notification.message} 
-          type={notification.type} 
-          onClose={closeNotification} 
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={closeNotification}
         />
       )}
-
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-2">Attendance Management System</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {activeTab === "daily"
+            ? "Track and manage daily attendance records"
+            : "View detailed reports and analytics"}
+        </p>
+      </div>
       {/* Tabs */}
       <div className="flex mb-6 border-b dark:border-gray-700">
         <button
@@ -373,7 +417,7 @@ export const AttendanceTracker = ({ darkMode }) => {
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
             activeTab === "daily"
               ? "border-b-2 border-green-600 text-green-600 dark:text-green-400"
-              : "text-inherit"
+              : "text-inherit hover:text-green-600 dark:hover:text-green-400"
           }`}
         >
           <Calendar size={18} />
@@ -384,14 +428,13 @@ export const AttendanceTracker = ({ darkMode }) => {
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
             activeTab === "reports"
               ? "border-b-2 border-green-600 text-green-600 dark:text-green-400"
-              : "text-inherit"
+              : "text-inherit hover:text-green-600 dark:hover:text-green-400"
           }`}
         >
-          <FileDown size={18} />
-          <span>Reports</span>
+          <BarChart3 size={18} />
+          <span>Reports & Analytics</span>
         </button>
       </div>
-
       {/* Daily Attendance */}
       {activeTab === "daily" && (
         <>
@@ -408,7 +451,7 @@ export const AttendanceTracker = ({ darkMode }) => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <button 
+              <button
                 className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-700 text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => setSearchTerm("")}
               >
@@ -428,68 +471,102 @@ export const AttendanceTracker = ({ darkMode }) => {
                 className="flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-md"
               >
                 <Plus size={18} />
-                <span>Add Attendance</span>
+                <span>Add Record</span>
               </button>
             </div>
           </div>
-
           {/* Summary Cards */}
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
-            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-full bg-green-100 dark:bg-green-800">
-                  <UserCheck size={20} className="text-green-500 dark:text-green-300" />
-                </div>
-                <h4 className="font-medium">Present</h4>
-              </div>
-              <div className="flex justify-between items-end mt-2">
-                <p className="text-2xl font-bold text-green-500">{summaryData.present}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
-              </div>
-            </div>
-            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-full bg-red-100 dark:bg-red-800">
-                  <UserX size={20} className="text-red-500 dark:text-red-300" />
-                </div>
-                <h4 className="font-medium">Absent</h4>
-              </div>
-              <div className="flex justify-between items-end mt-2">
-                <p className="text-2xl font-bold text-red-500">{summaryData.absent}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
-              </div>
-            </div>
-            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-800">
-                  <Calendar size={20} className="text-orange-500 dark:text-orange-300" />
-                </div>
-                <h4 className="font-medium">On Leave</h4>
-              </div>
-              <div className="flex justify-between items-end mt-2">
-                <p className="text-2xl font-bold text-orange-500">{summaryData.onLeave}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
-              </div>
-            </div>
-            <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-full bg-yellow-100 dark:bg-yellow-800">
-                  <Clock size={20} className="text-yellow-500 dark:text-yellow-300" />
-                </div>
-                <h4 className="font-medium">Late</h4>
-              </div>
-              <div className="flex justify-between items-end mt-2">
-                <p className="text-2xl font-bold text-yellow-500">{summaryData.late}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">out of {summaryData.total}</p>
-              </div>
-            </div>
+            <StatCard
+              title="Present"
+              value={summaryData.present}
+              subtitle={`out of ${summaryData.total}`}
+              icon={UserCheck}
+              color={{
+                bg: "bg-green-100 dark:bg-green-800",
+                text: "text-green-500 dark:text-green-300",
+                value: "text-green-500"
+              }}
+              darkMode={darkMode}
+            />
+            <StatCard
+              title="Absent"
+              value={summaryData.absent}
+              subtitle={`out of ${summaryData.total}`}
+              icon={UserX}
+              color={{
+                bg: "bg-red-100 dark:bg-red-800",
+                text: "text-red-500 dark:text-red-300",
+                value: "text-red-500"
+              }}
+              darkMode={darkMode}
+            />
+            <StatCard
+              title="On Leave"
+              value={summaryData.onLeave}
+              subtitle={`out of ${summaryData.total}`}
+              icon={Calendar}
+              color={{
+                bg: "bg-orange-100 dark:bg-orange-800",
+                text: "text-orange-500 dark:text-orange-300",
+                value: "text-orange-500"
+              }}
+              darkMode={darkMode}
+            />
+            <StatCard
+              title="Late"
+              value={summaryData.late}
+              subtitle={`out of ${summaryData.total}`}
+              icon={Clock}
+              color={{
+                bg: "bg-yellow-100 dark:bg-yellow-800",
+                text: "text-yellow-500 dark:text-yellow-300",
+                value: "text-yellow-500"
+              }}
+              darkMode={darkMode}
+            />
           </div>
-
+          {/* Quick Stats Chart */}
+          <div className="mb-6">
+            <ChartContainer title="Today's Attendance Overview" darkMode={darkMode}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={darkMode ? {
+                    backgroundColor: '#1F2937',
+                    borderColor: '#374151',
+                    color: '#F9FAFB'
+                  } : {}} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </div>
           {/* Attendance Table */}
-          {loading ? (
-            <div className="text-center py-8">Loading attendance data...</div>
-          ) : (
-            <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
+          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
+            <div className={`flex justify-between items-center p-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+              <h3 className="font-medium">Attendance Records</h3>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {attendanceData.length} records found
+              </span>
+            </div>
+           
+            {loading ? (
+              <div className="text-center py-8">Loading attendance data...</div>
+            ) : (
               <table className="w-full border-collapse">
                 <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
                   <tr>
@@ -528,7 +605,7 @@ export const AttendanceTracker = ({ darkMode }) => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
-                            <button 
+                            <button
                               onClick={() => handleEdit(record)}
                               className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
                               title="Edit"
@@ -555,9 +632,8 @@ export const AttendanceTracker = ({ darkMode }) => {
                   )}
                 </tbody>
               </table>
-            </div>
-          )}
-
+            )}
+          </div>
           {/* Add/Edit Attendance Modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -574,34 +650,34 @@ export const AttendanceTracker = ({ darkMode }) => {
                 <form className="space-y-4" onSubmit={handleSubmit}>
                   <div>
                     <label className="block text-sm font-medium mb-1">Employee ID *</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       name="employeeId"
-                      placeholder="Enter Employee ID" 
+                      placeholder="Enter Employee ID"
                       className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.employeeId ? "border-red-500" : ""}`}
                       value={formData.employeeId}
                       onChange={handleInputChange}
                     />
                     {formErrors.employeeId && <p className="text-red-500 text-xs mt-1">{formErrors.employeeId}</p>}
                   </div>
-                  
+                 
                   <div>
                     <label className="block text-sm font-medium mb-1">Name *</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       name="name"
-                      placeholder="Enter Name" 
+                      placeholder="Enter Name"
                       className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.name ? "border-red-500" : ""}`}
                       value={formData.name}
                       onChange={handleInputChange}
                     />
                     {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
                   </div>
-                  
+                 
                   <div>
                     <label className="block text-sm font-medium mb-1">Date *</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       name="date"
                       className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.date ? "border-red-500" : ""}`}
                       value={formData.date}
@@ -609,12 +685,29 @@ export const AttendanceTracker = ({ darkMode }) => {
                     />
                     {formErrors.date && <p className="text-red-500 text-xs mt-1">{formErrors.date}</p>}
                   </div>
-                  
+                 
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Status *</label>
+                    <select
+                      name="status"
+                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.status ? "border-red-500" : ""}`}
+                      value={formData.status}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Status</option>
+                      <option value="Present">Present</option>
+                      <option value="Absent">Absent</option>
+                      <option value="Late">Late</option>
+                      <option value="On Leave">On Leave</option>
+                    </select>
+                    {formErrors.status && <p className="text-red-500 text-xs mt-1">{formErrors.status}</p>}
+                  </div>
+                 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Check In</label>
-                      <input 
-                        type="time" 
+                      <input
+                        type="time"
                         name="checkIn"
                         className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.checkIn ? "border-red-500" : ""}`}
                         value={formData.checkIn}
@@ -622,11 +715,11 @@ export const AttendanceTracker = ({ darkMode }) => {
                       />
                       {formErrors.checkIn && <p className="text-red-500 text-xs mt-1">{formErrors.checkIn}</p>}
                     </div>
-                    
+                   
                     <div>
                       <label className="block text-sm font-medium mb-1">Check Out</label>
-                      <input 
-                        type="time" 
+                      <input
+                        type="time"
                         name="checkOut"
                         className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.checkOut ? "border-red-500" : ""}`}
                         value={formData.checkOut}
@@ -635,17 +728,17 @@ export const AttendanceTracker = ({ darkMode }) => {
                       {formErrors.checkOut && <p className="text-red-500 text-xs mt-1">{formErrors.checkOut}</p>}
                     </div>
                   </div>
-                  
+                 
                   <div className="flex justify-end gap-3 pt-4">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={closeForm}
                       className="px-4 py-2 rounded bg-gray-500 text-white hover:bg-gray-600 transition-colors"
                     >
                       Cancel
                     </button>
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
                     >
                       {editingId ? "Update" : "Save"}
@@ -657,17 +750,16 @@ export const AttendanceTracker = ({ darkMode }) => {
           )}
         </>
       )}
-
-      {/* Reports */}
+      {/* Reports & Analytics */}
       {activeTab === "reports" && (
         <div>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <h3 className="text-lg font-semibold flex items-center gap-2">
-              <FileDown size={20} />
-              Attendance Reports
+              <BarChart3 size={20} />
+              Attendance Analytics
             </h3>
             <div className="flex flex-col md:flex-row items-start md:items-center gap-2 w-full md:w-auto">
-              <select 
+              <select
                 className={`px-3 py-2 border rounded-md text-sm ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
                 value={reportPeriod}
                 onChange={(e) => setReportPeriod(e.target.value)}
@@ -681,31 +773,75 @@ export const AttendanceTracker = ({ darkMode }) => {
                 onClick={generatePDF}
                 className="flex items-center gap-2 px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors"
               >
-                <FileDown size={16} />
-                <span>Generate PDF</span>
+                <Download size={16} />
+                <span>Export PDF</span>
               </button>
             </div>
           </div>
-
           {loading ? (
             <div className="text-center py-8">Loading report data...</div>
           ) : (
             <>
-              <div className={`p-6 rounded-lg mb-6 shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-                <h4 className="mb-4 font-medium">Attendance Summary - {reportPeriod}</h4>
-                <div className="h-80">
+              {/* Key Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <StatCard
+                  title="Attendance Rate"
+                  value={`${reportStats.attendanceRate}%`}
+                  subtitle="Selected period"
+                  icon={UserCheck}
+                  color={{
+                    bg: "bg-green-100 dark:bg-green-800",
+                    text: "text-green-500 dark:text-green-300",
+                    value: "text-green-500"
+                  }}
+                  darkMode={darkMode}
+                />
+                <StatCard
+                  title="Late Arrivals"
+                  value={reportStats.lateArrivals}
+                  subtitle="Selected period"
+                  icon={Clock}
+                  color={{
+                    bg: "bg-yellow-100 dark:bg-yellow-800",
+                    text: "text-yellow-500 dark:text-yellow-300",
+                    value: "text-yellow-500"
+                  }}
+                  darkMode={darkMode}
+                />
+                <StatCard
+                  title="Absent Employees"
+                  value={summaryData.absent}
+                  subtitle="Today"
+                  icon={UserX}
+                  color={{
+                    bg: "bg-red-100 dark:bg-red-800",
+                    text: "text-red-500 dark:text-red-300",
+                    value: "text-red-500"
+                  }}
+                  darkMode={darkMode}
+                />
+                <StatCard
+                  title="On Leave"
+                  value={summaryData.onLeave}
+                  subtitle="Today"
+                  icon={Calendar}
+                  color={{
+                    bg: "bg-orange-100 dark:bg-orange-800",
+                    text: "text-orange-500 dark:text-orange-300",
+                    value: "text-orange-500"
+                  }}
+                  darkMode={darkMode}
+                />
+              </div>
+              {/* Main Chart */}
+              <div className="mb-6">
+                <ChartContainer title={`Attendance Trends - ${reportPeriod}`} darkMode={darkMode}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#4B5563" : "#E5E7EB"} />
                       <XAxis dataKey="period" stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
                       <YAxis stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
-                      <Tooltip 
-                        contentStyle={darkMode ? { 
-                          backgroundColor: '#1F2937', 
-                          borderColor: '#374151',
-                          color: '#F9FAFB'
-                        } : {}} 
-                      />
+                      <Tooltip content={<CustomTooltip darkMode={darkMode} />} />
                       <Legend />
                       <Bar dataKey="present" name="Present" fill="#22c55e" />
                       <Bar dataKey="absent" name="Absent" fill="#ef4444" />
@@ -713,85 +849,87 @@ export const AttendanceTracker = ({ darkMode }) => {
                       <Bar dataKey="late" name="Late" fill="#eab308" />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartContainer>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className={`p-6 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-                  <h4 className="font-medium mb-2">Today's Attendance Distribution</h4>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              {/* Additional Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Weekly Trend */}
+                <ChartContainer title="Attendance Trend" darkMode={darkMode}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={attendanceTrend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#4B5563" : "#E5E7EB"} />
+                      <XAxis dataKey="day" stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                      <YAxis stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                      <Tooltip content={<CustomTooltip darkMode={darkMode} />} />
+                      <Legend />
+                      <Line type="monotone" dataKey="present" name="Present" stroke="#22c55e" strokeWidth={2} />
+                      <Line type="monotone" dataKey="absent" name="Absent" stroke="#ef4444" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+                {/* Employee Performance */}
+                <ChartContainer title="Top Performers" darkMode={darkMode}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={employeeStats.slice(0, 5)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#4B5563" : "#E5E7EB"} />
+                      <XAxis dataKey="name" stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                      <YAxis stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                      <Tooltip content={<CustomTooltip darkMode={darkMode} />} />
+                      <Legend />
+                      <Area type="monotone" dataKey="present" name="Present" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
+                      <Area type="monotone" dataKey="late" name="Late" stackId="1" stroke="#eab308" fill="#eab308" fillOpacity={0.3} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </div>
+              {/* Employee Performance Table */}
+              <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 mb-6`}>
+                <div className={`flex justify-between items-center p-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                  <h3 className="font-medium">Employee Performance</h3>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Based on attendance records
+                  </span>
+                </div>
+                <table className="w-full border-collapse">
+                  <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
+                    <tr>
+                      <th className="text-left px-4 py-3 text-xs uppercase font-semibold">Employee</th>
+                      <th className="text-left px-4 py-3 text-xs uppercase font-semibold">Present</th>
+                      <th className="text-left px-4 py-3 text-xs uppercase font-semibold">Absent</th>
+                      <th className="text-left px-4 py-3 text-xs uppercase font-semibold">Late</th>
+                      <th className="text-left px-4 py-3 text-xs uppercase font-semibold">Leave</th>
+                      <th className="text-left px-4 py-3 text-xs uppercase font-semibold">Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employeeStats.map((employee, index) => {
+                      const totalDays = employee.present + employee.absent + employee.late + employee.leave;
+                      const attendanceRate = totalDays > 0 ? Math.round((employee.present / totalDays) * 100) : 0;
+                     
+                      return (
+                        <tr
+                          key={index}
+                          className={`border-t ${darkMode ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"}`}
                         >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          contentStyle={darkMode ? { 
-                            backgroundColor: '#1F2937', 
-                            borderColor: '#374151',
-                            color: '#F9FAFB'
-                          } : {}} 
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-                
-                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="p-2 rounded-full bg-green-100 dark:bg-green-800">
-                        <UserCheck size={20} className="text-green-500 dark:text-green-300" />
-                      </div>
-                      <h4>Attendance Rate</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-green-500">{reportStats.attendanceRate}%</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Average for selected period</p>
-                  </div>
-                  
-                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="p-2 rounded-full bg-yellow-100 dark:bg-yellow-800">
-                        <Clock size={20} className="text-yellow-500 dark:text-yellow-300" />
-                      </div>
-                      <h4>Late Arrivals</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-yellow-500">{reportStats.lateArrivals}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Selected period</p>
-                  </div>
-                  
-                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="p-2 rounded-full bg-red-100 dark:bg-red-800">
-                        <UserX size={20} className="text-red-500 dark:text-red-300" />
-                      </div>
-                      <h4>Absent Employees</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-red-500">{summaryData.absent}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Today</p>
-                  </div>
-                  
-                  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-800">
-                        <Calendar size={20} className="text-orange-500 dark:text-orange-300" />
-                      </div>
-                      <h4>On Leave</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-orange-500">{summaryData.onLeave}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Today</p>
-                  </div>
-                </div>
+                          <td className="px-4 py-3 font-medium">{employee.name}</td>
+                          <td className="px-4 py-3 text-green-500">{employee.present}</td>
+                          <td className="px-4 py-3 text-red-500">{employee.absent}</td>
+                          <td className="px-4 py-3 text-yellow-500">{employee.late}</td>
+                          <td className="px-4 py-3 text-orange-500">{employee.leave}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              attendanceRate >= 90 ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200" :
+                              attendanceRate >= 75 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200" :
+                              "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                            }`}>
+                              {attendanceRate}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
@@ -800,5 +938,4 @@ export const AttendanceTracker = ({ darkMode }) => {
     </div>
   );
 };
-
 export default AttendanceTracker;
