@@ -25,6 +25,10 @@ const CartSidebar = () => {
     return `$${price} × ${quantity}${unit} = $${(price * quantity).toFixed(2)}`;
   };
 
+  const handleContinueShopping = () => {
+    toggleCart(); // Close cart sidebar
+    navigate('/catalog'); // Navigate to catalog page
+  };
   const proceedToPayment = () => {
     if (cartItems.length === 0) {
       alert("Your cart is empty!");
@@ -80,8 +84,8 @@ const CartSidebar = () => {
               <div className="text-center py-8">
                 <ShoppingCart size={48} className={`mx-auto mb-4 ${darkMode ? "text-gray-500" : "text-gray-400"}`} />
                 <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No products in the cart.</p>
-                <button
-                  onClick={toggleCart}
+                  <button
+                  onClick={handleContinueShopping} // Use the new function
                   className={`mt-4 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"}`}
                 >
                   Continue Shopping
