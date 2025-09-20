@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import Navbar from '../UHNavbar/UHNavbar'; // Import the Navbar component
+import Navbar from '../UHNavbar/UHNavbar';
 import Footer from '../UHFooter/UHFooter';
-import { useTheme } from "../UHContext/UHThemeContext"; // Import the theme context
+import { useTheme } from "../UHContext/UHThemeContext";
 import ChatBot from '../UHChatbot/UHChatbot';
 
 // Hero images (update paths or use URLs)
 import hero1 from "../Images/AboutUs1.jpg";
-import hero2 from "../Images/AboutUs5.jpg";
+import hero2 from "../Images/AboutUs2.jpg";
 import hero3 from "../Images/AboutUs3.jpg";
 import hero4 from "../Images/AboutUs4.jpg";
 
@@ -16,7 +16,7 @@ import ctoImg from "../Images/CtoAboutUs.webp";
 import pmImg from "../Images/projectManagerAboutUs.jpeg";
 
 const AboutUs = () => {
-  const { darkMode } = useTheme(); // Get dark mode state from context
+  const { darkMode } = useTheme();
 
   // Reveal on scroll
   useEffect(() => {
@@ -42,7 +42,7 @@ const AboutUs = () => {
   const slides = [hero1, hero2, hero3, hero4];
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [cartItems] = useState([]); // Initialize empty cart for the navbar
+  const [cartItems] = useState([]);
 
   // Preload images
   useEffect(() => {
@@ -67,9 +67,7 @@ const AboutUs = () => {
   const prevSlide = () => setCurrent((i) => (i - 1 + slides.length) % slides.length);
   const nextSlide = () => setCurrent((i) => (i + 1) % slides.length);
 
-  // Function to handle cart click (if needed)
   const handleCartClick = () => {
-    // You might want to navigate to the cart page or show a modal
     console.log("Cart clicked");
   };
 
@@ -78,89 +76,73 @@ const AboutUs = () => {
       {/* Navbar */}
       <Navbar cartItems={cartItems} onCartClick={handleCartClick} />
       <ChatBot/>
-      {/* Decorative background blobs */}
-      {!darkMode && (
-        <>
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-green-300/30 blur-3xl"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute bottom-0 left-0 h-80 w-80 rounded-full bg-emerald-200/40 blur-3xl"
-          />
-        </>
-      )}
-
-      {/* Full-width hero slideshow with overlay text */}
-      <section
-        className="relative w-full"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
-        <div className="relative h-[50vh] md:h-[70vh] lg:h-[85vh] w-full overflow-hidden">
-          {/* Slides */}
-          {slides.map((src, i) => (
-            <img
-              key={i}
-              src={src}
-              alt={`About Us slide ${i + 1}`}
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out ${
-                i === current ? "opacity-100" : "opacity-0"
-              }`}
-              loading={i === 0 ? "eager" : "lazy"}
-              draggable="false"
-            />
-          ))}
-
-          {/* Gradient for text readability */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
-
-          {/* Overlayed heading and text */}
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center">
-            <h1 className="text-4xl md:text-6xl font-extrabold text-white drop-shadow-lg">
-              About Us
-            </h1>
-            <p className="mt-3 max-w-3xl text-base md:text-xl text-white/95 drop-shadow">
-              Welcome to <span className="font-semibold">Mount Olive Farm House</span>. We transform agriculture with technology,
-              managing 100+ farms and delivering organic vegetables, eggs, and milk with 2+ veterinarians and 3+ plant pathologists.
-            </p>
-            <div className="mt-5 inline-flex items-center gap-3">
-              <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="text-sm md:text-base font-semibold text-emerald-50 tracking-wide">
-                Sustainable • Smart • Trusted
-              </span>
-            </div>
+      
+      {/* Modern Hero Section */}
+      <section className="relative w-full overflow-hidden">
+        <div className="relative h-[85vh] w-full flex items-center justify-center">
+          {/* Slideshow background */}
+          <div className="absolute inset-0 w-full h-full">
+            {slides.map((src, i) => (
+              <div
+                key={i}
+                className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
+                  i === current ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                <img
+                  src={src}
+                  alt={`About Us slide ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="eager"
+                  draggable="false"
+                />
+                <div className="absolute inset-0 bg-black/40"></div>
+              </div>
+            ))}
           </div>
 
-          {/* Controls */}
-          <button
-            onClick={prevSlide}
-            aria-label="Previous slide"
-            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/85 p-2 text-gray-700 shadow hover:bg-white"
-          >
-            ‹
-          </button>
-          <button
-            onClick={nextSlide}
-            aria-label="Next slide"
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/85 p-2 text-gray-700 shadow hover:bg-white"
-          >
-            ›
-          </button>
-
-          {/* Dots */}
-          <div className="absolute bottom-4 left-0 right-0 z-10 flex items-center justify-center gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrent(i)}
-                aria-label={`Go to slide ${i + 1}`}
-                className={`h-2.5 w-2.5 rounded-full transition ${
-                  i === current ? "bg-green-500" : "bg-white/80 ring-1 ring-gray-300"
-                }`}
-              />
-            ))}
+          {/* Content */}
+          <div className="relative z-10 max-w-7xl mx-auto px-6 text-center text-white">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+              Cultivating <span className="text-emerald-400">Tomorrow's</span> Harvest
+            </h1>
+            
+            <p className="text-xl md:text-2xl max-w-3xl mx-auto mb-8 font-light">
+              Pioneering sustainable agriculture through innovation, technology, and decades of expertise.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <button className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-medium transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-emerald-500/30">
+                Explore Our Story
+              </button>
+              <button className="px-8 py-3 bg-transparent border-2 border-white hover:bg-white/10 text-white rounded-full font-medium transition-all duration-300">
+                Watch Video
+              </button>
+            </div>
+            
+            {/* Stats counter */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16 max-w-4xl mx-auto">
+              {[
+                { number: "100+", label: "Farms Managed" },
+                { number: "25+", label: "Years Experience" },
+                { number: "5000+", label: "Happy Customers" },
+                { number: "12", label: "Awards Won" }
+              ].map((stat, index) => (
+                <div key={index} className="text-center">
+                  <div className="text-3xl md:text-4xl font-bold text-emerald-400">{stat.number}</div>
+                  <div className="text-sm md:text-base opacity-90">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Scroll indicator */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+            <div className="animate-bounce">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+              </svg>
+            </div>
           </div>
         </div>
       </section>

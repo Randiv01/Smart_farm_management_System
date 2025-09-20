@@ -1,6 +1,9 @@
 import './App.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
+// Import ScrollToTop component
+import ScrollToTop from './Components/UserHome/ScrollToTop/ScrollToTop.jsx';
+
 // ----------------- Animal Management -----------------
 import Dashboard from './Components/AnimalManagement/Dashboard/Dashboard.jsx';
 import AnimalList from './Components/AnimalManagement/AnimalList/AnimalList.jsx';
@@ -121,6 +124,8 @@ import { SystemSettings as ESystemSettings } from './Components/EmployeeManageme
 function App() {
   return (
     <div className="App">
+      
+       <ScrollToTop />
       {/* ----------------- User / Frontend Routes ----------------- */}
       <AuthProvider>
         <UserThemeProvider>
