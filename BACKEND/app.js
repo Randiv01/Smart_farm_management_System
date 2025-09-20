@@ -35,6 +35,11 @@ const healthUploadsDir = path.join(
   "HealthManagement",
   "Health_uploads"
 );
+const plantUploadsDir = path.join(
+  __dirname,
+  "PlantManagement",
+  "Uploads"
+);
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -46,8 +51,15 @@ if (!fs.existsSync(healthUploadsDir)) {
   console.log("📁 Created Health_uploads directory");
 }
 
+if (!fs.existsSync(plantUploadsDir)) {
+  fs.mkdirSync(plantUploadsDir, { recursive: true });
+  console.log("📁 Created PlantManagement Uploads directory");
+}
+
+// Serve static folders
 app.use("/uploads", express.static(uploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
+app.use("/plant-uploads", express.static(plantUploadsDir)); // ✅ Serve PlantManagement images
 
 // Multer setup (optional if you handle uploads in individual routes)
 const storage = multer.diskStorage({
@@ -80,7 +92,7 @@ import {
   testEmail,
 } from "./AnimalManagement/controllers/medicalRequestController.js";
 import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
+import userRoutes from "./routes/userRoutes.js"; // ✅ Customers and general users
 
 // Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
@@ -121,7 +133,7 @@ app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/users", userRoutes); // ✅ Customer & user routes
 app.use("/api/doctors", doctorRouter);
 app.use("/productivity", productivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
@@ -148,6 +160,13 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
+
+// ----------------------- Customer Routes -----------------------
+// Example: profile image uploads
+app.use("/api/customers/profile-upload", upload.single("profileImage"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  res.json({ message: "Profile image uploaded successfully", path: `/uploads/${req.file.filename}` });
+});
 
 // ----------------------- Health Check -----------------------
 app.get("/health", (req, res) =>
