@@ -28,6 +28,9 @@ import {
   Edit,
   Heart,
   User,
+  Download,
+  Gift,
+  ImageIcon
 } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -79,6 +82,9 @@ const Catalog = () => {
   const [reviews, setReviews] = useState({});
   const [editingReview, setEditingReview] = useState(null);
   const [wishlist, setWishlist] = useState([]);
+  const [giftBucket, setGiftBucket] = useState([]);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [currentImage, setCurrentImage] = useState('');
   
   const categories = [
     "All",
@@ -109,40 +115,40 @@ const Catalog = () => {
   ];
 
   // Default seasonal products for hero section
-const defaultSeasonalProducts = [
-  {
-    _id: "default-1",
-    name: "Fresh Organic Fruits",
-    price: 12.99,
-    stock: { unit: "kg", quantity: 50 },
-    image: sampleImages[0],
-    category: "Fruits"
-  },
-  {
-    _id: "default-2",
-    name: "Farm Fresh Vegetables",
-    price: 8.99,
-    stock: { unit: "kg", quantity: 40 },
-    image: sampleImages[1],
-    category: "Vegetables"
-  },
-  {
-    _id: "default-3",
-    name: "Organic Honey",
-    price: 15.99,
-    stock: { unit: "jar", quantity: 30 },
-    image: sampleImages[2],
-    category: "Honey"
-  },
-  {
-    _id: "default-4",
-    name: "Farm Eggs",
-    price: 6.99,
-    stock: { unit: "dozen", quantity: 60 },
-    image: sampleImages[3],
-    category: "Eggs"
-  }
-];
+  const defaultSeasonalProducts = [
+    {
+      _id: "default-1",
+      name: "Fresh Organic Fruits",
+      price: 12.99,
+      stock: { unit: "kg", quantity: 50 },
+      image: sampleImages[0],
+      category: "Fruits"
+    },
+    {
+      _id: "default-2",
+      name: "Farm Fresh Vegetables",
+      price: 8.99,
+      stock: { unit: "kg", quantity: 40 },
+      image: sampleImages[1],
+      category: "Vegetables"
+    },
+    {
+      _id: "default-3",
+      name: "Organic Honey",
+      price: 15.99,
+      stock: { unit: "jar", quantity: 30 },
+      image: sampleImages[2],
+      category: "Honey"
+    },
+    {
+      _id: "default-4",
+      name: "Farm Eggs",
+      price: 6.99,
+      stock: { unit: "dozen", quantity: 60 },
+      image: sampleImages[3],
+      category: "Eggs"
+    }
+  ];
 
   useEffect(() => {
     if (catalogRef.current) {
@@ -165,6 +171,8 @@ const defaultSeasonalProducts = [
     }
     const savedWishlist = localStorage.getItem("farmWishlist");
     if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
+    const savedGiftBucket = localStorage.getItem("farmGiftBucket");
+    if (savedGiftBucket) setGiftBucket(JSON.parse(savedGiftBucket));
   }, []);
 
   useEffect(() => {
@@ -174,6 +182,10 @@ const defaultSeasonalProducts = [
   useEffect(() => {
     localStorage.setItem("farmWishlist", JSON.stringify(wishlist));
   }, [wishlist]);
+
+  useEffect(() => {
+    localStorage.setItem("farmGiftBucket", JSON.stringify(giftBucket));
+  }, [giftBucket]);
 
   useEffect(() => {
     if (deliveryInfo.zipcode || deliveryInfo.date || deliveryInfo.email) {
@@ -204,58 +216,58 @@ const defaultSeasonalProducts = [
   }, [searchTerm]);
 
   useEffect(() => {
-  const productsToUse = seasonalProducts.length > 0 ? seasonalProducts : defaultSeasonalProducts;
-  const interval = setInterval(() => {
-    setCarouselIndex((prev) => (prev + 1) % Math.max(productsToUse.length, 1));
-  }, 5000);
-  return () => clearInterval(interval);
-}, [seasonalProducts.length]);
+    const productsToUse = seasonalProducts.length > 0 ? seasonalProducts : defaultSeasonalProducts;
+    const interval = setInterval(() => {
+      setCarouselIndex((prev) => (prev + 1) % Math.max(productsToUse.length, 1));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [seasonalProducts.length]);
 
   const fetchProducts = async () => {
-  try {
-    setLoading(true);
-    const params = {
-      page: currentPage,
-      limit: 12,
-      sort: sortBy,
-      minPrice: priceRange[0],
-      maxPrice: priceRange[1],
-    };
-    if (selectedCategory !== "All") params.category = selectedCategory;
-    if (searchTerm) params.search = searchTerm;
-    if (selectedMarket === "Export Market") params.market = "Export";
-    const response = await axios.get("http://localhost:5000/api/inventory/products/catalog/products", { params });
-    setProducts(response.data.products);
-    setTotalPages(response.data.totalPages);
-    const aggregatedReviews = response.data.products.reduce((acc, product) => {
-      acc[product._id] = product.reviews || [];
-      return acc;
-    }, {});
-    setReviews(aggregatedReviews);
-    
-    // Only update seasonal products if we have actual products
-    if (response.data.products.length > 0) {
-      const seasonal = response.data.products
-        .filter(p => p.category === 'Fruits' || p.category === 'Vegetables')
-        .slice(0, 4)
-        .map((p, index) => ({
-          ...p,
-          image: p.image || sampleImages[index % sampleImages.length]
-        }));
-      setSeasonalProducts(seasonal);
-    } else {
-      // Use default products if no products returned
+    try {
+      setLoading(true);
+      const params = {
+        page: currentPage,
+        limit: 12,
+        sort: sortBy,
+        minPrice: priceRange[0],
+        maxPrice: priceRange[1],
+      };
+      if (selectedCategory !== "All") params.category = selectedCategory;
+      if (searchTerm) params.search = searchTerm;
+      if (selectedMarket === "Export Market") params.market = "Export";
+      const response = await axios.get("http://localhost:5000/api/inventory/products/catalog/products", { params });
+      setProducts(response.data.products);
+      setTotalPages(response.data.totalPages);
+      const aggregatedReviews = response.data.products.reduce((acc, product) => {
+        acc[product._id] = product.reviews || [];
+        return acc;
+      }, {});
+      setReviews(aggregatedReviews);
+      
+      // Only update seasonal products if we have actual products
+      if (response.data.products.length > 0) {
+        const seasonal = response.data.products
+          .filter(p => p.category === 'Fruits' || p.category === 'Vegetables')
+          .slice(0, 4)
+          .map((p, index) => ({
+            ...p,
+            image: p.image || sampleImages[index % sampleImages.length]
+          }));
+        setSeasonalProducts(seasonal);
+      } else {
+        // Use default products if no products returned
+        setSeasonalProducts(defaultSeasonalProducts);
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      // Set default seasonal products if API call fails
       setSeasonalProducts(defaultSeasonalProducts);
+    } finally {
+      setLoading(false);
+      setSearchLoading(false);
     }
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    // Set default seasonal products if API call fails
-    setSeasonalProducts(defaultSeasonalProducts);
-  } finally {
-    setLoading(false);
-    setSearchLoading(false);
-  }
-};
+  };
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -299,6 +311,16 @@ const defaultSeasonalProducts = [
     } else {
       setWishlist([...wishlist, product]);
       showToast(`${product.name} added to wishlist!`);
+    }
+  };
+
+  const toggleGiftBucket = (product) => {
+    if (giftBucket.find(item => item._id === product._id)) {
+      setGiftBucket(giftBucket.filter(item => item._id !== product._id));
+      showToast(`${product.name} removed from gift bucket!`);
+    } else {
+      setGiftBucket([...giftBucket, product]);
+      showToast(`${product.name} added to gift bucket!`);
     }
   };
 
@@ -369,13 +391,27 @@ const defaultSeasonalProducts = [
     });
   }, []);
 
-const openQuickView = (product) => {
-  // Only track real products, not default ones
-  if (!product._id.startsWith('default-')) {
-    trackViewedProduct(product);
-  }
-  setQuickViewProduct(product);
-};
+  const openQuickView = (product) => {
+    // Only track real products, not default ones
+    if (!product._id.startsWith('default-')) {
+      trackViewedProduct(product);
+    }
+    setQuickViewProduct(product);
+  };
+
+  const openImageModal = (imageUrl) => {
+    setCurrentImage(imageUrl);
+    setShowImageModal(true);
+  };
+
+  const downloadImage = () => {
+    const link = document.createElement('a');
+    link.href = currentImage;
+    link.download = 'product-image.jpg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const shareProduct = async (product) => {
     if (navigator.share) {
@@ -548,7 +584,20 @@ const openQuickView = (product) => {
   return (
     <>
       <Navbar cartItems={cartItems} onCartClick={() => setShowCart(true)} />
-         <ChatBot/>
+      
+      {/* Gift Bucket Icon - Moved to right side */}
+      <div className="fixed right-6 bottom-6 z-40">
+        <button className="relative p-4 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition-colors">
+          <Gift size={24} />
+          {giftBucket.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+              {giftBucket.length}
+            </span>
+          )}
+        </button>
+      </div>
+      
+      <ChatBot/>
       <div ref={catalogRef} className="pt-0"></div>
       
       <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}>
@@ -948,6 +997,7 @@ const openQuickView = (product) => {
                   const avgRating = getAverageRating(product._id);
                   const reviewCount = getReviewCount(product._id);
                   const isWishlisted = wishlist.find(item => item._id === product._id);
+                  const isGiftBucketed = giftBucket.find(item => item._id === product._id);
                   const isNew = product.createdAt && (new Date() - new Date(product.createdAt)) < (7 * 24 * 60 * 60 * 1000);
                   
                   return (
@@ -1003,15 +1053,42 @@ const openQuickView = (product) => {
                         
                         {/* Quick View Overlay */}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openQuickView(product);
-                            }}
-                            className="bg-white text-green-700 px-4 py-2 rounded-full font-medium flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
-                          >
-                            <Eye size={16} /> Quick View
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openQuickView(product);
+                              }}
+                              className="bg-white text-green-700 p-2 rounded-full font-medium flex items-center transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+                              title="Quick View"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openImageModal(product.image);
+                              }}
+                              className="bg-white text-blue-600 p-2 rounded-full font-medium flex items-center transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+                              title="View Image"
+                            >
+                              <ImageIcon size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleGiftBucket(product);
+                              }}
+                              className={`p-2 rounded-full font-medium flex items-center transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 ${
+                                isGiftBucketed 
+                                  ? 'bg-pink-600 text-white' 
+                                  : 'bg-white text-pink-600'
+                              }`}
+                              title="Add to Gift Bucket"
+                            >
+                              <Gift size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                       
@@ -1335,6 +1412,43 @@ const openQuickView = (product) => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Image Modal */}
+        {showImageModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className={`max-w-3xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? "bg-gray-900" : "bg-white"}`}>
+              <div className="p-4 border-b flex justify-between items-center">
+                <h2 className="text-xl font-bold">Product Image</h2>
+                <button 
+                  onClick={() => setShowImageModal(false)}
+                  className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6 flex justify-center">
+                <img
+                  src={currentImage}
+                  alt="Product"
+                  className="max-w-full max-h-96 object-contain rounded-lg"
+                />
+              </div>
+              <div className="p-4 border-t flex justify-center">
+                <button
+                  onClick={downloadImage}
+                  className={`px-6 py-3 rounded-lg flex items-center gap-2 font-semibold transition-colors ${
+                    darkMode 
+                      ? "bg-gray-700 hover:bg-gray-600 text-white" 
+                      : "bg-green-600 hover:bg-green-700 text-white"
+                  }`}
+                >
+                  <Download size={20} />
+                  Download Image
+                </button>
               </div>
             </div>
           </div>
