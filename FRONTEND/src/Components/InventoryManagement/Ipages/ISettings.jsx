@@ -1,3 +1,4 @@
+// ISettings.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
 import { 
@@ -17,6 +18,8 @@ import {
   FiCamera
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
+import io from 'socket.io-client';
 
 // MessagePopup Component
 const MessagePopup = ({ type, message, show, onClose }) => {
@@ -61,6 +64,7 @@ const MessagePopup = ({ type, message, show, onClose }) => {
 const ISettings = () => {
   const { theme, toggleTheme } = useITheme();
   const darkMode = theme === "dark";
+  const [socket, setSocket] = useState(null);
   
   // State for all settings
   const [settings, setSettings] = useState({
@@ -85,9 +89,12 @@ const ISettings = () => {
       categoryManagement: ["Vegetables", "Eggs", "Meat", "Milk", "Finals"]
     },
     user: {
-      name: "Farm Manager",
-      email: "manager@greenvalley.com",
-      role: "Administrator",
+      name: localStorage.getItem("name") || "Admin",
+      firstName: localStorage.getItem("firstName") || "",
+      lastName: localStorage.getItem("lastName") || "",
+      email: localStorage.getItem("email") || "",
+      role: localStorage.getItem("role") || "admin",
+      profileImage: localStorage.getItem("profileImage") || "",
       changePassword: ""
     }
   });
@@ -96,6 +103,16 @@ const ISettings = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [message, setMessage] = useState({ type: "", text: "", show: false });
   const [validationErrors, setValidationErrors] = useState({});
+
+  // Initialize socket connection
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+    
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
 
   // Show message popup
   const showMessage = useCallback((type, text) => {
@@ -143,16 +160,91 @@ const ISettings = () => {
     return Object.keys(errors).length === 0;
   };
 
+  // Handle profile image upload
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      showMessage("error", "Please select an image file");
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      showMessage("error", "Image size must be less than 5MB");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append('profileImage', file);
+      
+      const response = await axios.post(
+        "http://localhost:5000/api/users/upload-profile-image", 
+        formData, 
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      
+      // Update local state
+      handleInputChange("user", "profileImage", response.data.imageUrl);
+      
+      // Update localStorage
+      localStorage.setItem("profileImage", response.data.imageUrl);
+      
+      // Emit socket event to update other components
+      if (socket) {
+        socket.emit('userProfileUpdated', {
+          firstName: settings.user.firstName,
+          lastName: settings.user.lastName,
+          profileImage: response.data.imageUrl
+        });
+      }
+      
+      showMessage("success", "Profile image updated successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      showMessage("error", "Failed to upload image");
+    }
+  };
+
   // Handle save settings
-  const saveSettings = () => {
+  const saveSettings = async () => {
     if (!validateSettings()) {
       showMessage("error", "Please fix the validation errors");
       return;
     }
     
-    // In a real application, this would save to a backend
-    console.log("Saving settings:", settings);
-    showMessage("success", "Settings saved successfully!");
+    try {
+      // In a real application, this would save to a backend
+      console.log("Saving settings:", settings);
+      
+      // Update localStorage with user data
+      localStorage.setItem("firstName", settings.user.firstName);
+      localStorage.setItem("lastName", settings.user.lastName);
+      localStorage.setItem("name", `${settings.user.firstName} ${settings.user.lastName}`);
+      localStorage.setItem("email", settings.user.email);
+      
+      // Emit socket event to update other components
+      if (socket) {
+        socket.emit('userProfileUpdated', {
+          firstName: settings.user.firstName,
+          lastName: settings.user.lastName,
+          profileImage: settings.user.profileImage
+        });
+      }
+      
+      showMessage("success", "Settings saved successfully!");
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      showMessage("error", "Failed to save settings");
+    }
   };
 
   // Handle data export
@@ -178,14 +270,14 @@ const ISettings = () => {
   // Format role for display
   const formatRole = (role) => {
     const roleMap = {
-      animal: "Animal Manager",
-      plant: "Plant Manager", 
-      inv: "Inventory Manager",
-      emp: "Employee Manager",
-      health: "Health Manager",
-      owner: "Owner",
-      normal: "Normal User",
-      admin: "Administrator"
+      "animal": "Animal Manager",
+      "plant": "Plant Manager", 
+      "inv": "Inventory Manager",
+      "emp": "Employee Manager",
+      "health": "Health Manager",
+      "owner": "Owner",
+      "normal": "Normal User",
+      "admin": "Administrator"
     };
     
     return roleMap[role] || role;
@@ -450,12 +542,24 @@ const ISettings = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                    Name
+                    First Name
                   </label>
                   <input
                     type="text"
-                    value={settings.user.name}
-                    onChange={(e) => handleInputChange("user", "name", e.target.value)}
+                    value={settings.user.firstName}
+                    onChange={(e) => handleInputChange("user", "firstName", e.target.value)}
+                    className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                  />
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.user.lastName}
+                    onChange={(e) => handleInputChange("user", "lastName", e.target.value)}
                     className={`w-full p-3 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
                   />
                 </div>
@@ -484,7 +588,38 @@ const ISettings = () => {
                   />
                 </div>
                 
-                <div>
+                <div className="md:col-span-2">
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Profile Image
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <div className={`rounded-full overflow-hidden w-16 h-16 flex items-center justify-center ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
+                      {settings.user.profileImage ? (
+                        <img 
+                          src={settings.user.profileImage} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <FiUser size={24} className={darkMode ? "text-gray-400" : "text-gray-500"} />
+                      )}
+                    </div>
+                    <div>
+                      <label className="cursor-pointer bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1">
+                        <FiCamera size={14} />
+                        <span>Change Image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="md:col-span-2">
                   <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                     Change Password
                   </label>

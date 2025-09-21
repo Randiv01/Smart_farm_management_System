@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useETheme } from '../Econtexts/EThemeContext.jsx';
 import { FiCheck, FiX, FiCamera, FiTrash2, FiAlertCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
+import io from 'socket.io-client';
 
 // MessagePopup Component
 const MessagePopup = ({ type, message, show, onClose }) => {
@@ -48,6 +49,7 @@ const ESystemSettings = () => {
   const { theme, toggleTheme } = useETheme();
   const darkMode = theme === 'dark';
   const [loading, setLoading] = useState(false);
+  const [socket, setSocket] = useState(null);
 
   const [activeTab, setActiveTab] = useState('profile');
   const [userData, setUserData] = useState({
@@ -76,6 +78,16 @@ const ESystemSettings = () => {
   const [availableRoles, setAvailableRoles] = useState([]);
   const [imagePreview, setImagePreview] = useState(null);
 
+  // Initialize socket connection
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+    
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
+
   const getProfileImageUrl = useCallback((path) => {
     if (!path) return null;
     const cleanPath = path.replace(/\\/g, '/');
@@ -91,6 +103,27 @@ const ESystemSettings = () => {
     }, 3000);
   }, []);
 
+  // Emit user profile updates to socket
+  const emitProfileUpdate = (updatedData) => {
+    if (socket) {
+      socket.emit('userProfileUpdated', updatedData);
+    }
+  };
+
+  // Update localStorage and emit changes
+  const updateUserDataStorage = (newData) => {
+    // Update localStorage
+    if (newData.firstName) localStorage.setItem("firstName", newData.firstName);
+    if (newData.lastName) localStorage.setItem("lastName", newData.lastName);
+    if (newData.profileImage) localStorage.setItem("profileImage", newData.profileImage);
+    
+    // Emit socket event
+    emitProfileUpdate(newData);
+    
+    // Trigger storage event for other tabs
+    window.dispatchEvent(new Event('storage'));
+  };
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -104,6 +137,9 @@ const ESystemSettings = () => {
         if (userDataFromApi.profileImage) {
           setImagePreview(getProfileImageUrl(userDataFromApi.profileImage));
         }
+        
+        // Update localStorage with current data
+        updateUserDataStorage(userDataFromApi);
       } catch (error) {
         showMessage('error', 'Failed to fetch user profile');
       } finally {
@@ -199,9 +235,13 @@ const ESystemSettings = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      await axios.put('/api/users/profile', userData, {
+      const response = await axios.put('/api/users/profile', userData, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      // Update localStorage and emit changes
+      updateUserDataStorage(response.data);
+      
       showMessage('success', 'Profile updated successfully!');
     } catch (error) {
       showMessage('error', error.response?.data?.error || 'Failed to update profile');
@@ -260,8 +300,14 @@ const ESystemSettings = () => {
           'Content-Type': 'multipart/form-data',
         },
       });
-      setUserData((prev) => ({ ...prev, profileImage: response.data.imageUrl }));
+      
+      const updatedUserData = { ...userData, profileImage: response.data.imageUrl };
+      setUserData(updatedUserData);
       setImagePreview(URL.createObjectURL(file));
+      
+      // Update localStorage and emit changes
+      updateUserDataStorage(updatedUserData);
+      
       showMessage('success', 'Profile image updated successfully');
     } catch (error) {
       showMessage('error', 'Failed to upload image');
@@ -277,8 +323,14 @@ const ESystemSettings = () => {
       await axios.delete('/api/users/profile-image', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUserData((prev) => ({ ...prev, profileImage: '' }));
+      
+      const updatedUserData = { ...userData, profileImage: '' };
+      setUserData(updatedUserData);
       setImagePreview(null);
+      
+      // Update localStorage and emit changes
+      updateUserDataStorage(updatedUserData);
+      
       showMessage('success', 'Profile image removed successfully');
     } catch (error) {
       showMessage('error', 'Failed to remove image');
@@ -771,7 +823,7 @@ const ESystemSettings = () => {
                     disabled={loading}
                   >
                     {loading ? 'Updating...' : 'Change Password'}
-                  </button>
+                </button>
                 </div>
               </div>
             </div>
