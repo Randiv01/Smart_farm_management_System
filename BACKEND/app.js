@@ -9,6 +9,9 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import multer from "multer";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 // ----------------------- Fix __dirname for ES modules -----------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -16,6 +19,34 @@ const __dirname = path.dirname(__filename);
 
 // ----------------------- Initialize Express -----------------------
 const app = express();
+
+// ----------------------- Create HTTP server -----------------------
+const server = createServer(app);
+
+// ----------------------- Initialize Socket.io -----------------------
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Store socket.io instance in app
+app.set("io", io);
+
+// Socket.io connection handling
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+
+  // Join user to specific room based on their role
+  socket.on("join-user-room", (userId) => {
+    socket.join(`user-${userId}`);
+  });
+});
 
 // ----------------------- Middleware -----------------------
 app.use(
@@ -29,14 +60,17 @@ app.use(express.urlencoded({ extended: true }));
 
 // ----------------------- Uploads Setup -----------------------
 const uploadsDir = path.join(__dirname, "uploads");
-const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
+const healthUploadsDir = path.join(
+  __dirname,
+  "HealthManagement",
+  "Health_uploads"
+);
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
-// Ensure directories exist
 [uploadsDir, healthUploadsDir, plantUploadsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
-    console.log("📁 Created directory:", dir);
+    console.log(`📁 Created directory: ${dir}`);
   }
 });
 
@@ -46,6 +80,24 @@ app.use("/uploads", express.static(uploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/Health_Uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
+
+// ----------------------- Multer setup -----------------------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowed = /jpeg|jpg|png|gif/;
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowed.test(ext)) cb(null, true);
+  else cb(new Error("Only images are allowed"));
+};
+
+const upload = multer({ storage, fileFilter });
 
 // ----------------------- Import Routes -----------------------
 // Animal Management
@@ -72,7 +124,7 @@ import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologist
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
 
-// Contact us
+// Contact Us
 import contact from "./ContactUs/routes/contactRoutes.js";
 
 // Plant Management
@@ -80,6 +132,8 @@ import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
 import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
 import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
+import pestRoutes from "./PlantManagement/Routes/pestRoutes.js";
+import consultationRoutes from "./PlantManagement/Routes/consultationRoutes.js";
 
 // Inventory Management
 import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
@@ -87,6 +141,7 @@ import orderRoutes from "./InventoryManagement/Iroutes/orderRoutes.js";
 import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js";
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
+import refillRequestRoutes from "./InventoryManagement/Iroutes/refillRequestRoutes.js";
 
 // Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
@@ -94,8 +149,11 @@ import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
-// ----------------------- Debug env variables (optional) -----------------------
-console.log("OPENAI_API_KEY loaded:", process.env.OPENAI_API_KEY ? "YES" : "NO");
+// ----------------------- Debug env variables -----------------------
+console.log(
+  "OPENAI_API_KEY loaded:",
+  process.env.OPENAI_API_KEY ? "YES" : "NO"
+);
 console.log("EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
 
 // ----------------------- Routes Setup -----------------------
@@ -124,7 +182,7 @@ app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 
-// Contact us
+// Contact Us
 app.use("/api/contact", contact);
 
 // Plant Management
@@ -132,6 +190,8 @@ app.use("/api/inspections", inspectionRoutes);
 app.use("/api/plants", plantRoutes);
 app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
+app.use("/api/pests", pestRoutes);
+app.use("/api/consultations", consultationRoutes);
 
 // Inventory Management
 app.use("/api/inventory/products", productRoutes);
@@ -139,6 +199,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
+app.use("/api/refill-requests", refillRequestRoutes);
 
 // Employee Management
 app.use("/api/employees", employeeRoutes);
@@ -146,8 +207,54 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 
+// Customer Profile Image Upload
+app.use(
+  "/api/customers/profile-upload",
+  upload.single("profileImage"),
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    res.json({
+      message: "Profile image uploaded successfully",
+      path: `/uploads/${req.file.filename}`,
+    });
+  }
+);
+
+// Add debug endpoints
+app.get("/api/debug", (req, res) => {
+  res.json({
+    message: "Server is working",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || "development",
+  });
+});
+
+app.get("/api/check-db", async (req, res) => {
+  try {
+    // Try to perform a simple query
+    const Pest = mongoose.model("Pest");
+    const consultationCount = await mongoose.model("Consultation").countDocuments();
+    const pestCount = await Pest.countDocuments();
+
+    res.json({
+      success: true,
+      message: "MongoDB is connected",
+      pestCount,
+      consultationCount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "MongoDB connection error",
+      error: error.message,
+    });
+  }
+});
+
 // ----------------------- Health Check -----------------------
-app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
+app.get("/health", (req, res) =>
+  res.json({ status: "OK", message: "Server is running" })
+);
 app.get("/", (req, res) => res.send("Backend is running!"));
 
 // ----------------------- 404 -----------------------
@@ -163,7 +270,8 @@ app.use((err, req, res, next) => {
 });
 
 // ----------------------- MongoDB Connection -----------------------
-const MONGO_URI = process.env.MONGO_URI ||
+const MONGO_URI =
+  process.env.MONGO_URI ||
   "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
 
 const connectDB = async () => {
@@ -181,7 +289,10 @@ const connectDB = async () => {
 
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
-  app.listen(5000, () => console.log("🚀 Server running on port 5000"));
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () =>
+    console.log(`🚀 Server running on port ${PORT}`)
+  );
 });
 
 export default app;

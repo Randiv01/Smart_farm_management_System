@@ -30,7 +30,7 @@ import axios from 'axios';
 import Footer from '../UHFooter/UHFooter';
 import ChatBot from '../UHChatbot/UHChatbot';
 import { FaWhatsapp } from 'react-icons/fa';
-
+import { Link, useNavigate } from "react-router-dom";
 
 // Hero image imports
 import Heroimage1 from '../Images/Heroimage1.jpg';
@@ -58,6 +58,7 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const [isScrolled, setIsScrolled] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const navigate = useNavigate();
   
   // Refs for scroll animations
   const featuredProductsRef = useRef(null);
@@ -265,9 +266,14 @@ const Home = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("http://localhost:5000/api/inventory/products/catalog/products", {
-          params: { limit: 8 }
-        });
+        const params = {
+          limit: 8,
+          sort: activeTab === 'featured' ? 'featured' : 
+                activeTab === 'new' ? 'newest' : 
+                'popular'
+        };
+        
+        const response = await axios.get("http://localhost:5000/api/inventory/products/catalog/products", { params });
         setProducts(response.data.products || []);
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -284,7 +290,7 @@ const Home = () => {
     };
 
     fetchProducts();
-  }, []);
+  }, [activeTab]);
 
   // Handle newsletter subscription
   const handleNewsletterSubmit = (e) => {
@@ -310,54 +316,91 @@ const Home = () => {
     }
   };
 
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setLoading(true);
+  };
+
   // Product Card Component
-  const ProductCard = ({ product, index }) => (
-    <div className={`bg-soft-white dark:bg-dark-card rounded-xl shadow-md overflow-hidden transition-all duration-700 group
-      ${inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-      style={{ transitionDelay: `${index * 100}ms` }}>
-      <div className="relative h-48 overflow-hidden">
-        <img 
-          src={product.image} 
-          alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
-        <div className="absolute top-0 left-0 bg-dark-green text-soft-white text-xs font-semibold px-2 py-1 rounded-br-lg">
-          {product.category}
-        </div>
-        <button className="absolute top-2 right-2 p-2 bg-soft-white/80 rounded-full shadow-md hover:bg-soft-white transition-colors">
-          <HeartIcon className="h-5 w-5 text-dark-gray hover:text-dark-green" />
-        </button>
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <button className="bg-dark-green text-soft-white py-2 px-4 rounded-full flex items-center font-semibold transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-            <ShoppingBagIcon className="h-4 w-4 mr-1" /> Quick View
-          </button>
-        </div>
-      </div>
-      <div className="p-4">
-        <h4 className="font-semibold text-gray-800 dark:text-dark-text mb-1 line-clamp-1">{product.name}</h4>
-        <div className="flex items-center mb-2">
-          {[...Array(5)].map((_, i) => (
-            <StarIcon 
-              key={i} 
-              className={`h-4 w-4 ${i < 4 ? 'text-btn-yellow fill-current' : 'text-gray-300'}`} 
-            />
-          ))}
-          <span className="text-xs text-gray-500 ml-1">(24)</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-lg font-bold text-dark-green dark:text-green-400">${product.price}</span>
-            {product.originalPrice && (
-              <span className="text-sm text-gray-500 line-through ml-2">${product.originalPrice}</span>
-            )}
+  const ProductCard = ({ product, index }) => {
+    const handleProductClick = () => {
+      // Navigate to catalog page with product ID
+      navigate(`/catalog?product=${product._id}`);
+    };
+
+    const handleQuickView = (e) => {
+      e.stopPropagation();
+      // For now, just navigate to catalog
+      navigate(`/catalog?product=${product._id}`);
+    };
+
+    return (
+      <div 
+        className={`bg-soft-white dark:bg-dark-card rounded-xl shadow-md overflow-hidden transition-all duration-700 group cursor-pointer
+          ${inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+        style={{ transitionDelay: `${index * 100}ms` }}
+        onClick={handleProductClick}
+      >
+        <div className="relative h-48 overflow-hidden">
+          <img 
+            src={product.image} 
+            alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+          <div className="absolute top-0 left-0 bg-dark-green text-soft-white text-xs font-semibold px-2 py-1 rounded-br-lg">
+            {product.category}
           </div>
-          <button className="bg-dark-green hover:bg-green-800 text-soft-white p-2 rounded-full transition-colors">
-            <ShoppingBagIcon className="h-4 w-4" />
+          <button 
+            className="absolute top-2 right-2 p-2 bg-soft-white/80 rounded-full shadow-md hover:bg-soft-white transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Add to wishlist functionality would go here
+            }}
+          >
+            <HeartIcon className="h-5 w-5 text-dark-gray hover:text-dark-green" />
           </button>
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <button 
+              className="bg-dark-green text-soft-white py-2 px-4 rounded-full flex items-center font-semibold transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+              onClick={handleQuickView}
+            >
+              <EyeIcon className="h-4 w-4 mr-1" /> Quick View
+            </button>
+          </div>
+        </div>
+        <div className="p-4">
+          <h4 className="font-semibold text-gray-800 dark:text-dark-text mb-1 line-clamp-1">{product.name}</h4>
+          <div className="flex items-center mb-2">
+            {[...Array(5)].map((_, i) => (
+              <StarIcon 
+                key={i} 
+                className={`h-4 w-4 ${i < (product.rating || 4) ? 'text-btn-yellow fill-current' : 'text-gray-300'}`} 
+              />
+            ))}
+            <span className="text-xs text-gray-500 ml-1">({product.reviewCount || 24})</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-lg font-bold text-dark-green dark:text-green-400">${product.price}</span>
+              {product.originalPrice && (
+                <span className="text-sm text-gray-500 line-through ml-2">${product.originalPrice}</span>
+              )}
+            </div>
+            <button 
+              className="bg-dark-green hover:bg-green-800 text-soft-white p-2 rounded-full transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Add to cart functionality would go here
+              }}
+            >
+              <ShoppingBagIcon className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Testimonial Card Component
   const TestimonialCard = ({ testimonial, index }) => (
@@ -489,7 +532,7 @@ const Home = () => {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 animate-fadeIn">
                     <a 
-                      href={slide.cta === "Join Our Community" ? "/news" : "/InventoryManagement/catalog"} 
+                      href={slide.cta === "Join Our Community" ? "/news" : "/catalog"} 
                       className="bg-dark-green hover:bg-green-800 text-soft-white py-3 px-8 rounded-lg font-semibold transition-colors flex items-center"
                     >
                       {slide.cta} <ArrowRightIcon className="ml-2 h-5 w-5" />
@@ -640,19 +683,19 @@ const Home = () => {
               <div className="flex mt-4 md:mt-0 bg-light-beige dark:bg-dark-bg p-1 rounded-lg">
                 <button 
                   className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'featured' ? 'bg-dark-green text-soft-white' : 'text-gray-600'}`}
-                  onClick={() => setActiveTab('featured')}
+                  onClick={() => handleTabChange('featured')}
                 >
                   Featured
                 </button>
                 <button 
                   className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'new' ? 'bg-dark-green text-soft-white' : 'text-gray-600'}`}
-                  onClick={() => setActiveTab('new')}
+                  onClick={() => handleTabChange('new')}
                 >
                   New Arrivals
                 </button>
                 <button 
                   className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'bestsellers' ? 'bg-dark-green text-soft-white' : 'text-gray-600'}`}
-                  onClick={() => setActiveTab('bestsellers')}
+                  onClick={() => handleTabChange('bestsellers')}
                 >
                   Bestsellers
                 </button>
@@ -660,8 +703,20 @@ const Home = () => {
             </div>
             
             {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-dark-green"></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="bg-soft-white dark:bg-dark-card rounded-xl shadow-md overflow-hidden animate-pulse">
+                    <div className="h-48 bg-gray-300 dark:bg-gray-700"></div>
+                    <div className="p-4">
+                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded mb-2"></div>
+                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+                      <div className="flex justify-between items-center">
+                        <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-1/3"></div>
+                        <div className="h-8 w-8 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : products.length > 0 ? (
               <>
@@ -673,9 +728,9 @@ const Home = () => {
                 <div className={`text-center transition-all duration-700 ${
                   inView.featured ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}>
-                  <a href="/catalog" className="bg-dark-green hover:bg-green-800 text-soft-white py-3 px-8 rounded-lg font-semibold transition-colors inline-flex items-center">
+                  <Link to="/catalog" className="bg-dark-green hover:bg-green-800 text-soft-white py-3 px-8 rounded-lg font-semibold transition-colors inline-flex items-center">
                     View All Products <ArrowRightIcon className="ml-2 h-5 w-5" />
-                  </a>
+                  </Link>
                 </div>
               </>
             ) : (
@@ -730,20 +785,26 @@ const Home = () => {
           </div>
         </section>
 
-        {/* 7. Special Offers Section */}
-        <section ref={offersRef} className="py-16 bg-dark-green text-soft-white">
-          <div className="container mx-auto px-4">
-            <h2 className={`text-3xl font-bold text-center mb-12 transition-all duration-700 ${
-              inView.offers ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-            }`}>Special Offers</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {specialOffers.map((offer, index) => (
-                <OfferCard key={index} offer={offer} index={index} />
-              ))}
+          {/* 7. Special Offers Section */}
+          <section ref={offersRef} className="py-16 bg-dark-green text-soft-white">
+            <div className="container mx-auto px-4">
+              <h2
+                className={`text-3xl font-bold text-center mb-12 transition-all duration-700 ${
+                  inView.offers ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+              >
+                Special Offers
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {specialOffers.map((offer, index) => (
+                  <Link key={index} to="/catalog">
+                    <OfferCard offer={offer} index={index} />
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
         {/* 8. Testimonials Section */}
         <section ref={testimonialsRef} className="py-16 bg-soft-white dark:bg-dark-card">

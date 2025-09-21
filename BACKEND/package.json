@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
+    "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
@@ -28,6 +29,8 @@
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "serialport": "^13.0.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "twilio": "^5.8.0",
     "uuid": "^11.1.0"
   },

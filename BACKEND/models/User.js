@@ -71,7 +71,7 @@ const userSchema = new mongoose.Schema({
   role: { 
     type: String, 
     enum: ["animal", "plant", "inv", "emp", "health", "owner", "normal", "admin"], 
-    default: "normal" 
+    default: "normal" // default for customers
   },
   specialization: {
     type: String,
@@ -102,6 +102,31 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
     default: Date.now
+  },
+  // ---------------- Customer specific fields ----------------
+  loyaltyPoints: {
+    type: Number,
+    default: 0
+  },
+  membershipLevel: {
+    type: String,
+    enum: ["bronze", "silver", "gold", "platinum"],
+    default: "bronze"
+  },
+  wishlist: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product"
+  }],
+  orderHistory: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Order"
+  }],
+  notifications: [{
+    type: String
+  }],
+  lastPurchaseDate: {
+    type: Date,
+    default: null
   }
 }, { 
   timestamps: true,
@@ -142,5 +167,27 @@ userSchema.pre('save', async function(next) {
     next(error);
   }
 });
+
+// Method to add loyalty points
+userSchema.methods.addLoyaltyPoints = function(points) {
+  this.loyaltyPoints += points;
+  if (this.loyaltyPoints >= 1000) this.membershipLevel = "gold";
+  else if (this.loyaltyPoints >= 500) this.membershipLevel = "silver";
+  else this.membershipLevel = "bronze";
+  return this.save();
+};
+
+// Method to add notification
+userSchema.methods.addNotification = function(message) {
+  this.notifications.push(message);
+  return this.save();
+};
+
+// Method to add order to history
+userSchema.methods.addOrder = function(orderId) {
+  this.orderHistory.push(orderId);
+  this.lastPurchaseDate = new Date();
+  return this.save();
+};
 
 export default mongoose.model("User", userSchema);

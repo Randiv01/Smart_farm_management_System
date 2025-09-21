@@ -369,7 +369,7 @@ const Expiry = () => {
   const categoryData = getCategoryWiseData();
 
   return (
-    <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Farm Inventory</h1>

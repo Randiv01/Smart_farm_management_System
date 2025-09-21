@@ -38,6 +38,7 @@
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
     "recharts": "^3.1.2",
+    "socket.io-client": "^4.8.1",
     "twilio": "^5.8.2",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"

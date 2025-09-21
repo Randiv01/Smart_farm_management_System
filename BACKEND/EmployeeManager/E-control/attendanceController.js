@@ -188,12 +188,11 @@ export const createAttendance = async (req, res) => {
   }
 };
 // Update attendance record
-// Backend: attendanceController.js - Update the updateAttendance function
 export const updateAttendance = async (req, res) => {
   try {
     const { employeeId, name, date, checkIn = "-", checkOut = "-" } = req.body;
     
-    // Determine status based on check-in time (same logic as create)
+    // Determine status based on check-in time
     let status = "Present";
     if (checkIn !== "-") {
       const [time, modifier] = checkIn.split(" ");
@@ -216,7 +215,7 @@ export const updateAttendance = async (req, res) => {
       date: new Date(date),
       checkIn,
       checkOut,
-      status // Use the calculated status, not the one from request body
+      status
     };
 
     const updated = await Attendance.findByIdAndUpdate(

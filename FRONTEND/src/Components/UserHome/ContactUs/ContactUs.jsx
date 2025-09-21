@@ -8,7 +8,7 @@ import ChatBot from '../UHChatbot/UHChatbot';
 import slide1 from "../Images/ContactUs1.jpg";
 import slide2 from "../Images/ContactUs2.jpg";
 import slide3 from "../Images/ContactUs3.webp";
-import slide4 from "../Images/ContactUs4.webp";
+import slide4 from "../Images/ContactUs4.jpg";
 
 const ContactUs = () => {
   const { darkMode } = useTheme();
@@ -26,6 +26,10 @@ const ContactUs = () => {
       img.src = src;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    document.title = "Contact Us | Mount Olive Farm";
   }, []);
 
   // Auto-rotate every 5s

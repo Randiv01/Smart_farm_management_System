@@ -1,26 +1,29 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  ShoppingCartIcon, 
-  MenuIcon, 
-  XIcon, 
-  UserIcon, 
-  LogOutIcon, 
-  SearchIcon,
-  PhoneIcon,
-  HelpCircleIcon,
-  XCircleIcon
+  ShoppingCart, 
+  Menu, 
+  X, 
+  User, 
+  LogOut, 
+  Search,
+  Phone,
+  HelpCircle,
+  XCircle
 } from 'lucide-react';
 import { DarkModeToggle } from '../UHDarkModeToggle/UHDarkModeToggle';
 import { useAuth } from '../UHContext/UHAuthContext';
+import { useCart } from '../UHContext/UHCartContext';
 
-const Navbar = ({ cartItems = [], onCartClick }) => {
+const Navbar = ({ onCartClick }) => {
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { getTotalItems, toggleCart } = useCart();
   
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -34,7 +37,6 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close search when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showSearch && searchRef.current && !searchRef.current.contains(event.target)) {
@@ -49,14 +51,12 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
     };
   }, [showSearch]);
 
-  // Focus search input when opened
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, [showSearch]);
 
-  // Navigation items
   const navItems = [
     { path: '/', label: 'Home' },
     { path: '/catalog', label: 'Shop' },
@@ -65,7 +65,6 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
     { path: '/news', label: 'News' },
   ];
 
-  // Check if a nav item is active
   const isActive = (path) => {
     if (path === '/') {
       return location.pathname === '/';
@@ -73,7 +72,6 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
     return location.pathname.startsWith(path);
   };
 
-  // Handle search submission
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -83,13 +81,13 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
     }
   };
 
-  // Clear search input
   const clearSearch = () => {
     setSearchQuery('');
-    searchInputRef.current.focus();
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
   };
 
-  // Mock search suggestions (replace with actual API call in production)
   const getSuggestions = (query) => {
     if (!query) return [];
     const mockSuggestions = [
@@ -104,14 +102,8 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
     ).slice(0, 5);
   };
 
-  // Toggle search visibility
   const toggleSearch = () => {
     setShowSearch(!showSearch);
-  };
-
-  // Calculate total items in cart
-  const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
   return (
@@ -125,12 +117,12 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
           </div>
           <div className="flex items-center space-x-4 text-xs">
             <div className="flex items-center">
-              <PhoneIcon className="h-3.5 w-3.5 mr-1" />
+              <Phone size={14} className="mr-1" />
               <span>Call us: +94 81 249 2134</span>
             </div>
             <span className="hidden sm:inline">|</span>
             <a href="/contact" className="flex items-center hover:text-green-200 transition-colors">
-              <HelpCircleIcon className="h-3.5 w-3.5 mr-1" />
+              <HelpCircle size={14} className="mr-1" />
               <span className="hidden sm:inline">Help & Support</span>
             </a>
           </div>
@@ -138,8 +130,8 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
       </div>
 
       {/* Main Navbar */}
-      <nav
-        className={`sticky top-0 left-0 right-0 z-50 transition-all duration-300 ${
+       <nav
+        className={`sticky top-0 left-0 right-0 z-40 transition-all duration-300 ${
           isScrolled
             ? 'bg-white dark:bg-gray-900 shadow-md py-2'
             : 'bg-white dark:bg-gray-900 py-4 border-b border-gray-200 dark:border-gray-800'
@@ -158,16 +150,10 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
               className="h-12 w-12 mr-3" 
             />
             <div className="flex flex-col">
-              <span 
-                className="text-xl font-bold text-green-800 dark:text-green-400 hover:no-underline"
-                style={{ textDecoration: 'none' }}
-              >
+              <span className="text-xl font-bold text-green-800 dark:text-green-400">
                 Mount Olive Farm House
               </span>
-              <span 
-                className="text-xs text-gray-600 dark:text-gray-400 mt-1 hover:no-underline"
-                style={{ textDecoration: 'none' }}
-              >
+              <span className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                 Sustainable Farming Since 1995
               </span>
             </div>
@@ -205,7 +191,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                 aria-label="Toggle search"
                 aria-expanded={showSearch}
               >
-                <SearchIcon className="h-5 w-5" />
+                <Search size={20} />
               </button>
               
               {showSearch && (
@@ -228,7 +214,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                         className="absolute right-10 p-1 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400"
                         aria-label="Clear search"
                       >
-                        <XCircleIcon className="h-4 w-4" />
+                        <XCircle size={16} />
                       </button>
                     )}
                     <button
@@ -236,7 +222,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                       className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md ml-2 transition-colors"
                       aria-label="Submit search"
                     >
-                      <SearchIcon className="h-5 w-5" />
+                      <Search size={16} />
                     </button>
                   </form>
                   {/* Search Suggestions */}
@@ -266,25 +252,25 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
             <DarkModeToggle />
 
             {/* Shopping Cart */}
-            <button
-              onClick={onCartClick}
-              className="p-2 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors relative rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-              aria-label="Shopping cart"
-            >
-              <ShoppingCartIcon className="h-5 w-5" />
-              {getTotalItems() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </button>
+             <button
+        onClick={toggleCart} // This will now work globally
+        className="p-2 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors relative rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+        aria-label="Shopping cart"
+      >
+        <ShoppingCart size={20} />
+        {getTotalItems() > 0 && (
+          <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            {getTotalItems()}
+          </span>
+        )}
+      </button>
 
             {/* User Account */}
             {isAuthenticated ? (
               <div className="relative group">
                 <button className="flex items-center space-x-1 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                   <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                    <UserIcon className="h-4 w-4 text-green-700 dark:text-green-400" />
+                    <User size={16} className="text-green-700 dark:text-green-400" />
                   </div>
                   <span className="hidden lg:inline text-sm font-medium">
                     {user?.firstName || user?.name?.split(' ')[0] || "User"}
@@ -314,7 +300,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                     onClick={logout}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
-                    <LogOutIcon className="h-4 w-4 mr-2" /> Logout
+                    <LogOut size={16} className="mr-2" /> Logout
                   </button>
                 </div>
               </div>
@@ -324,7 +310,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                 className="hidden md:flex items-center text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
                 style={{ textDecoration: 'none' }}
               >
-                <UserIcon className="h-5 w-5 mr-1" /> 
+                <User size={20} className="mr-1" /> 
                 <span className="text-sm font-medium">Login</span>
               </Link>
             )}
@@ -334,8 +320,8 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
               className="md:hidden p-2 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={toggleMenu}
               aria-label="Menu"
-              >
-              {isMenuOpen ? <XIcon className="h-6 w-6" /> : <MenuIcon className="h-6 w-6" />}
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
@@ -362,14 +348,14 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                     className="absolute right-10 p-1 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400"
                     aria-label="Clear search"
                   >
-                    <XCircleIcon className="h-4 w-4" />
+                    <XCircle size={16} />
                   </button>
                 )}
                 <button
                   type="submit"
                   className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md ml-2 transition-colors"
                 >
-                  <SearchIcon className="h-5 w-5" />
+                  <Search size={16} />
                 </button>
               </form>
               {searchQuery && getSuggestions(searchQuery).length > 0 && (
@@ -433,7 +419,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                       onClick={() => { logout(); closeMenu(); }}
                       className="flex items-center w-full py-2 px-3 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
-                      <LogOutIcon className="h-4 w-4 mr-2" /> Logout
+                      <LogOut size={16} className="mr-2" /> Logout
                     </button>
                   </>
                 ) : (
@@ -443,7 +429,7 @@ const Navbar = ({ cartItems = [], onCartClick }) => {
                     className="flex items-center py-2 px-3 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
                     style={{ textDecoration: 'none' }}
                   >
-                    <UserIcon className="h-5 w-5 mr-2" /> Login
+                    <User size={20} className="mr-2" /> Login
                   </Link>
                 )}
               </div>
