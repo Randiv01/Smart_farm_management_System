@@ -15,7 +15,7 @@ import { useTheme } from "../context/ThemeContext";
 import "../styles/theme.css";
 
 const API_URL = "http://localhost:5000/api/plants";
-const IMG_BASE = "http://localhost:5000"; // backend base URL
+const IMG_BASE = "http://localhost:5000/plant-uploads"; // backend base URL
 
 const GreenhouseManagement = () => {
   const { theme } = useTheme();
@@ -120,6 +120,7 @@ const GreenhouseManagement = () => {
     setShowModal(true);
   };
 
+  // FIXED: Enhanced image preview handling in edit mode
   const handleEditClick = (plant) => {
     setIsEditing(true);
     setCurrentPlant(plant);
@@ -140,20 +141,28 @@ const GreenhouseManagement = () => {
       status: plant.status || "Active",
     });
     setSelectedImage(null);
-    setImagePreview(
-      plant.imageUrl ? `${IMG_BASE}${plant.imageUrl}` : null
-    );
+    
+    // FIX: Proper image preview handling for existing images
+    if (plant.imageUrl) {
+      // Check if it's already a full URL or needs base URL
+      const isFullUrl = plant.imageUrl.includes('http');
+      setImagePreview(isFullUrl ? plant.imageUrl : `${plant.imageUrl}`);
+    } else {
+      setImagePreview(null);
+    }
+    
     setShowModal(true);
   };
+  
 
+  // FIXED: Enhanced delete functionality with proper state update
   const handleDeleteClick = async (id) => {
-    // Confirm deletion
     if (!window.confirm("Are you sure you want to delete this plant?")) {
       return;
     }
 
     try {
-      setDeleting(id); // Show loading state for this plant
+      setDeleting(id);
       await axios.delete(`${API_URL}/${id}`);
       
       // Update plants state immediately without refetching
@@ -173,6 +182,7 @@ const GreenhouseManagement = () => {
     }
   };
 
+  // FIXED: Enhanced image handling and state management
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setSubmitStatus("submitting");
@@ -188,10 +198,13 @@ const GreenhouseManagement = () => {
           headers: { "Content-Type": "multipart/form-data" },
         });
         
-        // Update the specific plant in state immediately
+        // Update the specific plant in state immediately with proper image URL
         setPlants(prevPlants => 
           prevPlants.map(plant => 
-            plant._id === currentPlant._id ? response.data.plant : plant
+            plant._id === currentPlant._id ? { 
+              ...response.data.plant, 
+              imageUrl: response.data.plant.imageUrl 
+            } : plant
           )
         );
       } else {
@@ -199,8 +212,11 @@ const GreenhouseManagement = () => {
           headers: { "Content-Type": "multipart/form-data" },
         });
         
-        // Add new plant to state immediately
-        setPlants(prevPlants => [...prevPlants, response.data.plant]);
+        // Add new plant to state immediately with proper image URL
+        setPlants(prevPlants => [...prevPlants, { 
+          ...response.data.plant, 
+          imageUrl: response.data.plant.imageUrl 
+        }]);
       }
       
       setSubmitStatus("success");
@@ -257,18 +273,20 @@ const GreenhouseManagement = () => {
       
       <div className="flex gap-3 mb-3">
         <div className="w-16 h-16 overflow-hidden rounded-lg flex-shrink-0 bg-gray-200">
-          <img
-            src={
-              plant.imageUrl
-                ? `${IMG_BASE}${plant.imageUrl}`
-                : "https://via.placeholder.com/60"
-            }
-            alt={plant.plantName}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.src = "https://via.placeholder.com/60";
-            }}
-          />
+        <img
+  src={
+    plant.imageUrl
+      ? plant.imageUrl.includes('http') 
+        ? plant.imageUrl 
+        : `${IMG_BASE}${plant.imageUrl}`
+      : "https://via.placeholder.com/60"
+  }
+  alt={plant.plantName}
+  className="w-full h-full object-cover"
+  onError={(e) => {
+    e.target.src = "https://via.placeholder.com/60";
+  }}
+/>
         </div>
         <div className="flex-1">
           <h3 className="text-lg font-semibold">{plant.plantName}</h3>

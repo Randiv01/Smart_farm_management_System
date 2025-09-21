@@ -9,16 +9,17 @@ import {
   Pill,
   Stethoscope,
   CreditCard,
-  Settings,
+  Factory,
+  Boxes,
+  FlaskConical,
 } from "lucide-react";
-import { ThemeContext } from '../H_contexts/H_ThemeContext.js';
+import { ThemeContext } from "../H_contexts/H_ThemeContext.js";
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const ADMIN_BASE = "/admin";
-  
-  // Get theme context values
+
   const { darkMode, sidebarOpen, toggleSidebar } = useContext(ThemeContext);
 
   const navItems = [
@@ -27,12 +28,17 @@ export default function Sidebar() {
     { path: `${ADMIN_BASE}/specialist-details`, icon: Users, label: "Specialist Details" },
     { path: `${ADMIN_BASE}/medicine-company`, icon: Building, label: "Medicine Company" },
     { path: `${ADMIN_BASE}/plant-pathologist`, icon: Leaf, label: "Plant Pathologist" },
-    { path: `${ADMIN_BASE}/medistore`, icon: Pill, label: "MediStore" },
+
+    // New Fertiliser items
+    { path: `${ADMIN_BASE}/fertiliser-companies`, icon: Factory, label: "Fertiliser Companies" },
+    { path: `${ADMIN_BASE}/fertiliser-stock`, icon: Boxes, label: "Fertiliser Stock" },
+    { path: `${ADMIN_BASE}/fertiliser-details`, icon: FlaskConical, label: "Fertiliser Details" },
+
+    { path: `${ADMIN_BASE}/medistore`, icon: Pill, label: "Medicine Store" },
     { path: `${ADMIN_BASE}/treatments-details`, icon: Stethoscope, label: "Treatments Details" },
     { path: `${ADMIN_BASE}/treatments-payments`, icon: CreditCard, label: "Treatments Payments" },
   ];
 
-  // Auto-close sidebar if resized to mobile
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024 && sidebarOpen) {
@@ -43,18 +49,16 @@ export default function Sidebar() {
     return () => window.removeEventListener("resize", handleResize);
   }, [sidebarOpen, toggleSidebar]);
 
-  // Function to check if a nav item is active
   const isActive = (itemPath, exact = false) => {
-    if (exact) {
-      return location.pathname === itemPath;
-    }
-    return location.pathname.startsWith(itemPath) && 
-           location.pathname !== `${ADMIN_BASE}/dashboard`;
+    if (exact) return location.pathname === itemPath;
+    return (
+      location.pathname.startsWith(itemPath) &&
+      location.pathname !== `${ADMIN_BASE}/dashboard`
+    );
   };
 
   return (
     <>
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-30 lg:hidden"
@@ -96,9 +100,7 @@ export default function Sidebar() {
                 <button
                   onClick={() => {
                     navigate(item.path);
-                    if (window.innerWidth < 1024) {
-                      toggleSidebar(false);
-                    }
+                    if (window.innerWidth < 1024) toggleSidebar(false);
                   }}
                   className={`
                     flex items-center w-full p-3 rounded-lg transition-all
@@ -108,7 +110,7 @@ export default function Sidebar() {
                     focus:outline-none focus:ring-1 focus:ring-white/50
                   `}
                 >
-                  <item.icon size={20} className={`flex-shrink-0 ${sidebarOpen ? "mr-3" : ""}`} />
+                  <item.icon size={20} className={`flex-shrink-0 ${sidebarOpen ? "mr-3" : ""} text-white`} />
                   {sidebarOpen && (
                     <span className="text-sm whitespace-nowrap overflow-hidden overflow-ellipsis">
                       {item.label}
@@ -120,7 +122,7 @@ export default function Sidebar() {
           </ul>
         </nav>
 
-        {/* Footer: only show when sidebar is open */}
+        {/* Footer */}
         {sidebarOpen && (
           <div className="p-4 border-t border-white/20 flex flex-col items-center justify-center text-center text-white/80 text-xs space-y-1">
             <span className="font-bold text-sm text-white">Mount Olive</span>

@@ -1,4 +1,3 @@
-// Product.js
 import mongoose from "mongoose";
 import QRCode from 'qrcode';
 
@@ -97,7 +96,17 @@ const productSchema = new mongoose.Schema({
       required: true,
       default: Date.now
     }
-  }]
+  }],
+  // Gift box specific fields
+  isGiftable: {
+    type: Boolean,
+    default: true
+  },
+  giftNote: {
+    type: String,
+    default: '',
+    trim: true
+  }
 }, {
   timestamps: true
 });
@@ -105,6 +114,7 @@ const productSchema = new mongoose.Schema({
 // Index for better query performance
 productSchema.index({ name: 1, category: 1 });
 productSchema.index({ expiryDate: 1 });
+productSchema.index({ isGiftable: 1 }); // Index for giftable products
 
 // Middleware to update status before saving
 productSchema.pre('save', function(next) {

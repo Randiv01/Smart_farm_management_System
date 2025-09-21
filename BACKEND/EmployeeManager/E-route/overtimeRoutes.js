@@ -10,7 +10,6 @@ import {
 
 const router = express.Router();
 
-// Overtime records routes
 router.get("/", getOvertimeRecords);
 router.get("/analytics", getOvertimeAnalytics);
 router.get("/:id", getOvertimeRecord);

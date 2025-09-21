@@ -1,55 +1,50 @@
-// BACKEND/HealthManagement/Controllers/H_FertiliserController.js
 import Fertiliser from "../Model/H_Fertiliser.js";
 
-// Get all fertilisers
 export const getFertilisers = async (req, res) => {
   try {
-    const fertilisers = await Fertiliser.find().sort({ createdAt: -1 });
-    res.json(fertilisers);
+    const items = await Fertiliser.find().sort({ updatedAt: -1 });
+    res.status(200).json(items);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get fertiliser by ID
 export const getFertiliserById = async (req, res) => {
   try {
-    const fertiliser = await Fertiliser.findById(req.params.id);
-    if (!fertiliser) return res.status(404).json({ message: "Fertiliser not found" });
-    res.json(fertiliser);
+    const item = await Fertiliser.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Fertiliser not found" });
+    res.status(200).json(item);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Create fertiliser
 export const createFertiliser = async (req, res) => {
   try {
-    const fertiliser = new Fertiliser(req.body);
-    const saved = await fertiliser.save();
+    const saved = await new Fertiliser(req.body).save();
     res.status(201).json(saved);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
-// Update fertiliser
 export const updateFertiliser = async (req, res) => {
   try {
-    const updated = await Fertiliser.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updated = await Fertiliser.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
     if (!updated) return res.status(404).json({ message: "Fertiliser not found" });
-    res.json(updated);
+    res.status(200).json(updated);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
-// Delete fertiliser
 export const deleteFertiliser = async (req, res) => {
   try {
     const deleted = await Fertiliser.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Fertiliser not found" });
-    res.json({ message: "Fertiliser deleted successfully" });
+    res.status(200).json({ message: "Fertiliser deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

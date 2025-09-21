@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus, Edit, Trash2, QrCode, FileText, X, Users, Stethoscope, Leaf } from "lucide-react";
+import { 
+  Search, Plus, Edit, Trash2, QrCode, FileText, X, Users, Stethoscope, 
+  Leaf, Download, Upload, User, Mail, Phone, Calendar, MapPin, BookOpen, 
+  Award, Briefcase, Loader, UserX, UserCheck // ADD THESE TWO ICONS
+} from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import axios from "axios";
-
 export const StaffHub = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState("employees");
   const [showForm, setShowForm] = useState(false);
@@ -14,7 +17,17 @@ export const StaffHub = ({ darkMode }) => {
   const [employees, setEmployees] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [pathologists, setPathologists] = useState([]);
-  const [formData, setFormData] = useState({
+  const [loading, setLoading] = useState({
+    employees: false,
+    doctors: false,
+    pathologists: false,
+    form: false
+  });
+  const [errors, setErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+ 
+  const formDataTemplate = {
     id: "",
     name: "",
     contact: "",
@@ -23,7 +36,6 @@ export const StaffHub = ({ darkMode }) => {
     joined: "",
     photoFile: null,
     cvFile: null,
-    // Doctor/Pathologist specific fields
     email: "",
     licenseNumber: "",
     specializations: "",
@@ -33,16 +45,21 @@ export const StaffHub = ({ darkMode }) => {
     gender: "Male",
     address: "",
     password: ""
-  });
-
+  };
+ 
+  const [formData, setFormData] = useState(formDataTemplate);
   // Load data from backend
   useEffect(() => {
     fetchEmployees();
     fetchDoctors();
     fetchPathologists();
   }, []);
-
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
   const fetchEmployees = async () => {
+    setLoading(prev => ({ ...prev, employees: true }));
     try {
       const res = await fetch("http://localhost:5000/api/employees");
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -53,55 +70,82 @@ export const StaffHub = ({ darkMode }) => {
       setEmployees(data);
     } catch (err) {
       console.error("Error fetching employees:", err);
+    } finally {
+      setLoading(prev => ({ ...prev, employees: false }));
     }
   };
-
   const fetchDoctors = async () => {
+    setLoading(prev => ({ ...prev, doctors: true }));
     try {
       const res = await axios.get("http://localhost:5000/api/doctors");
       setDoctors(res.data);
     } catch (err) {
       console.error("Error fetching doctors:", err);
+    } finally {
+      setLoading(prev => ({ ...prev, doctors: false }));
     }
   };
-
   const fetchPathologists = async () => {
+    setLoading(prev => ({ ...prev, pathologists: true }));
     try {
       const res = await axios.get("http://localhost:5000/api/plant-pathologists");
       setPathologists(res.data);
     } catch (err) {
       console.error("Error fetching pathologists:", err);
+    } finally {
+      setLoading(prev => ({ ...prev, pathologists: false }));
     }
   };
-
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-  const resetForm = () => {
-    setFormData({
-      id: "",
-      name: "",
-      contact: "",
-      title: "",
-      type: "Full-time",
-      joined: "",
-      photoFile: null,
-      cvFile: null,
-      email: "",
-      licenseNumber: "",
-      specializations: "",
-      qualifications: "",
-      yearsOfExperience: "",
-      dateOfBirth: "",
-      gender: "Male",
-      address: "",
-      password: ""
-    });
-    setEditingItem(null);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+   
+    // Clear error when field is edited
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
+    }
   };
-
+  const validateForm = () => {
+    const newErrors = {};
+   
+    // Common validations
+    if (!formData.name) newErrors.name = "Name is required";
+    if (!formData.contact) newErrors.contact = "Contact number is required";
+   
+    // Employee-specific validations
+    if (activeTab === "employees" || editingItem?.type === "employee") {
+      if (!formData.id) newErrors.id = "Employee ID is required";
+      if (!formData.title) newErrors.title = "Job title is required";
+      if (!formData.joined) newErrors.joined = "Join date is required";
+    }
+   
+    // Doctor/Pathologist validations
+    if (activeTab === "doctors" || activeTab === "pathologists" ||
+        editingItem?.type === "doctor" || editingItem?.type === "pathologist") {
+      if (!formData.email) newErrors.email = "Email is required";
+      else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
+      if (!formData.licenseNumber) newErrors.licenseNumber = "License number is required";
+      if (!formData.specializations) newErrors.specializations = "Specializations are required";
+      if (!formData.qualifications) newErrors.qualifications = "Qualifications are required";
+      if (!formData.yearsOfExperience) newErrors.yearsOfExperience = "Experience is required";
+      if (!formData.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
+      if (!formData.password && !editingItem) newErrors.password = "Password is required";
+    }
+   
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  const resetForm = () => {
+    setFormData(formDataTemplate);
+    setEditingItem(null);
+    setErrors({});
+  };
   // Employee functions
   const handleAddEmployee = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+   
+    setLoading(prev => ({ ...prev, form: true }));
     try {
       const form = new FormData();
       for (let key in formData) {
@@ -109,29 +153,31 @@ export const StaffHub = ({ darkMode }) => {
       }
       if (formData.photoFile) form.append("photo", formData.photoFile);
       if (formData.cvFile) form.append("cv", formData.cvFile);
-
       const response = await fetch("http://localhost:5000/api/employees", {
         method: "POST",
         body: form,
       });
-
       const data = await response.json();
       if (response.ok) {
         setEmployees([...employees, data]);
         setShowForm(false);
         resetForm();
-        alert("Employee added successfully!");
+        showSuccess("Employee added successfully!");
       } else {
         alert(`Error: ${data.error || "Failed to add employee"}`);
       }
     } catch (err) {
       console.error(err);
       alert("Failed to add employee.");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
     }
   };
-
   const handleUpdateEmployee = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+   
+    setLoading(prev => ({ ...prev, form: true }));
     try {
       const form = new FormData();
       for (let key in formData) {
@@ -139,46 +185,50 @@ export const StaffHub = ({ darkMode }) => {
       }
       if (formData.photoFile) form.append("photo", formData.photoFile);
       if (formData.cvFile) form.append("cv", formData.cvFile);
-
       const response = await fetch(
         `http://localhost:5000/api/employees/${editingItem.id}`,
         { method: "PUT", body: form }
       );
-
       const data = await response.json();
       if (response.ok) {
         setEmployees(employees.map((emp) => (emp.id === data.id ? data : emp)));
         setShowForm(false);
         resetForm();
-        alert("Employee updated successfully!");
+        showSuccess("Employee updated successfully!");
       } else {
         alert(`Error: ${data.error || "Failed to update employee"}`);
       }
     } catch (err) {
       console.error(err);
       alert("Failed to update employee.");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
     }
   };
-
   const handleDeleteEmployee = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this employee?")) return;
+    setLoading(prev => ({ ...prev, employees: true }));
     try {
       const response = await fetch(`http://localhost:5000/api/employees/${id}`, { method: "DELETE" });
       if (response.ok) {
         setEmployees(employees.filter((emp) => emp.id !== id));
-        alert("Employee deleted successfully!");
+        setDeleteConfirm(null);
+        showSuccess("Employee deleted successfully!");
       } else {
         alert("Failed to delete employee.");
       }
     } catch (err) {
       console.error(err);
       alert("Failed to delete employee.");
+    } finally {
+      setLoading(prev => ({ ...prev, employees: false }));
     }
   };
-
   // Doctor functions
   const handleAddDoctor = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+   
+    setLoading(prev => ({ ...prev, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -191,23 +241,25 @@ export const StaffHub = ({ darkMode }) => {
       if (formData.photoFile) {
         data.append("profilePhoto", formData.photoFile);
       }
-
       await axios.post("http://localhost:5000/api/doctors", data, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-
-      alert("Doctor added successfully!");
+      showSuccess("Doctor added successfully!");
       fetchDoctors();
       setShowForm(false);
       resetForm();
     } catch (err) {
       console.error("Error adding doctor:", err);
       alert("Failed to add doctor");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
     }
   };
-
   const handleUpdateDoctor = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+   
+    setLoading(prev => ({ ...prev, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -220,31 +272,40 @@ export const StaffHub = ({ darkMode }) => {
       if (formData.photoFile) {
         data.append("profilePhoto", formData.photoFile);
       }
-
       await axios.put(`http://localhost:5000/api/doctors/${editingItem._id}`, data, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-
-      alert("Doctor updated successfully!");
+      showSuccess("Doctor updated successfully!");
       fetchDoctors();
       setShowForm(false);
       resetForm();
     } catch (err) {
       console.error("Error updating doctor:", err);
       alert("Failed to update doctor");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
     }
   };
-
   const handleDeleteDoctor = async (id) => {
-    if (window.confirm("Are you sure you want to delete this doctor?")) {
+    setLoading(prev => ({ ...prev, doctors: true }));
+    try {
       await axios.delete(`http://localhost:5000/api/doctors/${id}`);
       fetchDoctors();
+      setDeleteConfirm(null);
+      showSuccess("Doctor deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting doctor:", err);
+      alert("Failed to delete doctor");
+    } finally {
+      setLoading(prev => ({ ...prev, doctors: false }));
     }
   };
-
   // Pathologist functions
   const handleAddPathologist = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+   
+    setLoading(prev => ({ ...prev, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -257,23 +318,25 @@ export const StaffHub = ({ darkMode }) => {
       if (formData.photoFile) {
         data.append("profilePhoto", formData.photoFile);
       }
-
       await axios.post("http://localhost:5000/api/plant-pathologists", data, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-
-      alert("Plant Pathologist added successfully!");
+      showSuccess("Plant Pathologist added successfully!");
       fetchPathologists();
       setShowForm(false);
       resetForm();
     } catch (err) {
       console.error("Error adding plant pathologist:", err);
       alert("Failed to add plant pathologist");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
     }
   };
-
   const handleUpdatePathologist = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+   
+    setLoading(prev => ({ ...prev, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -286,59 +349,50 @@ export const StaffHub = ({ darkMode }) => {
       if (formData.photoFile) {
         data.append("profilePhoto", formData.photoFile);
       }
-
       await axios.put(`http://localhost:5000/api/plant-pathologists/${editingItem._id}`, data, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-
-      alert("Plant Pathologist updated successfully!");
+      showSuccess("Plant Pathologist updated successfully!");
       fetchPathologists();
       setShowForm(false);
       resetForm();
     } catch (err) {
       console.error("Error updating plant pathologist:", err);
       alert("Failed to update plant pathologist");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
     }
   };
-
   const handleDeletePathologist = async (id) => {
-    if (window.confirm("Are you sure you want to delete this plant pathologist?")) {
+    setLoading(prev => ({ ...prev, pathologists: true }));
+    try {
       await axios.delete(`http://localhost:5000/api/plant-pathologists/${id}`);
       fetchPathologists();
+      setDeleteConfirm(null);
+      showSuccess("Plant Pathologist deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting plant pathologist:", err);
+      alert("Failed to delete plant pathologist");
+    } finally {
+      setLoading(prev => ({ ...prev, pathologists: false }));
     }
   };
-
   const handleEdit = (item, type) => {
     if (type === "employee") {
       setFormData({
+        ...formDataTemplate,
         id: item.id,
         name: item.name,
         contact: item.contact,
         title: item.title,
         type: item.type,
         joined: item.joined,
-        photoFile: null,
-        cvFile: null,
-        email: "",
-        licenseNumber: "",
-        specializations: "",
-        qualifications: "",
-        yearsOfExperience: "",
-        dateOfBirth: "",
-        gender: "Male",
-        address: "",
-        password: ""
       });
     } else if (type === "doctor") {
       setFormData({
-        id: "",
+        ...formDataTemplate,
         name: item.fullName,
         contact: item.phoneNo,
-        title: "",
-        type: "",
-        joined: "",
-        photoFile: null,
-        cvFile: null,
         email: item.email,
         licenseNumber: item.licenseNumber,
         specializations: Array.isArray(item.specializations) ? item.specializations.join(", ") : item.specializations,
@@ -347,18 +401,12 @@ export const StaffHub = ({ darkMode }) => {
         dateOfBirth: item.dateOfBirth ? item.dateOfBirth.split("T")[0] : "",
         gender: item.gender,
         address: item.address || "",
-        password: ""
       });
     } else if (type === "pathologist") {
       setFormData({
-        id: "",
+        ...formDataTemplate,
         name: item.fullName,
         contact: item.phoneNo,
-        title: "",
-        type: "",
-        joined: "",
-        photoFile: null,
-        cvFile: null,
         email: item.email,
         licenseNumber: item.licenseNumber,
         specializations: Array.isArray(item.specializations) ? item.specializations.join(", ") : item.specializations,
@@ -366,23 +414,19 @@ export const StaffHub = ({ darkMode }) => {
         yearsOfExperience: item.yearsOfExperience,
         dateOfBirth: item.dateOfBirth ? item.dateOfBirth.split("T")[0] : "",
         gender: item.gender,
-        address: "",
-        password: ""
       });
     }
-    
+   
     setEditingItem({...item, type});
     setShowForm(true);
   };
-
   const handleDownloadPDF = (type) => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    
-    let data = [];
+   
     let headers = [];
     let body = [];
-    
+   
     if (type === "doctors") {
       doc.text("Doctor Details", 14, 20);
       headers = [
@@ -443,98 +487,146 @@ export const StaffHub = ({ darkMode }) => {
         e.joined,
       ]);
     }
-    
+   
     autoTable(doc, {
       head: [headers],
       body: body,
       startY: 30,
     });
-    
+   
     doc.save(`${type.charAt(0).toUpperCase() + type.slice(1)}.pdf`);
   };
-
-  // Fixed filtering functions to handle undefined values
+  // Filtering functions
   const filteredEmployees = employees.filter(
     (employee) =>
       (employee.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (employee.id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (employee.title || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   const filteredDoctors = doctors.filter(
     (doctor) =>
       (doctor.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (doctor.licenseNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(doctor.specializations) ? 
-        doctor.specializations.join(" ").toLowerCase().includes(searchQuery.toLowerCase()) : 
+      (Array.isArray(doctor.specializations) ?
+        doctor.specializations.join(" ").toLowerCase().includes(searchQuery.toLowerCase()) :
         (doctor.specializations || "").toLowerCase().includes(searchQuery.toLowerCase()))
   );
-
   const filteredPathologists = pathologists.filter(
     (pathologist) =>
       (pathologist.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (pathologist.licenseNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(pathologist.specializations) ? 
-        pathologist.specializations.join(" ").toLowerCase().includes(searchQuery.toLowerCase()) : 
+      (Array.isArray(pathologist.specializations) ?
+        pathologist.specializations.join(" ").toLowerCase().includes(searchQuery.toLowerCase()) :
         (pathologist.specializations || "").toLowerCase().includes(searchQuery.toLowerCase()))
   );
-
-  const renderEmployeeTable = () => (
+  // In your StaffHub component, update the employee table rendering
+const renderEmployeeTable = () => (
+  <div className="overflow-x-auto">
     <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
       <table className="w-full text-sm">
         <thead className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}>
           <tr>
-            <th className="px-6 py-3 text-left">Emp ID</th>
-            <th className="px-6 py-3 text-left">Name</th>
-            <th className="px-6 py-3 text-left">Contact No</th>
-            <th className="px-6 py-3 text-left">Job Title</th>
-            <th className="px-6 py-3 text-left">Type</th>
-            <th className="px-6 py-3 text-left">Joined</th>
-            <th className="px-6 py-3 text-left">Photo</th>
-            <th className="px-6 py-3 text-left">CV</th>
-            <th className="px-6 py-3 text-left">Actions</th>
+            <th className="px-4 py-3 text-left">Emp ID</th>
+            <th className="px-4 py-3 text-left">Name</th>
+            <th className="px-4 py-3 text-left">Contact No</th>
+            <th className="px-4 py-3 text-left">Job Title</th>
+            <th className="px-4 py-3 text-left">Type</th>
+            <th className="px-4 py-3 text-left">Status</th> {/* NEW: Status column */}
+            <th className="px-4 py-3 text-left">Joined</th>
+            <th className="px-4 py-3 text-left">Photo</th>
+            <th className="px-4 py-3 text-left">CV</th>
+            <th className="px-4 py-3 text-left">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filteredEmployees.length === 0 ? (
+          {loading.employees ? (
             <tr>
-              <td colSpan="9" className={`px-6 py-8 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              <td colSpan="10" className="px-6 py-8 text-center">
+                <div className="flex justify-center items-center">
+                  <Loader size={20} className="animate-spin mr-2" /> Loading employees...
+                </div>
+              </td>
+            </tr>
+          ) : filteredEmployees.length === 0 ? (
+            <tr>
+              <td colSpan="10" className={`px-6 py-8 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                 {searchQuery ? "No employees found matching your search." : "No employees found. Add your first employee!"}
               </td>
             </tr>
           ) : (
             filteredEmployees.map((employee) => (
               <tr key={employee.id} className={`transition ${darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"}`}>
-                <td className="px-6 py-3">{employee.id}</td>
-                <td className="px-6 py-3">{employee.name}</td>
-                <td className="px-6 py-3">{employee.contact}</td>
-                <td className="px-6 py-3">{employee.title}</td>
-                <td className="px-6 py-3">{employee.type}</td>
-                <td className="px-6 py-3">{employee.joined}</td>
-                <td className="px-6 py-3">
-                  {employee.photo ? <img src={`http://localhost:5000${employee.photo}`} alt="Employee" className="h-12 w-12 rounded-full" /> : "—"}
+                <td className="px-4 py-3 font-medium">{employee.id}</td>
+                <td className="px-4 py-3">{employee.name}</td>
+                <td className="px-4 py-3">{employee.contact}</td>
+                <td className="px-4 py-3">{employee.title}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded-full text-xs ${employee.type === "Full-time" ? "bg-green-100 text-green-800" : employee.type === "Part-time" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}>
+                    {employee.type}
+                  </span>
                 </td>
-                <td className="px-6 py-3">
-                  {employee.cv ? <a href={`http://localhost:5000${employee.cv}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">View CV</a> : "—"}
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded-full text-xs ${employee.status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                    {employee.status}
+                  </span>
                 </td>
-                <td className="px-6 py-3">
+                <td className="px-4 py-3">{employee.joined}</td>
+                <td className="px-4 py-3">
+                  {employee.photo ? <img src={`http://localhost:5000${employee.photo}`} alt="Employee" className="h-10 w-10 rounded-full object-cover" /> : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  {employee.cv ? (
+                    <a
+                      href={`http://localhost:5000${employee.cv}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-blue-500 hover:underline"
+                    >
+                      <FileText size={14} className="mr-1" /> View
+                    </a>
+                  ) : "—"}
+                </td>
+                <td className="px-4 py-3">
                   <div className="flex gap-2">
-                    <button onClick={() => setQrItem({...employee, type: "employee"})} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Generate QR Code">
+                    <button
+                      onClick={() => setQrItem({...employee, type: "employee"})}
+                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                      title="Generate QR Code"
+                    >
                       <QrCode size={16} className="text-purple-500" />
                     </button>
                     <a
                       href={`http://localhost:5000/api/employees/${employee.id}/pdf`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500"
+                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
                       title="Generate PDF Report"
                     >
                       <FileText size={16} className="text-green-500" />
                     </a>
-                    <button onClick={() => handleEdit(employee, "employee")} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Edit Employee">
+                    <button
+                      onClick={() => handleEdit(employee, "employee")}
+                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                      title="Edit Employee"
+                    >
                       <Edit size={16} className="text-blue-500" />
                     </button>
-                    <button onClick={() => handleDeleteEmployee(employee.id)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Delete Employee">
+                    <button
+                      onClick={() => handleToggleStatus(employee.id, employee.status)}
+                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                      title={employee.status === "Active" ? "Deactivate Employee" : "Activate Employee"}
+                    >
+                      {employee.status === "Active" ? (
+                        <UserX size={16} className="text-yellow-500" />
+                      ) : (
+                        <UserCheck size={16} className="text-green-500" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm({id: employee.id, type: "employee", name: employee.name})}
+                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                      title="Delete Employee"
+                    >
                       <Trash2 size={16} className="text-red-500" />
                     </button>
                   </div>
@@ -545,76 +637,207 @@ export const StaffHub = ({ darkMode }) => {
         </tbody>
       </table>
     </div>
-  );
+  </div>
+);
 
-  const renderDoctorTable = () => (
-    <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+// Add this function to handle status toggle
+const handleToggleStatus = async (id, currentStatus) => {
+  setLoading(prev => ({ ...prev, employees: true }));
+  try {
+    const response = await fetch(`http://localhost:5000/api/employees/${id}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (response.ok) {
+      const updatedEmployee = await response.json();
+      setEmployees(employees.map(emp => emp.id === id ? updatedEmployee : emp));
+      showSuccess(`Employee ${currentStatus === "Active" ? "deactivated" : "activated"} successfully!`);
+    } else {
+      alert("Failed to update employee status.");
+    }
+  } catch (err) {
+    console.error("Error toggling employee status:", err);
+    alert("Failed to update employee status.");
+  } finally {
+    setLoading(prev => ({ ...prev, employees: false }));
+  }
+};
+   const renderDoctorTable = () => (
+  <div className="overflow-x-auto">
+    <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
       <table className="w-full text-sm">
-        <thead className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}>
+        <thead className={`${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-100 text-gray-800"}`}>
           <tr>
-            <th className="px-6 py-3 text-left">Photo</th>
-            <th className="px-6 py-3 text-left">Full Name</th>
-            <th className="px-6 py-3 text-left">Email</th>
-            <th className="px-6 py-3 text-left">Phone</th>
-            <th className="px-6 py-3 text-left">License</th>
-            <th className="px-6 py-3 text-left">Specializations</th>
-            <th className="px-6 py-3 text-left">Qualifications</th>
-            <th className="px-6 py-3 text-left">Experience</th>
-            <th className="px-6 py-3 text-left">DOB</th>
-            <th className="px-6 py-3 text-left">Gender</th>
-            <th className="px-6 py-3 text-left">Actions</th>
-            <th className="px-6 py-3 text-left">Direct Contact</th>
+            <th className="px-4 py-3 text-left">Photo</th>
+            <th className="px-4 py-3 text-left">Full Name</th>
+            <th className="px-4 py-3 text-left">Email</th>
+            <th className="px-4 py-3 text-left">Phone</th>
+            <th className="px-4 py-3 text-left">License</th>
+            <th className="px-4 py-3 text-left">Specializations</th>
+            <th className="px-4 py-3 text-left">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filteredDoctors.length === 0 ? (
+          {loading.doctors ? (
             <tr>
-              <td colSpan="12" className={`px-6 py-8 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                {searchQuery ? "No doctors found matching your search." : "No doctors found. Add your first doctor!"}
+              <td colSpan="7" className="px-6 py-8 text-center">
+                <div className="flex justify-center items-center">
+                  <Loader size={20} className="animate-spin mr-2" />
+                  Loading doctors...
+                </div>
+              </td>
+            </tr>
+          ) : filteredDoctors.length === 0 ? (
+            <tr>
+              <td
+                colSpan="7"
+                className={`px-6 py-8 text-center ${
+                  darkMode ? "text-gray-300" : "text-gray-500"
+                }`}
+              >
+                {searchQuery
+                  ? "No doctors found matching your search."
+                  : "No doctors found. Add your first doctor!"}
               </td>
             </tr>
           ) : (
             filteredDoctors.map((doctor) => (
-              <tr key={doctor._id} className={`transition ${darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"}`}>
-                <td className="px-6 py-3">
-                  {doctor.profilePhoto && (
+              <tr
+                key={doctor._id}
+                className={`transition ${
+                  darkMode
+                    ? "hover:bg-gray-700 text-gray-200"
+                    : "hover:bg-gray-100 text-gray-800"
+                }`}
+              >
+                <td className="px-4 py-3">
+                  {doctor.profilePhoto ? (
                     <img
-                      src={`http://localhost:5000/Health_Uploads/${doctor.profilePhoto}`}
+                      src={`http://localhost:5000${doctor.profilePhoto}`}
                       alt={doctor.fullName}
-                      className="h-12 w-12 rounded-full object-cover"
+                      className="h-10 w-10 rounded-full object-cover"
                     />
+                  ) : (
+                    <div
+                      className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        darkMode ? "bg-gray-600" : "bg-gray-200"
+                      }`}
+                    >
+                      <User
+                        size={16}
+                        className={darkMode ? "text-gray-400" : "text-gray-500"}
+                      />
+                    </div>
                   )}
                 </td>
-                <td className="px-6 py-3">{doctor.fullName}</td>
-                <td className="px-6 py-3">{doctor.email}</td>
-                <td className="px-6 py-3">{doctor.phoneNo}</td>
-                <td className="px-6 py-3">{doctor.licenseNumber}</td>
-                <td className="px-6 py-3">{Array.isArray(doctor.specializations) ? doctor.specializations.join(", ") : doctor.specializations}</td>
-                <td className="px-6 py-3">{doctor.qualifications}</td>
-                <td className="px-6 py-3">{doctor.yearsOfExperience}</td>
-                <td className="px-6 py-3">{doctor.dateOfBirth ? doctor.dateOfBirth.split("T")[0] : ""}</td>
-                <td className="px-6 py-3">{doctor.gender}</td>
-                <td className="px-6 py-3">
-                  <div className="flex gap-2">
-                    <button onClick={() => setQrItem({...doctor, type: "doctor"})} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Generate QR Code">
-                      <QrCode size={16} className="text-purple-500" />
-                    </button>
-                    <button onClick={() => handleEdit(doctor, "doctor")} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Edit Doctor">
-                      <Edit size={16} className="text-blue-500" />
-                    </button>
-                    <button onClick={() => handleDeleteDoctor(doctor._id)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Delete Doctor">
-                      <Trash2 size={16} className="text-red-500" />
-                    </button>
+                <td className="px-4 py-3 font-medium">{doctor.fullName}</td>
+                <td className="px-4 py-3">{doctor.email}</td>
+                <td className="px-4 py-3">{doctor.phoneNo}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      darkMode
+                        ? "bg-blue-700 text-blue-200"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    {doctor.licenseNumber}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {Array.isArray(doctor.specializations) ? (
+                      doctor.specializations.map((spec, i) => (
+                        <span
+                          key={i}
+                          className={`text-xs px-2 py-1 rounded ${
+                            darkMode
+                              ? "bg-purple-700 text-purple-200"
+                              : "bg-purple-100 text-purple-800"
+                          }`}
+                        >
+                          {spec}
+                        </span>
+                      ))
+                    ) : (
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${
+                          darkMode
+                            ? "bg-purple-700 text-purple-200"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
+                      >
+                        {doctor.specializations}
+                      </span>
+                    )}
                   </div>
                 </td>
-                <td className="px-6 py-3">
-                  <div className="flex gap-2">
-                    <a href={`https://wa.me/${doctor.phoneNo}`} target="_blank" rel="noreferrer" className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="WhatsApp">
-                      <span className="text-green-500 text-sm">WhatsApp</span>
-                    </a>
-                    <a href={`mailto:${doctor.email}`} target="_blank" rel="noreferrer" className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Email">
-                      <span className="text-blue-500 text-sm">Email</span>
-                    </a>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setQrItem({ ...doctor, type: "doctor" })}
+                        className={`p-1.5 rounded transition ${
+                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                        }`}
+                        title="Generate QR Code"
+                      >
+                        <QrCode size={16} className="text-purple-500" />
+                      </button>
+                      <button
+                        onClick={() => handleEdit(doctor, "doctor")}
+                        className={`p-1.5 rounded transition ${
+                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                        }`}
+                        title="Edit Doctor"
+                      >
+                        <Edit size={16} className="text-blue-500" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setDeleteConfirm({
+                            id: doctor._id,
+                            type: "doctor",
+                            name: doctor.fullName,
+                          })
+                        }
+                        className={`p-1.5 rounded transition ${
+                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                        }`}
+                        title="Delete Doctor"
+                      >
+                        <Trash2 size={16} className="text-red-500" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`https://wa.me/${doctor.phoneNo}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`flex-1 text-center text-xs py-1 rounded transition ${
+                          darkMode
+                            ? "bg-green-700 text-green-200 hover:bg-green-600"
+                            : "bg-green-100 text-green-800 hover:bg-green-200"
+                        }`}
+                      >
+                        WhatsApp
+                      </a>
+                      <a
+                        href={`mailto:${doctor.email}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`flex-1 text-center text-xs py-1 rounded transition ${
+                          darkMode
+                            ? "bg-blue-700 text-blue-200 hover:bg-blue-600"
+                            : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                        }`}
+                      >
+                        Email
+                      </a>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -623,93 +846,145 @@ export const StaffHub = ({ darkMode }) => {
         </tbody>
       </table>
     </div>
-  );
-
+  </div>
+);
   const renderPathologistTable = () => (
-    <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
-      <table className="w-full text-sm">
-        <thead className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}>
-          <tr>
-            <th className="px-6 py-3 text-left">Photo</th>
-            <th className="px-6 py-3 text-left">Full Name</th>
-            <th className="px-6 py-3 text-left">Email</th>
-            <th className="px-6 py-3 text-left">Phone</th>
-            <th className="px-6 py-3 text-left">License</th>
-            <th className="px-6 py-3 text-left">Specializations</th>
-            <th className="px-6 py-3 text-left">Qualifications</th>
-            <th className="px-6 py-3 text-left">Experience</th>
-            <th className="px-6 py-3 text-left">DOB</th>
-            <th className="px-6 py-3 text-left">Gender</th>
-            <th className="px-6 py-3 text-left">Actions</th>
-            <th className="px-6 py-3 text-left">Direct Contact</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredPathologists.length === 0 ? (
+    <div className="overflow-x-auto">
+      <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <table className="w-full text-sm">
+          <thead className={`${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-100 text-gray-800"}`}>
             <tr>
-              <td colSpan="12" className={`px-6 py-8 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                {searchQuery ? "No plant pathologists found matching your search." : "No plant pathologists found. Add your first plant pathologist!"}
-              </td>
+              <th className="px-4 py-3 text-left">Photo</th>
+              <th className="px-4 py-3 text-left">Full Name</th>
+              <th className="px-4 py-3 text-left">Email</th>
+              <th className="px-4 py-3 text-left">Phone</th>
+              <th className="px-4 py-3 text-left">License</th>
+              <th className="px-4 py-3 text-left">Specializations</th>
+              <th className="px-4 py-3 text-left">Actions</th>
             </tr>
-          ) : (
-            filteredPathologists.map((pathologist) => (
-              <tr key={pathologist._id} className={`transition ${darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"}`}>
-                <td className="px-6 py-3">
-                  {pathologist.profilePhoto && (
-                    <img
-                      src={`http://localhost:5000/Health_Uploads/${pathologist.profilePhoto}`}
-                      alt={pathologist.fullName}
-                      className="h-12 w-12 rounded-full object-cover"
-                    />
-                  )}
-                </td>
-                <td className="px-6 py-3">{pathologist.fullName}</td>
-                <td className="px-6 py-3">{pathologist.email}</td>
-                <td className="px-6 py-3">{pathologist.phoneNo}</td>
-                <td className="px-6 py-3">{pathologist.licenseNumber}</td>
-                <td className="px-6 py-3">{Array.isArray(pathologist.specializations) ? pathologist.specializations.join(", ") : pathologist.specializations}</td>
-                <td className="px-6 py-3">{pathologist.qualifications}</td>
-                <td className="px-6 py-3">{pathologist.yearsOfExperience}</td>
-                <td className="px-6 py-3">{pathologist.dateOfBirth ? pathologist.dateOfBirth.split("T")[0] : ""}</td>
-                <td className="px-6 py-3">{pathologist.gender}</td>
-                <td className="px-6 py-3">
-                  <div className="flex gap-2">
-                    <button onClick={() => setQrItem({...pathologist, type: "pathologist"})} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Generate QR Code">
-                      <QrCode size={16} className="text-purple-500" />
-                    </button>
-                    <button onClick={() => handleEdit(pathologist, "pathologist")} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Edit Plant Pathologist">
-                      <Edit size={16} className="text-blue-500" />
-                    </button>
-                    <button onClick={() => handleDeletePathologist(pathologist._id)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Delete Plant Pathologist">
-                      <Trash2 size={16} className="text-red-500" />
-                    </button>
-                  </div>
-                </td>
-                <td className="px-6 py-3">
-                  <div className="flex gap-2">
-                    <a href={`https://wa.me/${pathologist.phoneNo}`} target="_blank" rel="noreferrer" className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="WhatsApp">
-                      <span className="text-green-500 text-sm">WhatsApp</span>
-                    </a>
-                    <a href={`mailto:${pathologist.email}`} target="_blank" rel="noreferrer" className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" title="Email">
-                      <span className="text-blue-500 text-sm">Email</span>
-                    </a>
+          </thead>
+          <tbody>
+            {loading.pathologists ? (
+              <tr>
+                <td colSpan="7" className="px-6 py-8 text-center">
+                  <div className="flex justify-center items-center">
+                    <Loader size={20} className="animate-spin mr-2" /> Loading pathologists...
                   </div>
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : filteredPathologists.length === 0 ? (
+              <tr>
+                <td colSpan="7" className={`px-6 py-8 text-center ${darkMode ? "text-gray-300" : "text-gray-500"}`}>
+                  {searchQuery ? "No plant pathologists found matching your search." : "No plant pathologists found. Add your first plant pathologist!"}
+                </td>
+              </tr>
+            ) : (
+              filteredPathologists.map((pathologist) => (
+                <tr key={pathologist._id} className={`transition ${darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-800"}`}>
+                  <td className="px-4 py-3">
+                    {pathologist.profilePhoto ? (
+                      <img
+                        src={`http://localhost:5000${pathologist.profilePhoto}`}
+                        alt={pathologist.fullName}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${darkMode ? "bg-gray-600" : "bg-gray-200"}`}>
+                        <User size={16} className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-medium">{pathologist.fullName}</td>
+                  <td className="px-4 py-3">{pathologist.email}</td>
+                  <td className="px-4 py-3">{pathologist.phoneNo}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-700 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+                      {pathologist.licenseNumber}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {Array.isArray(pathologist.specializations) ?
+                        pathologist.specializations.map((spec, i) => (
+                          <span key={i} className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-purple-700 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
+                            {spec}
+                          </span>
+                        )) :
+                        <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-purple-700 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
+                          {pathologist.specializations}
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setQrItem({...pathologist, type: "pathologist"})}
+                          className={`p-1.5 rounded transition ${darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"}`}
+                          title="Generate QR Code"
+                        >
+                          <QrCode size={16} className="text-purple-500" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(pathologist, "pathologist")}
+                          className={`p-1.5 rounded transition ${darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"}`}
+                          title="Edit Pathologist"
+                        >
+                          <Edit size={16} className="text-blue-500" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm({id: pathologist._id, type: "pathologist", name: pathologist.fullName})}
+                          className={`p-1.5 rounded transition ${darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"}`}
+                          title="Delete Pathologist"
+                        >
+                          <Trash2 size={16} className="text-red-500" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={`https://wa.me/${pathologist.phoneNo}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`flex-1 text-center text-xs py-1 rounded transition ${darkMode ? "bg-green-700 text-green-200 hover:bg-green-600" : "bg-green-100 text-green-800 hover:bg-green-200"}`}
+                        >
+                          WhatsApp
+                        </a>
+                        <a
+                          href={`mailto:${pathologist.email}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`flex-1 text-center text-xs py-1 rounded transition ${darkMode ? "bg-blue-700 text-blue-200 hover:bg-blue-600" : "bg-blue-100 text-blue-800 hover:bg-blue-200"}`}
+                        >
+                          Email
+                        </a>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
-
   return (
     <div className="p-4">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in">
+          <div className={`px-4 py-3 rounded-lg shadow-lg ${darkMode ? "bg-green-800 text-green-100" : "bg-green-100 text-green-800"} flex items-center`}>
+            <span className="mr-2">✅</span>
+            {successMessage}
+          </div>
+        </div>
+      )}
       {/* Tabs */}
-      <div className="flex mb-6 border-b">
+      <div className="flex mb-6 border-b overflow-x-auto">
         <button
           onClick={() => setActiveTab("employees")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition whitespace-nowrap ${
             activeTab === "employees"
               ? darkMode
                 ? "border-b-2 border-orange-500 text-orange-400"
@@ -719,10 +994,11 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Users size={18} />
           <span>Employees</span>
+          {loading.employees && <Loader size={16} className="animate-spin" />}
         </button>
         <button
           onClick={() => setActiveTab("doctors")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition whitespace-nowrap ${
             activeTab === "doctors"
               ? darkMode
                 ? "border-b-2 border-orange-500 text-orange-400"
@@ -732,10 +1008,11 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Stethoscope size={18} />
           <span>Doctors</span>
+          {loading.doctors && <Loader size={16} className="animate-spin" />}
         </button>
         <button
           onClick={() => setActiveTab("pathologists")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition whitespace-nowrap ${
             activeTab === "pathologists"
               ? darkMode
                 ? "border-b-2 border-orange-500 text-orange-400"
@@ -745,353 +1022,533 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Leaf size={18} />
           <span>Plant Pathologists</span>
+          {loading.pathologists && <Loader size={16} className="animate-spin" />}
         </button>
       </div>
-
       {/* Search & Add */}
-      <div className="flex justify-between items-center mb-6">
-        <div className={`flex items-center px-3 py-2 rounded-md ${darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div className={`flex items-center px-3 py-2 rounded-md w-full md:w-auto ${darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
           <Search size={18} className="text-gray-400" />
           <input
             type="text"
             placeholder={`Search ${activeTab}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`ml-2 bg-transparent outline-none text-sm ${
+            className={`ml-2 bg-transparent outline-none text-sm flex-1 ${
               darkMode ? "placeholder-gray-400 text-white" : "placeholder-gray-500 text-black"
             }`}
           />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="ml-2 text-gray-400 hover:text-gray-600">
+              <X size={16} />
+            </button>
+          )}
         </div>
-
-        <div className="flex gap-3">
+        <div className="flex gap-3 w-full md:w-auto">
           <button
             onClick={() => handleDownloadPDF(activeTab)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${
-              darkMode 
-                ? "bg-gray-600 hover:bg-gray-700 text-white" 
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition flex-1 md:flex-none justify-center ${
+              darkMode
+                ? "bg-gray-600 hover:bg-gray-700 text-white"
                 : "bg-gray-200 hover:bg-gray-300 text-gray-800"
             }`}
           >
-            <FileText size={18} />
-            <span>Download PDF</span>
+            <Download size={16} />
+            <span className="hidden sm:inline">Download PDF</span>
           </button>
-          
+         
           <button
             onClick={() => {
               resetForm();
               setShowForm(true);
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-white text-sm font-medium transition ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-white text-sm font-medium transition flex-1 md:flex-none justify-center ${
               darkMode ? "bg-red-600 hover:bg-red-700" : "bg-orange-500 hover:bg-orange-600"
             }`}
           >
-            <Plus size={18} />
+            <Plus size={16} />
             <span>Add {activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Pathologist"}</span>
           </button>
         </div>
       </div>
-
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
+          <div className="flex items-center">
+            <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-orange-100"}`}>
+              <Users className={darkMode ? "text-orange-400" : "text-orange-500"} size={20} />
+            </div>
+            <div>
+              <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Total Employees</p>
+              <p className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-800"}`}>{employees.length}</p>
+            </div>
+          </div>
+        </div>
+       
+        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
+          <div className="flex items-center">
+            <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-blue-100"}`}>
+              <Stethoscope className={darkMode ? "text-blue-400" : "text-blue-500"} size={20} />
+            </div>
+            <div>
+              <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Total Doctors</p>
+              <p className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-800"}`}>{doctors.length}</p>
+            </div>
+          </div>
+        </div>
+       
+        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
+          <div className="flex items-center">
+            <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-green-100"}`}>
+              <Leaf className={darkMode ? "text-green-400" : "text-green-500"} size={20} />
+            </div>
+            <div>
+              <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Total Pathologists</p>
+              <p className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-800"}`}>{pathologists.length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
       {/* Content based on active tab */}
       {activeTab === "employees" && renderEmployeeTable()}
       {activeTab === "doctors" && renderDoctorTable()}
       {activeTab === "pathologists" && renderPathologistTable()}
-
       {/* QR Modal */}
       {qrItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`rounded-lg p-6 w-full max-w-sm ${darkMode ? "bg-gray-800 text-white" : "bg-white"}`}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-lg p-6 w-full max-w-sm ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">QR Code</h2>
-              <button onClick={() => setQrItem(null)}>
+              <button onClick={() => setQrItem(null)} className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700">
                 <X size={20} />
               </button>
             </div>
             <div className="flex flex-col items-center gap-4">
-              <QRCodeCanvas value={qrItem.id || qrItem._id} size={180} />
+              <div className="p-4 bg-white rounded-lg">
+                <QRCodeCanvas value={qrItem.id || qrItem._id} size={180} />
+              </div>
               <p className="text-sm text-center">
                 <strong>{qrItem.name || qrItem.fullName}</strong><br />
                 <span className="text-gray-500">ID: {qrItem.id || qrItem._id}</span><br />
                 <span className="text-gray-500">Type: {qrItem.type}</span>
               </p>
+              <button
+                onClick={() => setQrItem(null)}
+                className={`mt-4 px-4 py-2 rounded-md ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} transition`}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Add/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className={`rounded-lg p-6 w-full max-w-2xl my-8 ${darkMode ? "bg-gray-800 text-white" : "bg-white"}`}>
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-lg p-6 w-full max-w-md ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">
-                {editingItem ? `Edit ${editingItem.type === "employee" ? "Employee" : editingItem.type === "doctor" ? "Doctor" : "Plant Pathologist"}` : 
-                `Add New ${activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Plant Pathologist"}`}
-              </h2>
-              <button onClick={() => { setShowForm(false); resetForm(); }}>
+              <h2 className="text-lg font-semibold">Confirm Delete</h2>
+              <button onClick={() => setDeleteConfirm(null)} className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700">
                 <X size={20} />
               </button>
             </div>
-
-            <form 
-              className="space-y-4 max-h-[70vh] overflow-y-auto pr-2" 
+            <p className="mb-6">
+              Are you sure you want to delete {deleteConfirm.name}? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className={`px-4 py-2 rounded-md ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} transition`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (deleteConfirm.type === "employee") handleDeleteEmployee(deleteConfirm.id);
+                  else if (deleteConfirm.type === "doctor") handleDeleteDoctor(deleteConfirm.id);
+                  else if (deleteConfirm.type === "pathologist") handleDeletePathologist(deleteConfirm.id);
+                }}
+                className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
+                disabled={loading.employees || loading.doctors || loading.pathologists}
+              >
+                {loading.employees || loading.doctors || loading.pathologists ? (
+                  <Loader size={16} className="animate-spin mx-4" />
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add/Edit Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+          <div className={`rounded-lg p-6 w-full max-w-4xl my-8 ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">
+                {editingItem ? `Edit ${editingItem.type === "employee" ? "Employee" : editingItem.type === "doctor" ? "Doctor" : "Plant Pathologist"}` :
+                `Add New ${activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Plant Pathologist"}`}
+              </h2>
+              <button onClick={() => { setShowForm(false); resetForm(); }} className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            <form
+              className="space-y-6 max-h-[70vh] overflow-y-auto pr-2"
               onSubmit={
-                editingItem ? 
-                  (editingItem.type === "employee" ? handleUpdateEmployee : 
+                editingItem ?
+                  (editingItem.type === "employee" ? handleUpdateEmployee :
                    editingItem.type === "doctor" ? handleUpdateDoctor : handleUpdatePathologist)
-                  : (activeTab === "employees" ? handleAddEmployee : 
+                  : (activeTab === "employees" ? handleAddEmployee :
                      activeTab === "doctors" ? handleAddDoctor : handleAddPathologist)
               }
             >
-              {/* Common fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Full Name *</label>
-                  <input 
-                    type="text" 
-                    name="name" 
-                    value={formData.name} 
-                    onChange={handleChange} 
-                    required 
-                    placeholder="e.g., John Doe" 
-                    className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                  />
-                </div>
-
-                {(activeTab === "employees" || editingItem?.type === "employee") ? (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Employee ID *</label>
-                    <input
-                      type="text"
-                      name="id"
-                      value={formData.id}
-                      onChange={handleChange}
-                      required
-                      disabled={editingItem}
-                      placeholder="e.g., EMP001"
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${editingItem ? "opacity-70 cursor-not-allowed" : ""}`}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">License Number *</label>
-                    <input
-                      type="text"
-                      name="licenseNumber"
-                      value={formData.licenseNumber}
-                      onChange={handleChange}
-                      required
-                      placeholder="e.g., MED12345"
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contact Number *</label>
-                  <input 
-                    type="text" 
-                    name="contact" 
-                    value={formData.contact} 
-                    onChange={handleChange} 
-                    required 
-                    placeholder="e.g., +1-234-567-8900" 
-                    className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                  />
-                </div>
-
-                {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Email *</label>
-                    <input 
-                      type="email" 
-                      name="email" 
-                      value={formData.email} 
-                      onChange={handleChange} 
-                      required 
-                      placeholder="e.g., john@example.com" 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                    />
-                  </div>
-                )}
-              </div>
-
-              {(activeTab === "employees" || editingItem?.type === "employee") && (
+              {/* Personal Information Section */}
+              <div>
+                <h3 className={`text-md font-medium mb-4 pb-2 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                  Personal Information
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Job Title *</label>
-                    <input 
-                      type="text" 
-                      name="title" 
-                      value={formData.title} 
-                      onChange={handleChange} 
-                      required 
-                      placeholder="e.g., Farm Manager" 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Employee Type</label>
-                    <select 
-                      name="type" 
-                      value={formData.type} 
-                      onChange={handleChange} 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`}
-                    >
-                      <option value="Full-time">Full-time</option>
-                      <option value="Part-time">Part-time</option>
-                      <option value="Contract">Contract</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Specializations *</label>
-                    <input 
-                      type="text" 
-                      name="specializations" 
-                      value={formData.specializations} 
-                      onChange={handleChange} 
-                      required 
-                      placeholder="e.g., Cardiology, Neurology (comma separated)" 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Qualifications *</label>
-                    <input 
-                      type="text" 
-                      name="qualifications" 
-                      value={formData.qualifications} 
-                      onChange={handleChange} 
-                      required 
-                      placeholder="e.g., MBBS, MD" 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Years of Experience *</label>
-                    <input 
-                      type="number" 
-                      name="yearsOfExperience" 
-                      value={formData.yearsOfExperience} 
-                      onChange={handleChange} 
-                      required 
-                      min="0" 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {(activeTab === "employees" || editingItem?.type === "employee") ? "Joined Date" : "Date of Birth"} *
-                  </label>
-                  <input 
-                    type="date" 
-                    name={(activeTab === "employees" || editingItem?.type === "employee") ? "joined" : "dateOfBirth"} 
-                    value={(activeTab === "employees" || editingItem?.type === "employee") ? formData.joined : formData.dateOfBirth} 
-                    onChange={handleChange} 
-                    required 
-                    className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`} 
-                  />
-                </div>
-              </div>
-
-              {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Gender</label>
-                    <select 
-                      name="gender" 
-                      value={formData.gender} 
-                      onChange={handleChange} 
-                      className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`}
-                    >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  {activeTab === "doctors" && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Address</label>
-                      <input 
-                        type="text" 
-                        name="address" 
-                        value={formData.address} 
-                        onChange={handleChange} 
-                        placeholder="e.g., 123 Main St, City" 
-                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
+                    <label className="block text-sm font-medium mb-1">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                        placeholder="e.g., John Doe"
+                        className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.name ? "border-red-500" : ""}`}
                       />
+                    </div>
+                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Contact Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Phone size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        name="contact"
+                        value={formData.contact}
+                        onChange={handleChange}
+                        required
+                        placeholder="e.g., +1-234-567-8900"
+                        className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.contact ? "border-red-500" : ""}`}
+                      />
+                    </div>
+                    {errors.contact && <p className="text-red-500 text-xs mt-1">{errors.contact}</p>}
+                  </div>
+                </div>
+                {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Mail size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          required
+                          placeholder="e.g., john@example.com"
+                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.email ? "border-red-500" : ""}`}
+                        />
+                      </div>
+                      {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Date of Birth <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Calendar size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                        <input
+                          type="date"
+                          name="dateOfBirth"
+                          value={formData.dateOfBirth}
+                          onChange={handleChange}
+                          required
+                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"} ${errors.dateOfBirth ? "border-red-500" : ""}`}
+                        />
+                      </div>
+                      {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
+                    </div>
+                  </div>
+                )}
+                {(activeTab === "employees" || editingItem?.type === "employee") && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Employee ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="id"
+                        value={formData.id}
+                        onChange={handleChange}
+                        required
+                        disabled={editingItem}
+                        placeholder="e.g., EMP001"
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${editingItem ? "opacity-70 cursor-not-allowed" : ""} ${errors.id ? "border-red-500" : ""}`}
+                      />
+                      {errors.id && <p className="text-red-500 text-xs mt-1">{errors.id}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Join Date <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Calendar size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                        <input
+                          type="date"
+                          name="joined"
+                          value={formData.joined}
+                          onChange={handleChange}
+                          required
+                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"} ${errors.joined ? "border-red-500" : ""}`}
+                        />
+                      </div>
+                      {errors.joined && <p className="text-red-500 text-xs mt-1">{errors.joined}</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Professional Information Section */}
+              <div>
+                <h3 className={`text-md font-medium mb-4 pb-2 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                  Professional Information
+                </h3>
+               
+                {(activeTab === "employees" || editingItem?.type === "employee") && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Job Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleChange}
+                        required
+                        placeholder="e.g., Farm Manager"
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.title ? "border-red-500" : ""}`}
+                      />
+                      {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Employee Type</label>
+                      <select
+                        name="type"
+                        value={formData.type}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`}
+                      >
+                        <option value="Full-time">Full-time</option>
+                        <option value="Part-time">Part-time</option>
+                        <option value="Contract">Contract</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          License Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="licenseNumber"
+                          value={formData.licenseNumber}
+                          onChange={handleChange}
+                          required
+                          placeholder="e.g., MED12345"
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.licenseNumber ? "border-red-500" : ""}`}
+                        />
+                        {errors.licenseNumber && <p className="text-red-500 text-xs mt-1">{errors.licenseNumber}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Years of Experience <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="yearsOfExperience"
+                          value={formData.yearsOfExperience}
+                          onChange={handleChange}
+                          required
+                          min="0"
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.yearsOfExperience ? "border-red-500" : ""}`}
+                        />
+                        {errors.yearsOfExperience && <p className="text-red-500 text-xs mt-1">{errors.yearsOfExperience}</p>}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Specializations <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <BookOpen size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                          <input
+                            type="text"
+                            name="specializations"
+                            value={formData.specializations}
+                            onChange={handleChange}
+                            required
+                            placeholder="e.g., Cardiology, Neurology (comma separated)"
+                            className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.specializations ? "border-red-500" : ""}`}
+                          />
+                        </div>
+                        {errors.specializations && <p className="text-red-500 text-xs mt-1">{errors.specializations}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Qualifications <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Award size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                          <input
+                            type="text"
+                            name="qualifications"
+                            value={formData.qualifications}
+                            onChange={handleChange}
+                            required
+                            placeholder="e.g., MBBS, MD"
+                            className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.qualifications ? "border-red-500" : ""}`}
+                          />
+                        </div>
+                        {errors.qualifications && <p className="text-red-500 text-xs mt-1">{errors.qualifications}</p>}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Gender</label>
+                        <select
+                          name="gender"
+                          value={formData.gender}
+                          onChange={handleChange}
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`}
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      {activeTab === "doctors" && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Address</label>
+                          <div className="relative">
+                            <MapPin size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                            <input
+                              type="text"
+                              name="address"
+                              value={formData.address}
+                              onChange={handleChange}
+                              placeholder="e.g., 123 Main St, City"
+                              className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {!editingItem && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1">
+                          Password <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleChange}
+                          required
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.password ? "border-red-500" : ""}`}
+                        />
+                        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Documents Section */}
+              <div>
+                <h3 className={`text-md font-medium mb-4 pb-2 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                  Documents
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Photo</label>
+                    <div className={`border-2 border-dashed rounded-md p-4 text-center ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+                      <Upload size={20} className="mx-auto text-gray-400 mb-2" />
+                      <label htmlFor="photo-upload" className="cursor-pointer text-blue-500 hover:text-blue-600">
+                        {formData.photoFile ? formData.photoFile.name : "Click to upload photo"}
+                      </label>
+                      <input
+                        id="photo-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setFormData({ ...formData, photoFile: e.target.files[0] })}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                  {(activeTab === "employees" || editingItem?.type === "employee") && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">CV (PDF)</label>
+                      <div className={`border-2 border-dashed rounded-md p-4 text-center ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+                        <FileText size={20} className="mx-auto text-gray-400 mb-2" />
+                        <label htmlFor="cv-upload" className="cursor-pointer text-blue-500 hover:text-blue-600">
+                          {formData.cvFile ? formData.cvFile.name : "Click to upload CV"}
+                        </label>
+                        <input
+                          id="cv-upload"
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) => setFormData({ ...formData, cvFile: e.target.files[0] })}
+                          className="hidden"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
-
-              {!editingItem && (activeTab === "doctors" || activeTab === "pathologists") && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Password *</label>
-                  <input 
-                    type="password" 
-                    name="password" 
-                    value={formData.password} 
-                    onChange={handleChange} 
-                    required 
-                    className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`} 
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Photo</label>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={(e) => setFormData({ ...formData, photoFile: e.target.files[0] })} 
-                    className="w-full text-sm" 
-                  />
-                </div>
-
-                {(activeTab === "employees" || editingItem?.type === "employee") && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">CV (PDF)</label>
-                    <input 
-                      type="file" 
-                      accept="application/pdf" 
-                      onChange={(e) => setFormData({ ...formData, cvFile: e.target.files[0] })} 
-                      className="w-full text-sm" 
-                    />
-                  </div>
-                )}
               </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button 
-                  type="button" 
-                  onClick={() => { setShowForm(false); resetForm(); }} 
-                  className="px-4 py-2 rounded-md bg-gray-300 text-black hover:bg-gray-400"
+              <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); resetForm(); }}
+                  className="px-4 py-2 rounded-md bg-gray-300 text-black hover:bg-gray-400 transition"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 rounded-md bg-orange-500 text-white hover:bg-orange-600"
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-md bg-orange-500 text-white hover:bg-orange-600 transition flex items-center gap-2"
+                  disabled={loading.form}
                 >
-                  {editingItem ? "Update" : "Add"} {activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Pathologist"}
+                  {loading.form ? (
+                    <>
+                      <Loader size={16} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      {editingItem ? "Update" : "Add"} {activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Pathologist"}
+                    </>
+                  )}
                 </button>
               </div>
             </form>

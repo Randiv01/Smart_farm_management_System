@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw } from "lucide-react";
+import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2 } from "lucide-react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-
-// Import the top navigation bar components
-import { FiTrendingUp, FiTrendingDown, FiDownload, FiAlertTriangle, FiBox, FiShoppingCart, FiGlobe, FiDollarSign } from "react-icons/fi";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Orders = () => {
   const { theme } = useITheme();
   const darkMode = theme === "dark";
-  const navigate = useNavigate();
-  
+ 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,6 +17,8 @@ const Orders = () => {
   const [stats, setStats] = useState({});
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [emailSearch, setEmailSearch] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const statusOptions = [
     { value: "all", label: "All Orders" },
@@ -55,24 +52,24 @@ const Orders = () => {
         page: currentPage,
         limit: 10
       };
-      
+     
       if (selectedStatus !== "all") {
         params.status = selectedStatus;
       }
-      
+     
       if (searchTerm) {
         params.search = searchTerm;
       }
-      
+     
       if (emailSearch) {
         params.email = emailSearch;
       }
-      
+     
       const response = await axios.get("http://localhost:5000/api/orders", {
         params,
         withCredentials: true
       });
-      
+     
       setOrders(response.data.orders);
       setTotalPages(response.data.totalPages);
     } catch (error) {
@@ -84,7 +81,9 @@ const Orders = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/orders/stats");
+      const response = await axios.get("http://localhost:5000/api/orders/stats", {
+        withCredentials: true
+      });
       setStats(response.data);
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -111,12 +110,14 @@ const Orders = () => {
       setUpdatingStatus(orderId);
       await axios.patch(`http://localhost:5000/api/orders/${orderId}/status`, {
         status: newStatus
+      }, {
+        withCredentials: true
       });
-      
+     
       // Refresh orders list
       fetchOrders();
       fetchStats();
-      
+     
       // Show success message
       alert(`Order status updated to ${newStatus}`);
     } catch (error) {
@@ -127,19 +128,52 @@ const Orders = () => {
     }
   };
 
+  const deleteOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to delete this order?")) return;
+    try {
+      setUpdatingStatus(orderId);
+      await axios.delete(`http://localhost:5000/api/orders/${orderId}`, {
+        withCredentials: true
+      });
+     
+      // Refresh orders list and stats
+      fetchOrders();
+      fetchStats();
+     
+      // Show success message
+      alert("Order deleted successfully");
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      alert("Failed to delete order");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   const sendStatusEmail = async (orderId, customerEmail, status) => {
     try {
-      // This would call your backend API to send an email
       await axios.post(`http://localhost:5000/api/orders/${orderId}/notify`, {
         email: customerEmail,
         status: status
+      }, {
+        withCredentials: true
       });
-      
+     
       alert(`Notification email sent to ${customerEmail}`);
     } catch (error) {
       console.error("Error sending email:", error);
       alert("Failed to send notification email");
     }
+  };
+
+  const viewOrderDetails = (order) => {
+    setSelectedOrder(order);
+    setShowOrderModal(true);
+  };
+
+  const closeOrderModal = () => {
+    setShowOrderModal(false);
+    setSelectedOrder(null);
   };
 
   const getStatusIcon = (status) => {
@@ -198,7 +232,7 @@ const Orders = () => {
 
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -214,8 +248,8 @@ const Orders = () => {
               </div>
             </div>
           </motion.div>
-          
-          <motion.div 
+         
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
@@ -231,8 +265,8 @@ const Orders = () => {
               </div>
             </div>
           </motion.div>
-          
-          <motion.div 
+         
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
@@ -248,8 +282,8 @@ const Orders = () => {
               </div>
             </div>
           </motion.div>
-          
-          <motion.div 
+         
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
@@ -261,7 +295,7 @@ const Orders = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-                <p className="text-2xl font-bold">${stats.totalRevenue || 0}</p>
+                <p className="text-2xl font-bold">${(stats.totalRevenue || 0).toFixed(2)}</p>
               </div>
             </div>
           </motion.div>
@@ -283,7 +317,7 @@ const Orders = () => {
                 onChange={handleSearch}
               />
             </div>
-            
+           
             <div className="relative w-full md:max-w-md">
               <Mail
                 size={20}
@@ -298,7 +332,7 @@ const Orders = () => {
               />
             </div>
           </div>
-          
+         
           <div className="flex items-center gap-2">
             <Filter size={20} className={darkMode ? "text-gray-400" : "text-gray-500"} />
             <select
@@ -364,12 +398,12 @@ const Orders = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex flex-col gap-2">
                             <button
-                              onClick={() => navigate(`/InventoryManagement/orders/${order._id}`)}
+                              onClick={() => viewOrderDetails(order)}
                               className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-left"
                             >
                               View Details
                             </button>
-                            
+                           
                             {/* Status Update Dropdown */}
                             {statusTransitions[order.status] && statusTransitions[order.status].length > 0 && (
                               <div className="relative inline-block text-left">
@@ -377,8 +411,8 @@ const Orders = () => {
                                   onChange={(e) => updateOrderStatus(order._id, e.target.value)}
                                   disabled={updatingStatus === order._id}
                                   className={`text-xs p-1 rounded border ${
-                                    darkMode 
-                                      ? 'bg-gray-700 text-white border-gray-600' 
+                                    darkMode
+                                      ? 'bg-gray-700 text-white border-gray-600'
                                       : 'bg-white text-gray-900 border-gray-300'
                                   }`}
                                 >
@@ -394,7 +428,7 @@ const Orders = () => {
                                 )}
                               </div>
                             )}
-                            
+                           
                             {/* Send Notification Button */}
                             <button
                               onClick={() => sendStatusEmail(order._id, order.customer.email, order.status)}
@@ -402,6 +436,16 @@ const Orders = () => {
                             >
                               <Mail size={12} className="mr-1" />
                               Notify Customer
+                            </button>
+                           
+                            {/* Delete Order Button */}
+                            <button
+                              onClick={() => deleteOrder(order._id)}
+                              disabled={updatingStatus === order._id}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 text-left text-xs flex items-center"
+                            >
+                              <Trash2 size={12} className="mr-1" />
+                              Delete Order
                             </button>
                           </div>
                         </td>
@@ -425,7 +469,7 @@ const Orders = () => {
                   >
                     Previous
                   </button>
-                  
+                 
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
@@ -441,7 +485,7 @@ const Orders = () => {
                       {page}
                     </button>
                   ))}
-                  
+                 
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
@@ -461,12 +505,154 @@ const Orders = () => {
             <p className="text-lg mb-2">No orders found</p>
             <p className={darkMode ? "text-gray-400" : "text-gray-500"}>
               {searchTerm || selectedStatus !== "all" || emailSearch
-                ? "Try adjusting your search or filter criteria." 
+                ? "Try adjusting your search or filter criteria."
                 : "No orders have been placed yet."}
             </p>
           </div>
         )}
       </div>
+
+      {/* Order Details Modal */}
+      <AnimatePresence>
+        {showOrderModal && selectedOrder && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-full p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black bg-opacity-50"
+                onClick={closeOrderModal}
+              />
+             
+              {/* Modal */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className={`relative z-50 w-full max-w-4xl p-6 rounded-lg shadow-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}
+              >
+                <button
+                  onClick={closeOrderModal}
+                  className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                >
+                  <X size={24} />
+                </button>
+               
+                <h2 className="text-2xl font-bold mb-6">Order Details - #{selectedOrder.orderNumber}</h2>
+               
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  {/* Customer Information */}
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <User size={20} className="mr-2" />
+                      Customer Information
+                    </h3>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Name:</span> {selectedOrder.customer.name}</p>
+                      <p><span className="font-medium">Email:</span> {selectedOrder.customer.email}</p>
+                      <p><span className="font-medium">Phone:</span> {selectedOrder.customer.phone || "Not provided"}</p>
+                    </div>
+                  </div>
+                 
+                  {/* Shipping Information */}
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <MapPin size={20} className="mr-2" />
+                      Shipping Address
+                    </h3>
+                    <div className="space-y-2">
+                      <p>{selectedOrder.customer.address || "Not provided"}</p>
+                      <p>{selectedOrder.customer.city}</p>
+                    </div>
+                  </div>
+                </div>
+               
+                {/* Order Items */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Order Items</h3>
+                  <div className={`rounded-lg overflow-hidden ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <table className="w-full">
+                      <thead className={darkMode ? "bg-gray-600" : "bg-gray-200"}>
+                        <tr>
+                          <th className="px-4 py-2 text-left">Product</th>
+                          <th className="px-4 py-2 text-left">Quantity</th>
+                          <th className="px-4 py-2 text-left">Price</th>
+                          <th className="px-4 py-2 text-left">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.items.map((item, index) => (
+                          <tr key={index} className={darkMode ? "border-b border-gray-600" : "border-b border-gray-200"}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center">
+                                <div className="ml-3">
+                                  <p className="font-medium">{item.name}</p>
+                                  {item.sku && <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {item.sku}</p>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">{item.quantity}</td>
+                            <td className="px-4 py-3">${item.price?.toFixed(2)}</td>
+                            <td className="px-4 py-3">${(item.quantity * item.price)?.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+               
+                {/* Order Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <CreditCard size={20} className="mr-2" />
+                      Payment Information
+                    </h3>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Payment Method:</span> {selectedOrder.paymentMethod || "Not specified"}</p>
+                      <p><span className="font-medium">Payment Status:</span> {selectedOrder.paymentStatus || "Not specified"}</p>
+                      <p><span className="font-medium">Transaction ID:</span> {selectedOrder.transactionId || "Not available"}</p>
+                    </div>
+                  </div>
+                 
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>${selectedOrder.subtotal?.toFixed(2) || '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Shipping:</span>
+                        <span>${selectedOrder.shipping?.toFixed(2) || '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tax:</span>
+                        <span>${selectedOrder.tax?.toFixed(2) || '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg pt-2 border-t dark:border-gray-600 border-gray-200">
+                        <span>Total:</span>
+                        <span>${selectedOrder.totalAmount?.toFixed(2) || '0.00'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+               
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={closeOrderModal}
+                    className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-// Backend: Attendance.js (Mongoose Model)
+// Backend: E-model/Attendance.js (Mongoose Model)
 import mongoose from "mongoose";
 
 const attendanceSchema = new mongoose.Schema({
@@ -13,14 +13,31 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Unique per (employeeId, date)
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
 
-attendanceSchema.virtual('formattedDate').get(function() {
-  return this.date.toISOString().split('T')[0];
+// Virtual formatted date
+attendanceSchema.virtual("formattedDate").get(function () {
+  return this.date.toISOString().split("T")[0];
+});
+attendanceSchema.set("toJSON", { virtuals: true });
+
+// Normalize date to start of day (save)
+attendanceSchema.pre("save", function (next) {
+  if (this.date) this.date.setHours(0, 0, 0, 0);
+  next();
 });
 
-attendanceSchema.set('toJSON', { virtuals: true });
+// Normalize date on updates
+attendanceSchema.pre(["findOneAndUpdate", "updateOne"], function (next) {
+  const update = this.getUpdate();
+  if (update?.date) {
+    const d = new Date(update.date);
+    d.setHours(0, 0, 0, 0);
+    this.setUpdate({ ...update, date: d });
+  }
+  next();
+});
 
 const Attendance = mongoose.model("Attendance", attendanceSchema);
-
 export default Attendance;

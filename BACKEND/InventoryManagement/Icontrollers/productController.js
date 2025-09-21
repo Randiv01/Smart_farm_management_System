@@ -1,4 +1,3 @@
-// productController.js
 import Product from "../Imodels/Product.js";
 
 // Get all products (for inventory management)
@@ -402,6 +401,26 @@ export const updateAllStatuses = async (req, res) => {
       updated: results.filter(r => r.updated).length,
       total: results.length
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get products by IDs for gift box
+export const getGiftBoxProducts = async (req, res) => {
+  try {
+    const { productIds } = req.body;
+    
+    if (!productIds || !Array.isArray(productIds)) {
+      return res.status(400).json({ message: 'Product IDs array is required' });
+    }
+    
+    const products = await Product.find({
+      _id: { $in: productIds },
+      isActive: true
+    }).select('name category price image description stock');
+    
+    res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

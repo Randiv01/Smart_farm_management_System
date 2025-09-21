@@ -1,38 +1,57 @@
-// BACKEND/HealthManagement/Controllers/DoctorDetailsController.js
 import DoctorDetails from "../Model/DoctorDetailsModel.js";
 import bcrypt from "bcrypt";
+
+function parseSpecializations(input) {
+  if (Array.isArray(input)) return input;
+  if (typeof input === "string") {
+    const txt = input.trim();
+    if (!txt) return [];
+    try {
+      const parsed = JSON.parse(txt);
+      if (Array.isArray(parsed)) {
+        return parsed.map((s) => String(s).trim()).filter(Boolean);
+      }
+    } catch (_) {}
+    return txt.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
 
 // Create Doctor
 export const createDoctor = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ message: "No form data received." });
+    }
+
     const {
-      fullName,
-      email,
-      phoneNo,
-      licenseNumber,
-      specializations,
-      qualifications,
-      yearsOfExperience,
-      dateOfBirth,
-      gender,
-      password,
+      fullName = "",
+      email = "",
+      phoneNo = "",
+      licenseNumber = "",
+      specializations = "[]",
+      qualifications = "",
+      yearsOfExperience = 0,
+      dateOfBirth = null,
+      gender = "Male",
+      password = "",
     } = req.body;
 
-    let profilePhotoPath = req.file ? req.file.path : null;
-
+    const specializationsArr = parseSpecializations(specializations);
     const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
+    const profilePhotoFilename = req.file ? req.file.filename : null;
 
     const newDoctor = new DoctorDetails({
       fullName,
       email,
       phoneNo,
       licenseNumber,
-      specializations,
+      specializations: specializationsArr,
       qualifications,
-      yearsOfExperience,
-      dateOfBirth,
+      yearsOfExperience: Number(yearsOfExperience) || 0,
+      dateOfBirth: dateOfBirth || null,
       gender,
-      profilePhoto: profilePhotoPath,
+      profilePhoto: profilePhotoFilename,
       password: hashedPassword,
     });
 
@@ -46,7 +65,7 @@ export const createDoctor = async (req, res) => {
 // Get All Doctors
 export const getDoctors = async (req, res) => {
   try {
-    const doctors = await DoctorDetails.find();
+    const doctors = await DoctorDetails.find().sort({ createdAt: -1 });
     res.status(200).json(doctors);
   } catch (error) {
     res.status(500).json({ message: "Error fetching doctors", error: error.message });
@@ -67,6 +86,10 @@ export const getDoctorById = async (req, res) => {
 // Update Doctor
 export const updateDoctor = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ message: "No form data received." });
+    }
+
     const {
       fullName,
       email,
@@ -83,17 +106,17 @@ export const updateDoctor = async (req, res) => {
     const doctor = await DoctorDetails.findById(req.params.id);
     if (!doctor) return res.status(404).json({ message: "Doctor not found" });
 
-    doctor.fullName = fullName || doctor.fullName;
-    doctor.email = email || doctor.email;
-    doctor.phoneNo = phoneNo || doctor.phoneNo;
-    doctor.licenseNumber = licenseNumber || doctor.licenseNumber;
-    doctor.specializations = specializations || doctor.specializations;
-    doctor.qualifications = qualifications || doctor.qualifications;
-    doctor.yearsOfExperience = yearsOfExperience || doctor.yearsOfExperience;
-    doctor.dateOfBirth = dateOfBirth || doctor.dateOfBirth;
-    doctor.gender = gender || doctor.gender;
+    if (fullName !== undefined) doctor.fullName = fullName;
+    if (email !== undefined) doctor.email = email;
+    if (phoneNo !== undefined) doctor.phoneNo = phoneNo;
+    if (licenseNumber !== undefined) doctor.licenseNumber = licenseNumber;
+    if (specializations !== undefined) doctor.specializations = parseSpecializations(specializations);
+    if (qualifications !== undefined) doctor.qualifications = qualifications;
+    if (yearsOfExperience !== undefined) doctor.yearsOfExperience = Number(yearsOfExperience) || 0;
+    if (dateOfBirth !== undefined) doctor.dateOfBirth = dateOfBirth || null;
+    if (gender !== undefined) doctor.gender = gender;
     if (password) doctor.password = await bcrypt.hash(password, 10);
-    if (req.file) doctor.profilePhoto = req.file.path;
+    if (req.file) doctor.profilePhoto = req.file.filename;
 
     await doctor.save();
     res.status(200).json({ message: "Doctor updated successfully", doctor });

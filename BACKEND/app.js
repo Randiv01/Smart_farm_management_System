@@ -60,7 +60,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // ----------------------- Uploads Setup -----------------------
 const uploadsDir = path.join(__dirname, "uploads");
-const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
+const healthUploadsDir = path.join(
+  __dirname,
+  "HealthManagement",
+  "Health_uploads"
+);
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
 [uploadsDir, healthUploadsDir, plantUploadsDir].forEach((dir) => {
@@ -72,7 +76,9 @@ const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
 // Serve static folders
 app.use("/uploads", express.static(uploadsDir));
+// Serve with both capitalizations to match any frontend usage
 app.use("/Health_uploads", express.static(healthUploadsDir));
+app.use("/Health_Uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
 
 const checkExpiryNotifications = async () => {
@@ -127,8 +133,11 @@ import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import chatbotRoutes from "./AnimalManagement/routes/chatbotRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
-import { doctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
-import { sendMedicalRequest, testEmail } from "./AnimalManagement/controllers/medicalRequestController.js";
+import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js"; // ⚠️ Renamed to avoid conflict
+import {
+  sendMedicalRequest,
+  testEmail,
+} from "./AnimalManagement/controllers/medicalRequestController.js";
 import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
@@ -152,6 +161,8 @@ import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
 import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
 import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
+import pestRoutes from "./PlantManagement/Routes/pestRoutes.js";
+import consultationRoutes from "./PlantManagement/Routes/consultationRoutes.js";
 
 // Inventory Management
 import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
@@ -168,7 +179,10 @@ import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
 // ----------------------- Debug env variables -----------------------
-console.log("OPENAI_API_KEY loaded:", process.env.OPENAI_API_KEY ? "YES" : "NO");
+console.log(
+  "OPENAI_API_KEY loaded:",
+  process.env.OPENAI_API_KEY ? "YES" : "NO"
+);
 console.log("EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
 
 // ----------------------- Routes Setup -----------------------
@@ -182,14 +196,15 @@ app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/doctors", doctorRouter);
+// IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
+app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
 app.use("/productivity", productivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 app.use("/api/meats", meatRoutes);
 
 // Health Management
-app.use("/api/doctors", doctorRoutes);
+app.use("/api/doctors", doctorRoutes); // ✅ Only HealthManagement doctors here
 app.use("/api/specialists", specialistRoutes);
 app.use("/api/medicine-companies", medicineCompanyRoutes);
 app.use("/api/medistore", mediStoreRoutes);
@@ -205,6 +220,8 @@ app.use("/api/inspections", inspectionRoutes);
 app.use("/api/plants", plantRoutes);
 app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
+app.use("/api/pests", pestRoutes);
+app.use("/api/consultations", consultationRoutes);
 
 // Inventory Management
 app.use("/api/inventory/products", productRoutes);
@@ -233,9 +250,54 @@ app.use(
   }
 );
 
+// Add debug endpoints
+app.get("/api/debug", (req, res) => {
+  res.json({
+    message: "Server is working",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || "development",
+  });
+});
+
+app.get("/api/check-db", async (req, res) => {
+  try {
+    // Try to perform a simple query
+    const Pest = mongoose.model("Pest");
+    const consultationCount = await mongoose.model("Consultation").countDocuments();
+    const pestCount = await Pest.countDocuments();
+
+    res.json({
+      success: true,
+      message: "MongoDB is connected",
+      pestCount,
+      consultationCount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "MongoDB connection error",
+      error: error.message,
+    });
+  }
+});
+
 // ----------------------- Health Check -----------------------
-app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
+app.get("/health", (req, res) =>
+  res.json({ status: "OK", message: "Server is running" })
+);
 app.get("/", (req, res) => res.send("Backend is running!"));
+
+// ----------------------- 404 -----------------------
+app.use((req, res, next) => {
+  res.status(404).json({ message: "Not Found" });
+});
+
+// ----------------------- Error Handling Middleware -----------------------
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || "Internal server error" });
+});
 
 // ----------------------- MongoDB Connection -----------------------
 const MONGO_URI =
@@ -255,16 +317,12 @@ const connectDB = async () => {
   }
 };
 
-// ----------------------- Error Handling Middleware -----------------------
-app.use((err, req, res, next) => {
-  console.error("Server error:", err);
-  res.status(500).json({ error: "Internal server error", stack: err.stack });
-});
-
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  server.listen(PORT, () =>
+    console.log(`🚀 Server running on port ${PORT}`)
+  );
 });
 
 export default app;

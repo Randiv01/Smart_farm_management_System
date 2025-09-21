@@ -30,7 +30,8 @@ const savePlantData = asyncHandler(async (req, res) => {
       expectedHarvest,
       estimatedYield,
       status,
-      imageUrl: req.file ? `/Uploads/${req.file.filename}` : undefined
+      // FIXED: Consistent path format (lowercase 'uploads')
+      imageUrl: req.file ? `/uploads/${req.file.filename}` : undefined
     });
 
     res.status(201).json({ success: true, message: 'Plant saved', data: plant });

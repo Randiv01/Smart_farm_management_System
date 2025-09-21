@@ -1,4 +1,3 @@
-// BACKEND/HealthManagement/Routes/H_FertiliserRoute.js
 import express from "express";
 import {
   getFertilisers,
