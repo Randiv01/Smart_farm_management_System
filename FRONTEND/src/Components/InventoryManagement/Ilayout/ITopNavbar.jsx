@@ -17,8 +17,8 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Load user data from localStorage
+  // Function to load user data from localStorage
+  const loadUserData = () => {
     const user = {
       name: localStorage.getItem("name") || "Admin",
       firstName: localStorage.getItem("firstName"),
@@ -28,6 +28,12 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       userId: localStorage.getItem("userId")
     };
     setUserData(user);
+    return user;
+  };
+
+  useEffect(() => {
+    // Load initial user data
+    const user = loadUserData();
     
     // Initialize Socket.io connection
     const newSocket = io('http://localhost:5000');
@@ -46,6 +52,17 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     newSocket.on('refillRequestUpdate', (data) => {
       addNotification(data);
     });
+
+    // Listen for user profile updates
+    newSocket.on('userProfileUpdated', (updatedUser) => {
+      // Update localStorage with new data
+      if (updatedUser.firstName) localStorage.setItem("firstName", updatedUser.firstName);
+      if (updatedUser.lastName) localStorage.setItem("lastName", updatedUser.lastName);
+      if (updatedUser.profileImage) localStorage.setItem("profileImage", updatedUser.profileImage);
+      
+      // Reload user data
+      loadUserData();
+    });
     
     // Fetch initial notifications
     fetchNotifications();
@@ -53,9 +70,19 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     // Set up interval to check for new notifications every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
     
+    // Listen for storage events (for cross-tab updates)
+    const handleStorageChange = (e) => {
+      if (e.key === "firstName" || e.key === "lastName" || e.key === "profileImage") {
+        loadUserData();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
     return () => {
       newSocket.disconnect();
       clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -382,6 +409,12 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                     </p>
                   </div>
                 </div>
+                <button
+                  onClick={() => navigate("/Inventory/isettings")}
+                  className={`flex items-center w-full text-left px-4 py-2 text-sm ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`}
+                >
+                  <User size={16} className="mr-2" /> Profile Settings
+                </button>
                 <button
                   onClick={handleLogout}
                   className={`flex items-center w-full text-left px-4 py-2 text-sm ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`}
