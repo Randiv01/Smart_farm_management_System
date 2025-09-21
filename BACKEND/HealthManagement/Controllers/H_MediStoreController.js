@@ -1,4 +1,3 @@
-// BACKEND/HealthManagement/Controllers/H_MediStoreController.js
 import H_MediStore from "../Model/H_mediStoreModel.js";
 
 export const addMedicine = async (req, res) => {
@@ -31,7 +30,11 @@ export const getMedicineById = async (req, res) => {
 
 export const updateMedicine = async (req, res) => {
   try {
-    const updatedMedicine = await H_MediStore.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedMedicine = await H_MediStore.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
     if (!updatedMedicine) return res.status(404).json({ message: "Medicine not found" });
     res.status(200).json(updatedMedicine);
   } catch (err) {

@@ -1,4 +1,3 @@
-// BACKEND/HealthManagement/Model/H_Fertiliser.js
 import mongoose from "mongoose";
 
 const fertiliserSchema = new mongoose.Schema(

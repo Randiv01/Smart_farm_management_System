@@ -70,7 +70,6 @@ import FertilizerStock from "./Components/InventoryManagement/Ipages/FertilizerS
 import ISupplier from "./Components/InventoryManagement/Ipages/ISupplier.jsx";
 import ISettings from "./Components/InventoryManagement/Ipages/ISettings.jsx";
 
-
 // ----------------- Employee Management -----------------
 import EmployeeLayoutWrapper from "./Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx";
 import { Dashboard as EDashboard } from "./Components/EmployeeManagement/pages/E-Dashboard.js";
@@ -81,6 +80,9 @@ import { OvertimeMonitor as EOvertimeMonitor } from "./Components/EmployeeManage
 import { SalaryDesk as ESalaryDesk } from "./Components/EmployeeManagement/pages/E-SalaryDesk.js";
 import { EEmployeeReportCenter } from "./Components/EmployeeManagement/pages/E-EmployeeReportCenter.js";
 import  ESystemSettings  from "./Components/EmployeeManagement/pages/E-SystemSettings.js";
+
+// NEW: Fertiliser Companies page
+import FertiliserCompanies from './Components/HealthManagement/PlantPathologistPart/FertiliserCompanies.js';
 
 // ----------------- Plant Management -----------------
 import PLayout from "./Components/PlantManagement/P-Layout.jsx";
@@ -229,7 +231,7 @@ function App() {
                             {/* Admin */}
                             <Route path="/admin/*" element={
                               <AdminProtectedRoute allowedRoles={["health"]}>
-                                <HLanguageProvider><HThemeProvider><HealthThemeProvider><AdminLayout /></HealthThemeProvider></HThemeProvider></HLanguageProvider>
+                                <AdminLayout />
                               </AdminProtectedRoute>
                             }>
                               <Route index element={<Navigate to="dashboard" replace />} />
@@ -237,6 +239,12 @@ function App() {
                               <Route path="doctor-details" element={<DoctorDetails />} />
                               <Route path="specialist-details" element={<SpecialistDetails />} />
                               <Route path="medicine-company" element={<MedicineCompany />} />
+
+                              {/* NEW: Fertiliser routes visible in Admin */}
+                              <Route path="fertiliser-companies" element={<FertiliserCompanies />} />
+                              <Route path="fertiliser-stock" element={<FertiliserStock />} />
+                              <Route path="fertiliser-details" element={<FertiliserDetails />} />
+
                               <Route path="medistore" element={<MediStore />} />
                               <Route path="treatments-details" element={<TreatmentsDetails />} />
                               <Route path="treatments-payments" element={<TreatmentsPayments />} />
@@ -247,7 +255,7 @@ function App() {
                             {/* Doctor */}
                             <Route path="/doctor/*" element={
                               <AdminProtectedRoute allowedRoles={["health"]}>
-                                <HLanguageProvider><HThemeProvider><HealthThemeProvider><DoctorLayout /></HealthThemeProvider></HThemeProvider></HLanguageProvider>
+                                <DoctorLayout />
                               </AdminProtectedRoute>
                             }>
                               <Route index element={<Navigate to="home" replace />} />
@@ -263,7 +271,7 @@ function App() {
                             {/* Plant Pathologist */}
                             <Route path="/plant-pathologist/*" element={
                               <AdminProtectedRoute allowedRoles={["health"]}>
-                                <HLanguageProvider><HThemeProvider><HealthThemeProvider><PlantPathologistLayout /></HealthThemeProvider></HThemeProvider></HLanguageProvider>
+                                <PlantPathologistLayout />
                               </AdminProtectedRoute>
                             }>
                               <Route index element={<Navigate to="home" replace />} />

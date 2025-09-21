@@ -1,4 +1,3 @@
-// BACKEND/HealthManagement/Model/H_mediStoreModel.js
 import mongoose from "mongoose";
 
 const mediStoreSchema = new mongoose.Schema(

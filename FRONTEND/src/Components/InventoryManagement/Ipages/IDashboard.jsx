@@ -179,7 +179,7 @@ const IDashboard = () => {
   };
 
   return (
-    <div className={`min-h-full ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
+    <div className={`min-h-full ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
