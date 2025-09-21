@@ -446,7 +446,7 @@ export default function FeedStocksAnimalManager() {
   const summary = getSummary();
 
   return (
-    <div className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
@@ -578,7 +578,7 @@ export default function FeedStocksAnimalManager() {
           </button>
           <button 
             onClick={() => setShowChart(!showChart)} 
-            className="bg-purple-600 px-4 py-2 rounded-lg text-white hover:bg-purple-700 transition flex items-center justify-center gap-2"
+            className="bg-green-600 px-4 py-2 rounded-lg text-white hover:bg-green-700 transition flex items-center justify-center gap-2"
           >
             <BarChart3 size={18} />
             {showChart ? "Hide Chart" : "Show Chart"}

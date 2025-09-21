@@ -1,3 +1,4 @@
+// models/Productivity.js
 import mongoose from 'mongoose';
 
 const productivitySchema = new mongoose.Schema({
@@ -13,19 +14,6 @@ const productivitySchema = new mongoose.Schema({
   isGroup: {
     type: Boolean,
     default: false
-  },
-  productType: {
-    type: String,
-    required: true
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  unit: {
-    type: String,
-    default: ''
   },
   date: {
     type: Date,
@@ -47,14 +35,23 @@ const productivitySchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
-  }
-});
+  }, // COMMA ADDED HERE
+  productType: {
+    type: String,
+    default: ''
+  },
+  quantity: {
+    type: Number,
+    default: 0
+  },
+  // Note: Productivity fields will be dynamic based on animal type
+}, { strict: false }); // Allow dynamic fields
 
 // Indexes for better performance
 productivitySchema.index({ animalId: 1, date: 1 });
 productivitySchema.index({ batchId: 1, date: 1 });
 productivitySchema.index({ isGroup: 1 });
-productivitySchema.index({ productType: 1 });
+productivitySchema.index({ date: 1 });
 
 // Auto-update updatedAt
 productivitySchema.pre('save', function(next) {

@@ -1,3 +1,4 @@
+// routes/productivity.js
 import express from 'express';
 import {
   createProductivityRecord,
@@ -6,7 +7,8 @@ import {
   getProductivitySummary,
   updateProductivityRecord,
   deleteProductivityRecord,
-  getProductivityTrends
+  getProductivityTrends,
+  getProductivityAnalytics // NEW
 } from '../controllers/productivityController.js';
 
 const router = express.Router();
@@ -22,6 +24,9 @@ router.get('/batch/:batchId', getBatchProductivity);
 
 // Get productivity summary
 router.get('/summary', getProductivitySummary);
+
+// Get productivity analytics (NEW)
+router.get('/analytics', getProductivityAnalytics);
 
 // Get productivity trends
 router.get('/trends', getProductivityTrends);

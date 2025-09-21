@@ -58,6 +58,7 @@ import AnimalZones from "./Components/AnimalManagement/AnimalZones/AnimalZones.j
 import Productivity from "./Components/AnimalManagement/Productivity/Productivity.jsx";
 import Settings from "./Components/AnimalManagement/Settings/Settings.jsx";
 import Alerts from "./Components/AnimalManagement/Alerts/Alerts.jsx";
+import MeatManagement from "./Components/AnimalManagement/MeatManagement/MeatManagement.jsx";
 
 // ----------------- Inventory Management -----------------
 import ILayout from "./Components/InventoryManagement/Ilayout/ILayout.jsx";
@@ -177,6 +178,7 @@ function App() {
                               <Route path="settings" element={<Settings />} />
                               <Route path="alerts" element={<Alerts />} />
                               <Route path=":type" element={<AnimalList />} />
+                              <Route path="MeatManagement" element={<MeatManagement />} />
                             </Route>
 
                             {/* ----------------- Inventory Management ----------------- */}

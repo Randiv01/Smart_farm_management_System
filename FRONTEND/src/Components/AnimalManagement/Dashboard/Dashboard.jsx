@@ -61,7 +61,7 @@ export default function Dashboard() {
 
     // Set the document title on component mount
     useEffect(() => {
-        document.title = "Animal Dashboard";
+        document.title = "Dashboard - Animal Manager";
     }, []);
 
     // Fetch initial data for animal types and zones on component mount

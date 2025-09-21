@@ -1,3 +1,4 @@
+// controllers/animalTypeController.js
 import AnimalType from '../models/AnimalType.js';
 import fs from 'fs';
 import path from 'path';
@@ -6,10 +7,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Create new animal type with auto-generated TypeID
+// Create new animal type with auto-generated TypeID and productivity fields
 export const createAnimalType = async (req, res) => {
   try {
-    const { name, managementType, caretakers, categories, caretakerName } = req.body;
+    const { name, managementType, caretakers, categories, productivityFields, caretakerName } = req.body;
 
     if (!name || !categories) {
       return res.status(400).json({ 
@@ -18,14 +19,15 @@ export const createAnimalType = async (req, res) => {
       });
     }
 
-    // Parse categories and caretakers if they're strings
+    // Parse JSON data if it's sent as strings
     let parsedCategories;
+    let parsedProductivityFields = [];
     let parsedCaretakers = [];
 
     try {
       parsedCategories = typeof categories === 'string' ? JSON.parse(categories) : categories;
       
-      // Validate fields & add default options for select type
+      // Validate category fields
       parsedCategories.forEach(category => {
         category.fields.forEach(field => {
           if (!field.name || !field.label) throw new Error("Each field must have a name and label");
@@ -34,6 +36,17 @@ export const createAnimalType = async (req, res) => {
           }
         });
       });
+
+      // Parse productivity fields if provided
+      if (productivityFields) {
+        parsedProductivityFields = typeof productivityFields === 'string' ? 
+          JSON.parse(productivityFields) : productivityFields;
+        
+        // Validate productivity fields
+        parsedProductivityFields.forEach(field => {
+          if (!field.name || !field.label) throw new Error("Each productivity field must have a name and label");
+        });
+      }
 
       // Parse caretakers if provided
       if (caretakers) {
@@ -67,6 +80,7 @@ export const createAnimalType = async (req, res) => {
       managementType: managementType || 'individual',
       bannerImage,
       categories: parsedCategories,
+      productivityFields: parsedProductivityFields, // Save productivity fields
       caretakers: parsedCaretakers,
       caretakerName: caretakerName || ''
     });
@@ -123,14 +137,16 @@ export const getAnimalTypeByIdOrName = async (req, res) => {
   }
 };
 
-// Update animal type
+// Update animal type with productivity fields
 export const updateAnimalType = async (req, res) => {
   try {
-    const { name, managementType, caretakers, categories, caretakerName } = req.body;
+    const { name, managementType, caretakers, categories, productivityFields, caretakerName } = req.body;
     
     let parsedCategories;
+    let parsedProductivityFields;
     let parsedCaretakers;
     
+    // Parse categories
     if (categories && typeof categories === 'string') {
       try {
         parsedCategories = JSON.parse(categories);
@@ -150,6 +166,22 @@ export const updateAnimalType = async (req, res) => {
       }
     }
 
+    // Parse productivity fields
+    if (productivityFields && typeof productivityFields === 'string') {
+      try {
+        parsedProductivityFields = JSON.parse(productivityFields);
+        parsedProductivityFields.forEach(field => {
+          if (!field.name || !field.label) throw new Error("Each productivity field must have a name and label");
+        });
+      } catch (parseError) {
+        return res.status(400).json({ 
+          message: "Invalid productivity fields format", 
+          error: parseError.message 
+        });
+      }
+    }
+
+    // Parse caretakers
     if (caretakers && typeof caretakers === 'string') {
       try {
         parsedCaretakers = JSON.parse(caretakers);
@@ -165,6 +197,7 @@ export const updateAnimalType = async (req, res) => {
       name: name ? name.toLowerCase() : undefined,
       managementType,
       categories: parsedCategories || categories,
+      productivityFields: parsedProductivityFields || productivityFields,
       caretakers: parsedCaretakers || caretakers,
       caretakerName: caretakerName !== undefined ? caretakerName : undefined
     };

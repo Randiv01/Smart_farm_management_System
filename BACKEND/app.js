@@ -75,6 +75,32 @@ app.use("/uploads", express.static(uploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
 
+const checkExpiryNotifications = async () => {
+  try {
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const batchesNearingExpiry = await MeatProductivity.find({
+      expiryDate: { $lte: threeDaysFromNow, $gte: now },
+      status: { $in: ["Fresh", "Stored", "Processed"] }, // Exclude already expired or sold
+    });
+
+    batchesNearingExpiry.forEach((batch) => {
+      const daysUntilExpiry = Math.ceil((new Date(batch.expiryDate) - now) / (24 * 60 * 60 * 1000));
+      if (daysUntilExpiry <= 3 && daysUntilExpiry >= 0) {
+        io.emit("batchExpiring", {
+          message: `Batch ${batch.batchId} (${batch.animalType}, ${batch.meatType}) is nearing expiry in ${daysUntilExpiry} day(s)`,
+          batchId: batch.batchId,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error checking batch expiry:", error);
+  }
+};
+
+// NEW: Set up interval for expiry checks (every 12 hours)
+setInterval(checkExpiryNotifications, 12 * 60 * 60 * 1000);
+
 // ----------------------- Multer setup -----------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
@@ -105,6 +131,9 @@ import { doctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
 import { sendMedicalRequest, testEmail } from "./AnimalManagement/controllers/medicalRequestController.js";
 import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
+import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
+import HarvestHistory from ".//AnimalManagement/models/HarvestHistory.js";
 
 // Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
@@ -157,6 +186,7 @@ app.use("/api/doctors", doctorRouter);
 app.use("/productivity", productivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
+app.use("/api/meats", meatRoutes);
 
 // Health Management
 app.use("/api/doctors", doctorRoutes);
