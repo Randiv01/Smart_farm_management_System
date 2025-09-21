@@ -353,7 +353,7 @@ Market: ${product.market}`;
   }
 
   return (
-    <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">

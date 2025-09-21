@@ -7,7 +7,8 @@ import {
   updateOrderStatus,
   cancelOrder,
   getOrderStats,
-  sendOrderNotification
+  sendOrderNotification,
+  deleteOrder
 } from "../Icontrollers/orderController.js";
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.get("/:id", getOrder);
 router.patch("/:id/status", updateOrderStatus);
 router.patch("/:id/cancel", cancelOrder);
 router.post("/:id/notify", sendOrderNotification);
+router.delete("/:id", deleteOrder);
 
 export default router;
