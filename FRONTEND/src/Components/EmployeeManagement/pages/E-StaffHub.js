@@ -1,13 +1,69 @@
+// src/pages/StaffHub.jsx
 import React, { useState, useEffect } from "react";
-import { 
-  Search, Plus, Edit, Trash2, QrCode, FileText, X, Users, Stethoscope, 
-  Leaf, Download, Upload, User, Mail, Phone, Calendar, MapPin, BookOpen, 
-  Award, Briefcase, Loader, UserX, UserCheck // ADD THESE TWO ICONS
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  QrCode,
+  FileText,
+  X,
+  Users,
+  Stethoscope,
+  Leaf,
+  Download,
+  Upload,
+  User,
+  Mail,
+  Phone,
+  Calendar,
+  MapPin,
+  BookOpen,
+  Award,
+  Loader,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import axios from "axios";
+
+/* ---------- helpers: validation ---------- */
+
+// Sri Lankan mobile: allow 9–10 digits (7XXXXXXXX or 07XXXXXXXX)
+// (Matches the requirement “more than 8 or less than 10 characters” ⇒ 9 or 10)
+const isValidSLMobile = (val) => {
+  if (!val) return false;
+  const clean = String(val).replace(/\D/g, "");
+  if (clean.length === 10) return /^07\d{8}$/.test(clean);
+  if (clean.length === 9) return /^7\d{8}$/.test(clean);
+  return false;
+};
+
+const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v || "");
+const isAlphaName = (v) =>
+  /^[A-Za-zÀ-ÖØ-öø-ÿ.'\s-]{2,60}$/.test((v || "").trim());
+const isEmpId = (v) => /^[A-Za-z0-9_-]{3,20}$/.test((v || "").trim());
+const minLen = (v, n) => (v || "").trim().length >= n;
+const maxLen = (v, n) => (v || "").trim().length <= n;
+
+const notFutureDate = (iso) => {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  d.setHours(0, 0, 0, 0);
+  now.setHours(0, 0, 0, 0);
+  return d <= now;
+};
+const ageFromISO = (iso) => {
+  if (!iso) return 0;
+  const b = new Date(iso);
+  const t = new Date();
+  let age = t.getFullYear() - b.getFullYear();
+  const m = t.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && t.getDate() < b.getDate())) age--;
+  return age;
+};
+
 export const StaffHub = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState("employees");
   const [showForm, setShowForm] = useState(false);
@@ -21,13 +77,14 @@ export const StaffHub = ({ darkMode }) => {
     employees: false,
     doctors: false,
     pathologists: false,
-    form: false
+    form: false,
   });
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
- 
+
   const formDataTemplate = {
+    // common
     id: "",
     name: "",
     contact: "",
@@ -36,6 +93,7 @@ export const StaffHub = ({ darkMode }) => {
     joined: "",
     photoFile: null,
     cvFile: null,
+    // med
     email: "",
     licenseNumber: "",
     specializations: "",
@@ -44,122 +102,166 @@ export const StaffHub = ({ darkMode }) => {
     dateOfBirth: "",
     gender: "Male",
     address: "",
-    password: ""
+    password: "",
   };
- 
+
   const [formData, setFormData] = useState(formDataTemplate);
-  // Load data from backend
+
+  /* ---------- data ---------- */
   useEffect(() => {
     fetchEmployees();
     fetchDoctors();
     fetchPathologists();
   }, []);
+
   const showSuccess = (message) => {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(""), 3000);
   };
+
   const fetchEmployees = async () => {
-    setLoading(prev => ({ ...prev, employees: true }));
+    setLoading((p) => ({ ...p, employees: true }));
     try {
       const res = await fetch("http://localhost:5000/api/employees");
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json"))
-        throw new Error("Server returned non-JSON response");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) throw new Error("Non-JSON response");
       const data = await res.json();
       setEmployees(data);
     } catch (err) {
       console.error("Error fetching employees:", err);
     } finally {
-      setLoading(prev => ({ ...prev, employees: false }));
+      setLoading((p) => ({ ...p, employees: false }));
     }
   };
+
   const fetchDoctors = async () => {
-    setLoading(prev => ({ ...prev, doctors: true }));
+    setLoading((p) => ({ ...p, doctors: true }));
     try {
       const res = await axios.get("http://localhost:5000/api/doctors");
       setDoctors(res.data);
     } catch (err) {
       console.error("Error fetching doctors:", err);
     } finally {
-      setLoading(prev => ({ ...prev, doctors: false }));
+      setLoading((p) => ({ ...p, doctors: false }));
     }
   };
+
   const fetchPathologists = async () => {
-    setLoading(prev => ({ ...prev, pathologists: true }));
+    setLoading((p) => ({ ...p, pathologists: true }));
     try {
-      const res = await axios.get("http://localhost:5000/api/plant-pathologists");
+      const res = await axios.get(
+        "http://localhost:5000/api/plant-pathologists"
+      );
       setPathologists(res.data);
     } catch (err) {
       console.error("Error fetching pathologists:", err);
     } finally {
-      setLoading(prev => ({ ...prev, pathologists: false }));
+      setLoading((p) => ({ ...p, pathologists: false }));
     }
   };
+
+  /* ---------- form helpers ---------- */
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-   
-    // Clear error when field is edited
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
-    }
+    setFormData((f) => ({ ...f, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
-  const validateForm = () => {
-    const newErrors = {};
-   
-    // Common validations
-    if (!formData.name) newErrors.name = "Name is required";
-    if (!formData.contact) newErrors.contact = "Contact number is required";
-   
-    // Employee-specific validations
-    if (activeTab === "employees" || editingItem?.type === "employee") {
-      if (!formData.id) newErrors.id = "Employee ID is required";
-      if (!formData.title) newErrors.title = "Job title is required";
-      if (!formData.joined) newErrors.joined = "Join date is required";
-    }
-   
-    // Doctor/Pathologist validations
-    if (activeTab === "doctors" || activeTab === "pathologists" ||
-        editingItem?.type === "doctor" || editingItem?.type === "pathologist") {
-      if (!formData.email) newErrors.email = "Email is required";
-      else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
-      if (!formData.licenseNumber) newErrors.licenseNumber = "License number is required";
-      if (!formData.specializations) newErrors.specializations = "Specializations are required";
-      if (!formData.qualifications) newErrors.qualifications = "Qualifications are required";
-      if (!formData.yearsOfExperience) newErrors.yearsOfExperience = "Experience is required";
-      if (!formData.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
-      if (!formData.password && !editingItem) newErrors.password = "Password is required";
-    }
-   
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+
   const resetForm = () => {
     setFormData(formDataTemplate);
     setEditingItem(null);
     setErrors({});
   };
-  // Employee functions
+
+  /* ---------- validation ---------- */
+  const validateForm = () => {
+    const e = {};
+    const fd = formData;
+    const isEmp = activeTab === "employees" || editingItem?.type === "employee";
+    const isDoc =
+      activeTab === "doctors" || editingItem?.type === "doctor";
+    const isPath =
+      activeTab === "pathologists" || editingItem?.type === "pathologist";
+
+    // Common fields
+    if (!isAlphaName(fd.name)) {
+      e.name =
+        "Enter a valid full name (letters/spaces only, 2–60 characters).";
+    }
+    if (!isValidSLMobile(fd.contact)) {
+      e.contact =
+        "Enter a valid Sri Lankan mobile (7XXXXXXXX or 07XXXXXXXX).";
+    }
+
+    // Employees
+    if (isEmp) {
+      if (!isEmpId(fd.id)) {
+        e.id = "Employee ID should be 3–20 characters (letters, numbers, _ or -).";
+      }
+      if (!minLen(fd.title, 2) || !maxLen(fd.title, 40)) {
+        e.title = "Job title must be 2–40 characters.";
+      }
+      if (!fd.joined || !notFutureDate(fd.joined)) {
+        e.joined = "Join date is required and cannot be in the future.";
+      }
+      if (!["Full-time", "Part-time", "Contract"].includes(fd.type)) {
+        e.type = "Select a valid employee type.";
+      }
+    }
+
+    // Doctors / Pathologists
+    if (isDoc || isPath) {
+      if (!isEmail(fd.email)) e.email = "Enter a valid email address.";
+      if (!/^[A-Za-z0-9-]{3,30}$/.test((fd.licenseNumber || "").trim())) {
+        e.licenseNumber = "License number should be 3–30 letters/numbers.";
+      }
+      if (!minLen(fd.specializations, 2)) {
+        e.specializations = "Enter at least one specialization.";
+      }
+      if (!minLen(fd.qualifications, 2)) {
+        e.qualifications = "Enter qualifications.";
+      }
+      const years = Number(fd.yearsOfExperience);
+      if (!Number.isFinite(years) || years < 0 || years > 60) {
+        e.yearsOfExperience = "Years of experience must be 0–60.";
+      }
+      if (!fd.dateOfBirth) e.dateOfBirth = "Date of birth is required.";
+      else if (ageFromISO(fd.dateOfBirth) < 18) {
+        e.dateOfBirth = "Must be at least 18 years old.";
+      }
+      if (!editingItem && !/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(fd.password)) {
+        e.password =
+          "Password must be at least 8 characters with letters and numbers.";
+      }
+    }
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  /* ---------- employee CRUD ---------- */
   const handleAddEmployee = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-   
-    setLoading(prev => ({ ...prev, form: true }));
+
+    setLoading((p) => ({ ...p, form: true }));
     try {
       const form = new FormData();
-      for (let key in formData) {
-        if (key !== "photoFile" && key !== "cvFile") form.append(key, formData[key]);
-      }
+      Object.entries(formData).forEach(([k, v]) => {
+        if (k !== "photoFile" && k !== "cvFile") form.append(k, v);
+      });
       if (formData.photoFile) form.append("photo", formData.photoFile);
       if (formData.cvFile) form.append("cv", formData.cvFile);
+
       const response = await fetch("http://localhost:5000/api/employees", {
         method: "POST",
         body: form,
       });
       const data = await response.json();
+
       if (response.ok) {
-        setEmployees([...employees, data]);
+        setEmployees((list) => [...list, data]);
         setShowForm(false);
         resetForm();
         showSuccess("Employee added successfully!");
@@ -170,28 +272,33 @@ export const StaffHub = ({ darkMode }) => {
       console.error(err);
       alert("Failed to add employee.");
     } finally {
-      setLoading(prev => ({ ...prev, form: false }));
+      setLoading((p) => ({ ...p, form: false }));
     }
   };
+
   const handleUpdateEmployee = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-   
-    setLoading(prev => ({ ...prev, form: true }));
+
+    setLoading((p) => ({ ...p, form: true }));
     try {
       const form = new FormData();
-      for (let key in formData) {
-        if (key !== "photoFile" && key !== "cvFile") form.append(key, formData[key]);
-      }
+      Object.entries(formData).forEach(([k, v]) => {
+        if (k !== "photoFile" && k !== "cvFile") form.append(k, v);
+      });
       if (formData.photoFile) form.append("photo", formData.photoFile);
       if (formData.cvFile) form.append("cv", formData.cvFile);
+
       const response = await fetch(
         `http://localhost:5000/api/employees/${editingItem.id}`,
         { method: "PUT", body: form }
       );
       const data = await response.json();
+
       if (response.ok) {
-        setEmployees(employees.map((emp) => (emp.id === data.id ? data : emp)));
+        setEmployees((list) =>
+          list.map((emp) => (emp.id === data.id ? data : emp))
+        );
         setShowForm(false);
         resetForm();
         showSuccess("Employee updated successfully!");
@@ -202,15 +309,19 @@ export const StaffHub = ({ darkMode }) => {
       console.error(err);
       alert("Failed to update employee.");
     } finally {
-      setLoading(prev => ({ ...prev, form: false }));
+      setLoading((p) => ({ ...p, form: false }));
     }
   };
+
   const handleDeleteEmployee = async (id) => {
-    setLoading(prev => ({ ...prev, employees: true }));
+    setLoading((p) => ({ ...p, employees: true }));
     try {
-      const response = await fetch(`http://localhost:5000/api/employees/${id}`, { method: "DELETE" });
+      const response = await fetch(
+        `http://localhost:5000/api/employees/${id}`,
+        { method: "DELETE" }
+      );
       if (response.ok) {
-        setEmployees(employees.filter((emp) => emp.id !== id));
+        setEmployees((list) => list.filter((emp) => emp.id !== id));
         setDeleteConfirm(null);
         showSuccess("Employee deleted successfully!");
       } else {
@@ -220,29 +331,34 @@ export const StaffHub = ({ darkMode }) => {
       console.error(err);
       alert("Failed to delete employee.");
     } finally {
-      setLoading(prev => ({ ...prev, employees: false }));
+      setLoading((p) => ({ ...p, employees: false }));
     }
   };
-  // Doctor functions
+
+  /* ---------- doctor CRUD ---------- */
   const handleAddDoctor = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-   
-    setLoading(prev => ({ ...prev, form: true }));
+
+    setLoading((p) => ({ ...p, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
         if (key === "specializations") {
-          data.append(key, JSON.stringify(formData.specializations.split(",").map(s => s.trim())));
+          data.append(
+            key,
+            JSON.stringify(
+              formData.specializations.split(",").map((s) => s.trim())
+            )
+          );
         } else if (key !== "photoFile" && key !== "cvFile") {
           data.append(key, formData[key]);
         }
       });
-      if (formData.photoFile) {
-        data.append("profilePhoto", formData.photoFile);
-      }
+      if (formData.photoFile) data.append("profilePhoto", formData.photoFile);
+
       await axios.post("http://localhost:5000/api/doctors", data, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
       });
       showSuccess("Doctor added successfully!");
       fetchDoctors();
@@ -252,29 +368,36 @@ export const StaffHub = ({ darkMode }) => {
       console.error("Error adding doctor:", err);
       alert("Failed to add doctor");
     } finally {
-      setLoading(prev => ({ ...prev, form: false }));
+      setLoading((p) => ({ ...p, form: false }));
     }
   };
+
   const handleUpdateDoctor = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-   
-    setLoading(prev => ({ ...prev, form: true }));
+
+    setLoading((p) => ({ ...p, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
         if (key === "specializations") {
-          data.append(key, JSON.stringify(formData.specializations.split(",").map(s => s.trim())));
+          data.append(
+            key,
+            JSON.stringify(
+              formData.specializations.split(",").map((s) => s.trim())
+            )
+          );
         } else if (key !== "photoFile" && key !== "cvFile") {
           data.append(key, formData[key]);
         }
       });
-      if (formData.photoFile) {
-        data.append("profilePhoto", formData.photoFile);
-      }
-      await axios.put(`http://localhost:5000/api/doctors/${editingItem._id}`, data, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      if (formData.photoFile) data.append("profilePhoto", formData.photoFile);
+
+      await axios.put(
+        `http://localhost:5000/api/doctors/${editingItem._id}`,
+        data,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
       showSuccess("Doctor updated successfully!");
       fetchDoctors();
       setShowForm(false);
@@ -283,11 +406,12 @@ export const StaffHub = ({ darkMode }) => {
       console.error("Error updating doctor:", err);
       alert("Failed to update doctor");
     } finally {
-      setLoading(prev => ({ ...prev, form: false }));
+      setLoading((p) => ({ ...p, form: false }));
     }
   };
+
   const handleDeleteDoctor = async (id) => {
-    setLoading(prev => ({ ...prev, doctors: true }));
+    setLoading((p) => ({ ...p, doctors: true }));
     try {
       await axios.delete(`http://localhost:5000/api/doctors/${id}`);
       fetchDoctors();
@@ -297,29 +421,34 @@ export const StaffHub = ({ darkMode }) => {
       console.error("Error deleting doctor:", err);
       alert("Failed to delete doctor");
     } finally {
-      setLoading(prev => ({ ...prev, doctors: false }));
+      setLoading((p) => ({ ...p, doctors: false }));
     }
   };
-  // Pathologist functions
+
+  /* ---------- pathologist CRUD ---------- */
   const handleAddPathologist = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-   
-    setLoading(prev => ({ ...prev, form: true }));
+
+    setLoading((p) => ({ ...p, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
         if (key === "specializations") {
-          data.append(key, JSON.stringify(formData.specializations.split(",").map(s => s.trim())));
+          data.append(
+            key,
+            JSON.stringify(
+              formData.specializations.split(",").map((s) => s.trim())
+            )
+          );
         } else if (key !== "photoFile" && key !== "cvFile") {
           data.append(key, formData[key]);
         }
       });
-      if (formData.photoFile) {
-        data.append("profilePhoto", formData.photoFile);
-      }
+      if (formData.photoFile) data.append("profilePhoto", formData.photoFile);
+
       await axios.post("http://localhost:5000/api/plant-pathologists", data, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
       });
       showSuccess("Plant Pathologist added successfully!");
       fetchPathologists();
@@ -329,29 +458,36 @@ export const StaffHub = ({ darkMode }) => {
       console.error("Error adding plant pathologist:", err);
       alert("Failed to add plant pathologist");
     } finally {
-      setLoading(prev => ({ ...prev, form: false }));
+      setLoading((p) => ({ ...p, form: false }));
     }
   };
+
   const handleUpdatePathologist = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-   
-    setLoading(prev => ({ ...prev, form: true }));
+
+    setLoading((p) => ({ ...p, form: true }));
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
         if (key === "specializations") {
-          data.append(key, JSON.stringify(formData.specializations.split(",").map(s => s.trim())));
+          data.append(
+            key,
+            JSON.stringify(
+              formData.specializations.split(",").map((s) => s.trim())
+            )
+          );
         } else if (key !== "photoFile" && key !== "cvFile") {
           data.append(key, formData[key]);
         }
       });
-      if (formData.photoFile) {
-        data.append("profilePhoto", formData.photoFile);
-      }
-      await axios.put(`http://localhost:5000/api/plant-pathologists/${editingItem._id}`, data, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      if (formData.photoFile) data.append("profilePhoto", formData.photoFile);
+
+      await axios.put(
+        `http://localhost:5000/api/plant-pathologists/${editingItem._id}`,
+        data,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
       showSuccess("Plant Pathologist updated successfully!");
       fetchPathologists();
       setShowForm(false);
@@ -360,13 +496,16 @@ export const StaffHub = ({ darkMode }) => {
       console.error("Error updating plant pathologist:", err);
       alert("Failed to update plant pathologist");
     } finally {
-      setLoading(prev => ({ ...prev, form: false }));
+      setLoading((p) => ({ ...p, form: false }));
     }
   };
+
   const handleDeletePathologist = async (id) => {
-    setLoading(prev => ({ ...prev, pathologists: true }));
+    setLoading((p) => ({ ...p, pathologists: true }));
     try {
-      await axios.delete(`http://localhost:5000/api/plant-pathologists/${id}`);
+      await axios.delete(
+        `http://localhost:5000/api/plant-pathologists/${id}`
+      );
       fetchPathologists();
       setDeleteConfirm(null);
       showSuccess("Plant Pathologist deleted successfully!");
@@ -374,9 +513,11 @@ export const StaffHub = ({ darkMode }) => {
       console.error("Error deleting plant pathologist:", err);
       alert("Failed to delete plant pathologist");
     } finally {
-      setLoading(prev => ({ ...prev, pathologists: false }));
+      setLoading((p) => ({ ...p, pathologists: false }));
     }
   };
+
+  /* ---------- edit prefill ---------- */
   const handleEdit = (item, type) => {
     if (type === "employee") {
       setFormData({
@@ -395,7 +536,9 @@ export const StaffHub = ({ darkMode }) => {
         contact: item.phoneNo,
         email: item.email,
         licenseNumber: item.licenseNumber,
-        specializations: Array.isArray(item.specializations) ? item.specializations.join(", ") : item.specializations,
+        specializations: Array.isArray(item.specializations)
+          ? item.specializations.join(", ")
+          : item.specializations,
         qualifications: item.qualifications,
         yearsOfExperience: item.yearsOfExperience,
         dateOfBirth: item.dateOfBirth ? item.dateOfBirth.split("T")[0] : "",
@@ -409,24 +552,27 @@ export const StaffHub = ({ darkMode }) => {
         contact: item.phoneNo,
         email: item.email,
         licenseNumber: item.licenseNumber,
-        specializations: Array.isArray(item.specializations) ? item.specializations.join(", ") : item.specializations,
+        specializations: Array.isArray(item.specializations)
+          ? item.specializations.join(", ")
+          : item.specializations,
         qualifications: item.qualifications,
         yearsOfExperience: item.yearsOfExperience,
         dateOfBirth: item.dateOfBirth ? item.dateOfBirth.split("T")[0] : "",
         gender: item.gender,
       });
     }
-   
-    setEditingItem({...item, type});
+    setEditingItem({ ...item, type });
     setShowForm(true);
   };
+
+  /* ---------- export ---------- */
   const handleDownloadPDF = (type) => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-   
+
     let headers = [];
     let body = [];
-   
+
     if (type === "doctors") {
       doc.text("Doctor Details", 14, 20);
       headers = [
@@ -445,7 +591,9 @@ export const StaffHub = ({ darkMode }) => {
         d.email,
         d.phoneNo,
         d.licenseNumber,
-        Array.isArray(d.specializations) ? d.specializations.join(", ") : d.specializations,
+        Array.isArray(d.specializations)
+          ? d.specializations.join(", ")
+          : d.specializations,
         d.qualifications,
         d.yearsOfExperience,
         d.dateOfBirth ? d.dateOfBirth.split("T")[0] : "",
@@ -469,7 +617,9 @@ export const StaffHub = ({ darkMode }) => {
         p.email,
         p.phoneNo,
         p.licenseNumber,
-        Array.isArray(p.specializations) ? p.specializations.join(", ") : p.specializations,
+        Array.isArray(p.specializations)
+          ? p.specializations.join(", ")
+          : p.specializations,
         p.qualifications,
         p.yearsOfExperience,
         p.dateOfBirth ? p.dateOfBirth.split("T")[0] : "",
@@ -487,372 +637,416 @@ export const StaffHub = ({ darkMode }) => {
         e.joined,
       ]);
     }
-   
-    autoTable(doc, {
-      head: [headers],
-      body: body,
-      startY: 30,
-    });
-   
+
+    autoTable(doc, { head: [headers], body, startY: 30 });
     doc.save(`${type.charAt(0).toUpperCase() + type.slice(1)}.pdf`);
   };
-  // Filtering functions
+
+  /* ---------- filtering ---------- */
   const filteredEmployees = employees.filter(
     (employee) =>
-      (employee.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (employee.name || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
       (employee.id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (employee.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+      (employee.title || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
   );
+
   const filteredDoctors = doctors.filter(
     (doctor) =>
-      (doctor.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (doctor.licenseNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(doctor.specializations) ?
-        doctor.specializations.join(" ").toLowerCase().includes(searchQuery.toLowerCase()) :
-        (doctor.specializations || "").toLowerCase().includes(searchQuery.toLowerCase()))
+      (doctor.fullName || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (doctor.licenseNumber || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (Array.isArray(doctor.specializations)
+        ? doctor.specializations.join(" ").toLowerCase()
+        : (doctor.specializations || "").toLowerCase()
+      ).includes(searchQuery.toLowerCase())
   );
+
   const filteredPathologists = pathologists.filter(
     (pathologist) =>
-      (pathologist.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (pathologist.licenseNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(pathologist.specializations) ?
-        pathologist.specializations.join(" ").toLowerCase().includes(searchQuery.toLowerCase()) :
-        (pathologist.specializations || "").toLowerCase().includes(searchQuery.toLowerCase()))
+      (pathologist.fullName || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (pathologist.licenseNumber || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (Array.isArray(pathologist.specializations)
+        ? pathologist.specializations.join(" ").toLowerCase()
+        : (pathologist.specializations || "").toLowerCase()
+      ).includes(searchQuery.toLowerCase())
   );
-  // In your StaffHub component, update the employee table rendering
-const renderEmployeeTable = () => (
-  <div className="overflow-x-auto">
-    <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
-      <table className="w-full text-sm">
-        <thead className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}>
-          <tr>
-            <th className="px-4 py-3 text-left">Emp ID</th>
-            <th className="px-4 py-3 text-left">Name</th>
-            <th className="px-4 py-3 text-left">Contact No</th>
-            <th className="px-4 py-3 text-left">Job Title</th>
-            <th className="px-4 py-3 text-left">Type</th>
-            <th className="px-4 py-3 text-left">Status</th> {/* NEW: Status column */}
-            <th className="px-4 py-3 text-left">Joined</th>
-            <th className="px-4 py-3 text-left">Photo</th>
-            <th className="px-4 py-3 text-left">CV</th>
-            <th className="px-4 py-3 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading.employees ? (
+
+  /* ---------- tables ---------- */
+  const renderEmployeeTable = () => (
+    <div className="overflow-x-auto">
+      <div
+        className={`rounded-lg overflow-hidden shadow ${
+          darkMode ? "bg-gray-700" : "bg-gray-50"
+        }`}
+      >
+        <table className="w-full text-sm">
+          <thead
+            className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}
+          >
             <tr>
-              <td colSpan="10" className="px-6 py-8 text-center">
-                <div className="flex justify-center items-center">
-                  <Loader size={20} className="animate-spin mr-2" /> Loading employees...
-                </div>
-              </td>
+              <th className="px-4 py-3 text-left">Emp ID</th>
+              <th className="px-4 py-3 text-left">Name</th>
+              <th className="px-4 py-3 text-left">Contact No</th>
+              <th className="px-4 py-3 text-left">Job Title</th>
+              <th className="px-4 py-3 text-left">Type</th>
+              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left">Joined</th>
+              <th className="px-4 py-3 text-left">Photo</th>
+              <th className="px-4 py-3 text-left">CV</th>
+              <th className="px-4 py-3 text-left">Actions</th>
             </tr>
-          ) : filteredEmployees.length === 0 ? (
-            <tr>
-              <td colSpan="10" className={`px-6 py-8 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                {searchQuery ? "No employees found matching your search." : "No employees found. Add your first employee!"}
-              </td>
-            </tr>
-          ) : (
-            filteredEmployees.map((employee) => (
-              <tr key={employee.id} className={`transition ${darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"}`}>
-                <td className="px-4 py-3 font-medium">{employee.id}</td>
-                <td className="px-4 py-3">{employee.name}</td>
-                <td className="px-4 py-3">{employee.contact}</td>
-                <td className="px-4 py-3">{employee.title}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${employee.type === "Full-time" ? "bg-green-100 text-green-800" : employee.type === "Part-time" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}>
-                    {employee.type}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${employee.status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                    {employee.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{employee.joined}</td>
-                <td className="px-4 py-3">
-                  {employee.photo ? <img src={`http://localhost:5000${employee.photo}`} alt="Employee" className="h-10 w-10 rounded-full object-cover" /> : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  {employee.cv ? (
-                    <a
-                      href={`http://localhost:5000${employee.cv}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-500 hover:underline"
-                    >
-                      <FileText size={14} className="mr-1" /> View
-                    </a>
-                  ) : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setQrItem({...employee, type: "employee"})}
-                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
-                      title="Generate QR Code"
-                    >
-                      <QrCode size={16} className="text-purple-500" />
-                    </button>
-                    <a
-                      href={`http://localhost:5000/api/employees/${employee.id}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
-                      title="Generate PDF Report"
-                    >
-                      <FileText size={16} className="text-green-500" />
-                    </a>
-                    <button
-                      onClick={() => handleEdit(employee, "employee")}
-                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
-                      title="Edit Employee"
-                    >
-                      <Edit size={16} className="text-blue-500" />
-                    </button>
-                    <button
-                      onClick={() => handleToggleStatus(employee.id, employee.status)}
-                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
-                      title={employee.status === "Active" ? "Deactivate Employee" : "Activate Employee"}
-                    >
-                      {employee.status === "Active" ? (
-                        <UserX size={16} className="text-yellow-500" />
-                      ) : (
-                        <UserCheck size={16} className="text-green-500" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm({id: employee.id, type: "employee", name: employee.name})}
-                      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
-                      title="Delete Employee"
-                    >
-                      <Trash2 size={16} className="text-red-500" />
-                    </button>
+          </thead>
+          <tbody>
+            {loading.employees ? (
+              <tr>
+                <td colSpan="10" className="px-6 py-8 text-center">
+                  <div className="flex justify-center items-center">
+                    <Loader size={20} className="animate-spin mr-2" /> Loading
+                    employees...
                   </div>
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-// Add this function to handle status toggle
-const handleToggleStatus = async (id, currentStatus) => {
-  setLoading(prev => ({ ...prev, employees: true }));
-  try {
-    const response = await fetch(`http://localhost:5000/api/employees/${id}/status`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    
-    if (response.ok) {
-      const updatedEmployee = await response.json();
-      setEmployees(employees.map(emp => emp.id === id ? updatedEmployee : emp));
-      showSuccess(`Employee ${currentStatus === "Active" ? "deactivated" : "activated"} successfully!`);
-    } else {
-      alert("Failed to update employee status.");
-    }
-  } catch (err) {
-    console.error("Error toggling employee status:", err);
-    alert("Failed to update employee status.");
-  } finally {
-    setLoading(prev => ({ ...prev, employees: false }));
-  }
-};
-   const renderDoctorTable = () => (
-  <div className="overflow-x-auto">
-    <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-      <table className="w-full text-sm">
-        <thead className={`${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-100 text-gray-800"}`}>
-          <tr>
-            <th className="px-4 py-3 text-left">Photo</th>
-            <th className="px-4 py-3 text-left">Full Name</th>
-            <th className="px-4 py-3 text-left">Email</th>
-            <th className="px-4 py-3 text-left">Phone</th>
-            <th className="px-4 py-3 text-left">License</th>
-            <th className="px-4 py-3 text-left">Specializations</th>
-            <th className="px-4 py-3 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading.doctors ? (
-            <tr>
-              <td colSpan="7" className="px-6 py-8 text-center">
-                <div className="flex justify-center items-center">
-                  <Loader size={20} className="animate-spin mr-2" />
-                  Loading doctors...
-                </div>
-              </td>
-            </tr>
-          ) : filteredDoctors.length === 0 ? (
-            <tr>
-              <td
-                colSpan="7"
-                className={`px-6 py-8 text-center ${
-                  darkMode ? "text-gray-300" : "text-gray-500"
-                }`}
-              >
-                {searchQuery
-                  ? "No doctors found matching your search."
-                  : "No doctors found. Add your first doctor!"}
-              </td>
-            </tr>
-          ) : (
-            filteredDoctors.map((doctor) => (
-              <tr
-                key={doctor._id}
-                className={`transition ${
-                  darkMode
-                    ? "hover:bg-gray-700 text-gray-200"
-                    : "hover:bg-gray-100 text-gray-800"
-                }`}
-              >
-                <td className="px-4 py-3">
-                  {doctor.profilePhoto ? (
-                    <img
-                      src={`http://localhost:5000${doctor.profilePhoto}`}
-                      alt={doctor.fullName}
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        darkMode ? "bg-gray-600" : "bg-gray-200"
+            ) : filteredEmployees.length === 0 ? (
+              <tr>
+                <td
+                  colSpan="10"
+                  className={`px-6 py-8 text-center ${
+                    darkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  {searchQuery
+                    ? "No employees found matching your search."
+                    : "No employees found. Add your first employee!"}
+                </td>
+              </tr>
+            ) : (
+              filteredEmployees.map((employee) => (
+                <tr
+                  key={employee.id}
+                  className={`transition ${
+                    darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"
+                  }`}
+                >
+                  <td className="px-4 py-3 font-medium">{employee.id}</td>
+                  <td className="px-4 py-3">{employee.name}</td>
+                  <td className="px-4 py-3">{employee.contact}</td>
+                  <td className="px-4 py-3">{employee.title}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        employee.type === "Full-time"
+                          ? "bg-green-100 text-green-800"
+                          : employee.type === "Part-time"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-purple-100 text-purple-800"
                       }`}
                     >
-                      <User
-                        size={16}
-                        className={darkMode ? "text-gray-400" : "text-gray-500"}
+                      {employee.type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        employee.status === "Active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {employee.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">{employee.joined}</td>
+                  <td className="px-4 py-3">
+                    {employee.photo ? (
+                      <img
+                        src={`http://localhost:5000${employee.photo}`}
+                        alt="Employee"
+                        className="h-10 w-10 rounded-full object-cover"
                       />
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-medium">{doctor.fullName}</td>
-                <td className="px-4 py-3">{doctor.email}</td>
-                <td className="px-4 py-3">{doctor.phoneNo}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      darkMode
-                        ? "bg-blue-700 text-blue-200"
-                        : "bg-blue-100 text-blue-800"
-                    }`}
-                  >
-                    {doctor.licenseNumber}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {Array.isArray(doctor.specializations) ? (
-                      doctor.specializations.map((spec, i) => (
-                        <span
-                          key={i}
-                          className={`text-xs px-2 py-1 rounded ${
-                            darkMode
-                              ? "bg-purple-700 text-purple-200"
-                              : "bg-purple-100 text-purple-800"
-                          }`}
-                        >
-                          {spec}
-                        </span>
-                      ))
                     ) : (
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${
-                          darkMode
-                            ? "bg-purple-700 text-purple-200"
-                            : "bg-purple-100 text-purple-800"
-                        }`}
-                      >
-                        {doctor.specializations}
-                      </span>
+                      "—"
                     )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col gap-2">
+                  </td>
+                  <td className="px-4 py-3">
+                    {employee.cv ? (
+                      <a
+                        href={`http://localhost:5000${employee.cv}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-500 hover:underline"
+                      >
+                        <FileText size={14} className="mr-1" /> View
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setQrItem({ ...doctor, type: "doctor" })}
-                        className={`p-1.5 rounded transition ${
-                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
-                        }`}
+                        onClick={() => setQrItem({ ...employee, type: "employee" })}
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
                         title="Generate QR Code"
                       >
                         <QrCode size={16} className="text-purple-500" />
                       </button>
+                      <a
+                        href={`http://localhost:5000/api/employees/${employee.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        title="Generate PDF Report"
+                      >
+                        <FileText size={16} className="text-green-500" />
+                      </a>
                       <button
-                        onClick={() => handleEdit(doctor, "doctor")}
-                        className={`p-1.5 rounded transition ${
-                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
-                        }`}
-                        title="Edit Doctor"
+                        onClick={() => handleEdit(employee, "employee")}
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        title="Edit Employee"
                       >
                         <Edit size={16} className="text-blue-500" />
                       </button>
                       <button
                         onClick={() =>
                           setDeleteConfirm({
-                            id: doctor._id,
-                            type: "doctor",
-                            name: doctor.fullName,
+                            id: employee.id,
+                            type: "employee",
+                            name: employee.name,
                           })
                         }
-                        className={`p-1.5 rounded transition ${
-                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
-                        }`}
-                        title="Delete Doctor"
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        title="Delete Employee"
                       >
                         <Trash2 size={16} className="text-red-500" />
                       </button>
+                      {/* Removed Activate/Deactivate toggle button as requested */}
                     </div>
-                    <div className="flex gap-2">
-                      <a
-                        href={`https://wa.me/${doctor.phoneNo}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`flex-1 text-center text-xs py-1 rounded transition ${
-                          darkMode
-                            ? "bg-green-700 text-green-200 hover:bg-green-600"
-                            : "bg-green-100 text-green-800 hover:bg-green-200"
-                        }`}
-                      >
-                        WhatsApp
-                      </a>
-                      <a
-                        href={`mailto:${doctor.email}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`flex-1 text-center text-xs py-1 rounded transition ${
-                          darkMode
-                            ? "bg-blue-700 text-blue-200 hover:bg-blue-600"
-                            : "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                        }`}
-                      >
-                        Email
-                      </a>
-                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderDoctorTable = () => (
+    <div className="overflow-x-auto">
+      <div
+        className={`rounded-lg overflow-hidden shadow ${
+          darkMode ? "bg-gray-800" : "bg-white"
+        }`}
+      >
+        <table className="w-full text-sm">
+          <thead
+            className={`${
+              darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-100 text-gray-800"
+            }`}
+          >
+            <tr>
+              <th className="px-4 py-3 text-left">Photo</th>
+              <th className="px-4 py-3 text-left">Full Name</th>
+              <th className="px-4 py-3 text-left">Email</th>
+              <th className="px-4 py-3 text-left">Phone</th>
+              <th className="px-4 py-3 text-left">License</th>
+              <th className="px-4 py-3 text-left">Specializations</th>
+              <th className="px-4 py-3 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading.doctors ? (
+              <tr>
+                <td colSpan="7" className="px-6 py-8 text-center">
+                  <div className="flex justify-center items-center">
+                    <Loader size={20} className="animate-spin mr-2" />
+                    Loading doctors...
                   </div>
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : filteredDoctors.length === 0 ? (
+              <tr>
+                <td
+                  colSpan="7"
+                  className={`px-6 py-8 text-center ${
+                    darkMode ? "text-gray-300" : "text-gray-500"
+                  }`}
+                >
+                  {searchQuery
+                    ? "No doctors found matching your search."
+                    : "No doctors found. Add your first doctor!"}
+                </td>
+              </tr>
+            ) : (
+              filteredDoctors.map((doctor) => (
+                <tr
+                  key={doctor._id}
+                  className={`transition ${
+                    darkMode
+                      ? "hover:bg-gray-700 text-gray-200"
+                      : "hover:bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  <td className="px-4 py-3">
+                    {doctor.profilePhoto ? (
+                      <img
+                        src={`http://localhost:5000${doctor.profilePhoto}`}
+                        alt={doctor.fullName}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          darkMode ? "bg-gray-600" : "bg-gray-200"
+                        }`}
+                      >
+                        <User
+                          size={16}
+                          className={darkMode ? "text-gray-400" : "text-gray-500"}
+                        />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-medium">{doctor.fullName}</td>
+                  <td className="px-4 py-3">{doctor.email}</td>
+                  <td className="px-4 py-3">{doctor.phoneNo}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-xs px-2 py-1 rounded ${
+                        darkMode
+                          ? "bg-blue-700 text-blue-200"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {doctor.licenseNumber}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {Array.isArray(doctor.specializations) ? (
+                        doctor.specializations.map((spec, i) => (
+                          <span
+                            key={i}
+                            className={`text-xs px-2 py-1 rounded ${
+                              darkMode
+                                ? "bg-purple-700 text-purple-200"
+                                : "bg-purple-100 text-purple-800"
+                            }`}
+                          >
+                            {spec}
+                          </span>
+                        ))
+                      ) : (
+                        <span
+                          className={`text-xs px-2 py-1 rounded ${
+                            darkMode
+                              ? "bg-purple-700 text-purple-200"
+                              : "bg-purple-100 text-purple-800"
+                          }`}
+                        >
+                          {doctor.specializations}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setQrItem({ ...doctor, type: "doctor" })}
+                          className={`p-1.5 rounded transition ${
+                            darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
+                          title="Generate QR Code"
+                        >
+                          <QrCode size={16} className="text-purple-500" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(doctor, "doctor")}
+                          className={`p-1.5 rounded transition ${
+                            darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
+                          title="Edit Doctor"
+                        >
+                          <Edit size={16} className="text-blue-500" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDeleteConfirm({
+                              id: doctor._id,
+                              type: "doctor",
+                              name: doctor.fullName,
+                            })
+                          }
+                          className={`p-1.5 rounded transition ${
+                            darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
+                          title="Delete Doctor"
+                        >
+                          <Trash2 size={16} className="text-red-500" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={`https://wa.me/${doctor.phoneNo}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`flex-1 text-center text-xs py-1 rounded transition ${
+                            darkMode
+                              ? "bg-green-700 text-green-200 hover:bg-green-600"
+                              : "bg-green-100 text-green-800 hover:bg-green-200"
+                          }`}
+                        >
+                          WhatsApp
+                        </a>
+                        <a
+                          href={`mailto:${doctor.email}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`flex-1 text-center text-xs py-1 rounded transition ${
+                            darkMode
+                              ? "bg-blue-700 text-blue-200 hover:bg-blue-600"
+                              : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                          }`}
+                        >
+                          Email
+                        </a>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+
   const renderPathologistTable = () => (
     <div className="overflow-x-auto">
-      <div className={`rounded-lg overflow-hidden shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+      <div
+        className={`rounded-lg overflow-hidden shadow ${
+          darkMode ? "bg-gray-800" : "bg-white"
+        }`}
+      >
         <table className="w-full text-sm">
-          <thead className={`${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-100 text-gray-800"}`}>
+          <thead
+            className={`${
+              darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-100 text-gray-800"
+            }`}
+          >
             <tr>
               <th className="px-4 py-3 text-left">Photo</th>
               <th className="px-4 py-3 text-left">Full Name</th>
@@ -868,19 +1062,34 @@ const handleToggleStatus = async (id, currentStatus) => {
               <tr>
                 <td colSpan="7" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" /> Loading pathologists...
+                    <Loader size={20} className="animate-spin mr-2" /> Loading
+                    pathologists...
                   </div>
                 </td>
               </tr>
             ) : filteredPathologists.length === 0 ? (
               <tr>
-                <td colSpan="7" className={`px-6 py-8 text-center ${darkMode ? "text-gray-300" : "text-gray-500"}`}>
-                  {searchQuery ? "No plant pathologists found matching your search." : "No plant pathologists found. Add your first plant pathologist!"}
+                <td
+                  colSpan="7"
+                  className={`px-6 py-8 text-center ${
+                    darkMode ? "text-gray-300" : "text-gray-500"
+                  }`}
+                >
+                  {searchQuery
+                    ? "No plant pathologists found matching your search."
+                    : "No plant pathologists found. Add your first plant pathologist!"}
                 </td>
               </tr>
             ) : (
               filteredPathologists.map((pathologist) => (
-                <tr key={pathologist._id} className={`transition ${darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-800"}`}>
+                <tr
+                  key={pathologist._id}
+                  className={`transition ${
+                    darkMode
+                      ? "hover:bg-gray-700 text-gray-200"
+                      : "hover:bg-gray-100 text-gray-800"
+                  }`}
+                >
                   <td className="px-4 py-3">
                     {pathologist.profilePhoto ? (
                       <img
@@ -889,8 +1098,15 @@ const handleToggleStatus = async (id, currentStatus) => {
                         className="h-10 w-10 rounded-full object-cover"
                       />
                     ) : (
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${darkMode ? "bg-gray-600" : "bg-gray-200"}`}>
-                        <User size={16} className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} />
+                      <div
+                        className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          darkMode ? "bg-gray-600" : "bg-gray-200"
+                        }`}
+                      >
+                        <User
+                          size={16}
+                          className={`${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                        />
                       </div>
                     )}
                   </td>
@@ -898,44 +1114,78 @@ const handleToggleStatus = async (id, currentStatus) => {
                   <td className="px-4 py-3">{pathologist.email}</td>
                   <td className="px-4 py-3">{pathologist.phoneNo}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-700 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+                    <span
+                      className={`text-xs px-2 py-1 rounded ${
+                        darkMode
+                          ? "bg-blue-700 text-blue-200"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
                       {pathologist.licenseNumber}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {Array.isArray(pathologist.specializations) ?
-                        pathologist.specializations.map((spec, i) => (
-                          <span key={i} className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-purple-700 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
-                            {spec}
+                      {Array.isArray(pathologist.specializations)
+                        ? pathologist.specializations.map((spec, i) => (
+                            <span
+                              key={i}
+                              className={`text-xs px-2 py-1 rounded ${
+                                darkMode
+                                  ? "bg-purple-700 text-purple-200"
+                                  : "bg-purple-100 text-purple-800"
+                              }`}
+                            >
+                              {spec}
+                            </span>
+                          ))
+                        : (
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              darkMode
+                                ? "bg-purple-700 text-purple-200"
+                                : "bg-purple-100 text-purple-800"
+                            }`}
+                          >
+                            {pathologist.specializations}
                           </span>
-                        )) :
-                        <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-purple-700 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
-                          {pathologist.specializations}
-                        </span>
-                      }
+                        )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setQrItem({...pathologist, type: "pathologist"})}
-                          className={`p-1.5 rounded transition ${darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"}`}
+                          onClick={() =>
+                            setQrItem({ ...pathologist, type: "pathologist" })
+                          }
+                          className={`p-1.5 rounded transition ${
+                            darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
                           title="Generate QR Code"
                         >
                           <QrCode size={16} className="text-purple-500" />
                         </button>
                         <button
                           onClick={() => handleEdit(pathologist, "pathologist")}
-                          className={`p-1.5 rounded transition ${darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"}`}
+                          className={`p-1.5 rounded transition ${
+                            darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
                           title="Edit Pathologist"
                         >
                           <Edit size={16} className="text-blue-500" />
                         </button>
                         <button
-                          onClick={() => setDeleteConfirm({id: pathologist._id, type: "pathologist", name: pathologist.fullName})}
-                          className={`p-1.5 rounded transition ${darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"}`}
+                          onClick={() =>
+                            setDeleteConfirm({
+                              id: pathologist._id,
+                              type: "pathologist",
+                              name: pathologist.fullName,
+                            })
+                          }
+                          className={`p-1.5 rounded transition ${
+                            darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
                           title="Delete Pathologist"
                         >
                           <Trash2 size={16} className="text-red-500" />
@@ -946,7 +1196,11 @@ const handleToggleStatus = async (id, currentStatus) => {
                           href={`https://wa.me/${pathologist.phoneNo}`}
                           target="_blank"
                           rel="noreferrer"
-                          className={`flex-1 text-center text-xs py-1 rounded transition ${darkMode ? "bg-green-700 text-green-200 hover:bg-green-600" : "bg-green-100 text-green-800 hover:bg-green-200"}`}
+                          className={`flex-1 text-center text-xs py-1 rounded transition ${
+                            darkMode
+                              ? "bg-green-700 text-green-200 hover:bg-green-600"
+                              : "bg-green-100 text-green-800 hover:bg-green-200"
+                          }`}
                         >
                           WhatsApp
                         </a>
@@ -954,7 +1208,11 @@ const handleToggleStatus = async (id, currentStatus) => {
                           href={`mailto:${pathologist.email}`}
                           target="_blank"
                           rel="noreferrer"
-                          className={`flex-1 text-center text-xs py-1 rounded transition ${darkMode ? "bg-blue-700 text-blue-200 hover:bg-blue-600" : "bg-blue-100 text-blue-800 hover:bg-blue-200"}`}
+                          className={`flex-1 text-center text-xs py-1 rounded transition ${
+                            darkMode
+                              ? "bg-blue-700 text-blue-200 hover:bg-blue-600"
+                              : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                          }`}
                         >
                           Email
                         </a>
@@ -969,17 +1227,25 @@ const handleToggleStatus = async (id, currentStatus) => {
       </div>
     </div>
   );
+
+  /* ---------- render ---------- */
   return (
     <div className="p-4">
-      {/* Success Message */}
       {successMessage && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in">
-          <div className={`px-4 py-3 rounded-lg shadow-lg ${darkMode ? "bg-green-800 text-green-100" : "bg-green-100 text-green-800"} flex items-center`}>
+          <div
+            className={`px-4 py-3 rounded-lg shadow-lg ${
+              darkMode
+                ? "bg-green-800 text-green-100"
+                : "bg-green-100 text-green-800"
+            } flex items-center`}
+          >
             <span className="mr-2">✅</span>
             {successMessage}
           </div>
         </div>
       )}
+
       {/* Tabs */}
       <div className="flex mb-6 border-b overflow-x-auto">
         <button
@@ -1025,9 +1291,14 @@ const handleToggleStatus = async (id, currentStatus) => {
           {loading.pathologists && <Loader size={16} className="animate-spin" />}
         </button>
       </div>
-      {/* Search & Add */}
+
+      {/* Search & actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className={`flex items-center px-3 py-2 rounded-md w-full md:w-auto ${darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+        <div
+          className={`flex items-center px-3 py-2 rounded-md w-full md:w-auto ${
+            darkMode ? "bg-gray-700" : "bg-gray-100"
+          }`}
+        >
           <Search size={18} className="text-gray-400" />
           <input
             type="text"
@@ -1035,11 +1306,16 @@ const handleToggleStatus = async (id, currentStatus) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={`ml-2 bg-transparent outline-none text-sm flex-1 ${
-              darkMode ? "placeholder-gray-400 text-white" : "placeholder-gray-500 text-black"
+              darkMode
+                ? "placeholder-gray-400 text-white"
+                : "placeholder-gray-500 text-black"
             }`}
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="ml-2 text-gray-400 hover:text-gray-600">
+            <button
+              onClick={() => setSearchQuery("")}
+              className="ml-2 text-gray-400 hover:text-gray-600"
+            >
               <X size={16} />
             </button>
           )}
@@ -1056,7 +1332,7 @@ const handleToggleStatus = async (id, currentStatus) => {
             <Download size={16} />
             <span className="hidden sm:inline">Download PDF</span>
           </button>
-         
+
           <button
             onClick={() => {
               resetForm();
@@ -1067,11 +1343,19 @@ const handleToggleStatus = async (id, currentStatus) => {
             }`}
           >
             <Plus size={16} />
-            <span>Add {activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Pathologist"}</span>
+            <span>
+              Add{" "}
+              {activeTab === "employees"
+                ? "Employee"
+                : activeTab === "doctors"
+                ? "Doctor"
+                : "Pathologist"}
+            </span>
           </button>
         </div>
       </div>
-      {/* Stats Summary */}
+
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
           <div className="flex items-center">
@@ -1084,7 +1368,7 @@ const handleToggleStatus = async (id, currentStatus) => {
             </div>
           </div>
         </div>
-       
+
         <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
           <div className="flex items-center">
             <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-blue-100"}`}>
@@ -1096,7 +1380,7 @@ const handleToggleStatus = async (id, currentStatus) => {
             </div>
           </div>
         </div>
-       
+
         <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
           <div className="flex items-center">
             <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-green-100"}`}>
@@ -1109,17 +1393,26 @@ const handleToggleStatus = async (id, currentStatus) => {
           </div>
         </div>
       </div>
-      {/* Content based on active tab */}
+
+      {/* Tables */}
       {activeTab === "employees" && renderEmployeeTable()}
       {activeTab === "doctors" && renderDoctorTable()}
       {activeTab === "pathologists" && renderPathologistTable()}
+
       {/* QR Modal */}
       {qrItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg p-6 w-full max-w-sm ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}>
+          <div
+            className={`rounded-lg p-6 w-full max-w-sm ${
+              darkMode ? "bg-gray-800 text-white" : "bg-white"
+            } animate-scale-in`}
+          >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">QR Code</h2>
-              <button onClick={() => setQrItem(null)} className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700">
+              <button
+                onClick={() => setQrItem(null)}
+                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -1128,13 +1421,17 @@ const handleToggleStatus = async (id, currentStatus) => {
                 <QRCodeCanvas value={qrItem.id || qrItem._id} size={180} />
               </div>
               <p className="text-sm text-center">
-                <strong>{qrItem.name || qrItem.fullName}</strong><br />
-                <span className="text-gray-500">ID: {qrItem.id || qrItem._id}</span><br />
+                <strong>{qrItem.name || qrItem.fullName}</strong>
+                <br />
+                <span className="text-gray-500">ID: {qrItem.id || qrItem._id}</span>
+                <br />
                 <span className="text-gray-500">Type: {qrItem.type}</span>
               </p>
               <button
                 onClick={() => setQrItem(null)}
-                className={`mt-4 px-4 py-2 rounded-md ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} transition`}
+                className={`mt-4 px-4 py-2 rounded-md ${
+                  darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                } transition`}
               >
                 Close
               </button>
@@ -1142,31 +1439,45 @@ const handleToggleStatus = async (id, currentStatus) => {
           </div>
         </div>
       )}
-      {/* Delete Confirmation Modal */}
+
+      {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg p-6 w-full max-w-md ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}>
+          <div
+            className={`rounded-lg p-6 w-full max-w-md ${
+              darkMode ? "bg-gray-800 text-white" : "bg-white"
+            } animate-scale-in`}
+          >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Confirm Delete</h2>
-              <button onClick={() => setDeleteConfirm(null)} className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
                 <X size={20} />
               </button>
             </div>
             <p className="mb-6">
-              Are you sure you want to delete {deleteConfirm.name}? This action cannot be undone.
+              Are you sure you want to delete {deleteConfirm.name}? This action cannot be
+              undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className={`px-4 py-2 rounded-md ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} transition`}
+                className={`px-4 py-2 rounded-md ${
+                  darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                } transition`}
               >
                 Cancel
               </button>
               <button
                 onClick={() => {
-                  if (deleteConfirm.type === "employee") handleDeleteEmployee(deleteConfirm.id);
-                  else if (deleteConfirm.type === "doctor") handleDeleteDoctor(deleteConfirm.id);
-                  else if (deleteConfirm.type === "pathologist") handleDeletePathologist(deleteConfirm.id);
+                  if (deleteConfirm.type === "employee")
+                    handleDeleteEmployee(deleteConfirm.id);
+                  else if (deleteConfirm.type === "doctor")
+                    handleDeleteDoctor(deleteConfirm.id);
+                  else if (deleteConfirm.type === "pathologist")
+                    handleDeletePathologist(deleteConfirm.id);
                 }}
                 className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
                 disabled={loading.employees || loading.doctors || loading.pathologists}
@@ -1181,32 +1492,67 @@ const handleToggleStatus = async (id, currentStatus) => {
           </div>
         </div>
       )}
+
       {/* Add/Edit Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
-          <div className={`rounded-lg p-6 w-full max-w-4xl my-8 ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}>
+          <div
+            className={`rounded-lg p-6 w-full max-w-4xl my-8 ${
+              darkMode ? "bg-gray-800 text-white" : "bg-white"
+            } animate-scale-in`}
+          >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">
-                {editingItem ? `Edit ${editingItem.type === "employee" ? "Employee" : editingItem.type === "doctor" ? "Doctor" : "Plant Pathologist"}` :
-                `Add New ${activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Plant Pathologist"}`}
+                {editingItem
+                  ? `Edit ${
+                      editingItem.type === "employee"
+                        ? "Employee"
+                        : editingItem.type === "doctor"
+                        ? "Doctor"
+                        : "Plant Pathologist"
+                    }`
+                  : `Add New ${
+                      activeTab === "employees"
+                        ? "Employee"
+                        : activeTab === "doctors"
+                        ? "Doctor"
+                        : "Plant Pathologist"
+                    }`}
               </h2>
-              <button onClick={() => { setShowForm(false); resetForm(); }} className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700">
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
                 <X size={20} />
               </button>
             </div>
+
             <form
               className="space-y-6 max-h-[70vh] overflow-y-auto pr-2"
               onSubmit={
-                editingItem ?
-                  (editingItem.type === "employee" ? handleUpdateEmployee :
-                   editingItem.type === "doctor" ? handleUpdateDoctor : handleUpdatePathologist)
-                  : (activeTab === "employees" ? handleAddEmployee :
-                     activeTab === "doctors" ? handleAddDoctor : handleAddPathologist)
+                editingItem
+                  ? editingItem.type === "employee"
+                    ? handleUpdateEmployee
+                    : editingItem.type === "doctor"
+                    ? handleUpdateDoctor
+                    : handleUpdatePathologist
+                  : activeTab === "employees"
+                  ? handleAddEmployee
+                  : activeTab === "doctors"
+                  ? handleAddDoctor
+                  : handleAddPathologist
               }
             >
-              {/* Personal Information Section */}
+              {/* Personal Information */}
               <div>
-                <h3 className={`text-md font-medium mb-4 pb-2 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                <h3
+                  className={`text-md font-medium mb-4 pb-2 border-b ${
+                    darkMode ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
                   Personal Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1223,11 +1569,18 @@ const handleToggleStatus = async (id, currentStatus) => {
                         onChange={handleChange}
                         required
                         placeholder="e.g., John Doe"
-                        className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.name ? "border-red-500" : ""}`}
+                        className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.name ? "border-red-500" : ""}`}
                       />
                     </div>
-                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                    {errors.name && (
+                      <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+                    )}
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       Contact Number <span className="text-red-500">*</span>
@@ -1240,14 +1593,24 @@ const handleToggleStatus = async (id, currentStatus) => {
                         value={formData.contact}
                         onChange={handleChange}
                         required
-                        placeholder="e.g., +1-234-567-8900"
-                        className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.contact ? "border-red-500" : ""}`}
+                        placeholder="07XXXXXXXX or 7XXXXXXXX"
+                        className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.contact ? "border-red-500" : ""}`}
                       />
                     </div>
-                    {errors.contact && <p className="text-red-500 text-xs mt-1">{errors.contact}</p>}
+                    {errors.contact && (
+                      <p className="text-red-500 text-xs mt-1">{errors.contact}</p>
+                    )}
                   </div>
                 </div>
-                {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
+
+                {(activeTab === "doctors" ||
+                  activeTab === "pathologists" ||
+                  editingItem?.type === "doctor" ||
+                  editingItem?.type === "pathologist") && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">
@@ -1262,30 +1625,48 @@ const handleToggleStatus = async (id, currentStatus) => {
                           onChange={handleChange}
                           required
                           placeholder="e.g., john@example.com"
-                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.email ? "border-red-500" : ""}`}
+                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              : "border-gray-300 placeholder-gray-500"
+                          } ${errors.email ? "border-red-500" : ""}`}
                         />
                       </div>
-                      {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                      {errors.email && (
+                        <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">
                         Date of Birth <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <Calendar size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                        <Calendar
+                          size={18}
+                          className="absolute left-3 top-2.5 text-gray-400"
+                        />
                         <input
                           type="date"
                           name="dateOfBirth"
                           value={formData.dateOfBirth}
                           onChange={handleChange}
                           required
-                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"} ${errors.dateOfBirth ? "border-red-500" : ""}`}
+                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600"
+                              : "border-gray-300"
+                          } ${errors.dateOfBirth ? "border-red-500" : ""}`}
                         />
                       </div>
-                      {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
+                      {errors.dateOfBirth && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.dateOfBirth}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
+
                 {(activeTab === "employees" || editingItem?.type === "employee") && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div>
@@ -1298,38 +1679,60 @@ const handleToggleStatus = async (id, currentStatus) => {
                         value={formData.id}
                         onChange={handleChange}
                         required
-                        disabled={editingItem}
+                        disabled={!!editingItem}
                         placeholder="e.g., EMP001"
-                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${editingItem ? "opacity-70 cursor-not-allowed" : ""} ${errors.id ? "border-red-500" : ""}`}
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${editingItem ? "opacity-70 cursor-not-allowed" : ""} ${
+                          errors.id ? "border-red-500" : ""
+                        }`}
                       />
-                      {errors.id && <p className="text-red-500 text-xs mt-1">{errors.id}</p>}
+                      {errors.id && (
+                        <p className="text-red-500 text-xs mt-1">{errors.id}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">
                         Join Date <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <Calendar size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                        <Calendar
+                          size={18}
+                          className="absolute left-3 top-2.5 text-gray-400"
+                        />
                         <input
                           type="date"
                           name="joined"
                           value={formData.joined}
                           onChange={handleChange}
                           required
-                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"} ${errors.joined ? "border-red-500" : ""}`}
+                          className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600"
+                              : "border-gray-300"
+                          } ${errors.joined ? "border-red-500" : ""}`}
                         />
                       </div>
-                      {errors.joined && <p className="text-red-500 text-xs mt-1">{errors.joined}</p>}
+                      {errors.joined && (
+                        <p className="text-red-500 text-xs mt-1">{errors.joined}</p>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-              {/* Professional Information Section */}
+
+              {/* Professional Information */}
               <div>
-                <h3 className={`text-md font-medium mb-4 pb-2 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                <h3
+                  className={`text-md font-medium mb-4 pb-2 border-b ${
+                    darkMode ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
                   Professional Information
                 </h3>
-               
+
                 {(activeTab === "employees" || editingItem?.type === "employee") && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1343,26 +1746,45 @@ const handleToggleStatus = async (id, currentStatus) => {
                         onChange={handleChange}
                         required
                         placeholder="e.g., Farm Manager"
-                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.title ? "border-red-500" : ""}`}
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.title ? "border-red-500" : ""}`}
                       />
-                      {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+                      {errors.title && (
+                        <p className="text-red-500 text-xs mt-1">{errors.title}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Employee Type</label>
+                      <label className="block text-sm font-medium mb-1">
+                        Employee Type
+                      </label>
                       <select
                         name="type"
                         value={formData.type}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`}
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-700 text-white border-gray-600"
+                            : "border-gray-300"
+                        } ${errors.type ? "border-red-500" : ""}`}
                       >
                         <option value="Full-time">Full-time</option>
                         <option value="Part-time">Part-time</option>
                         <option value="Contract">Contract</option>
                       </select>
+                      {errors.type && (
+                        <p className="text-red-500 text-xs mt-1">{errors.type}</p>
+                      )}
                     </div>
                   </div>
                 )}
-                {(activeTab === "doctors" || activeTab === "pathologists" || editingItem?.type === "doctor" || editingItem?.type === "pathologist") && (
+
+                {(activeTab === "doctors" ||
+                  activeTab === "pathologists" ||
+                  editingItem?.type === "doctor" ||
+                  editingItem?.type === "pathologist") && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -1376,9 +1798,17 @@ const handleToggleStatus = async (id, currentStatus) => {
                           onChange={handleChange}
                           required
                           placeholder="e.g., MED12345"
-                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.licenseNumber ? "border-red-500" : ""}`}
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              : "border-gray-300 placeholder-gray-500"
+                          } ${errors.licenseNumber ? "border-red-500" : ""}`}
                         />
-                        {errors.licenseNumber && <p className="text-red-500 text-xs mt-1">{errors.licenseNumber}</p>}
+                        {errors.licenseNumber && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.licenseNumber}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">
@@ -1391,18 +1821,30 @@ const handleToggleStatus = async (id, currentStatus) => {
                           onChange={handleChange}
                           required
                           min="0"
-                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.yearsOfExperience ? "border-red-500" : ""}`}
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              : "border-gray-300 placeholder-gray-500"
+                          } ${errors.yearsOfExperience ? "border-red-500" : ""}`}
                         />
-                        {errors.yearsOfExperience && <p className="text-red-500 text-xs mt-1">{errors.yearsOfExperience}</p>}
+                        {errors.yearsOfExperience && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.yearsOfExperience}
+                          </p>
+                        )}
                       </div>
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <div>
                         <label className="block text-sm font-medium mb-1">
                           Specializations <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
-                          <BookOpen size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                          <BookOpen
+                            size={18}
+                            className="absolute left-3 top-2.5 text-gray-400"
+                          />
                           <input
                             type="text"
                             name="specializations"
@@ -1410,17 +1852,28 @@ const handleToggleStatus = async (id, currentStatus) => {
                             onChange={handleChange}
                             required
                             placeholder="e.g., Cardiology, Neurology (comma separated)"
-                            className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.specializations ? "border-red-500" : ""}`}
+                            className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                              darkMode
+                                ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                                : "border-gray-300 placeholder-gray-500"
+                            } ${errors.specializations ? "border-red-500" : ""}`}
                           />
                         </div>
-                        {errors.specializations && <p className="text-red-500 text-xs mt-1">{errors.specializations}</p>}
+                        {errors.specializations && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.specializations}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">
                           Qualifications <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
-                          <Award size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                          <Award
+                            size={18}
+                            className="absolute left-3 top-2.5 text-gray-400"
+                          />
                           <input
                             type="text"
                             name="qualifications"
@@ -1428,20 +1881,35 @@ const handleToggleStatus = async (id, currentStatus) => {
                             onChange={handleChange}
                             required
                             placeholder="e.g., MBBS, MD"
-                            className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.qualifications ? "border-red-500" : ""}`}
+                            className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                              darkMode
+                                ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                                : "border-gray-300 placeholder-gray-500"
+                            } ${errors.qualifications ? "border-red-500" : ""}`}
                           />
                         </div>
-                        {errors.qualifications && <p className="text-red-500 text-xs mt-1">{errors.qualifications}</p>}
+                        {errors.qualifications && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.qualifications}
+                          </p>
+                        )}
                       </div>
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Gender</label>
+                        <label className="block text-sm font-medium mb-1">
+                          Gender
+                        </label>
                         <select
                           name="gender"
                           value={formData.gender}
                           onChange={handleChange}
-                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600" : "border-gray-300"}`}
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600"
+                              : "border-gray-300"
+                          }`}
                         >
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -1450,21 +1918,31 @@ const handleToggleStatus = async (id, currentStatus) => {
                       </div>
                       {activeTab === "doctors" && (
                         <div>
-                          <label className="block text-sm font-medium mb-1">Address</label>
+                          <label className="block text-sm font-medium mb-1">
+                            Address
+                          </label>
                           <div className="relative">
-                            <MapPin size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                            <MapPin
+                              size={18}
+                              className="absolute left-3 top-2.5 text-gray-400"
+                            />
                             <input
                               type="text"
                               name="address"
                               value={formData.address}
                               onChange={handleChange}
                               placeholder="e.g., 123 Main St, City"
-                              className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"}`}
+                              className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
+                                darkMode
+                                  ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                                  : "border-gray-300 placeholder-gray-500"
+                              }`}
                             />
                           </div>
                         </div>
                       )}
                     </div>
+
                     {!editingItem && (
                       <div>
                         <label className="block text-sm font-medium mb-1">
@@ -1476,49 +1954,89 @@ const handleToggleStatus = async (id, currentStatus) => {
                           value={formData.password}
                           onChange={handleChange}
                           required
-                          className={`w-full px-3 py-2 rounded-md text-sm border ${darkMode ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400" : "border-gray-300 placeholder-gray-500"} ${errors.password ? "border-red-500" : ""}`}
+                          className={`w-full px-3 py-2 rounded-md text-sm border ${
+                            darkMode
+                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              : "border-gray-300 placeholder-gray-500"
+                          } ${errors.password ? "border-red-500" : ""}`}
                         />
-                        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+                        {errors.password && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.password}
+                          </p>
+                        )}
                       </div>
                     )}
                   </>
                 )}
               </div>
-              {/* Documents Section */}
+
+              {/* Documents */}
               <div>
-                <h3 className={`text-md font-medium mb-4 pb-2 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+                <h3
+                  className={`text-md font-medium mb-4 pb-2 border-b ${
+                    darkMode ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
                   Documents
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Photo</label>
-                    <div className={`border-2 border-dashed rounded-md p-4 text-center ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+                    <label className="block text-sm font-medium mb-1">
+                      Photo
+                    </label>
+                    <div
+                      className={`border-2 border-dashed rounded-md p-4 text-center ${
+                        darkMode ? "border-gray-600" : "border-gray-300"
+                      }`}
+                    >
                       <Upload size={20} className="mx-auto text-gray-400 mb-2" />
-                      <label htmlFor="photo-upload" className="cursor-pointer text-blue-500 hover:text-blue-600">
-                        {formData.photoFile ? formData.photoFile.name : "Click to upload photo"}
+                      <label
+                        htmlFor="photo-upload"
+                        className="cursor-pointer text-blue-500 hover:text-blue-600"
+                      >
+                        {formData.photoFile
+                          ? formData.photoFile.name
+                          : "Click to upload photo"}
                       </label>
                       <input
                         id="photo-upload"
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setFormData({ ...formData, photoFile: e.target.files[0] })}
+                        onChange={(e) =>
+                          setFormData((f) => ({ ...f, photoFile: e.target.files[0] }))
+                        }
                         className="hidden"
                       />
                     </div>
                   </div>
+
                   {(activeTab === "employees" || editingItem?.type === "employee") && (
                     <div>
-                      <label className="block text-sm font-medium mb-1">CV (PDF)</label>
-                      <div className={`border-2 border-dashed rounded-md p-4 text-center ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+                      <label className="block text-sm font-medium mb-1">
+                        CV (PDF)
+                      </label>
+                      <div
+                        className={`border-2 border-dashed rounded-md p-4 text-center ${
+                          darkMode ? "border-gray-600" : "border-gray-300"
+                        }`}
+                      >
                         <FileText size={20} className="mx-auto text-gray-400 mb-2" />
-                        <label htmlFor="cv-upload" className="cursor-pointer text-blue-500 hover:text-blue-600">
-                          {formData.cvFile ? formData.cvFile.name : "Click to upload CV"}
+                        <label
+                          htmlFor="cv-upload"
+                          className="cursor-pointer text-blue-500 hover:text-blue-600"
+                        >
+                          {formData.cvFile
+                            ? formData.cvFile.name
+                            : "Click to upload CV"}
                         </label>
                         <input
                           id="cv-upload"
                           type="file"
                           accept="application/pdf"
-                          onChange={(e) => setFormData({ ...formData, cvFile: e.target.files[0] })}
+                          onChange={(e) =>
+                            setFormData((f) => ({ ...f, cvFile: e.target.files[0] }))
+                          }
                           className="hidden"
                         />
                       </div>
@@ -1526,10 +2044,14 @@ const handleToggleStatus = async (id, currentStatus) => {
                   )}
                 </div>
               </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); resetForm(); }}
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
                   className="px-4 py-2 rounded-md bg-gray-300 text-black hover:bg-gray-400 transition"
                 >
                   Cancel
@@ -1546,7 +2068,12 @@ const handleToggleStatus = async (id, currentStatus) => {
                     </>
                   ) : (
                     <>
-                      {editingItem ? "Update" : "Add"} {activeTab === "employees" ? "Employee" : activeTab === "doctors" ? "Doctor" : "Pathologist"}
+                      {editingItem ? "Update" : "Add"}{" "}
+                      {activeTab === "employees"
+                        ? "Employee"
+                        : activeTab === "doctors"
+                        ? "Doctor"
+                        : "Pathologist"}
                     </>
                   )}
                 </button>

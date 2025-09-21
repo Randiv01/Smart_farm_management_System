@@ -16,6 +16,39 @@ import { FileDown, Filter, Plus, ChevronDown, Loader, Edit, Trash2, X } from 'lu
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// ===== helpers to build a professional Overtime ID (frontend fallback) =====
+const looksLikeObjectId = (s) => typeof s === 'string' && /^[0-9a-f]{24}$/i.test(s);
+
+const getEmployeeCode = (emp) => {
+  if (!emp) return 'EMP-XXX';
+  const candidates = [
+    emp.employeeCode,
+    emp.code,
+    emp.empId,
+    emp.staffId,
+    emp.employeeId,
+    emp.customId,
+    emp.hrId,
+    emp.id, // sometimes teams store a custom code here
+  ].filter(Boolean);
+
+  const chosen = candidates.find((c) => typeof c === 'string' && !looksLikeObjectId(c));
+  if (chosen) return String(chosen).toUpperCase();
+
+  const namePart = (emp.name || 'EMP').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase().padEnd(3, 'X');
+  return `EMP-${namePart}`;
+};
+
+const makeOvertimeIdFallback = (record) => {
+  const code = getEmployeeCode(record?.employee);
+  const d = new Date(record?.date || Date.now());
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const tail = (record?._id || '').toString().slice(-6).toUpperCase();
+  return `OT-${code}-${y}${m}${day}-${tail}`;
+};
+
 export const OvertimeMonitor = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState('records');
 
@@ -92,7 +125,6 @@ export const OvertimeMonitor = ({ darkMode }) => {
         `http://localhost:5000/api/overtime/analytics?mode=trend&window=${trendWindow}`
       );
       const data = await res.json();
-      // returns [{date: '2025-09-01', hours: 4.5}, ...]
       setTrendData(
         (data.trendData || []).map((d) => ({
           name: d.label || d.date,
@@ -113,7 +145,6 @@ export const OvertimeMonitor = ({ darkMode }) => {
         `http://localhost:5000/api/overtime/analytics?mode=top&range=${topRange}`
       );
       const data = await res.json();
-      // returns [{name, hours}]
       setTopEmployees(data.topEmployees || []);
     } catch (e) {
       console.error('Error fetching top employees:', e);
@@ -207,7 +238,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
     }
   };
 
-  // ===== New: compute stats directly from the table (for the selected month/year) =====
+  // ===== compute stats directly from the table (for the selected month/year) =====
   const { totalOvertimeHours, avgPerEmployeeHours } = useMemo(() => {
     if (!Array.isArray(overtimeRecords) || overtimeRecords.length === 0) {
       return { totalOvertimeHours: 0, avgPerEmployeeHours: 0 };
@@ -226,7 +257,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
     return `${whole}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  // ===== New: Export CURRENT TABLE VIEW as PDF =====
+  // ===== Export CURRENT TABLE VIEW as PDF (uses Overtime ID) =====
   const handleExportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape' });
     const title = `Overtime Records - ${new Date(0, filters.month - 1).toLocaleString('default', {
@@ -237,7 +268,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
     doc.text(title, 14, 14);
 
     const body = overtimeRecords.map((r) => [
-      r._id?.slice(0, 6) || '',
+      r.overtimeId || makeOvertimeIdFallback(r), // <-- OVERTIME ID
       r.employee?.name || '',
       new Date(r.date).toLocaleDateString(),
       formatHours(r.regularHours),
@@ -330,8 +361,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
                 })}
               </select>
 
-              {/* (Optional) keep server-side status filter selector hidden by default
-                  You can remove completely if you don't plan to use it. */}
+              {/* optional status control kept hidden */}
               <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -374,7 +404,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
             </div>
           </div>
 
-          {/* Stats (UPDATED: only 2 cards, computed from table; pending removed) */}
+          {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
               <h4 className="text-sm text-gray-500 dark:text-gray-400">Total Overtime Hours</h4>
@@ -392,7 +422,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
             </div>
           </div>
 
-          {/* Table (UPDATED: removed Status column) */}
+          {/* Table (first column now Overtime ID) */}
           <div className="overflow-x-auto mt-6">
             <table className="w-full border-collapse">
               <thead className="bg-gray-100 dark:bg-gray-800">
@@ -414,7 +444,9 @@ export const OvertimeMonitor = ({ darkMode }) => {
                 ) : (
                   overtimeRecords.map((record) => (
                     <tr key={record._id} className="border-t dark:border-gray-700">
-                      <td className="px-4 py-2">{record._id?.substring(0, 6)}</td>
+                      <td className="px-4 py-2">
+                        {record.overtimeId || makeOvertimeIdFallback(record)}
+                      </td>
                       <td className="px-4 py-2">{record.employee?.name}</td>
                       <td className="px-4 py-2">{new Date(record.date).toLocaleDateString()}</td>
                       <td className="px-4 py-2">{formatHours(record.regularHours)}</td>

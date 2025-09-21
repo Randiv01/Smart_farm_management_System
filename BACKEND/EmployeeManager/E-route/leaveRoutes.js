@@ -1,18 +1,19 @@
-// E-route/leaveRoutes.js
 import express from "express";
-import * as ctrl from "../E-control/leaveController.js"; // note the .js extension
+import * as ctrl from "../E-control/leaveController.js";
 
 const router = express.Router();
 
-// Routes
+// CRUD
 router.get("/", ctrl.getLeaves);
 router.post("/", ctrl.createLeave);
 router.put("/:id", ctrl.updateLeave);
 router.delete("/:id", ctrl.deleteLeave);
 
+// Analytics / extras
 router.get("/balance", ctrl.getBalance);
 router.get("/distribution", ctrl.getDistribution);
+router.get("/trend", ctrl.getTrend);          // <- keep before any "/:id" GET route
 router.get("/upcoming", ctrl.getUpcoming);
 router.get("/stream", ctrl.stream);
 
-export default router; // ✅ default export
+export default router;
