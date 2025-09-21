@@ -343,7 +343,7 @@ Market: ${product.market}`;
 
   if (loading) {
     return (
-      <div className={`min-h-full p-6 flex items-center justify-center ${darkMode ? "bg-dark-card text-dark-text" : "bg-gray-50 text-gray-900"}`}>
+      <div className={`min-h-full p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4">Loading products...</p>
@@ -353,7 +353,7 @@ Market: ${product.market}`;
   }
 
   return (
-    <div className={`min-h-full p-6 ${darkMode ? "bg-dark-card text-dark-text" : "bg-gray-50 text-gray-800"}`}>
+    <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">
@@ -371,7 +371,7 @@ Market: ${product.market}`;
         </div>
       )}
       {/* Search and Actions */}
-      <div className={`p-4 rounded-2xl shadow-lg mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+      <div className={`p-4 rounded-lg shadow-sm mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-4 flex-1 min-w-[300px]">
             <div className="relative flex-1">
@@ -495,7 +495,7 @@ Market: ${product.market}`;
       </div>
       {/* Table View */}
       {viewMode === 'table' && (
-        <div className={`rounded-2xl shadow-lg overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className={`rounded-lg shadow-sm overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
               <tr>
@@ -625,7 +625,7 @@ Market: ${product.market}`;
             inventory.map((item) => (
               <div
                 key={item._id}
-                className={`p-4 rounded-2xl shadow-lg border-2 ${darkMode ? `bg-gray-800 ${item.status === 'Low Stock' ? 'border-red-700 bg-red-900/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`}`}
+                className={`p-4 rounded-lg shadow-sm border-2 ${darkMode ? `bg-gray-800 ${item.status === 'Low Stock' ? 'border-red-700 bg-red-900/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`}`}
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
@@ -727,7 +727,7 @@ Market: ${product.market}`;
               </div>
             ))
           ) : (
-            <div className={`col-span-3 p-8 text-center ${darkMode ? "bg-gray-800" : "bg-white"} rounded-2xl shadow-lg`}>
+            <div className={`col-span-3 p-8 text-center ${darkMode ? "bg-gray-800" : "bg-white"} rounded-lg`}>
               No products found
             </div>
           )}
@@ -756,7 +756,7 @@ Market: ${product.market}`;
       {/* Add/Edit Product Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-2xl shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className={`rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">
                 {editingProduct ? (formData.market === "Export" ? "Edit Export Product" : "Edit Product") : (formData.market === "Export" ? "Add Export Product" : "Add New Product")}
@@ -1037,7 +1037,7 @@ Market: ${product.market}`;
       {/* Refill Modal */}
       {showRefillForm && refillingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-2xl shadow-lg max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className={`rounded-lg shadow-lg max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Refill {refillingProduct.name}</h2>
               <button
@@ -1079,8 +1079,8 @@ Market: ${product.market}`;
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Note: Refilling will update the creation date and recalculate the expiry date based on the current date.
                 </label>
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -1105,7 +1105,7 @@ Market: ${product.market}`;
       {/* QR Code Modal */}
       {showQRCode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-2xl shadow-lg max-w-sm w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className={`rounded-lg shadow-lg max-w-sm w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Product QR Code</h2>
               <button

@@ -220,7 +220,7 @@ const Orders = () => {
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
+    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       {/* Header */}
       <div className="max-w-7xl mx-auto p-6">
         <div className="mb-8">

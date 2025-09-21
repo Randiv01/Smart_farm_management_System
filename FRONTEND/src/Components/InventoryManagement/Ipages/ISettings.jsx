@@ -88,7 +88,7 @@ const ISettings = () => {
   };
 
   return (
-    <div className={`min-h-full p-4 md:p-6 ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
+    <div className={`min-h-full p-4 md:p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
