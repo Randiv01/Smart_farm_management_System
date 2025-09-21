@@ -1,4 +1,3 @@
-// BACKEND/HealthManagement/Routes/H_MediStoreRoute.js
 import express from "express";
 import {
   addMedicine,

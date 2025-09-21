@@ -9,7 +9,6 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import multer from "multer";
 
 // ----------------------- Fix __dirname for ES modules -----------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -30,49 +29,23 @@ app.use(express.urlencoded({ extended: true }));
 
 // ----------------------- Uploads Setup -----------------------
 const uploadsDir = path.join(__dirname, "uploads");
-const healthUploadsDir = path.join(
-  __dirname,
-  "HealthManagement",
-  "Health_uploads"
-);
+const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log("📁 Created uploads directory");
-}
-
-if (!fs.existsSync(healthUploadsDir)) {
-  fs.mkdirSync(healthUploadsDir, { recursive: true });
-  console.log("📁 Created Health_uploads directory");
-}
-
-if (!fs.existsSync(plantUploadsDir)) {
-  fs.mkdirSync(plantUploadsDir, { recursive: true });
-  console.log("📁 Created PlantManagement Uploads directory");
-}
+// Ensure directories exist
+[uploadsDir, healthUploadsDir, plantUploadsDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log("📁 Created directory:", dir);
+  }
+});
 
 // Serve static folders
 app.use("/uploads", express.static(uploadsDir));
+// Serve with both capitalizations to match any frontend usage
 app.use("/Health_uploads", express.static(healthUploadsDir));
+app.use("/Health_Uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
-
-// Multer setup (optional if you handle uploads in individual routes)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const uniqueSuffix =
-      Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
-const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif/;
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (allowed.test(ext)) cb(null, true);
-  else cb(new Error("Only images are allowed"));
-};
-const upload = multer({ storage, fileFilter });
 
 // ----------------------- Import Routes -----------------------
 // Animal Management
@@ -82,7 +55,7 @@ import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import chatbotRoutes from "./AnimalManagement/routes/chatbotRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
-import { doctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
+import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js"; // ⚠️ Renamed to avoid conflict
 import {
   sendMedicalRequest,
   testEmail,
@@ -99,7 +72,7 @@ import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologist
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
 
-//Contact us
+// Contact us
 import contact from "./ContactUs/routes/contactRoutes.js";
 
 // Plant Management
@@ -115,24 +88,14 @@ import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js"
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
 
-// ----------------------- Employee Management -----------------------
+// Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
 import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
-// ----------------------- Ensure uploads folder exists for employee manager -----------------------
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-  console.log("📁 Created uploads directory for employee manager");
-}
-app.use("/uploads", express.static("uploads"));
-
-// ----------------------- Debug env variables -----------------------
-console.log(
-  "OPENAI_API_KEY loaded:",
-  process.env.OPENAI_API_KEY ? "YES" : "NO"
-);
+// ----------------------- Debug env variables (optional) -----------------------
+console.log("OPENAI_API_KEY loaded:", process.env.OPENAI_API_KEY ? "YES" : "NO");
 console.log("EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
 
 // ----------------------- Routes Setup -----------------------
@@ -146,13 +109,14 @@ app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/doctors", doctorRouter);
+// IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
+app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
 app.use("/productivity", productivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 
 // Health Management
-app.use("/api/doctors", doctorRoutes);
+app.use("/api/doctors", doctorRoutes); // ✅ Only HealthManagement doctors here
 app.use("/api/specialists", specialistRoutes);
 app.use("/api/medicine-companies", medicineCompanyRoutes);
 app.use("/api/medistore", mediStoreRoutes);
@@ -160,7 +124,7 @@ app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 
-//Contact us
+// Contact us
 app.use("/api/contact", contact);
 
 // Plant Management
@@ -183,13 +147,23 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 
 // ----------------------- Health Check -----------------------
-app.get("/health", (req, res) =>
-  res.json({ status: "OK", message: "Server is running" })
-);
+app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
 app.get("/", (req, res) => res.send("Backend is running!"));
 
+// ----------------------- 404 -----------------------
+app.use((req, res, next) => {
+  res.status(404).json({ message: "Not Found" });
+});
+
+// ----------------------- Error Handling Middleware -----------------------
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || "Internal server error" });
+});
+
 // ----------------------- MongoDB Connection -----------------------
-const MONGO_URI =
+const MONGO_URI = process.env.MONGO_URI ||
   "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
 
 const connectDB = async () => {
@@ -205,17 +179,9 @@ const connectDB = async () => {
   }
 };
 
-// ----------------------- Error Handling Middleware -----------------------
-app.use((err, req, res, next) => {
-  console.error("Server error:", err);
-  res.status(500).json({ error: "Internal server error", stack: err.stack });
-});
-
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
-  app.listen(5000, () =>
-    console.log("🚀 Server running on port 5000")
-  );
+  app.listen(5000, () => console.log("🚀 Server running on port 5000"));
 });
 
 export default app;

@@ -1,8 +1,10 @@
+// frontend/src/components/H_FertiliserStock.js
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
+import { useLocation } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -17,15 +19,65 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import logo from "../logo.jpg";
 
-const COLORS = ["#4ade80", "#60a5fa", "#f472b6", "#facc15", "#fb923c"];
+// Hero slideshow images (adjust paths if needed)
+import heroA from "../../UserHome/Images/AboutUs3.jpg";
+import heroB from "../../UserHome/Images/ContactUs3.webp";
+import heroC from "../../UserHome/Images/ReducesWaste.jpg";
+import heroD from "../../UserHome/Images/medistock6.png";
+
+// Pie slice palette
+const PIE_COLORS = ["#4ade80", "#60a5fa", "#f472b6", "#facc15", "#fb923c"];
+
+// Bar colors and thresholds
+const BAR_COLORS = {
+  red: "#ef4444",     // critical or very low
+  yellow: "#f59e0b",  // medium
+  green: "#22c55e",   // healthy
+};
+
+// Units to check for critical threshold (< 2)
+const CRITICAL_UNITS = new Set([
+  "litters", "liter", "litre", "liters", "litres", "l", "ltr", "ltrs",
+  "gal", "gallon", "gallons",
+  "bag", "bags",
+  "kg", "kilogram", "kilograms",
+]);
+
+const normalizeUnit = (unit) => (unit || "").toString().trim().toLowerCase();
+const isCriticalItem = (item) => {
+  const unit = normalizeUnit(item.unit);
+  const value = Number(item.currentStock);
+  return CRITICAL_UNITS.has(unit) && value < 2;
+};
+
+// Map stock -> bar color (and legend)
+const getBarColor = (item) => {
+  const v = Number(item.currentStock);
+  if (isCriticalItem(item)) return BAR_COLORS.red;          // critical rule
+  if (v <= 10) return BAR_COLORS.red;                       // very low
+  if (v <= 50) return BAR_COLORS.yellow;                    // medium
+  return BAR_COLORS.green;                                  // healthy
+};
+
+// Table row color (kept similar to your original logic)
+const getRowLevelClass = (item) => {
+  const v = Number(item.currentStock);
+  if (isCriticalItem(item)) return "bg-red-100 text-red-800";
+  if (v <= 10) return "bg-red-100 text-red-800";
+  if (v <= 50) return "bg-yellow-100 text-yellow-800";
+  return "bg-green-100 text-green-800";
+};
 
 const H_FertiliserStock = () => {
   const [stock, setStock] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // 🔍 search state
+
+  // Search state
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
   const [newFertiliser, setNewFertiliser] = useState({
     name: "",
     type: "",
@@ -41,19 +93,36 @@ const H_FertiliserStock = () => {
     notes: "",
   });
 
+  // Refs for capturing charts
   const barRef = useRef();
   const lineRef = useRef();
   const pieRef = useRef();
   const tableRef = useRef();
+  const location = useLocation();
 
-  // Fetch Fertiliser stock data from backend
+  // Hero slideshow
+  const slides = [heroA, heroB, heroC, heroD];
+  const [slideIndex, setSlideIndex] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSlideIndex((i) => (i + 1) % slides.length);
+    }, 6000); // 6 seconds
+    return () => clearInterval(id);
+  }, [slides.length]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("showForm") === "1") setShowForm(true);
+  }, [location.search]);
+
   const fetchStock = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/fertilisers");
-      setStock(res.data);
+      setStock(res.data || []);
       setLoading(false);
     } catch (err) {
       console.error(err);
+      setStock([]);
       setLoading(false);
     }
   };
@@ -63,8 +132,25 @@ const H_FertiliserStock = () => {
   }, []);
 
   const captureElementAsImage = async (element) => {
-    const canvas = await html2canvas(element);
+    const canvas = await html2canvas(element, {
+      backgroundColor: "#ffffff",
+      scale: 2, // sharper
+    });
     return canvas.toDataURL("image/png");
+  };
+
+  const downloadElementAsImage = async (ref, fileName) => {
+    if (!ref.current) return;
+    try {
+      const dataUrl = await captureElementAsImage(ref.current);
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `${fileName}.png`;
+      link.click();
+    } catch (e) {
+      console.error("Failed to download image:", e);
+      alert("Failed to download image");
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -75,8 +161,8 @@ const H_FertiliserStock = () => {
     doc.text("Mount Olive Farm House - Fertiliser Stock Report", 14, 20);
 
     const img = new Image();
-    img.src = logo;
-    doc.addImage(img, "jpg", 150, 10, 40, 20);
+    img.src = "/logo192.png";
+    doc.addImage(img, "png", 150, 10, 40, 20);
 
     let yPos = 40;
 
@@ -131,52 +217,112 @@ const H_FertiliserStock = () => {
         storageConditions: "",
         notes: "",
       });
-      fetchStock(); // Refresh data
+      fetchStock();
     } catch (err) {
       console.error(err);
       alert("Error adding fertiliser");
     }
   };
 
-  const getStockLevelColor = (stockValue) => {
-    if (stockValue <= 10) return "bg-red-100 text-red-800";
-    if (stockValue <= 50) return "bg-yellow-100 text-yellow-800";
-    return "bg-green-100 text-green-800";
-  };
-
-  // 🔍 Filter stock by search term
-  const filteredStock = stock.filter(
-    (f) =>
-      f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Search filter across most fields
+  const filteredStock = stock.filter((f) => {
+    const q = (searchTerm || "").trim().toLowerCase();
+    if (!q) return true;
+    const fields = [
+      f._id,
+      f.name,
+      f.type,
+      f.unit,
+      f.supplierName,
+      f.supplierContact,
+      f.email,
+      f.storageLocation,
+      f.storageConditions,
+      f.notes,
+      f.purchaseDate,
+    ];
+    return (
+      fields.some((v) => String(v || "").toLowerCase().includes(q)) ||
+      String(f.currentStock || "").toLowerCase().includes(q) ||
+      String(f.purchasePrice || "").toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-extrabold text-green-800 tracking-tight">
-            Fertiliser Stock Dashboard
-          </h1>
-          <div className="flex space-x-4">
+
+        {/* Hero Slideshow */}
+        <div className="relative rounded-xl overflow-hidden shadow-lg mb-8">
+          <img
+            src={slides[slideIndex]}
+            alt="Fertiliser stock slide"
+            className="w-full h-64 md:h-80 lg:h-96 object-cover transition-opacity duration-700"
+          />
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-4">
+            <h1 className="text-3xl md:text-5xl font-extrabold drop-shadow">
+              Fertiliser Stock Dashboard
+            </h1>
+            <p className="mt-3 text-lg md:text-2xl font-semibold drop-shadow">
+              Charts, stock and reports
+            </p>
+          </div>
+          {/* Dots */}
+          <div className="absolute bottom-3 right-4 flex space-x-2">
+            {slides.map((_, i) => (
+              <span
+                key={i}
+                className={`h-2.5 w-2.5 rounded-full transition-all ${
+                  i === slideIndex ? "bg-white" : "bg-white/60"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
+          <div className="flex gap-2">
             <input
               type="text"
               placeholder="Search fertiliser..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && setSearchTerm(searchInput)}
               className="border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
+              onClick={() => setSearchTerm(searchInput)}
+            >
+              🔍 Search
+            </button>
+            {searchTerm && (
+              <button
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded-lg"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchTerm("");
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="flex space-x-4">
             <button
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
               onClick={() => setShowForm(!showForm)}
             >
-              {showForm ? "Close Form" : "➕Add New Fertiliser"}
+              {showForm ? "Close Form" : "➕ Add New Fertiliser"}
             </button>
             <button
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
               onClick={handleDownloadPDF}
             >
-              📄Download Report PDF
+              📄 Download Report PDF
             </button>
           </div>
         </div>
@@ -243,47 +389,122 @@ const H_FertiliserStock = () => {
           <>
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-              {/* Bar Chart */}
-              <div ref={barRef} className="bg-white p-6 rounded-xl shadow-lg flex justify-center">
-                <BarChart width={500} height={350} data={filteredStock}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#374151" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "#374151" }} />
-                  <Tooltip />
-                  <Bar dataKey="currentStock" fill="#4ade80" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </div>
+              {/* Bar Chart - color coded with legend + download */}
+              <div className="bg-white p-6 rounded-xl shadow-lg">
+                <div ref={barRef} className="flex justify-center">
+                  <BarChart width={500} height={350} data={filteredStock}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#374151" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "#374151" }} />
+                    <Tooltip />
+                    <Bar dataKey="currentStock" radius={[4, 4, 0, 0]}>
+                      {filteredStock.map((item, index) => (
+                        <Cell
+                          key={`cell-bar-${item._id || index}`}
+                          fill={getBarColor(item)}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </div>
 
-              {/* Line Chart */}
-              <div ref={lineRef} className="bg-white p-6 rounded-xl shadow-lg flex justify-center">
-                <LineChart width={500} height={350} data={filteredStock}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#374151" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "#374151" }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="currentStock" stroke="#60a5fa" strokeWidth={2} />
-                </LineChart>
-              </div>
+                {/* Color range legend (matches bar colors) */}
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Color range</h4>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-5 h-5 rounded"
+                        style={{ backgroundColor: BAR_COLORS.red }}
+                        title="Red"
+                      />
+                      <span className="text-sm text-gray-700">
+                        Red: Critical (&lt; 2 for L/Litre/Gallon/Bag/Kg) or ≤ 10 units
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-5 h-5 rounded"
+                        style={{ backgroundColor: BAR_COLORS.yellow }}
+                        title="Yellow"
+                      />
+                      <span className="text-sm text-gray-700">
+                        Yellow: 11 - 50 units
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-5 h-5 rounded"
+                        style={{ backgroundColor: BAR_COLORS.green }}
+                        title="Green"
+                      />
+                      <span className="text-sm text-gray-700">
+                        Green: &gt; 50 units
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-              {/* Pie Chart */}
-              <div ref={pieRef} className="bg-white p-6 rounded-xl shadow-lg flex justify-center col-span-1 lg:col-span-2">
-                <PieChart width={500} height={350}>
-                  <Pie
-                    data={filteredStock}
-                    dataKey="currentStock"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                <div className="mt-4 flex">
+                  <button
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
+                    onClick={() => downloadElementAsImage(barRef, "Fertiliser_BarChart")}
                   >
-                    {filteredStock.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Legend align="center" verticalAlign="bottom" />
-                  <Tooltip />
-                </PieChart>
+                    Download Bar Chart
+                  </button>
+                </div>
+              </div>
+
+              {/* Line Chart + download */}
+              <div className="bg-white p-6 rounded-xl shadow-lg">
+                <div ref={lineRef} className="flex justify-center">
+                  <LineChart width={500} height={350} data={filteredStock}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#374151" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "#374151" }} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="currentStock" stroke="#60a5fa" strokeWidth={2} />
+                  </LineChart>
+                </div>
+                <div className="mt-4 flex">
+                  <button
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
+                    onClick={() => downloadElementAsImage(lineRef, "Fertiliser_LineGraph")}
+                  >
+                    Download Line Graph
+                  </button>
+                </div>
+              </div>
+
+              {/* Pie Chart + download */}
+              <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center col-span-1 lg:col-span-2">
+                <div ref={pieRef} className="flex justify-center">
+                  <PieChart width={500} height={350}>
+                    <Pie
+                      data={filteredStock}
+                      dataKey="currentStock"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={120}
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    >
+                      {filteredStock.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend align="center" verticalAlign="bottom" />
+                    <Tooltip />
+                  </PieChart>
+                </div>
+                <div className="mt-4 flex">
+                  <button
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
+                    onClick={() => downloadElementAsImage(pieRef, "Fertiliser_PieChart")}
+                  >
+                    Download Pie Chart
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -304,11 +525,14 @@ const H_FertiliserStock = () => {
                 </thead>
                 <tbody>
                   {filteredStock.map((f) => (
-                    <tr key={f._id} className={`hover:bg-gray-50 ${getStockLevelColor(f.currentStock)}`}>
+                    <tr
+                      key={f._id}
+                      className={`hover:bg-gray-50 ${getRowLevelClass(f)}`}
+                    >
                       <td className="py-3 px-6 border-b">{f._id}</td>
                       <td className="py-3 px-6 border-b">{f.name}</td>
                       <td className="py-3 px-6 border-b">{f.type}</td>
-                      <td className="py-3 px-6 border-b">{f.currentStock}</td>
+                      <td className="py-3 px-6 border-b font-semibold">{f.currentStock}</td>
                       <td className="py-3 px-6 border-b">{f.unit}</td>
                     </tr>
                   ))}
