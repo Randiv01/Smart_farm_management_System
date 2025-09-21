@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import Plant from '../models/plantModel.js';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -70,7 +71,7 @@ router.post('/add', upload.single('plantImage'), async (req, res) => {
   try {
     const plantData = {
       ...req.body,
-      imageUrl: req.file ? `/uploads/${req.file.filename}` : undefined
+      imageUrl: req.file ? `/plant-uploads/${req.file.filename}` : undefined
     };
 
     const plant = new Plant(plantData);
@@ -91,7 +92,8 @@ router.post('/add', upload.single('plantImage'), async (req, res) => {
 router.put('/:id', upload.single('plantImage'), async (req, res) => {
   try {
     const updateData = { ...req.body };
-    if (req.file) updateData.imageUrl = `/uploads/${req.file.filename}`;
+    // FIX: Use consistent path format with plant-uploads
+    if (req.file) updateData.imageUrl = `/plant-uploads/${req.file.filename}`;
 
     const plant = await Plant.findByIdAndUpdate(req.params.id, updateData, { new: true, maxTimeMS: 10000 });
     if (!plant) return res.status(404).json({ success: false, message: 'Plant not found' });
@@ -106,18 +108,25 @@ router.put('/:id', upload.single('plantImage'), async (req, res) => {
   }
 });
 
-// DELETE plant
+// DELETE plant - FIXED: Corrected image path deletion
 router.delete('/:id', async (req, res) => {
   try {
     const plant = await Plant.findByIdAndDelete(req.params.id);
     if (!plant) return res.status(404).json({ success: false, message: 'Plant not found' });
 
-    // Delete image file if it exists
+    // Delete image file if it exists - FIXED: Correct path handling
     if (plant.imageUrl) {
-      const imagePath = path.join(__dirname, '..', 'Uploads', path.basename(plant.imageUrl));
+      // Remove leading slash if present to create proper path
+      const imageFilename = plant.imageUrl.startsWith('/') ? plant.imageUrl.substring(1) : plant.imageUrl;
+      const imagePath = path.join(__dirname, '..', imageFilename);
+      
       fs.unlink(imagePath, (err) => {
-        if (err) console.error('❌ Failed to delete image:', err.message);
-        else console.log('🗑️ Image deleted:', imagePath);
+        if (err) {
+          console.error('❌ Failed to delete image:', err.message);
+          // Don't fail the request if image deletion fails
+        } else {
+          console.log('🗑️ Image deleted:', imagePath);
+        }
       });
     }
 
@@ -127,6 +136,5 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ success: false, message: 'Error deleting plant', error: err.message });
   }
 });
-
 
 export default router;

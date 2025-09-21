@@ -123,6 +123,8 @@ import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
 import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
 import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
+import pestRoutes from './PlantManagement/Routes/pestRoutes.js';
+import consultationRoutes from './PlantManagement/Routes/consultationRoutes.js';
 
 // Inventory Management
 import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
@@ -175,6 +177,8 @@ app.use("/api/inspections", inspectionRoutes);
 app.use("/api/plants", plantRoutes);
 app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
+app.use('/api/pests', pestRoutes);
+app.use('/api/consultations', consultationRoutes);
 
 // Inventory Management
 app.use("/api/inventory/products", productRoutes);
@@ -202,6 +206,37 @@ app.use(
     });
   }
 );
+
+// Add debug endpoints
+app.get('/api/debug', (req, res) => {
+  res.json({ 
+    message: 'Server is working',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get('/api/check-db', async (req, res) => {
+  try {
+    // Try to perform a simple query
+    const Pest = mongoose.model('Pest');
+    const pestCount = await Pest.countDocuments();
+    const consultationCount = await Consultation.countDocuments();
+    
+    res.json({
+      success: true,
+      message: 'MongoDB is connected',
+      pestCount,
+      consultationCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'MongoDB connection error',
+      error: error.message
+    });
+  }
+});
 
 // ----------------------- Health Check -----------------------
 app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
