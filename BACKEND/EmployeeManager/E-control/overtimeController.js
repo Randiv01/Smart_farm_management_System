@@ -5,37 +5,33 @@ import Employee from "../E-model/Employee.js";
 export const getOvertimeRecords = async (req, res) => {
   try {
     const { month, year, status, employee, page = 1, limit = 10 } = req.query;
-    
-    // Build filter object
+
     const filter = {};
-    
+
     if (month && year) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
       filter.date = { $gte: startDate, $lte: endDate };
     }
-    
+
     if (status) filter.status = status;
     if (employee) filter.employee = employee;
-    
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-    
-    // Get records with population
+
+    const skip = (Number(page) - 1) * Number(limit);
+
     const records = await Overtime.find(filter)
       .populate("employee", "name id")
       .populate("approvedBy", "name")
       .sort({ date: -1 })
       .skip(skip)
       .limit(parseInt(limit));
-    
-    // Get total count for pagination
+
     const total = await Overtime.countDocuments(filter);
-    
+
     res.json({
       records,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / Number(limit) || 1),
+      currentPage: Number(page),
       total
     });
   } catch (error) {
@@ -50,11 +46,9 @@ export const getOvertimeRecord = async (req, res) => {
       .populate("employee", "name id contact title")
       .populate("approvedBy", "name")
       .populate("createdBy", "name");
-    
-    if (!record) {
-      return res.status(404).json({ error: "Overtime record not found" });
-    }
-    
+
+    if (!record) return res.status(404).json({ error: "Overtime record not found" });
+
     res.json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -65,16 +59,12 @@ export const getOvertimeRecord = async (req, res) => {
 export const createOvertimeRecord = async (req, res) => {
   try {
     const { employee, date, regularHours, overtimeHours, description } = req.body;
-    
-    // Validate employee exists
+
     const employeeExists = await Employee.findById(employee);
-    if (!employeeExists) {
-      return res.status(404).json({ error: "Employee not found" });
-    }
-    
-    // Calculate total hours
+    if (!employeeExists) return res.status(404).json({ error: "Employee not found" });
+
     const totalHours = parseFloat(regularHours) + parseFloat(overtimeHours);
-    
+
     const newRecord = new Overtime({
       employee,
       date,
@@ -84,14 +74,13 @@ export const createOvertimeRecord = async (req, res) => {
       description,
       createdBy: req.user?.id
     });
-    
+
     await newRecord.save();
-    
-    // Populate and return the new record
+
     const populatedRecord = await Overtime.findById(newRecord._id)
       .populate("employee", "name id")
       .populate("createdBy", "name");
-    
+
     res.status(201).json(populatedRecord);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -102,37 +91,32 @@ export const createOvertimeRecord = async (req, res) => {
 export const updateOvertimeRecord = async (req, res) => {
   try {
     const { regularHours, overtimeHours, description, status } = req.body;
-    
+
     const record = await Overtime.findById(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: "Overtime record not found" });
-    }
-    
-    // Update fields if provided
+    if (!record) return res.status(404).json({ error: "Overtime record not found" });
+
     if (regularHours !== undefined) record.regularHours = parseFloat(regularHours);
     if (overtimeHours !== undefined) record.overtimeHours = parseFloat(overtimeHours);
     if (description !== undefined) record.description = description;
-    
-    // Recalculate total hours if regular or overtime hours changed
+
     if (regularHours !== undefined || overtimeHours !== undefined) {
       record.totalHours = record.regularHours + record.overtimeHours;
     }
-    
-    // Handle status change (approval/rejection)
+
+    // Keep status logic if you still use it elsewhere
     if (status && ["Approved", "Rejected"].includes(status) && record.status === "Pending") {
       record.status = status;
       record.approvedBy = req.user?.id;
       record.approvedAt = new Date();
     }
-    
+
     await record.save();
-    
-    // Get updated record with population
+
     const updatedRecord = await Overtime.findById(record._id)
       .populate("employee", "name id")
       .populate("approvedBy", "name")
       .populate("createdBy", "name");
-    
+
     res.json(updatedRecord);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -143,11 +127,8 @@ export const updateOvertimeRecord = async (req, res) => {
 export const deleteOvertimeRecord = async (req, res) => {
   try {
     const record = await Overtime.findById(req.params.id);
-    
-    if (!record) {
-      return res.status(404).json({ error: "Overtime record not found" });
-    }
-    
+    if (!record) return res.status(404).json({ error: "Overtime record not found" });
+
     await Overtime.findByIdAndDelete(req.params.id);
     res.json({ message: "Overtime record deleted successfully" });
   } catch (error) {
@@ -155,126 +136,96 @@ export const deleteOvertimeRecord = async (req, res) => {
   }
 };
 
-// Get overtime analytics
+/**
+ * ANALYTICS (UPDATED)
+ * - mode=trend&window=30|90|365  -> daily totals for last N days (or month totals if 365)
+ * - mode=top&range=thisMonth|lastMonth -> top 5 employees by overtime in that month
+ * 
+ * NOTE: We DO NOT restrict to status="Approved" here because you requested
+ * "from the overtime records table". If you need only approved, add `status:"Approved"` to $match.
+ */
 export const getOvertimeAnalytics = async (req, res) => {
   try {
-    const { period, year } = req.query;
-    const currentYear = year || new Date().getFullYear();
-    
-    let groupBy;
-    let dateFormat;
-    
-    switch (period) {
-      case "monthly":
-        groupBy = { $month: "$date" };
-        dateFormat = { $arrayToObject: [[{ k: "month", v: "$_id" }, { k: "hours", v: "$totalHours" }]] };
-        break;
-      case "weekly":
-        groupBy = { $week: "$date" };
-        dateFormat = { $arrayToObject: [[{ k: "week", v: "$_id" }, { k: "hours", v: "$totalHours" }]] };
-        break;
-      default:
-        groupBy = { $month: "$date" };
-        dateFormat = { $arrayToObject: [[{ k: "month", v: "$_id" }, { k: "hours", v: "$totalHours" }]] };
+    const { mode = 'trend', window = '30', range = 'thisMonth' } = req.query;
+
+    if (mode === 'trend') {
+      const now = new Date();
+      const days = Number(window) || 30;
+
+      // start date
+      let start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - (days - 1));
+
+      // group by day for 30/90, by month for 365 (this year)
+      const groupStage =
+        days >= 365
+          ? { _id: { $month: '$date' }, hours: { $sum: '$overtimeHours' } }
+          : { _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } }, hours: { $sum: '$overtimeHours' } };
+
+      const data = await Overtime.aggregate([
+        {
+          $match: {
+            date: { $gte: start, $lte: now }
+            // if you want only approved: , status: 'Approved'
+          }
+        },
+        { $group: groupStage },
+        { $sort: { _id: 1 } },
+      ]);
+
+      const trendData =
+        days >= 365
+          ? data.map((d) => ({ label: `Month ${d._id}`, hours: d.hours }))
+          : data.map((d) => ({ date: d._id, hours: d.hours }));
+
+      return res.json({ trendData });
     }
-    
-    // Get overtime trend data
-    const trendData = await Overtime.aggregate([
-      {
-        $match: {
-          date: {
-            $gte: new Date(`${currentYear}-01-01`),
-            $lte: new Date(`${currentYear}-12-31`)
-          },
-          status: "Approved"
-        }
-      },
-      {
-        $group: {
-          _id: groupBy,
-          totalHours: { $sum: "$overtimeHours" }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
-    
-    // Get top employees with most overtime
-    const topEmployees = await Overtime.aggregate([
-      {
-        $match: {
-          date: {
-            $gte: new Date(`${currentYear}-01-01`),
-            $lte: new Date(`${currentYear}-12-31`)
-          },
-          status: "Approved"
-        }
-      },
-      {
-        $group: {
-          _id: "$employee",
-          totalOvertime: { $sum: "$overtimeHours" }
-        }
-      },
-      {
-        $sort: { totalOvertime: -1 }
-      },
-      {
-        $limit: 5
-      },
-      {
-        $lookup: {
-          from: "employees",
-          localField: "_id",
-          foreignField: "_id",
-          as: "employee"
-        }
-      },
-      {
-        $unwind: "$employee"
-      },
-      {
-        $project: {
-          name: "$employee.name",
-          hours: { $round: ["$totalOvertime", 2] }
+
+    if (mode === 'top') {
+      const today = new Date();
+      let month = today.getMonth(); // 0-based
+      let year = today.getFullYear();
+
+      if (range === 'lastMonth') {
+        if (month === 0) {
+          month = 11;
+          year -= 1;
+        } else {
+          month -= 1;
         }
       }
-    ]);
-    
-    // Get statistics
-    const totalOvertime = await Overtime.aggregate([
-      {
-        $match: {
-          date: {
-            $gte: new Date(`${currentYear}-01-01`),
-            $lte: new Date(`${currentYear}-12-31`)
-          },
-          status: "Approved"
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalHours: { $sum: "$overtimeHours" },
-          avgPerEmployee: { $avg: "$overtimeHours" },
-          recordCount: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    // Get pending approvals count
-    const pendingCount = await Overtime.countDocuments({ status: "Pending" });
-    
-    res.json({
-      trendData,
-      topEmployees,
-      statistics: {
-        totalOvertime: totalOvertime[0]?.totalHours || 0,
-        avgPerEmployee: totalOvertime[0]?.avgPerEmployee || 0,
-        pendingCount
-      }
-    });
+
+      const startDate = new Date(year, month, 1, 0, 0, 0);
+      const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+      const topEmployees = await Overtime.aggregate([
+        {
+          $match: {
+            date: { $gte: startDate, $lte: endDate }
+            // if you want only approved: , status: 'Approved'
+          }
+        },
+        { $group: { _id: '$employee', hours: { $sum: '$overtimeHours' } } },
+        { $sort: { hours: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: 'employees',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'emp'
+          }
+        },
+        { $unwind: '$emp' },
+        { $project: { name: '$emp.name', hours: { $round: ['$hours', 2] } } }
+      ]);
+
+      return res.json({ topEmployees });
+    }
+
+    // default fallback
+    res.json({ trendData: [], topEmployees: [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

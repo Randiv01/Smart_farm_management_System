@@ -80,7 +80,7 @@ import { ELeavePlanner } from "./Components/EmployeeManagement/pages/E-LeavePlan
 import { OvertimeMonitor as EOvertimeMonitor } from "./Components/EmployeeManagement/pages/E-OvertimeMonitor.js";
 import { SalaryDesk as ESalaryDesk } from "./Components/EmployeeManagement/pages/E-SalaryDesk.js";
 import { EEmployeeReportCenter } from "./Components/EmployeeManagement/pages/E-EmployeeReportCenter.js";
-import { SystemSettings as ESystemSettings } from "./Components/EmployeeManagement/pages/E-SystemSettings.js";
+import  ESystemSettings  from "./Components/EmployeeManagement/pages/E-SystemSettings.js";
 
 // ----------------- Plant Management -----------------
 import PLayout from "./Components/PlantManagement/P-Layout.jsx";

@@ -12,6 +12,12 @@ import {
 
 const router = express.Router();
 
+// Middleware to log all requests for debugging
+router.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, req.method === "GET" ? req.query : req.body);
+  next();
+});
+
 // Get all attendance records with optional filtering
 router.get("/", getAttendance);
 
@@ -27,8 +33,9 @@ router.get("/reports", getReports);
 // Create new attendance record
 router.post("/", createAttendance);
 
-// Update attendance record
+// Update attendance record (PATCH or PUT)
 router.patch("/:id", updateAttendance);
+router.put("/:id", updateAttendance);
 
 // Delete attendance record
 router.delete("/:id", deleteAttendance);

@@ -1,24 +1,33 @@
-// Backend: attendanceController.js
+// Backend: attendanceController.js - FINAL FIXED VERSION
 import Attendance from "../E-model/Attendance.js";
 
 // Get all attendance records with optional filtering
 export const getAttendance = async (req, res) => {
   try {
-    const { employeeId, date } = req.query;
+    const { employeeId, date, search } = req.query;
     const filter = {};
 
     if (employeeId) filter.employeeId = employeeId;
+
     if (date) {
       const day = new Date(date);
       day.setHours(0, 0, 0, 0);
-      filter.date = day;
+      const nextDay = new Date(day);
+      nextDay.setDate(day.getDate() + 1);
+      filter.date = { $gte: day, $lt: nextDay };
+    }
+
+    if (search) {
+      filter.$or = [
+        { employeeId: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: "i" } }
+      ];
     }
 
     const records = await Attendance.find(filter).sort({ date: -1, createdAt: -1 });
     res.json(records);
   } catch (error) {
-    console.error("Error fetching attendance:", error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Error fetching attendance records" });
   }
 };
 
@@ -27,8 +36,12 @@ export const getSummary = async (req, res) => {
   try {
     const date = new Date(req.params.date);
     date.setHours(0, 0, 0, 0);
+    const nextDay = new Date(date);
+    nextDay.setDate(date.getDate() + 1);
 
-    const records = await Attendance.find({ date });
+    const records = await Attendance.find({
+      date: { $gte: date, $lt: nextDay }
+    });
 
     const summary = {
       present: records.filter(r => r.status === "Present").length,
@@ -40,11 +53,9 @@ export const getSummary = async (req, res) => {
 
     res.json(summary);
   } catch (error) {
-    console.error("Error fetching summary:", error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Error fetching summary data" });
   }
 };
-
 
 // Get recent check-ins
 export const getRecentCheckins = async (req, res) => {
@@ -54,8 +65,7 @@ export const getRecentCheckins = async (req, res) => {
       .limit(10);
     res.json(records);
   } catch (error) {
-    console.error("Error fetching recent check-ins:", error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Error fetching recent check-ins" });
   }
 };
 
@@ -102,7 +112,7 @@ export const getReports = async (req, res) => {
 
     const reportsByDate = {};
     records.forEach(record => {
-      const dateStr = record.date.toISOString().split('T')[0];
+      const dateStr = record.date.toISOString().split("T")[0];
       if (!reportsByDate[dateStr]) {
         reportsByDate[dateStr] = { period: dateStr, present: 0, absent: 0, leave: 0, late: 0 };
       }
@@ -119,127 +129,170 @@ export const getReports = async (req, res) => {
     const totalRecords = records.length;
     const presentRecords = records.filter(r => r.status === "Present" || r.status === "Late").length;
     const attendanceRate = totalRecords > 0 ? Math.round((presentRecords / totalRecords) * 100) : 0;
-
     const lateArrivals = records.filter(record => record.status === "Late").length;
 
     res.json({ chartData: reports, attendanceRate, lateArrivals });
   } catch (error) {
-    console.error("Error fetching reports:", error.message);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Error fetching reports data" });
+  }
+};
+
+// Helper to determine status from check-in (if not manually set)
+const determineStatus = (checkIn, manualStatus = null) => {
+  if (manualStatus && manualStatus !== "Present") return manualStatus;
+  if (!checkIn || checkIn === "-") return "Absent";
+  try {
+    const [time, modifier] = checkIn.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+    if (hours > 10 || (hours === 10 && minutes > 0)) return "Absent";
+    if (hours > 8 || (hours === 8 && minutes > 0)) return "Late";
+    return "Present";
+  } catch {
+    return manualStatus || "Present";
   }
 };
 
 // Create new attendance record
 export const createAttendance = async (req, res) => {
   try {
-    const { employeeId, name, date, checkIn = "-", checkOut = "-" } = req.body;
+    const { employeeId, name, date, checkIn = "-", checkOut = "-", status } = req.body;
 
-    if (!employeeId || !name || !date)
-      return res.status(400).json({ message: "Missing required fields" });
+    if (!employeeId || !name || !date) {
+      return res.status(400).json({ message: "Employee ID, name, and date are required" });
+    }
 
     const recordDate = new Date(date);
     recordDate.setHours(0, 0, 0, 0);
 
-    const existingRecord = await Attendance.findOne({ employeeId, date: recordDate });
-    if (existingRecord)
-      return res.status(400).json({ message: "Attendance record already exists for this employee on the selected date" });
-
-    // Determine status based on check-in time
-    let status = "Present";
-    if (checkIn !== "-") {
-      const [time, modifier] = checkIn.split(" ");
-      let [hours, minutes] = time.split(":").map(Number);
-      
-      if (modifier === "PM" && hours !== 12) hours += 12;
-      if (modifier === "AM" && hours === 12) hours = 0;
-      
-      // After 10:00 AM is absent
-      if (hours > 10 || (hours === 10 && minutes > 0)) status = "Absent";
-      // After 8:00 AM is late
-      else if (hours > 8 || (hours === 8 && minutes > 0)) status = "Late";
-    } else {
-      status = "Absent";
-    }
-
-    let nextNumber = 1;
-    const highestRecord = await Attendance.findOne().sort({ number: -1 });
-    if (highestRecord && highestRecord.number) nextNumber = highestRecord.number + 1;
-
-    const attendance = new Attendance({
-      number: nextNumber,
+    const existingRecord = await Attendance.findOne({
       employeeId,
-      name,
-      date: recordDate,
-      status,
-      checkIn,
-      checkOut
+      date: { $gte: recordDate, $lt: new Date(recordDate.getTime() + 24 * 60 * 60 * 1000) }
     });
 
-    const newAttendance = await attendance.save();
-    res.status(201).json(newAttendance);
-  } catch (error) {
-    console.error("Error saving attendance record:", error.message);
-    if (error.code === 11000) return res.status(400).json({ message: "Attendance record already exists" });
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(e => e.message);
-      return res.status(400).json({ message: errors.join(', ') });
+    if (existingRecord) {
+      return res.status(400).json({ message: "Attendance record already exists for this employee on the selected date" });
     }
-    res.status(500).json({ message: error.message });
+
+    const finalStatus = status || determineStatus(checkIn);
+
+    const highestRecord = await Attendance.findOne().sort({ number: -1 });
+    const nextNumber = highestRecord?.number ? highestRecord.number + 1 : 1;
+
+    const savedAttendance = await new Attendance({
+      number: nextNumber,
+      employeeId: employeeId.trim(),
+      name: name.trim(),
+      date: recordDate,
+      status: finalStatus,
+      checkIn,
+      checkOut
+    }).save();
+
+    res.status(201).json(savedAttendance);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Attendance record already exists for this employee on this date" });
+    }
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ message: errors.join(", ") });
+    }
+    res.status(500).json({ message: "Error creating attendance record" });
   }
 };
-// Update attendance record
+
+// Update attendance record (hardened)
 export const updateAttendance = async (req, res) => {
   try {
-    const { employeeId, name, date, checkIn = "-", checkOut = "-" } = req.body;
-    
-    // Determine status based on check-in time
-    let status = "Present";
-    if (checkIn !== "-") {
-      const [time, modifier] = checkIn.split(" ");
-      let [hours, minutes] = time.split(":").map(Number);
-      
-      if (modifier === "PM" && hours !== 12) hours += 12;
-      if (modifier === "AM" && hours === 12) hours = 0;
-      
-      // After 10:00 AM is absent
-      if (hours > 10 || (hours === 10 && minutes > 0)) status = "Absent";
-      // After 8:00 AM is late
-      else if (hours > 8 || (hours === 8 && minutes > 0)) status = "Late";
-    } else {
-      status = "Absent";
+    const recordId = req.params.id;
+    const { employeeId, name, date, checkIn = "-", checkOut = "-", status } = req.body;
+
+    if (!employeeId || !name || !date) {
+      return res.status(400).json({ message: "Employee ID, name, and date are required" });
     }
 
-    const updateData = {
-      employeeId,
-      name,
-      date: new Date(date),
-      checkIn,
-      checkOut,
-      status
-    };
+    if (!recordId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: "Invalid record ID format" });
+    }
 
-    const updated = await Attendance.findByIdAndUpdate(
-      req.params.id, 
-      updateData, 
-      { new: true, runValidators: true }
+    const existingRecord = await Attendance.findById(recordId);
+    if (!existingRecord) {
+      return res.status(404).json({ message: "Attendance record not found" });
+    }
+
+    const recordDate = new Date(date);
+    recordDate.setHours(0, 0, 0, 0);
+    const nextDay = new Date(recordDate);
+    nextDay.setDate(recordDate.getDate() + 1);
+
+    const employeeIdChanged = existingRecord.employeeId !== employeeId.trim();
+    const dateChanged = existingRecord.date.getTime() !== recordDate.getTime();
+
+    if (employeeIdChanged || dateChanged) {
+      const duplicateRecord = await Attendance.findOne({
+        _id: { $ne: recordId },
+        employeeId: employeeId.trim(),
+        date: { $gte: recordDate, $lt: nextDay }
+      });
+      if (duplicateRecord) {
+        return res.status(400).json({ message: "Another attendance record already exists for this employee on this date" });
+      }
+    }
+
+    const finalStatus = status || determineStatus(checkIn);
+
+    const updatedRecord = await Attendance.findOneAndUpdate(
+      { _id: recordId },
+      {
+        $set: {
+          employeeId: employeeId.trim(),
+          name: name.trim(),
+          date: recordDate,
+          checkIn,
+          checkOut,
+          status: finalStatus
+        }
+      },
+      { new: true, runValidators: true, upsert: false }
     );
-    
-    if (!updated) return res.status(404).json({ message: "Record not found" });
-    res.json(updated);
+
+    if (!updatedRecord) {
+      return res.status(404).json({ message: "Failed to update attendance record" });
+    }
+
+    res.json(updatedRecord);
   } catch (error) {
-    console.error("Error updating attendance record:", error.message);
-    res.status(500).json({ message: error.message });
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Attendance record already exists for this employee on this date" });
+    }
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ message: errors.join(", ") });
+    }
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid record ID format" });
+    }
+    res.status(500).json({ message: "Error updating attendance record" });
   }
 };
+
 // Delete attendance record
 export const deleteAttendance = async (req, res) => {
   try {
-    const deleted = await Attendance.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: "Record not found" });
-    res.json({ message: "Attendance deleted successfully" });
+    const recordId = req.params.id;
+
+    const deletedRecord = await Attendance.findByIdAndDelete(recordId);
+    if (!deletedRecord) {
+      return res.status(404).json({ message: "Attendance record not found" });
+    }
+
+    res.json({ message: "Attendance record deleted successfully" });
   } catch (error) {
-    console.error("Error deleting attendance record:", error.message);
-    res.status(500).json({ message: error.message });
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid record ID format" });
+    }
+    res.status(500).json({ message: "Error deleting attendance record" });
   }
 };
-

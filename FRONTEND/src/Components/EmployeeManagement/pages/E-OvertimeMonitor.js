@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -7,20 +7,30 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import { FileDown, Filter, Plus, ChevronDown, Loader, Edit, Trash2, X } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const OvertimeMonitor = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState('records');
+
   const [overtimeRecords, setOvertimeRecords] = useState([]);
-  const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // records filtering/pagination
   const [filters, setFilters] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
-    status: ''
+    status: '' // kept in case you still want to filter on server, but we remove status column
   });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
+
+  // form
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     employee: '',
@@ -32,29 +42,27 @@ export const OvertimeMonitor = ({ darkMode }) => {
   const [employees, setEmployees] = useState([]);
   const [editingRecord, setEditingRecord] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    totalPages: 1,
-    total: 0
-  });
 
-  // Fetch employees for dropdown
+  // analytics state (built from API helpers)
+  const [trendWindow, setTrendWindow] = useState('30'); // 30 | 90 | 365
+  const [trendData, setTrendData] = useState([]);       // last 30/90/this year
+  const [topRange, setTopRange] = useState('thisMonth'); // thisMonth | lastMonth
+  const [topEmployees, setTopEmployees] = useState([]);  // for pie chart
+
+  // fetch employees
   useEffect(() => {
-    const fetchEmployees = async () => {
+    (async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/employees');
-        const data = await response.json();
+        const res = await fetch('http://localhost:5000/api/employees');
+        const data = await res.json();
         setEmployees(data);
-      } catch (error) {
-        console.error('Error fetching employees:', error);
+      } catch (e) {
+        console.error('Error fetching employees:', e);
       }
-    };
-    
-    fetchEmployees();
+    })();
   }, []);
 
-  // Fetch overtime records
+  // fetch overtime records (list table)
   const fetchOvertimeRecords = async () => {
     setLoading(true);
     try {
@@ -63,200 +71,211 @@ export const OvertimeMonitor = ({ darkMode }) => {
         year: filters.year,
         page: pagination.page,
         limit: pagination.limit,
-        ...(filters.status && { status: filters.status })
+        ...(filters.status && { status: filters.status }),
       });
-      
-      const response = await fetch(`http://localhost:5000/api/overtime?${params}`);
-      const data = await response.json();
-      setOvertimeRecords(data.records);
-      setPagination(prev => ({
-        ...prev,
-        totalPages: data.totalPages,
-        total: data.total
-      }));
-    } catch (error) {
-      console.error('Error fetching overtime records:', error);
+      const res = await fetch(`http://localhost:5000/api/overtime?${params}`);
+      const data = await res.json();
+      setOvertimeRecords(data.records || []);
+      setPagination((p) => ({ ...p, totalPages: data.totalPages || 1, total: data.total || 0 }));
+    } catch (e) {
+      console.error('Error fetching overtime records:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch analytics data
-  const fetchAnalytics = async () => {
+  // analytics fetchers
+  const fetchTrend = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/overtime/analytics?period=monthly');
-      const data = await response.json();
-      setAnalyticsData(data);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+      const res = await fetch(
+        `http://localhost:5000/api/overtime/analytics?mode=trend&window=${trendWindow}`
+      );
+      const data = await res.json();
+      // returns [{date: '2025-09-01', hours: 4.5}, ...]
+      setTrendData(
+        (data.trendData || []).map((d) => ({
+          name: d.label || d.date,
+          hours: d.hours,
+        }))
+      );
+    } catch (e) {
+      console.error('Error fetching trend:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load data when tab changes
+  const fetchTopEmployees = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/overtime/analytics?mode=top&range=${topRange}`
+      );
+      const data = await res.json();
+      // returns [{name, hours}]
+      setTopEmployees(data.topEmployees || []);
+    } catch (e) {
+      console.error('Error fetching top employees:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // tab -> load content
   useEffect(() => {
     if (activeTab === 'records') {
       fetchOvertimeRecords();
-    } else if (activeTab === 'analytics') {
-      fetchAnalytics();
+    } else {
+      fetchTrend();
+      fetchTopEmployees();
     }
-  }, [activeTab, pagination.page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
-  // Handle filter changes
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
+  // pagination page change re-load
+  useEffect(() => {
+    if (activeTab === 'records') fetchOvertimeRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page]);
 
-  // Apply filters
+  // analytics control changes
+  useEffect(() => {
+    if (activeTab === 'analytics') fetchTrend();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendWindow]);
+
+  useEffect(() => {
+    if (activeTab === 'analytics') fetchTopEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topRange]);
+
+  // helpers
+  const handleFilterChange = (key, val) => setFilters((f) => ({ ...f, [key]: val }));
   const applyFilters = () => {
     if (activeTab === 'records') {
-      setPagination(prev => ({ ...prev, page: 1 }));
+      setPagination((p) => ({ ...p, page: 1 }));
       fetchOvertimeRecords();
     }
   };
+  const handleInputChange = (e) => setFormData((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const resetForm = () =>
+    setFormData({ employee: '', date: '', regularHours: '', overtimeHours: '', description: '' });
 
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      employee: '',
-      date: '',
-      regularHours: '',
-      overtimeHours: '',
-      description: ''
-    });
-    setEditingRecord(null);
-  };
-
-  // Open form for editing
   const handleEdit = (record) => {
     setEditingRecord(record._id);
     setFormData({
-      employee: record.employee._id,
+      employee: record.employee?._id,
       date: new Date(record.date).toISOString().split('T')[0],
       regularHours: record.regularHours,
       overtimeHours: record.overtimeHours,
-      description: record.description || ''
+      description: record.description || '',
     });
     setShowForm(true);
   };
 
-  // Submit new or update overtime record
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const url = editingRecord 
+      const url = editingRecord
         ? `http://localhost:5000/api/overtime/${editingRecord}`
         : 'http://localhost:5000/api/overtime';
-      
       const method = editingRecord ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
+      const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
       });
-      
-      if (response.ok) {
-        setShowForm(false);
-        resetForm();
-        fetchOvertimeRecords(); // Refresh the list
-      } else {
-        console.error('Failed to save record');
-      }
-    } catch (error) {
-      console.error('Error saving record:', error);
+      if (!res.ok) throw new Error('Failed to save record');
+      setShowForm(false);
+      setEditingRecord(null);
+      resetForm();
+      fetchOvertimeRecords();
+    } catch (e) {
+      console.error('Error saving record:', e);
     }
   };
 
-  // Delete overtime record
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/overtime/${id}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        setDeleteConfirm(null);
-        fetchOvertimeRecords(); // Refresh the list
-      } else {
-        console.error('Failed to delete record');
-      }
-    } catch (error) {
-      console.error('Error deleting record:', error);
+      const res = await fetch(`http://localhost:5000/api/overtime/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      setDeleteConfirm(null);
+      fetchOvertimeRecords();
+    } catch (e) {
+      console.error('Error deleting record:', e);
     }
   };
 
-  // Export data
-  const handleExport = async () => {
-    try {
-      const params = new URLSearchParams({
-        month: filters.month,
-        year: filters.year,
-        ...(filters.status && { status: filters.status })
-      });
-      
-      const response = await fetch(`http://localhost:5000/api/overtime/export?${params}`);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `overtime-records-${new Date().toISOString()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting data:', error);
+  // ===== New: compute stats directly from the table (for the selected month/year) =====
+  const { totalOvertimeHours, avgPerEmployeeHours } = useMemo(() => {
+    if (!Array.isArray(overtimeRecords) || overtimeRecords.length === 0) {
+      return { totalOvertimeHours: 0, avgPerEmployeeHours: 0 };
     }
-  };
+    const total = overtimeRecords.reduce((sum, r) => sum + (Number(r.overtimeHours) || 0), 0);
+    const uniqueEmployees = new Set(overtimeRecords.map((r) => r.employee?._id || r.employee)).size;
+    return {
+      totalOvertimeHours: total,
+      avgPerEmployeeHours: uniqueEmployees ? total / uniqueEmployees : 0,
+    };
+  }, [overtimeRecords]);
 
-  // Format chart data
-  const formatChartData = () => {
-    if (!analyticsData?.trendData) return [];
-    
-    return analyticsData.trendData.map(item => ({
-      name: `Month ${item._id}`,
-      hours: item.totalHours
-    }));
-  };
-
-  // Format employee progress data
-  const formatEmployeeData = () => {
-    if (!analyticsData?.topEmployees) return [];
-    
-    const maxHours = Math.max(...analyticsData.topEmployees.map(e => e.hours));
-    
-    return analyticsData.topEmployees.map(emp => ({
-      ...emp,
-      width: `${(emp.hours / maxHours) * 100}%`
-    }));
-  };
-
-  // Format hours for display
   const formatHours = (hours) => {
-    const wholeHours = Math.floor(hours);
-    const minutes = Math.round((hours - wholeHours) * 60);
-    return `${wholeHours}:${minutes.toString().padStart(2, '0')}`;
+    const whole = Math.floor(Number(hours) || 0);
+    const minutes = Math.round(((Number(hours) || 0) - whole) * 60);
+    return `${whole}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  // Handle pagination
-  const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+  // ===== New: Export CURRENT TABLE VIEW as PDF =====
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const title = `Overtime Records - ${new Date(0, filters.month - 1).toLocaleString('default', {
+      month: 'long',
+    })} ${filters.year}`;
+
+    doc.setFontSize(16);
+    doc.text(title, 14, 14);
+
+    const body = overtimeRecords.map((r) => [
+      r._id?.slice(0, 6) || '',
+      r.employee?.name || '',
+      new Date(r.date).toLocaleDateString(),
+      formatHours(r.regularHours),
+      formatHours(r.overtimeHours),
+      formatHours(r.totalHours),
+      r.description || '-',
+    ]);
+
+    autoTable(doc, {
+      head: [['ID', 'Employee', 'Date', 'Regular Hours', 'Overtime Hours', 'Total Hours', 'Description']],
+      body,
+      startY: 20,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [33, 150, 243] },
+    });
+
+    // footer summary
+    const endY = doc.lastAutoTable.finalY || 20;
+    doc.setFontSize(12);
+    doc.text(`Total Overtime: ${formatHours(totalOvertimeHours)}`, 14, endY + 10);
+    doc.text(
+      `Average per Employee: ${formatHours(avgPerEmployeeHours)} hours/month`,
+      80,
+      endY + 10
+    );
+
+    doc.save(
+      `overtime-records-${filters.year}-${String(filters.month).padStart(2, '0')}.pdf`
+    );
   };
+
+  const handlePageChange = (newPage) => setPagination((p) => ({ ...p, page: newPage }));
+
+  // pie colors
+  const PIE_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f97316', '#f43f5e', '#a78bfa', '#22d3ee'];
 
   return (
     <div className={`p-4 space-y-6 min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-      
       {/* Tabs */}
       <div className="flex space-x-4 border-b">
         <button
@@ -279,15 +298,15 @@ export const OvertimeMonitor = ({ darkMode }) => {
         </div>
       )}
 
-      {/* Records Tab */}
+      {/* RECORDS TAB */}
       {!loading && activeTab === 'records' && (
         <>
           {/* Toolbar */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
-              <select 
+              <select
                 value={filters.month}
-                onChange={(e) => handleFilterChange('month', e.target.value)}
+                onChange={(e) => handleFilterChange('month', Number(e.target.value))}
                 className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
               >
                 {Array.from({ length: 12 }, (_, i) => (
@@ -296,27 +315,35 @@ export const OvertimeMonitor = ({ darkMode }) => {
                   </option>
                 ))}
               </select>
-              <select 
+              <select
                 value={filters.year}
-                onChange={(e) => handleFilterChange('year', e.target.value)}
+                onChange={(e) => handleFilterChange('year', Number(e.target.value))}
                 className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
               >
                 {Array.from({ length: 5 }, (_, i) => {
-                  const year = new Date().getFullYear() - 2 + i;
-                  return <option key={year} value={year}>{year}</option>;
+                  const y = new Date().getFullYear() - 2 + i;
+                  return (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  );
                 })}
               </select>
-              <select 
+
+              {/* (Optional) keep server-side status filter selector hidden by default
+                  You can remove completely if you don't plan to use it. */}
+              <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700 hidden"
               >
                 <option value="">All Status</option>
                 <option value="Pending">Pending</option>
                 <option value="Approved">Approved</option>
                 <option value="Rejected">Rejected</option>
               </select>
-              <button 
+
+              <button
                 onClick={applyFilters}
                 className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
               >
@@ -324,10 +351,12 @@ export const OvertimeMonitor = ({ darkMode }) => {
                 <span>Filter</span>
               </button>
             </div>
+
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => {
                   resetForm();
+                  setEditingRecord(null);
                   setShowForm(true);
                 }}
                 className="flex items-center gap-2 px-3 py-2 rounded-md bg-btn-teal text-white hover:bg-green-700"
@@ -335,82 +364,71 @@ export const OvertimeMonitor = ({ darkMode }) => {
                 <Plus size={18} />
                 <span>Add Record</span>
               </button>
-              <button 
-                onClick={handleExport}
+              <button
+                onClick={handleExportPDF}
                 className="flex items-center gap-2 px-3 py-2 rounded-md bg-btn-blue text-white hover:bg-blue-700"
               >
                 <FileDown size={18} />
-                <span>Export</span>
+                <span>Export PDF</span>
               </button>
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          {/* Stats (UPDATED: only 2 cards, computed from table; pending removed) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
               <h4 className="text-sm text-gray-500 dark:text-gray-400">Total Overtime Hours</h4>
               <p className="text-2xl font-bold text-orange-500">
-                {analyticsData?.statistics?.totalOvertime ? formatHours(analyticsData.statistics.totalOvertime) : '0:00'}
+                {formatHours(totalOvertimeHours)}
               </p>
-              <p className="text-xs text-gray-400">This month</p>
+              <p className="text-xs text-gray-400">This selection</p>
             </div>
             <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
               <h4 className="text-sm text-gray-500 dark:text-gray-400">Average Per Employee</h4>
               <p className="text-2xl font-bold text-blue-500">
-                {analyticsData?.statistics?.avgPerEmployee ? formatHours(analyticsData.statistics.avgPerEmployee) : '0:00'}
+                {formatHours(avgPerEmployeeHours)}
               </p>
-              <p className="text-xs text-gray-400">Hours/month</p>
-            </div>
-            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
-              <h4 className="text-sm text-gray-500 dark:text-gray-400">Pending Approval</h4>
-              <p className="text-2xl font-bold text-yellow-500">{analyticsData?.statistics?.pendingCount || 0}</p>
-              <p className="text-xs text-gray-400">Records</p>
+              <p className="text-xs text-gray-400">hours/month</p>
             </div>
           </div>
 
-          {/* Table */}
+          {/* Table (UPDATED: removed Status column) */}
           <div className="overflow-x-auto mt-6">
             <table className="w-full border-collapse">
               <thead className="bg-gray-100 dark:bg-gray-800">
                 <tr>
-                  {['ID', 'Employee', 'Date', 'Regular Hours', 'Overtime Hours', 'Total Hours', 'Status', 'Actions'].map(h => (
-                    <th key={h} className="px-4 py-2 text-left text-sm font-semibold">{h}</th>
+                  {['ID', 'Employee', 'Date', 'Regular Hours', 'Overtime Hours', 'Total Hours', 'Actions'].map((h) => (
+                    <th key={h} className="px-4 py-2 text-left text-sm font-semibold">
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {overtimeRecords.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-4 py-4 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-4 text-center text-gray-500">
                       No overtime records found
                     </td>
                   </tr>
                 ) : (
                   overtimeRecords.map((record) => (
                     <tr key={record._id} className="border-t dark:border-gray-700">
-                      <td className="px-4 py-2">{record._id.substring(0, 6)}</td>
+                      <td className="px-4 py-2">{record._id?.substring(0, 6)}</td>
                       <td className="px-4 py-2">{record.employee?.name}</td>
                       <td className="px-4 py-2">{new Date(record.date).toLocaleDateString()}</td>
                       <td className="px-4 py-2">{formatHours(record.regularHours)}</td>
                       <td className="px-4 py-2">{formatHours(record.overtimeHours)}</td>
                       <td className="px-4 py-2">{formatHours(record.totalHours)}</td>
                       <td className="px-4 py-2">
-                        <span className={`px-2 py-1 rounded-md text-xs font-semibold 
-                          ${record.status === 'Approved' ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300' : 
-                            record.status === 'Rejected' ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300' : 
-                            'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300'}`}>
-                          {record.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2">
                         <div className="flex gap-2">
-                          <button 
+                          <button
                             onClick={() => handleEdit(record)}
                             className="text-blue-500 hover:text-blue-700"
                           >
                             <Edit size={16} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => setDeleteConfirm(record._id)}
                             className="text-red-500 hover:text-red-700"
                           >
@@ -450,80 +468,80 @@ export const OvertimeMonitor = ({ darkMode }) => {
         </>
       )}
 
-      {/* Analytics Tab */}
-      {!loading && activeTab === 'analytics' && analyticsData && (
+      {/* ANALYTICS TAB */}
+      {!loading && activeTab === 'analytics' && (
         <div className="space-y-6">
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Overtime Analytics</h3>
-            <div className="flex items-center gap-3">
-              <select className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700">
-                <option>Last 30 Days</option>
-                <option>Last 90 Days</option>
-                <option>This Year</option>
-                <option>Custom Range</option>
-              </select>
-              <button 
-                onClick={handleExport}
-                className="flex items-center gap-2 px-3 py-2 rounded-md bg-btn-blue text-white hover:bg-blue-700"
-              >
-                <FileDown size={18} />
-                <span>Export</span>
-              </button>
-            </div>
-          </div>
+          {/* Controls (Export removed) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Overtime Trend</h3>
+                <select
+                  value={trendWindow}
+                  onChange={(e) => setTrendWindow(e.target.value)}
+                  className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                >
+                  <option value="30">Last 30 Days</option>
+                  <option value="90">Last 90 Days</option>
+                  <option value="365">This Year</option>
+                </select>
+              </div>
 
-          {/* Chart */}
-          <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
-            <h4 className="mb-4 font-medium">Monthly Overtime Trend</h4>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={formatChartData()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#4B5563' : '#E5E7EB'} />
-                  <XAxis dataKey="name" stroke={darkMode ? '#9CA3AF' : '#6B7280'} />
-                  <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} />
-                  <Tooltip 
-                    contentStyle={darkMode ? { 
-                      backgroundColor: '#1F2937', 
-                      borderColor: '#374151',
-                      color: '#F9FAFB'
-                    } : {}} 
-                  />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="hours" 
-                    stroke="#f97316" 
-                    strokeWidth={2} 
-                    dot={{ r: 4 }} 
-                    activeDot={{ r: 6 }} 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#4B5563' : '#E5E7EB'} />
+                    <XAxis dataKey="name" stroke={darkMode ? '#9CA3AF' : '#6B7280'} />
+                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} />
+                    <Tooltip
+                      contentStyle={
+                        darkMode
+                          ? { backgroundColor: '#1F2937', borderColor: '#374151', color: '#F9FAFB' }
+                          : {}
+                      }
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="hours" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
 
-          {/* Top Employees */}
-          <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="font-medium">Top Overtime Employees</h4>
-              <button className="flex items-center gap-1 text-sm">
-                <span>This Month</span>
-                <ChevronDown size={16} />
-              </button>
-            </div>
-            <div className="space-y-3">
-              {formatEmployeeData().map((emp, i) => (
-                <div key={i}>
-                  <div className="flex justify-between text-sm">
-                    <span>{emp.name}</span>
-                    <span>{formatHours(emp.hours)} hours</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full dark:bg-gray-700">
-                    <div className="h-2 bg-blue-500 rounded-full" style={{ width: emp.width }}></div>
-                  </div>
-                </div>
-              ))}
+            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Top Overtime Employees</h3>
+                <button className="flex items-center gap-1 text-sm">
+                  <select
+                    value={topRange}
+                    onChange={(e) => setTopRange(e.target.value)}
+                    className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                  >
+                    <option value="thisMonth">This Month</option>
+                    <option value="lastMonth">Last Month</option>
+                  </select>
+                  <ChevronDown size={16} className="hidden" />
+                </button>
+              </div>
+
+              {/* Pie chart distribution */}
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      dataKey="hours"
+                      nameKey="name"
+                      data={topEmployees}
+                      outerRadius={100}
+                      label={(d) => `${d.name} (${formatHours(d.hours)})`}
+                    >
+                      {topEmployees.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </div>
@@ -534,12 +552,11 @@ export const OvertimeMonitor = ({ darkMode }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className={`rounded-lg p-6 w-full max-w-md ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'}`}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">
-                {editingRecord ? 'Edit Overtime Record' : 'Add Overtime Record'}
-              </h2>
-              <button 
+              <h2 className="text-lg font-semibold">{editingRecord ? 'Edit Overtime Record' : 'Add Overtime Record'}</h2>
+              <button
                 onClick={() => {
                   setShowForm(false);
+                  setEditingRecord(null);
                   resetForm();
                 }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -547,7 +564,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
                 <X size={24} />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Employee</label>
@@ -559,14 +576,14 @@ export const OvertimeMonitor = ({ darkMode }) => {
                   className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
                 >
                   <option value="">Select Employee</option>
-                  {employees.map(emp => (
+                  {employees.map((emp) => (
                     <option key={emp._id} value={emp._id}>
                       {emp.name} ({emp.id})
                     </option>
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-1">Date</label>
                 <input
@@ -578,7 +595,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
                   className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Regular Hours</label>
@@ -593,7 +610,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
                     className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Overtime Hours</label>
                   <input
@@ -608,7 +625,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-1">Description (Optional)</label>
                 <textarea
@@ -619,22 +636,20 @@ export const OvertimeMonitor = ({ darkMode }) => {
                   className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
                 />
               </div>
-              
+
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setShowForm(false);
+                    setEditingRecord(null);
                     resetForm();
                   }}
                   className="px-4 py-2 rounded-md bg-btn-gray text-white hover:bg-gray-600"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-md bg-btn-teal text-white hover:bg-green-700"
-                >
+                <button type="submit" className="px-4 py-2 rounded-md bg-btn-teal text-white hover:bg-green-700">
                   {editingRecord ? 'Update Record' : 'Save Record'}
                 </button>
               </div>
@@ -650,16 +665,10 @@ export const OvertimeMonitor = ({ darkMode }) => {
             <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
             <p className="mb-6">Are you sure you want to delete this overtime record? This action cannot be undone.</p>
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 rounded-md bg-btn-gray text-white hover:bg-gray-600"
-              >
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-md bg-btn-gray text-white hover:bg-gray-600">
                 Cancel
               </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="px-4 py-2 rounded-md bg-btn-red text-white hover:bg-red-700"
-              >
+              <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 rounded-md bg-btn-red text-white hover:bg-red-700">
                 Delete
               </button>
             </div>
