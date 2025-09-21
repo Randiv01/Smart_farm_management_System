@@ -3,15 +3,12 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useLoader } from "../contexts/LoaderContext";
 import { useNavigate } from "react-router-dom";
 
-
-// Main component with updated logic
 function AddAnimalType() {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const { loading, setLoading } = useLoader();
   const navigate = useNavigate();
   
-
   // State for the main animal type name and banner
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState("");
@@ -35,111 +32,83 @@ function AddAnimalType() {
   // State for popup notifications
   const [popup, setPopup] = useState({ show: false, success: true, message: "" });
   
+  // NEW: State for productivity fields
+  const [productivityFields, setProductivityFields] = useState([
+    { name: "", label: "", type: "number", unit: "", required: false }
+  ]);
+
   // Define default categories for different management types
-  const defaultIndividualCategories = [
-    {
-      name: "Basic Info",
-      fields: [
-        { name: "name", label: "Name", type: "text", required: true },
-        { name: "breed", label: "Breed", type: "text", required: true },
-        { name: "age", label: "Age", type: "number", required: true },
-        { name: "dob", label: "Date of Birth", type: "date", required: true },
-        { name: "gender", label: "Gender", type: "select", options: ["Male", "Female"], required: true },
-        { name: "owner", label: "Owner", type: "select", options: ["Mount Olive", "Other"], required: true },
-      ],
-    },
-    {
-      name: "Health Info",
-      fields: [
-       { name: "weight", label: "Weight (kg)", type: "number", required: false },
+const defaultIndividualCategories = [
+  {
+    name: "Basic Info",
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "breed", label: "Breed", type: "text", required: true },
+      { name: "dob", label: "Date of Birth", type: "date", required: true },
+      { name: "gender", label: "Gender", type: "select", options: ["Male", "Female"], required: true },
+      { name: "owner", label: "Owner", type: "select", options: ["Mount Olive", "Other"], required: true },
+    ],
+  },
+  {
+    name: "Health Info",
+    fields: [
+      { name: "weight", label: "Weight (kg)", type: "number", required: false },
       { name: "temperature", label: "Temperature (°C)", type: "number", required: false },
-        {
-          name: "healthStatus",
-          label: "Health Status",
-          type: "select",
-          options: ["Healthy", "Sick", "Injured", "In Treatment", "Critical", "Quarantined", "Recovered", "Deceased"],
-          required: true,
-        },
-        { name: "lastCheckup", label: "Last Checkup", type: "date", required: false },
-        { name: "symptoms", label: "Symptoms", type: "text", required: false },
-        {
-          name: "vaccinations",
-          label: "Vaccinations",
-          type: "select",
-          options: ["Not Vaccinated", "Partially Vaccinated", "Fully Vaccinated", "Overdue", "Unknown"],
-          required: true,
-        },
-        {
-          name: "reproductiveStatus",
-          label: "Reproductive Status",
-          type: "select",
-          options: ["Not Pregnant", "Pregnant", "Lactating", "Ready for Breeding", "Unknown"],
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "Productivity Info",
-      fields: [
-        { name: "milkProduction", label: "Milk Production(L)", type: "number", required: false },
-        { name: "eggProduction", label: "Egg Production", type: "number", required: false },
-        {
-          name: "feedType",
-          label: "Feed Type",
-          type: "select", 
-          options: ["Grass", "Hay", "Silage", "Grains", "Concentrates","Supplements"],
-          required: false,
-        },
+      {
+        name: "healthStatus",
+        label: "Health Status",
+        type: "select",
+        options: ["Healthy", "Sick", "Injured", "In Treatment", "Critical", "Quarantined", "Recovered", "Deceased"],
+        required: true, readOnly: true
+      },
+      { name: "lastCheckup", label: "Last Checkup", type: "date", required: false },
+      { name: "symptoms", label: "Symptoms", type: "text", required: false },
+      {
+        name: "vaccinations",
+        label: "Vaccinations",
+        type: "select",
+        options: ["Not Vaccinated", "Partially Vaccinated", "Fully Vaccinated", "Overdue", "Unknown"],
+        required: true,readOnly: true
+      },
+      {
+        name: "reproductiveStatus",
+        label: "Reproductive Status",
+        type: "select",
+        options: ["Not Pregnant", "Pregnant", "Lactating", "Ready for Breeding", "Unknown"],
+        required: false,readOnly: true
+      },
+    ],
+  },
+];
 
-      ],
-    },
-  ];
+const defaultGroupCategories = [
+  {
+    name: "Batch Info",
+    fields: [
+      { name: "batchName", label: "Batch Name", type: "text", required: true },
+      { name: "species", label: "Species", type: "text", required: true },
+      { name: "arrivalDate", label: "Arrival Date", type: "date", required: true },
+    ],
+  },
+  {
+    name: "Health & Care",
+    fields: [
+      { name: "batchHealth", label: "Batch Health Status", type: "select", options: ["Healthy", "Sick", "Quarantined"], required: true, readOnly: true },
+      { name: "lastTreatment", label: "Last Treatment Date", type: "date", required: false },
+      { name: "medication", label: "Medication", type: "text", required: false },
+    ],
+  },
+];
 
-  const defaultGroupCategories = [
-    {
-      name: "Batch Info",
-      fields: [
-        { name: "batchName", label: "Batch Name", type: "text", required: true },
-        { name: "species", label: "Species", type: "text", required: true },
-        { name: "arrivalDate", label: "Arrival Date", type: "date", required: true },
-      ],
-    },
-    {
-      name: "Health & Care",
-      fields: [
-        { name: "batchHealth", label: "Batch Health Status", type: "select", options: ["Healthy", "Sick", "Quarantined"], required: true },
-        { name: "lastTreatment", label: "Last Treatment Date", type: "date", required: false },
-        { name: "medication", label: "Medication", type: "text", required: false },
-      ],
-    },
-    {
-      name: "Harvest & Productivity",
-      fields: [
-        { name: "totalEggs", label: "Total Eggs Produced", type: "number", required: false },
-        { name: "totalMilk", label: "Total Milk Produced (L)", type: "number", required: false },
-        { name: "harvestWeight", label: "Harvest Weight (kg)", type: "number", required: false },
-      ],
-    },
-  ];
-
-  const defaultOtherCategories = [
-    {
-      name: "Hive/Farm Info",
-      fields: [
-        { name: "hiveName", label: "Hive Name", type: "text", required: true },
-        { name: "hiveHealth", label: "Hive Health", type: "select", options: ["Healthy", "Pest Infestation", "Weak Colony"], required: true },
-
-      ],
-    },
-    {
-      name: "Productivity Info",
-      fields: [
-        { name: "biodiversityScore", label: "Biodiversity Score", type: "number", required: false },
-        { name: "soilMoisture", label: "Soil Moisture (%)", type: "number", required: false },
-        { name: "pollinationRate", label: "Pollination Rate", type: "number", required: false },
-      ],
-    },
-  ];
+const defaultOtherCategories = [
+  {
+    name: "Hive/Farm Info",
+    fields: [
+      { name: "hiveName", label: "Hive Name", type: "text", required: true },
+      { name: "hiveHealth", label: "Hive Health", type: "select", options: ["Healthy", "Pest Infestation", "Weak Colony"], required: true },
+    ],
+  },
+];
 
   // Effect to update document title and categories on component mount or management type change
   useEffect(() => {
@@ -253,6 +222,33 @@ function AddAnimalType() {
     setCaretakerErrors(newCaretakerErrors);
   };
 
+  // NEW: Productivity field handlers
+  const handleProductivityFieldChange = (index, key, value) => {
+    const newFields = [...productivityFields];
+    
+    if (key === "label") {
+      // Auto-generate name from label
+      newFields[index].label = value;
+      newFields[index].name = value.toLowerCase().replace(/\s+/g, '_');
+    } else {
+      newFields[index][key] = value;
+    }
+    
+    setProductivityFields(newFields);
+  };
+
+  const handleAddProductivityField = () => {
+    setProductivityFields([...productivityFields, 
+      { name: "", label: "", type: "number", unit: "", required: false }
+    ]);
+  };
+
+  const handleRemoveProductivityField = (index) => {
+    const newFields = [...productivityFields];
+    newFields.splice(index, 1);
+    setProductivityFields(newFields);
+  };
+
   // Validate caretaker data
   const validateCaretaker = (caretaker, index) => {
     const errors = {};
@@ -353,6 +349,7 @@ function AddAnimalType() {
       formData.append('managementType', managementType);
       formData.append('caretakers', JSON.stringify(caretakers));
       formData.append('categories', JSON.stringify(categories));
+      formData.append('productivityFields', JSON.stringify(productivityFields)); // NEW
       
       if (banner) {
         formData.append('bannerImage', banner);
@@ -380,6 +377,7 @@ function AddAnimalType() {
       setBanner(null);
       setCaretakers([{ id: "", name: "", mobile: "" }]);
       setCaretakerErrors([{}]);
+      setProductivityFields([{ name: "", label: "", type: "number", unit: "", required: false }]); // Reset productivity fields
 
     } catch (error) {
       console.error("Save error:", error);
@@ -394,7 +392,7 @@ function AddAnimalType() {
   };
 
   return (
-    <div className={`${darkMode ? "dark bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900"} min-h-screen transition-colors duration-300 p-4`}>
+    <div className={`${darkMode ? "dark bg-gray-900 text-gray-100" : "light-beige"} min-h-screen transition-colors duration-300 p-4`}>
       <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-green-600 to-teal-500 bg-clip-text text-transparent">
           Add New Animal Type
@@ -481,84 +479,176 @@ function AddAnimalType() {
         </div>
 
         {/* Caretaker fields for all management types */}
-  <div className="mb-6 p-4 rounded-xl bg-white dark:bg-gray-800 shadow-md">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-    <h3 className="font-semibold text-lg dark:text-gray-200">Assigned Caretakers: *</h3>
-    <button
-      onClick={handleAddCaretaker}
-      className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-1 transition-colors"
-    >
-      <span>+</span> Add Caretaker
-    </button>
-  </div>
-  <div className="flex flex-col gap-4">
-    {caretakers.map((caretaker, index) => (
-      <div key={index} className="flex flex-wrap gap-4 items-start p-4 rounded-xl bg-gray-100 dark:bg-gray-700 relative">
-        <div className="flex-1 min-w-[120px]">
-          <label className="mb-1 text-sm font-medium dark:text-gray-200">ID: *</label>
-          <input
-            type="text"
-            value={caretaker.id}
-            onChange={(e) => handleCaretakerChange(index, "id", e.target.value)}
-            className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
-              caretakerErrors[index]?.id 
-                ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
-                : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
-            }`}
-            placeholder="CT-001"
-          />
-          {caretakerErrors[index]?.id && (
-            <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].id}</p>
-          )}
+        <div className="mb-6 p-4 rounded-xl bg-white dark:bg-gray-800 shadow-md">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+            <h3 className="font-semibold text-lg dark:text-gray-200">Assigned Caretakers: *</h3>
+            <button
+              onClick={handleAddCaretaker}
+              className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-1 transition-colors"
+            >
+              <span>+</span> Add Caretaker
+            </button>
+          </div>
+          <div className="flex flex-col gap-4">
+            {caretakers.map((caretaker, index) => (
+              <div key={index} className="flex flex-wrap gap-4 items-start p-4 rounded-xl bg-gray-100 dark:bg-gray-700 relative">
+                <div className="flex-1 min-w-[120px]">
+                  <label className="mb-1 text-sm font-medium dark:text-gray-200">ID: *</label>
+                  <input
+                    type="text"
+                    value={caretaker.id}
+                    onChange={(e) => handleCaretakerChange(index, "id", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
+                      caretakerErrors[index]?.id 
+                        ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
+                        : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
+                    }`}
+                    placeholder="CT-001"
+                  />
+                  {caretakerErrors[index]?.id && (
+                    <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].id}</p>
+                  )}
+                </div>
+                <div className="flex-1 min-w-[120px]">
+                  <label className="mb-1 text-sm font-medium dark:text-gray-200">Name: *</label>
+                  <input
+                    type="text"
+                    value={caretaker.name}
+                    onChange={(e) => handleCaretakerChange(index, "name", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
+                      caretakerErrors[index]?.name 
+                        ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
+                        : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
+                    }`}
+                    placeholder="John Doe"
+                  />
+                  {caretakerErrors[index]?.name && (
+                    <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].name}</p>
+                  )}
+                </div>
+                <div className="flex-1 min-w-[120px]">
+                  <label className="mb-1 text-sm font-medium dark:text-gray-200">Mobile: *</label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"   // mobile shows numeric keyboard
+                    pattern="[0-9]*"      // only allows digits in some browsers
+                    value={caretaker.mobile}
+                    onChange={(e) => {
+                      // Only allow digits in the state
+                      const value = e.target.value.replace(/\D/g, "");
+                      handleCaretakerChange(index, "mobile", value);
+                    }}
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
+                      caretakerErrors[index]?.mobile 
+                        ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
+                        : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
+                    }`}
+                    placeholder="0765432140"
+                    maxLength={10}
+                  />
+
+                  {caretakerErrors[index]?.mobile && (
+                    <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].mobile}</p>
+                  )}
+                </div>
+                {caretakers.length > 1 && (
+                  <button
+                    onClick={() => handleRemoveCaretaker(index)}
+                    className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm hover:bg-red-700 transition-colors mt-6"
+                    aria-label="Remove caretaker"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex-1 min-w-[120px]">
-          <label className="mb-1 text-sm font-medium dark:text-gray-200">Name: *</label>
-          <input
-            type="text"
-            value={caretaker.name}
-            onChange={(e) => handleCaretakerChange(index, "name", e.target.value)}
-            className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
-              caretakerErrors[index]?.name 
-                ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
-                : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
-            }`}
-            placeholder="John Doe"
-          />
-          {caretakerErrors[index]?.name && (
-            <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].name}</p>
-          )}
+
+        {/* NEW: Productivity Fields Section */}
+        <div className="mb-6 p-4 rounded-xl bg-white dark:bg-gray-800 shadow-md">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+            <h3 className="font-semibold text-lg dark:text-gray-200">Productivity Tracking Fields</h3>
+            <button
+              onClick={handleAddProductivityField}
+              className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-1 transition-colors"
+            >
+              <span>+</span> Add Productivity Field
+            </button>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Define what productivity metrics you want to track for this animal type
+          </p>
+          
+          <div className="flex flex-col gap-4">
+            {productivityFields.map((field, index) => (
+              <div key={index} className="flex flex-wrap gap-4 items-start p-4 rounded-xl bg-gray-100 dark:bg-gray-700">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="mb-1 text-sm font-medium dark:text-gray-200">Field Label *</label>
+                  <input
+                    type="text"
+                    value={field.label}
+                    onChange={(e) => handleProductivityFieldChange(index, "label", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-gray-200"
+                    placeholder="e.g., Milk Production"
+                  />
+                </div>
+                
+                <div className="flex-1 min-w-[120px]">
+                  <label className="mb-1 text-sm font-medium dark:text-gray-200">Data Type</label>
+                  <select
+                    value={field.type}
+                    onChange={(e) => handleProductivityFieldChange(index, "type", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-gray-200"
+                  >
+                    <option value="number">Number</option>
+                    <option value="text">Text</option>
+                  </select>
+                </div>
+                
+                <div className="flex-1 min-w-[100px]">
+                <label className="mb-1 text-sm font-medium dark:text-gray-200">Unit</label>
+                <select
+                  value={field.unit}
+                  onChange={(e) => handleProductivityFieldChange(index, "unit", e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-gray-200"
+                >
+                  <option value="">Select Unit</option>
+                  <option value="kg">kg</option>
+                  <option value="L">L</option>
+                  <option value="units">units</option>
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="dozen">dozen</option>
+                </select>
+              </div>
+
+                
+                <div className="flex items-center gap-4 mt-6">
+                  <label className="text-sm flex items-center gap-2 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={field.required || false}
+                      onChange={(e) => handleProductivityFieldChange(index, "required", e.target.checked)}
+                      className="rounded"
+                    />
+                    Required
+                  </label>
+                  
+                  {productivityFields.length > 1 && (
+                    <button
+                      onClick={() => handleRemoveProductivityField(index)}
+                      className="bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs hover:bg-red-700 transition-colors"
+                      aria-label="Remove field"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex-1 min-w-[120px]">
-          <label className="mb-1 text-sm font-medium dark:text-gray-200">Mobile: *</label>
-          <input
-            type="tel"
-            value={caretaker.mobile}
-            onChange={(e) => handleCaretakerChange(index, "mobile", e.target.value)}
-            className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
-              caretakerErrors[index]?.mobile 
-                ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
-                : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
-            }`}
-            placeholder="9876543210"
-            maxLength="10"
-          />
-          {caretakerErrors[index]?.mobile && (
-            <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].mobile}</p>
-          )}
-        </div>
-        {caretakers.length > 1 && (
-          <button
-            onClick={() => handleRemoveCaretaker(index)}
-            className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm hover:bg-red-700 transition-colors mt-6"
-            aria-label="Remove caretaker"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-    ))}
-  </div>
-</div>
 
         {/* Dynamic Category and Field Section */}
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-2 mb-6">
@@ -654,47 +744,57 @@ function AddAnimalType() {
       </div>
 
       {/* Popup */}
-      {popup.show && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
-          onClick={() => setPopup({ ...popup, show: false })}
-        >
-          <div
-            className={`bg-white dark:bg-gray-800 p-6 rounded-2xl max-w-xs text-center shadow-xl border-t-4 ${
-              popup.success ? "border-green-500" : "border-red-500"
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4">
-              {popup.success ? (
-                <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mx-auto relative flex items-center justify-center">
-                  <div className="w-10 h-5 border-l-2 border-b-2 border-green-500 rotate-[-45deg] translate-y-[-2px]"></div>
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mx-auto relative flex items-center justify-center">
-                  <span className="w-8 h-1 bg-red-500 rotate-45 absolute"></span>
-                  <span className="w-8 h-1 bg-red-500 -rotate-45 absolute"></span>
-                </div>
-              )}
-            </div>
-            <p className="text-sm font-medium dark:text-gray-200 mb-2">{popup.message}</p>
-           <button
-              onClick={() => {
-                setPopup({ ...popup, show: false });
-                navigate("/AnimalManagement");
-              }}
-              className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium ${
-                popup.success 
-                  ? "bg-green-600 hover:bg-green-700 text-white" 
-                  : "bg-red-600 hover:bg-red-700 text-white"
-              } transition-colors`}
-            >
-              OK
-            </button>
-
+{popup.show && (
+  <div
+    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+    onClick={() => setPopup({ ...popup, show: false })}
+  >
+    <div
+      className={`bg-white dark:bg-gray-800 p-6 rounded-2xl max-w-xs text-center shadow-xl border-t-4 ${
+        popup.success ? "border-green-500" : "border-red-500"
+      }`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Icon */}
+      <div className="mb-4">
+        {popup.success ? (
+          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mx-auto relative flex items-center justify-center">
+            <div className="w-10 h-5 border-l-2 border-b-2 border-green-500 rotate-[-45deg] translate-y-[-2px]"></div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mx-auto relative flex items-center justify-center">
+            <span className="w-8 h-1 bg-red-500 rotate-45 absolute"></span>
+            <span className="w-8 h-1 bg-red-500 -rotate-45 absolute"></span>
+          </div>
+        )}
+      </div>
+
+      {/* Message */}
+      <p className="text-sm font-medium dark:text-gray-200 mb-2">{popup.message}</p>
+
+      {/* Button */}
+      <button
+        onClick={() => {
+          setPopup({ ...popup, show: false });
+
+          if (popup.success) {
+            // Success → redirect to /AnimalManagement
+            navigate("/AnimalManagement");
+          }
+          // Error → stay on the same page (no navigation needed)
+        }}
+        className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium ${
+          popup.success
+            ? "bg-green-600 hover:bg-green-700 text-white"
+            : "bg-red-600 hover:bg-red-700 text-white"
+        } transition-colors`}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
+
 
       {/* Loader */}
       {loading && (

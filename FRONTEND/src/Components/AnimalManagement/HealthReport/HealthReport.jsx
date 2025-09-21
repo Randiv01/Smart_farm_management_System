@@ -581,15 +581,16 @@ const handleMedicalRequest = async () => {
     );
 
   return (
-    <div className={`min-h-screen ${darkMode ? "dark bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800"}`}>
+    <div className={`min-h-screen ${darkMode ? "dark bg-gray-900 text-gray-100" : "light-beige"}`}>
       <main className="p-5">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center mb-5 gap-4">
-          <h2 className="text-2xl font-semibold">
-            {animalType.name} Health Information
-            {animalType.managementType !== "individual" && 
-              ` (${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} View)`}
-          </h2>
+         <h2 className="text-2xl font-semibold">
+          {animalType.name.charAt(0).toUpperCase() + animalType.name.slice(1).toLowerCase()} Health Information
+          {animalType.managementType !== "individual" && 
+            ` (${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} View)`}
+        </h2>
+
           <button
             onClick={() => navigate(`/AnimalManagement/add-animal/${animalType._id}`)}
             className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-teal-600 text-white hover:bg-teal-700"

@@ -1,49 +1,97 @@
 import Productivity from '../models/Productivity.js';
 import Animal from '../models/Animal.js';
+import AnimalType from '../models/AnimalType.js';
+import mongoose from 'mongoose';
 
-// Create productivity record
+// Create productivity record with validation against animal type fields
 export const createProductivityRecord = async (req, res) => {
   try {
-    const { animalId, batchId, isGroup, productType, quantity, unit, date, notes } = req.body;
+    const { animalId, batchId, isGroup, date, notes, recordedBy, ...productivityData } = req.body;
 
     // Validate required fields
-    if (!productType || quantity === undefined) {
-      return res.status(400).json({ message: 'Product type and quantity are required' });
+    if (!animalId && !batchId) {
+      return res.status(400).json({ message: 'Animal ID or Batch ID is required' });
     }
 
-    // If it's for an individual animal, verify the animal exists
-    if (!isGroup && animalId) {
-      const animal = await Animal.findById(animalId);
-      if (!animal) {
-        return res.status(404).json({ message: 'Animal not found' });
-      }
-    }
+    let animalType;
+    let animal;
+    let batchAnimals = [];
 
-    // If it's for a batch, verify batch exists and has animals
+    // Get animal type information for validation
     if (isGroup && batchId) {
-      const batchAnimals = await Animal.find({ batchId });
+      // For batch records, get the first animal to determine type
+      batchAnimals = await Animal.find({ batchId }).populate('type');
       if (batchAnimals.length === 0) {
         return res.status(404).json({ message: 'Batch not found or empty' });
       }
+      animalType = batchAnimals[0].type;
+    } else if (animalId) {
+      // For individual records
+      animal = await Animal.findById(animalId).populate('type');
+      if (!animal) {
+        return res.status(404).json({ message: 'Animal not found' });
+      }
+      animalType = animal.type;
     }
 
-    const record = new Productivity({
+    // Validate productivity data against animal type's productivity fields
+    if (animalType && animalType.productivityFields) {
+      const validationErrors = [];
+      
+      // Check required fields
+      animalType.productivityFields.forEach(field => {
+        if (field.required && !productivityData[field.name]) {
+          validationErrors.push(`${field.label} is required`);
+        }
+        
+        // Validate data types
+        if (productivityData[field.name] !== undefined) {
+          if (field.type === 'number' && isNaN(Number(productivityData[field.name]))) {
+            validationErrors.push(`${field.label} must be a number`);
+          }
+        }
+      });
+      
+      // Check for extra fields that aren't defined
+      Object.keys(productivityData).forEach(key => {
+        const definedField = animalType.productivityFields.find(f => f.name === key);
+        if (!definedField) {
+          validationErrors.push(`Field '${key}' is not defined for this animal type`);
+        }
+      });
+      
+      if (validationErrors.length > 0) {
+        return res.status(400).json({ 
+          message: 'Validation failed', 
+          errors: validationErrors 
+        });
+      }
+    }
+
+    // Prepare record data
+    const recordData = {
       animalId: isGroup ? null : animalId,
       batchId: isGroup ? batchId : null,
       isGroup,
-      productType,
-      quantity: parseFloat(quantity),
-      unit: unit || '',
       date: date ? new Date(date) : new Date(),
       notes: notes || '',
-      recordedBy: req.user?.name || 'System'
-    });
+      recordedBy: recordedBy || req.user?.name || 'System',
+      ...productivityData
+    };
 
+    const record = new Productivity(recordData);
     await record.save();
 
-    // Populate animal data for response
+    // Populate related data for response
     const populatedRecord = await Productivity.findById(record._id)
-      .populate('animalId', 'animalId data');
+      .populate('animalId', 'animalId data')
+      .populate({
+        path: 'animalId',
+        populate: {
+          path: 'type',
+          select: 'name productivityFields'
+        }
+      });
 
     res.status(201).json({
       message: 'Productivity record created successfully',
@@ -55,11 +103,14 @@ export const createProductivityRecord = async (req, res) => {
   }
 };
 
-// Get productivity records for an animal
+// Get productivity records for an animal with animal type validation
 export const getAnimalProductivity = async (req, res) => {
   try {
     const { animalId } = req.params;
     const { startDate, endDate, productType } = req.query;
+
+    const animal = await Animal.findById(animalId).populate('type');
+    if (!animal) return res.status(404).json({ message: 'Animal not found' });
 
     let query = { animalId, isGroup: false };
 
@@ -79,11 +130,27 @@ export const getAnimalProductivity = async (req, res) => {
       .populate('animalId', 'animalId data')
       .sort({ date: -1 });
 
+    // Calculate totals for each productivity field
+    const fieldTotals = {};
+    const fieldAverages = {};
+    
+    if (animal.type.productivityFields) {
+      animal.type.productivityFields.forEach(field => {
+        const fieldRecords = records.filter(record => record[field.name] !== undefined);
+        const total = fieldRecords.reduce((sum, record) => sum + (Number(record[field.name]) || 0), 0);
+        fieldTotals[field.name] = total;
+        fieldAverages[field.name] = fieldRecords.length > 0 ? total / fieldRecords.length : 0;
+      });
+    }
+
     res.json({
       animalId,
+      animalType: animal.type.name,
+      productivityFields: animal.type.productivityFields || [],
       records,
       totalRecords: records.length,
-      totalQuantity: records.reduce((sum, record) => sum + record.quantity, 0)
+      fieldTotals,
+      fieldAverages
     });
   } catch (error) {
     console.error('Get animal productivity error:', error);
@@ -116,17 +183,29 @@ export const getBatchProductivity = async (req, res) => {
 
     // Get batch animals for additional info
     const batchAnimals = await Animal.find({ batchId })
-      .populate('type', 'name')
+      .populate('type', 'name productivityFields')
       .select('animalId data type');
+
+    // Calculate field totals and averages for the batch
+    const fieldTotals = {};
+    const fieldAverages = {};
+    
+    if (batchAnimals.length > 0 && batchAnimals[0].type.productivityFields) {
+      batchAnimals[0].type.productivityFields.forEach(field => {
+        const fieldRecords = records.filter(record => record[field.name] !== undefined);
+        const total = fieldRecords.reduce((sum, record) => sum + (Number(record[field.name]) || 0), 0);
+        fieldTotals[field.name] = total;
+        fieldAverages[field.name] = batchAnimals.length > 0 ? total / batchAnimals.length : 0;
+      });
+    }
 
     res.json({
       batchId,
       records,
       batchAnimals,
       totalRecords: records.length,
-      totalQuantity: records.reduce((sum, record) => sum + record.quantity, 0),
-      averagePerAnimal: batchAnimals.length > 0 ? 
-        records.reduce((sum, record) => sum + record.quantity, 0) / batchAnimals.length : 0
+      fieldTotals,
+      fieldAverages
     });
   } catch (error) {
     console.error('Get batch productivity error:', error);
@@ -134,9 +213,158 @@ export const getBatchProductivity = async (req, res) => {
   }
 };
 
+// Get productivity analytics for dashboard
+export const getProductivityAnalytics = async (req, res) => {
+  try {
+    const { animalTypeId, timeframe = 'month', groupBy = 'day' } = req.query;
+    
+    // Calculate date range
+    const now = new Date();
+    let startDate;
+    
+    switch(timeframe) {
+      case 'day':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
 
+    // Build query
+    let query = { date: { $gte: startDate, $lte: now } };
 
-// Get productivity summary for dashboard
+    // Filter by animal type if provided
+    if (animalTypeId) {
+      const animals = await Animal.find({ type: animalTypeId }).select('_id');
+      const animalIds = animals.map(animal => animal._id);
+      query.$or = [
+        { animalId: { $in: animalIds }, isGroup: false },
+        { 
+          batchId: { $exists: true }, 
+          isGroup: true
+        }
+      ];
+    }
+
+    const records = await Productivity.find(query)
+      .populate({
+        path: 'animalId',
+        populate: {
+          path: 'type',
+          select: 'name productivityFields'
+        }
+      })
+      .sort({ date: 1 });
+
+    // Get animal type info for field definitions
+    let animalType;
+    if (animalTypeId) {
+      animalType = await AnimalType.findById(animalTypeId);
+    }
+
+    // Group records by date and calculate analytics
+    const analytics = {};
+    const dates = [];
+    
+    records.forEach(record => {
+      let dateKey;
+      
+      switch(groupBy) {
+        case 'hour':
+          dateKey = record.date.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+          break;
+        case 'day':
+          dateKey = record.date.toISOString().split('T')[0]; // YYYY-MM-DD
+          break;
+        case 'week':
+          const weekNum = Math.ceil((record.date.getDate() + 6) / 7);
+          dateKey = `${record.date.getFullYear()}-W${weekNum}`;
+          break;
+        case 'month':
+          dateKey = record.date.toISOString().slice(0, 7); // YYYY-MM
+          break;
+        default:
+          dateKey = record.date.toISOString().split('T')[0];
+      }
+      
+      if (!analytics[dateKey]) {
+        analytics[dateKey] = {
+          date: dateKey,
+          records: 0,
+          values: {},
+          animals: new Set()
+        };
+        dates.push(dateKey);
+      }
+      
+      analytics[dateKey].records++;
+      
+      // Track unique animals
+      if (record.animalId) {
+        analytics[dateKey].animals.add(record.animalId._id.toString());
+      }
+      
+      // Sum values for each productivity field
+      if (animalType && animalType.productivityFields) {
+        animalType.productivityFields.forEach(field => {
+          if (record[field.name] !== undefined) {
+            if (!analytics[dateKey].values[field.name]) {
+              analytics[dateKey].values[field.name] = {
+                total: 0,
+                count: 0,
+                average: 0
+              };
+            }
+            
+            analytics[dateKey].values[field.name].total += Number(record[field.name]) || 0;
+            analytics[dateKey].values[field.name].count++;
+          }
+        });
+      }
+    });
+    
+    // Calculate averages
+    Object.keys(analytics).forEach(dateKey => {
+      Object.keys(analytics[dateKey].values).forEach(fieldName => {
+        const fieldData = analytics[dateKey].values[fieldName];
+        fieldData.average = fieldData.count > 0 ? fieldData.total / fieldData.count : 0;
+      });
+      
+      analytics[dateKey].animalCount = analytics[dateKey].animals.size;
+    });
+
+    // Convert to array sorted by date
+    const analyticsArray = dates.sort().map(dateKey => analytics[dateKey]);
+
+    res.json({
+      timeframe,
+      groupBy,
+      startDate,
+      endDate: now,
+      animalType: animalType ? {
+        _id: animalType._id,
+        name: animalType.name,
+        productivityFields: animalType.productivityFields
+      } : null,
+      analytics: analyticsArray,
+      totalRecords: records.length
+    });
+  } catch (error) {
+    console.error('Get productivity analytics error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get productivity summary for dashboard (compatibility with old code)
 export const getProductivitySummary = async (req, res) => {
   try {
     const { animalType, period = 'month' } = req.query;
@@ -173,8 +401,7 @@ export const getProductivitySummary = async (req, res) => {
         { animalId: { $in: animalIds }, isGroup: false },
         { 
           batchId: { $exists: true }, 
-          isGroup: true,
-          'animalId.type': animalType 
+          isGroup: true
         }
       ];
     }
@@ -189,9 +416,9 @@ export const getProductivitySummary = async (req, res) => {
       })
       .sort({ date: -1 });
 
-    // Group by product type
+    // Group by product type (for backward compatibility)
     const summaryByProduct = records.reduce((acc, record) => {
-      const productType = record.productType;
+      const productType = record.productType || 'default';
       if (!acc[productType]) {
         acc[productType] = {
           totalQuantity: 0,
@@ -199,7 +426,20 @@ export const getProductivitySummary = async (req, res) => {
           averagePerDay: 0
         };
       }
-      acc[productType].totalQuantity += record.quantity;
+      
+      // Use the first numeric field for quantity if productType exists
+      let quantity = 0;
+      if (record.productType) {
+        quantity = record.quantity || 0;
+      } else if (record.animalId && record.animalId.type && record.animalId.type.productivityFields) {
+        // Use the first numeric field from productivityFields
+        const numericField = record.animalId.type.productivityFields.find(f => f.type === 'number');
+        if (numericField && record[numericField.name] !== undefined) {
+          quantity = Number(record[numericField.name]) || 0;
+        }
+      }
+      
+      acc[productType].totalQuantity += quantity;
       acc[productType].records.push(record);
       return acc;
     }, {});
@@ -216,7 +456,7 @@ export const getProductivitySummary = async (req, res) => {
       startDate,
       endDate: now,
       totalRecords: records.length,
-      totalQuantity: records.reduce((sum, record) => sum + record.quantity, 0),
+      totalQuantity: Object.values(summaryByProduct).reduce((sum, product) => sum + product.totalQuantity, 0),
       byProductType: summaryByProduct,
       allRecords: records
     });
@@ -230,14 +470,48 @@ export const getProductivitySummary = async (req, res) => {
 export const updateProductivityRecord = async (req, res) => {
   try {
     const { id } = req.params;
-    const { productType, quantity, unit, date, notes } = req.body;
+    const { date, notes, recordedBy, ...productivityData } = req.body;
+
+    // Get the existing record to validate against animal type
+    const existingRecord = await Productivity.findById(id)
+      .populate({
+        path: 'animalId',
+        populate: {
+          path: 'type',
+          select: 'productivityFields'
+        }
+      });
+
+    if (!existingRecord) {
+      return res.status(404).json({ message: 'Productivity record not found' });
+    }
+
+    // Validate productivity data if animal type has defined fields
+    if (existingRecord.animalId && existingRecord.animalId.type && existingRecord.animalId.type.productivityFields) {
+      const validationErrors = [];
+      const animalType = existingRecord.animalId.type;
+      
+      // Check for extra fields that aren't defined
+      Object.keys(productivityData).forEach(key => {
+        const definedField = animalType.productivityFields.find(f => f.name === key);
+        if (!definedField) {
+          validationErrors.push(`Field '${key}' is not defined for this animal type`);
+        }
+      });
+      
+      if (validationErrors.length > 0) {
+        return res.status(400).json({ 
+          message: 'Validation failed', 
+          errors: validationErrors 
+        });
+      }
+    }
 
     const updateData = {
-      ...(productType && { productType }),
-      ...(quantity !== undefined && { quantity: parseFloat(quantity) }),
-      ...(unit !== undefined && { unit }),
+      ...productivityData,
       ...(date && { date: new Date(date) }),
       ...(notes !== undefined && { notes }),
+      ...(recordedBy !== undefined && { recordedBy }),
       updatedAt: new Date()
     };
 
@@ -245,11 +519,13 @@ export const updateProductivityRecord = async (req, res) => {
       id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('animalId', 'animalId data');
-
-    if (!updatedRecord) {
-      return res.status(404).json({ message: 'Productivity record not found' });
-    }
+    ).populate({
+      path: 'animalId',
+      populate: {
+        path: 'type',
+        select: 'name productivityFields'
+      }
+    });
 
     res.json({
       message: 'Productivity record updated successfully',
@@ -282,11 +558,10 @@ export const deleteProductivityRecord = async (req, res) => {
   }
 };
 
-
 // Get productivity trends over time
 export const getProductivityTrends = async (req, res) => {
   try {
-    const { animalType, productType, timeframe = '30days' } = req.query;
+    const { animalTypeId, timeframe = '30days' } = req.query;
 
     // Calculate date range
     const now = new Date();
@@ -317,20 +592,15 @@ export const getProductivityTrends = async (req, res) => {
       }
     };
 
-    if (productType) {
-      query.productType = productType;
-    }
-
     // Filter by animal type if provided
-    if (animalType) {
-      const animals = await Animal.find({ type: animalType }).select('_id');
+    if (animalTypeId) {
+      const animals = await Animal.find({ type: animalTypeId }).select('_id');
       const animalIds = animals.map(animal => animal._id);
       query.$or = [
         { animalId: { $in: animalIds }, isGroup: false },
         { 
           batchId: { $exists: true }, 
-          isGroup: true,
-          'animalId.type': animalType 
+          isGroup: true
         }
       ];
     }
@@ -340,12 +610,16 @@ export const getProductivityTrends = async (req, res) => {
         path: 'animalId',
         populate: {
           path: 'type',
-          select: 'name'
+          select: 'name productivityFields'
         }
       })
       .sort({ date: 1 });
 
-      
+    // Get animal type info for field definitions
+    let animalType;
+    if (animalTypeId) {
+      animalType = await AnimalType.findById(animalTypeId);
+    }
 
     // Group by date
     const trends = records.reduce((acc, record) => {
@@ -358,7 +632,20 @@ export const getProductivityTrends = async (req, res) => {
           animalCount: new Set()
         };
       }
-      acc[dateStr].totalQuantity += record.quantity;
+      
+      // Calculate quantity based on available fields
+      let quantity = 0;
+      if (record.productType) {
+        quantity = record.quantity || 0;
+      } else if (animalType && animalType.productivityFields) {
+        // Use the first numeric field from productivityFields
+        const numericField = animalType.productivityFields.find(f => f.type === 'number');
+        if (numericField && record[numericField.name] !== undefined) {
+          quantity = Number(record[numericField.name]) || 0;
+        }
+      }
+      
+      acc[dateStr].totalQuantity += quantity;
       acc[dateStr].records.push(record);
       
       // Track unique animals for average calculation
@@ -380,11 +667,13 @@ export const getProductivityTrends = async (req, res) => {
       timeframe,
       startDate,
       endDate: now,
-      productType,
-      animalType,
+      animalType: animalType ? {
+        _id: animalType._id,
+        name: animalType.name
+      } : null,
       trends: trendsArray,
       totalRecords: records.length,
-      totalQuantity: records.reduce((sum, record) => sum + record.quantity, 0)
+      totalQuantity: trendsArray.reduce((sum, day) => sum + day.totalQuantity, 0)
     });
   } catch (error) {
     console.error('Get productivity trends error:', error);

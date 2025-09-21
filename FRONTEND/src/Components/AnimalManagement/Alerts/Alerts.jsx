@@ -11,7 +11,7 @@ export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
-    document.title = "Animal Alerts";
+    document.title = "Animal Alerts - Animal Manager";
     fetchAlerts();
   }, []);
 
