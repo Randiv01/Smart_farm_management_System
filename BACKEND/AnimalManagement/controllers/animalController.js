@@ -4,7 +4,7 @@ import AnimalType from '../models/AnimalType.js';
 import mongoose from 'mongoose';
 import { canZoneAccommodate, updateZoneOccupancy } from '../utils/zoneOccupancy.js';
 
-// Create new animal with auto-generated AnimalID
+
 // Create new animal with auto-generated AnimalID
 export const createAnimal = async (req, res) => {
   try {

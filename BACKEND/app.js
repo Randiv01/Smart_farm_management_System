@@ -59,6 +59,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ----------------------- Uploads Setup -----------------------
+const animalUploadsDir = path.join(__dirname, "AnimalManagement", "Uploads");
 const uploadsDir = path.join(__dirname, "uploads");
 const healthUploadsDir = path.join(
   __dirname,
@@ -76,7 +77,7 @@ const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
 // Serve static folders
 app.use("/uploads", express.static(uploadsDir));
-// Serve with both capitalizations to match any frontend usage
+app.use("/animal-uploads", express.static(animalUploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/Health_Uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
