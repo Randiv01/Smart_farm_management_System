@@ -71,12 +71,21 @@ const defaultIndividualCategories = [
         required: true,readOnly: true
       },
       {
-        name: "reproductiveStatus",
-        label: "Reproductive Status",
-        type: "select",
-        options: ["Not Pregnant", "Pregnant", "Lactating", "Ready for Breeding", "Unknown","None(Male)"],
-        required: false,readOnly: true
-      },
+  name: "reproductiveStatus",
+  label: "Reproductive Status",
+  type: "select",
+  options: [
+    "Not Pregnant",
+    "Pregnant",
+    "Lactating",
+    "Ready for Breeding",
+    "Unknown",
+    "None (Male)"
+  ],
+  required: false,
+  readOnly: true
+}
+
     ],
   },
 ];
@@ -619,6 +628,7 @@ const defaultOtherCategories = [
                   <option value="units">units</option>
                   <option value="g">g</option>
                   <option value="ml">ml</option>
+                  <option value="pcs">pcs</option>
                   <option value="dozen">dozen</option>
                 </select>
               </div>

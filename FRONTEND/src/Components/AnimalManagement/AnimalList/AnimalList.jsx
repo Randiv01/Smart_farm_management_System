@@ -104,7 +104,7 @@ export default function AnimalList() {
     return { name: "Not assigned", id: null };
   };
 
-  // Fetch data with zone information
+  // Fetch data with zone information - UPDATED: Handle batch records properly
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -133,55 +133,9 @@ export default function AnimalList() {
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
       const animalsData = await animalsRes.json();
       
-      // For batch/group management, group animals by batchId
-      if (typeData.managementType === "batch") {
-        const batchGroups = {};
-        animalsData.forEach(animal => {
-          if (animal.batchId) {
-            if (!batchGroups[animal.batchId]) {
-              batchGroups[animal.batchId] = {
-                ...animal,
-                count: 1,
-                animals: [animal]
-              };
-            } else {
-              batchGroups[animal.batchId].count += 1;
-              batchGroups[animal.batchId].animals.push(animal);
-            }
-          } else {
-            if (!batchGroups[animal._id]) {
-              batchGroups[animal._id] = {
-                ...animal,
-                count: 1,
-                animals: [animal]
-              };
-            }
-          }
-        });
-        
-        setAnimals(Object.values(batchGroups));
-      } else if (typeData.managementType === "other") {
-        const hiveFarmGroups = {};
-        const mainField = typeData.categories.find(cat => cat.name === "Hive/Farm Info")?.fields[0]?.name || "name";
-        
-        animalsData.forEach(animal => {
-          const groupKey = animal.batchId || animal.data[mainField] || animal._id;
-          
-          if (!hiveFarmGroups[groupKey]) {
-            hiveFarmGroups[groupKey] = {
-              ...animal,
-              groupId: groupKey,
-              animals: [animal]
-            };
-          } else {
-            hiveFarmGroups[groupKey].animals.push(animal);
-          }
-        });
-        
-        setAnimals(Object.values(hiveFarmGroups));
-      } else {
-        setAnimals(animalsData);
-      }
+      // FIXED: Handle batch records properly - don't group on frontend
+      // Backend now returns batch records as single records with count field
+      setAnimals(animalsData);
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -200,42 +154,32 @@ export default function AnimalList() {
       setTimeout(() => setPopup({ ...popup, show: false }), 2500);
   };
 
-  const handleDelete = (id, isGroup = false, groupType = "individual") => {
+  // FIXED: Delete function to handle batch records properly
+  const handleDelete = async (animalId, isBatch = false) => {
     setPopup({
       show: true,
-      message: isGroup 
-        ? `Are you sure you want to delete this entire ${groupType === "batch" ? "batch" : groupType === "other" ? "hive/farm" : "group"}? This will delete all items in this ${groupType === "batch" ? "batch" : groupType === "other" ? "hive/farm" : "group"}.` 
+      message: isBatch 
+        ? `Are you sure you want to delete this entire batch? This will delete all ${animalType?.name.toLowerCase()}s in this batch.` 
         : "Are you sure you want to delete this animal?",
       success: false,
       type: "delete",
       confirmAction: async () => {
         try {
-          if (isGroup) {
-            if (groupType === "batch") {
-              const res = await fetch(`http://localhost:5000/animals/batch/${id}`, {
-                method: "DELETE",
-              });
-              if (!res.ok) throw new Error("Failed to delete batch");
-            } else {
-              const groupAnimals = animals.find(a => 
-                (a.batchId === id) || (a.groupId === id) || (a._id === id)
-              )?.animals || [];
-              
-              for (const animal of groupAnimals) {
-                const res = await fetch(`http://localhost:5000/animals/${animal._id}`, {
-                  method: "DELETE",
-                });
-                if (!res.ok) throw new Error("Failed to delete animal");
-              }
-            }
+          if (isBatch) {
+            // Delete batch record (single record representing the batch)
+            const res = await fetch(`http://localhost:5000/animals/${animalId}`, {
+              method: "DELETE",
+            });
+            if (!res.ok) throw new Error("Failed to delete batch");
           } else {
-            const res = await fetch(`http://localhost:5000/animals/${id}`, {
+            // Delete individual animal
+            const res = await fetch(`http://localhost:5000/animals/${animalId}`, {
               method: "DELETE",
             });
             if (!res.ok) throw new Error("Failed to delete animal");
           }
           fetchData();
-          showPopup(isGroup ? `${groupType === "batch" ? "Batch" : groupType === "other" ? "Hive/Farm" : "Group"} deleted successfully!` : "Animal deleted successfully!", true, "save");
+          showPopup(isBatch ? "Batch deleted successfully!" : "Animal deleted successfully!", true, "save");
         } catch (err) {
           showPopup(err.message, false, "error");
         }
@@ -252,6 +196,7 @@ export default function AnimalList() {
     setEditData(editValues);
   };
 
+  // FIXED: Update function to handle batch records
   const handleUpdate = async (id) => {
     const emptyFields = Object.entries(editData)
       .filter(([key, value]) => !value || value.toString().trim() === "")
@@ -285,6 +230,8 @@ export default function AnimalList() {
       });
       if (!res.ok) throw new Error("Failed to update animal");
       const updatedAnimal = await res.json();
+      
+      // FIXED: Update the animal in state to reflect changes immediately
       setAnimals((prev) => prev.map((a) => (a._id === id ? updatedAnimal : a)));
       setEditId(null);
       showPopup("Animal updated successfully!");
@@ -310,12 +257,20 @@ export default function AnimalList() {
 
   // Get group identifier for display
   const getGroupIdentifier = (animal) => {
-    if (animalType.managementType === "batch") {
+    if (animal.isBatch) {
+      return `Batch: ${animal.animalId}`;
+    } else if (animalType.managementType === "batch") {
       return animal.batchId;
     } else if (animalType.managementType === "other") {
       return animal.groupId || animal.batchId || animal._id;
     }
     return animal.animalId;
+  };
+
+  // Get display count for animal
+  const getDisplayCount = (animal) => {
+    // FIXED: Always use count field if it exists, otherwise default to 1
+    return animal.isBatch ? (animal.count || 1) : 1;
   };
 
   // Advanced search & filter logic
@@ -395,8 +350,8 @@ export default function AnimalList() {
       aValue = getZoneInfo(a).name;
       bValue = getZoneInfo(b).name;
     } else if (sortConfig.key === 'count') {
-      aValue = a.count || 0;
-      bValue = b.count || 0;
+      aValue = getDisplayCount(a);
+      bValue = getDisplayCount(b);
     } else {
       aValue = a.data[sortConfig.key] || "";
       bValue = b.data[sortConfig.key] || "";
@@ -428,7 +383,7 @@ export default function AnimalList() {
     setExportModal({ open: false, format: 'excel', selection: 'current', includeQR: false });
   };
 
-  // Export to Excel function
+  // Export to Excel function - UPDATED for batch records
   const exportToExcel = (data) => {
     try {
       // Prepare data for Excel
@@ -436,12 +391,8 @@ export default function AnimalList() {
         const rowData = {
           'ID': getGroupIdentifier(animal),
           'Zone': getZoneInfo(animal).name,
+          'Count': getDisplayCount(animal), // FIXED: Use getDisplayCount function
         };
-
-        // Add count for batch animals
-        if (animalType.managementType === "batch") {
-          rowData['Count'] = animal.count;
-        }
 
         // Add dynamic fields
         displayFields.forEach(field => {
@@ -457,13 +408,10 @@ export default function AnimalList() {
       
       // Set column widths
       const colWidths = [
-        { wch: 20 }, // ID
+        { wch: 25 }, // ID (wider for batch IDs)
         { wch: 15 }, // Zone
+        { wch: 10 }, // Count
       ];
-      
-      if (animalType.managementType === "batch") {
-        colWidths.push({ wch: 10 }); // Count
-      }
       
       displayFields.forEach(() => {
         colWidths.push({ wch: 20 });
@@ -484,7 +432,7 @@ export default function AnimalList() {
     }
   };
 
-  // Export to PDF function
+  // Export to PDF function - UPDATED for batch records
   const exportToPDF = (data) => {
     try {
       const doc = new jsPDF({
@@ -502,14 +450,14 @@ export default function AnimalList() {
       const headers = [
         'ID', 
         'Zone',
-        ...(animalType.managementType === "batch" ? ['Count'] : []),
+        'Count',
         ...displayFields.map(f => f.label)
       ];
 
       const tableData = data.map(animal => [
         getGroupIdentifier(animal),
         getZoneInfo(animal).name,
-        ...(animalType.managementType === "batch" ? [animal.count] : []),
+        getDisplayCount(animal).toString(), // FIXED: Use getDisplayCount function
         ...displayFields.map(field => animal.data[field.name] || '-')
       ]);
 
@@ -562,33 +510,32 @@ export default function AnimalList() {
   };
 
   // Loading / Error
-if (loading)
-  return (
-    <div className="flex flex-col justify-center items-center h-48 text-gray-700 dark:text-gray-300">
-      {/* New SVG Arc Spinner */}
-      <svg
-        className="animate-spin h-12 w-12 text-green-600 dark:text-green-400"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
-        ></circle>
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        ></path>
-      </svg>
-      <p className="mt-4 font-medium">Loading data...</p>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex flex-col justify-center items-center h-48 text-gray-700 dark:text-gray-300">
+        <svg
+          className="animate-spin h-12 w-12 text-green-600 dark:text-green-400"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+        <p className="mt-4 font-medium">Loading data...</p>
+      </div>
+    );
 
   if (error || !animalType)
     return (
@@ -853,16 +800,14 @@ if (loading)
                   Zone {getSortIcon('zone')}
                 </div>
               </th>
-              {animalType.managementType === "batch" && (
-                <th 
-                  className="p-3 text-center cursor-pointer hover:bg-opacity-80"
-                  onClick={() => requestSort('count')}
-                >
-                  <div className="flex items-center justify-center">
-                    Count {getSortIcon('count')}
-                  </div>
-                </th>
-              )}
+              <th 
+                className="p-3 text-center cursor-pointer hover:bg-opacity-80"
+                onClick={() => requestSort('count')}
+              >
+                <div className="flex items-center justify-center">
+                  Count {getSortIcon('count')}
+                </div>
+              </th>
               {displayFields.map((field, idx) => (
                 <th 
                   key={idx} 
@@ -881,7 +826,7 @@ if (loading)
             {sortedAnimals.length === 0 ? (
               <tr>
                 <td
-                  colSpan={displayFields.length + (animalType.managementType === "batch" ? 4 : 3)}
+                  colSpan={displayFields.length + 4} // FIXED: Always 4 columns (ID, Zone, Count, Actions)
                   className="p-4 text-center italic text-gray-500 dark:text-gray-400"
                 >
                   No matching {animalType.name} found.
@@ -895,10 +840,22 @@ if (loading)
                     darkMode ? "bg-dark-card text-dark-text" : "bg-white"
                   } hover:${darkMode ? "bg-dark-gray" : "bg-gray-100"}`}
                 >
-                  {/* QR Code + Animal/Batch/Hive ID */}
+                  {/* QR Code + Animal/Batch ID */}
                   <td className="p-3">
                     <div className="flex flex-col items-center justify-center">
-                      {animalType.managementType !== "individual" ? (
+                      {animal.isBatch ? (
+                        <div className="text-center">
+                          <QRCodeCanvas 
+                            value={animal.batchId || animal.animalId} 
+                            size={60} 
+                            level="H" 
+                            className="mx-auto"
+                          />
+                          <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                            <strong>Batch: {animal.animalId}</strong>
+                          </div>
+                        </div>
+                      ) : animalType.managementType !== "individual" ? (
                         <div className="text-center">
                           <QRCodeCanvas 
                             value={getGroupIdentifier(animal)} 
@@ -934,12 +891,10 @@ if (loading)
                     {getZoneInfo(animal).name}
                   </td>
 
-                  {/* Count for batch animals only */}
-                  {animalType.managementType === "batch" && (
-                    <td className="p-2 text-center font-semibold">
-                      {animal.count}
-                    </td>
-                  )}
+                  {/* Count - FIXED: Use getDisplayCount function */}
+                  <td className="p-2 text-center font-semibold">
+                    {getDisplayCount(animal)}
+                  </td>
 
                   {/* Dynamic Fields */}
                   {displayFields.map((field, idx) => (
@@ -1033,11 +988,8 @@ if (loading)
                           </button>
                           <button
                             onClick={() => handleDelete(
-                              animalType.managementType !== "individual" 
-                                ? (animalType.managementType === "batch" ? animal.batchId : animal.groupId || animal._id)
-                                : animal._id,
-                              animalType.managementType !== "individual",
-                              animalType.managementType
+                              animal._id, // FIXED: Always use animal._id
+                              animal.isBatch // FIXED: Pass isBatch flag
                             )}
                             className="px-2 py-1 rounded bg-btn-red text-white hover:bg-red-600"
                           >
@@ -1059,7 +1011,7 @@ if (loading)
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div className={`bg-white dark:bg-dark-card p-6 rounded-xl w-96 ${darkMode ? "text-dark-text" : ""}`}>
             <h3 className="text-lg font-semibold mb-4">
-              Move {animalType.managementType !== "individual" 
+              Move {animalToMove.isBatch ? "Batch" : animalType.managementType !== "individual" 
                 ? (animalType.managementType === "batch" ? "Batch" : "Hive/Farm") 
                 : animalToMove.data?.name} to another zone
             </h3>
@@ -1095,48 +1047,19 @@ if (loading)
                   }
                   
                   try {
-                    if (animalType.managementType !== "individual") {
-                      if (animalType.managementType === "batch") {
-                        const res = await fetch(`http://localhost:5000/animals/batch/${animalToMove.batchId}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ zoneId: moveZoneId }),
-                        });
-                        
-                        if (!res.ok) {
-                          const errorData = await res.json();
-                          throw new Error(errorData.message || "Failed to move batch");
-                        }
-                      } else {
-                        for (const animal of animalToMove.animals || [animalToMove]) {
-                          const res = await fetch(`http://localhost:5000/animals/${animal._id}/move-zone`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ zoneId: moveZoneId }),
-                          });
-                          
-                          if (!res.ok) {
-                            const errorData = await res.json();
-                            throw new Error(errorData.message || "Failed to move animal");
-                          }
-                        }
-                      }
-                    } else {
-                      const res = await fetch(`http://localhost:5000/animals/${animalToMove._id}/move-zone`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ zoneId: moveZoneId }),
-                      });
-                      
-                      if (!res.ok) {
-                        const errorData = await res.json();
-                        throw new Error(errorData.message || "Failed to move animal");
-                      }
+                    // FIXED: Use single endpoint for both individual and batch animals
+                    const res = await fetch(`http://localhost:5000/animals/${animalToMove._id}/move-zone`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ zoneId: moveZoneId }),
+                    });
+                    
+                    if (!res.ok) {
+                      const errorData = await res.json();
+                      throw new Error(errorData.message || "Failed to move animal");
                     }
                     
-                    showPopup(animalType.managementType !== "individual" 
-                      ? `${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} moved successfully!` 
-                      : "Animal moved successfully!");
+                    showPopup(animalToMove.isBatch ? "Batch moved successfully!" : "Animal moved successfully!");
                     setAnimalToMove(null);
                     fetchData();
                   } catch (err) {

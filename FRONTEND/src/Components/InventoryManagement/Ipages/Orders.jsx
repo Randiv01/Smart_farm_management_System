@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react";
+import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart as PieChartIcon, Zap, AlertCircle, Send, Download } from "lucide-react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -26,6 +26,8 @@ const Orders = () => {
   const [chartData, setChartData] = useState({});
   const [activeChartTab, setActiveChartTab] = useState("profit");
   const [showChart, setShowChart] = useState(true);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const statusOptions = [
     { value: "all", label: "All Orders" },
@@ -48,11 +50,11 @@ const Orders = () => {
 
   // Chart color schemes for dark/light mode
   const COLORS = {
-    delivered: darkMode ? '#86efac' : '#22c55e', // Green shades
-    processing: darkMode ? '#fde047' : '#eab308', // Yellow shades
-    pending: darkMode ? '#fdba74' : '#f97316', // Orange shades
-    shipped: darkMode ? '#a5b4fc' : '#6366f1', // Indigo shades
-    cancelled: darkMode ? '#fca5a5' : '#ef4444', // Red shades
+    delivered: darkMode ? '#86efac' : '#22c55e',
+    processing: darkMode ? '#fde047' : '#eab308',
+    pending: darkMode ? '#fdba74' : '#f97316',
+    shipped: darkMode ? '#a5b4fc' : '#6366f1',
+    cancelled: darkMode ? '#fca5a5' : '#ef4444',
     primary: darkMode ? '#86efac' : '#22c55e',
     secondary: darkMode ? '#107703ff' : '#02751eff',
     accent: darkMode ? '#1ef81eff' : '#4bf916ff',
@@ -60,6 +62,16 @@ const Orders = () => {
     text: darkMode ? '#e5e7eb' : '#374151',
     grid: darkMode ? '#4b5563' : '#e5e7eb'
   };
+
+  // Clear success messages after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   // Fetch orders from API
   useEffect(() => {
@@ -95,8 +107,10 @@ const Orders = () => {
      
       setOrders(response.data.orders);
       setTotalPages(response.data.totalPages);
+      setError("");
     } catch (error) {
       console.error("Error fetching orders:", error);
+      setError("Failed to load orders. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -115,7 +129,6 @@ const Orders = () => {
 
   const fetchChartData = async () => {
     try {
-      // Mock chart data - you'll need to implement actual API endpoints for this
       const monthlyData = [
         { month: 'Jan', revenue: 4500, profit: 3200, orders: 45 },
         { month: 'Feb', revenue: 5200, profit: 3800, orders: 52 },
@@ -185,10 +198,10 @@ const Orders = () => {
      
       fetchOrders();
       fetchStats();
-      alert(`Order status updated to ${newStatus}`);
+      setSuccess(`Order status updated to ${newStatus}`);
     } catch (error) {
       console.error("Error updating order status:", error);
-      alert("Failed to update order status");
+      setError("Failed to update order status");
     } finally {
       setUpdatingStatus(null);
     }
@@ -204,10 +217,10 @@ const Orders = () => {
      
       fetchOrders();
       fetchStats();
-      alert("Order deleted successfully");
+      setSuccess("Order deleted successfully");
     } catch (error) {
       console.error("Error deleting order:", error);
-      alert("Failed to delete order");
+      setError("Failed to delete order");
     } finally {
       setUpdatingStatus(null);
     }
@@ -222,10 +235,10 @@ const Orders = () => {
         withCredentials: true
       });
      
-      alert(`Notification email sent to ${customerEmail}`);
+      setSuccess(`Notification email sent to ${customerEmail}`);
     } catch (error) {
       console.error("Error sending email:", error);
-      alert("Failed to send notification email");
+      setError("Failed to send notification email");
     }
   };
 
@@ -399,10 +412,10 @@ const Orders = () => {
 
   if (loading) {
     return (
-      <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+      <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4">Loading orders...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
+          <p className="mt-4 text-lg">Loading orders...</p>
         </div>
       </div>
     );
@@ -413,81 +426,165 @@ const Orders = () => {
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Order Management</h1>
-          <p className={darkMode ? "text-gray-400" : "text-gray-600"}>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <Package className="text-green-500" size={32} />
+            Order Management
+          </h1>
+          <p className={`mt-2 text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
             View and manage all customer orders with detailed analytics
           </p>
         </div>
 
-        {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className={`rounded-xl p-5 shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}
+        {/* Success Message */}
+        {success && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-green-900/30 text-green-200" : "bg-green-100 text-green-800"} shadow-sm`}>
+            <Zap size={20} className="mr-3 flex-shrink-0" />
+            <span>{success}</span>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-red-900/30 text-red-200" : "bg-red-100 text-red-800"} shadow-sm`}>
+            <AlertCircle size={20} className="mr-3 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+            <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+              <Package className="text-blue-500" size={24} />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total Orders</h3>
+              <p className="text-2xl font-bold">{stats.totalOrders || 0}</p>
+            </div>
+          </div>
+          
+          <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+            <div className={`p-3 rounded-full ${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}>
+              <Clock className="text-yellow-500" size={24} />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Pending</h3>
+              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.pendingOrders || 0}</p>
+            </div>
+          </div>
+          
+          <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+            <div className={`p-3 rounded-full ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+              <CheckCircle className="text-green-500" size={24} />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Completed</h3>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.completedOrders || 0}</p>
+            </div>
+          </div>
+          
+          <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+            <div className={`p-3 rounded-full ${darkMode ? "bg-purple-900/30" : "bg-purple-100"}`}>
+              <DollarSign className="text-purple-500" size={24} />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total Revenue</h3>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">${(stats.totalRevenue || 0).toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Action Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => handleStatusChange("all")}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedStatus === "all" ? "bg-green-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
           >
-            <div className="flex items-center">
-              <div className="p-2 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300">
-                <Package size={20} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Orders</p>
-                <p className="text-2xl font-bold">{stats.totalOrders || 0}</p>
+            All Orders
+          </button>
+          <button
+            onClick={() => handleStatusChange("pending")}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedStatus === "pending" ? "bg-yellow-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => handleStatusChange("processing")}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedStatus === "processing" ? "bg-blue-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            Processing
+          </button>
+          <button
+            onClick={() => handleStatusChange("shipped")}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedStatus === "shipped" ? "bg-orange-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            Shipped
+          </button>
+          <button
+            onClick={() => handleStatusChange("delivered")}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedStatus === "delivered" ? "bg-green-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            Delivered
+          </button>
+        </div>
+
+        {/* Search and Filters */}
+        <div className={`p-6 rounded-xl shadow-lg mb-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search
+                  size={20}
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                />
+                <input
+                  type="text"
+                  placeholder="Search by order number, customer name, or email..."
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  value={searchTerm}
+                  onChange={handleSearch}
+                />
               </div>
             </div>
-          </motion.div>
-         
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className={`rounded-xl p-5 shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}
-          >
-            <div className="flex items-center">
-              <div className="p-2 rounded-full bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300">
-                <Clock size={20} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
-                <p className="text-2xl font-bold">{stats.pendingOrders || 0}</p>
-              </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={fetchOrders}
+                className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+                title="Refresh Data"
+              >
+                <RefreshCw size={20} />
+              </button>
+              <button
+                onClick={() => setShowChart(!showChart)}
+                className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+                title={showChart ? "Hide Charts" : "Show Charts"}
+              >
+                <PieChartIcon size={20} />
+              </button>
+              <Filter size={20} className={darkMode ? "text-gray-400" : "text-gray-500"} />
+              <select
+                value={selectedStatus}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className={`px-3 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+              >
+                {statusOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </motion.div>
-         
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            className={`rounded-xl p-5 shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}
-          >
-            <div className="flex items-center">
-              <div className="p-2 rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300">
-                <CheckCircle size={20} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</p>
-                <p className="text-2xl font-bold">{stats.completedOrders || 0}</p>
-              </div>
-            </div>
-          </motion.div>
-         
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            className={`rounded-xl p-5 shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}
-          >
-            <div className="flex items-center">
-              <div className="p-2 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300">
-                <DollarSign size={20} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-                <p className="text-2xl font-bold">${(stats.totalRevenue || 0).toFixed(2)}</p>
-              </div>
-            </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Charts Section */}
@@ -497,7 +594,7 @@ const Orders = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold flex items-center">
                   <BarChart3 className="mr-2" size={24} />
-                  Analytics & Insights
+                  Order Analytics
                 </h2>
                 <div className="flex space-x-2">
                   {['profit', 'trends', 'weekly', 'status'].map((tab) => (
@@ -530,61 +627,6 @@ const Orders = () => {
             </div>
           </div>
         )}
-
-        {/* Search and Filters */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-          <div className="flex flex-col md:flex-row gap-4 w-full">
-            <div className="relative w-full md:max-w-md">
-              <Search
-                size={20}
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
-              />
-              <input
-                type="text"
-                placeholder="Search orders by number, name, or email..."
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-                value={searchTerm}
-                onChange={handleSearch}
-              />
-            </div>
-           
-            <div className="relative w-full md:max-w-md">
-              <Mail
-                size={20}
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
-              />
-              <input
-                type="email"
-                placeholder="Filter by customer email..."
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-                value={emailSearch}
-                onChange={handleEmailSearch}
-              />
-            </div>
-          </div>
-         
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowChart(!showChart)}
-              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
-              title={showChart ? "Hide Charts" : "Show Charts"}
-            >
-              <PieChartIcon size={20} />
-            </button>
-            <Filter size={20} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-            <select
-              value={selectedStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className={`px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-            >
-              {statusOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
         {/* Orders Table */}
         {orders.length > 0 ? (
@@ -636,8 +678,9 @@ const Orders = () => {
                           <div className="flex flex-col gap-2">
                             <button
                               onClick={() => viewOrderDetails(order)}
-                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-left"
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-left flex items-center"
                             >
+                              <Edit size={12} className="mr-1" />
                               View Details
                             </button>
                            
@@ -680,6 +723,9 @@ const Orders = () => {
                             >
                               <Trash2 size={12} className="mr-1" />
                               Delete Order
+                              {updatingStatus === order._id && (
+                                <RefreshCw size={12} className="animate-spin ml-1 inline" />
+                              )}
                             </button>
                           </div>
                         </td>

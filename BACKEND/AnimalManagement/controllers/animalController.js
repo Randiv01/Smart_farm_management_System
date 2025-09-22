@@ -143,7 +143,7 @@ export const createAnimal = async (req, res) => {
   }
 };
 
-// Create batch animals - UPDATED: Don't generate individual QR codes
+// Create batch animals - FIXED: Create only ONE record for the entire batch
 export const createBatchAnimals = async (req, res) => {
   try {
     const { type, data, zoneId, batchId, count, generateQR } = req.body;
@@ -167,12 +167,12 @@ export const createBatchAnimals = async (req, res) => {
       }
     }
 
-    const animals = [];
+    // Generate batch ID if not provided
     const batchIdentifier = batchId || `BATCH-${Date.now()}`;
-    
-    // FIXED: Get last animal ID to start numbering from there
+
+    // Generate a single animal ID for the entire batch
     const lastAnimal = await Animal.findOne({ type: animalType._id })
-      .sort({ animalId: -1 }) // Sort by animalId instead of createdAt
+      .sort({ animalId: -1 })
       .select('animalId');
 
     let nextNumber = 1;
@@ -186,28 +186,24 @@ export const createBatchAnimals = async (req, res) => {
       }
     }
 
-    // Create all animals in the batch - NO individual QR codes for batch animals
-    for (let i = 0; i < count; i++) {
-      const animalId = `MO-${animalType.typeId}-${String(nextNumber + i).padStart(3, '0')}`;
-      
-      const animal = new Animal({
-        type: animalType._id,
-        data: { 
-          ...data, 
-          batchNumber: i + 1, // Add batch position to data
-          batchId: batchIdentifier // Also store batch ID in data for easy filtering
-        },
-        qrCode: null, // No individual QR codes for batch animals
-        animalId,
-        assignedZone: zoneId || null,
-        batchId: batchIdentifier
-      });
-      
-      animals.push(animal);
-    }
+    const animalId = `MO-${animalType.typeId}-${String(nextNumber).padStart(3, '0')}`;
 
-    // Save all animals
-    await Animal.insertMany(animals);
+    // Create ONLY ONE animal record for the entire batch
+    const animal = new Animal({
+      type: animalType._id,
+      data: { 
+        ...data, 
+        batchId: batchIdentifier
+      },
+      qrCode: batchIdentifier, // Use batch ID as QR code
+      animalId,
+      assignedZone: zoneId || null,
+      batchId: batchIdentifier,
+      count: count, // Store the total count
+      isBatch: true // Mark as batch record
+    });
+
+    await animal.save();
 
     // Update zone occupancy if zone is assigned
     if (zoneId) {
@@ -215,16 +211,17 @@ export const createBatchAnimals = async (req, res) => {
     }
 
     res.status(201).json({
-      message: `Created ${count} animals in batch ${batchIdentifier}`,
+      message: `Created batch of ${count} animals`,
       batchId: batchIdentifier,
       animalsCount: count,
-      batchQRCode: batchIdentifier // Use batch ID as the QR code for the entire batch
+      animal: animal, // Return the single animal record
+      batchQRCode: batchIdentifier
     });
   } catch (error) {
     console.error('Create batch animals error:', error);
     if (error.code === 11000) {
       return res.status(400).json({ 
-        message: 'Duplicate animal ID in batch. Please try again.',
+        message: 'Duplicate animal ID. Please try again.',
         error: error.message 
       });
     }
@@ -233,6 +230,7 @@ export const createBatchAnimals = async (req, res) => {
 };
 
 // Get all animals (optionally filtered by type) - FIXED: Proper population
+// Get all animals (optionally filtered by type)
 export const getAnimals = async (req, res) => {
   try {
     const query = {};
@@ -250,12 +248,29 @@ export const getAnimals = async (req, res) => {
       query.type = typeDoc._id;
     }
     
-    // FIXED: Properly populate assignedZone field
     const animals = await Animal.find(query)
       .populate('type')
-      .populate('assignedZone');
+      .populate('assignedZone')
+      .sort({ isBatch: 1, createdAt: -1 }); // Sort batch records first
     
-    res.json(animals);
+    // Transform the data for frontend
+    const transformedAnimals = animals.map(animal => {
+      const animalObj = animal.toObject();
+      
+      // For batch animals, show count instead of individual animal
+      if (animal.isBatch) {
+        return {
+          ...animalObj,
+          // This will make it display as "Batch: ID" with the count
+          displayId: `Batch: ${animal.animalId}`,
+          count: animal.count
+        };
+      }
+      
+      return animalObj;
+    });
+    
+    res.json(transformedAnimals);
   } catch (error) {
     console.error('Get animals error:', error);
     res.status(500).json({ message: error.message });
@@ -351,36 +366,32 @@ export const deleteAnimal = async (req, res) => {
 };
 
 // Delete batch animals
+// Delete batch animals - FIXED: Handle count properly
 export const deleteBatchAnimals = async (req, res) => {
   try {
     const { batchId } = req.params;
     
-    // Get all animals in the batch
-    const batchAnimals = await Animal.find({ batchId });
-    if (batchAnimals.length === 0) {
+    // Find the batch animal record
+    const batchAnimal = await Animal.findOne({ batchId, isBatch: true });
+    if (!batchAnimal) {
       return res.status(404).json({ message: 'Batch not found' });
     }
 
-    // Group animals by zone for efficient occupancy updates
-    const zoneCounts = {};
-    batchAnimals.forEach(animal => {
-      if (animal.assignedZone) {
-        const zoneId = animal.assignedZone.toString();
-        zoneCounts[zoneId] = (zoneCounts[zoneId] || 0) + 1;
-      }
-    });
+    // Store zone ID and count before deletion
+    const zoneId = batchAnimal.assignedZone;
+    const count = batchAnimal.count;
 
-    // Delete all animals in the batch
-    await Animal.deleteMany({ batchId });
+    // Delete the batch record
+    await Animal.findByIdAndDelete(batchAnimal._id);
 
-    // Update occupancy for all affected zones
-    for (const [zoneId, count] of Object.entries(zoneCounts)) {
-      await updateZoneOccupancy(zoneId, -count);
+    // Update zone occupancy if batch was assigned to a zone
+    if (zoneId) {
+      await updateZoneOccupancy(zoneId.toString(), -count);
     }
 
     res.json({ 
-      message: `Deleted ${batchAnimals.length} animals from batch ${batchId}`,
-      deletedCount: batchAnimals.length
+      message: `Deleted batch ${batchId} containing ${count} animals`,
+      deletedCount: count
     });
   } catch (error) {
     console.error('Delete batch animals error:', error);
