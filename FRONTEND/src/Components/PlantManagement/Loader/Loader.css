@@ -44,12 +44,12 @@
   margin: 2px;
   border: inherit;
   border-radius: 50%;
-  animation: l15 2s infinite;
+  animation: l15 1s infinite;
 }
 
 .loader::after {
   margin: 8px;
-  animation-duration: 3s;
+  animation-duration: 2s;
 }
 
 @keyframes l15 {
