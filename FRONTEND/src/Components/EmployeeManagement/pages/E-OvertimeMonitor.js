@@ -16,6 +16,7 @@ import { FileDown, Filter, Plus, ChevronDown, Loader, Edit, Trash2, X } from 'lu
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+
 // ===== helpers to build a professional Overtime ID (frontend fallback) =====
 const looksLikeObjectId = (s) => typeof s === 'string' && /^[0-9a-f]{24}$/i.test(s);
 
@@ -307,6 +308,16 @@ export const OvertimeMonitor = ({ darkMode }) => {
 
   return (
     <div className={`p-4 space-y-6 min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+      {/* PAGE HEADER — title + one-line tagline */}
+      <div className="mb-2">
+        <h1 className={`text-2xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+          Overtime Management System
+        </h1>
+        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          Track and optimize extra hours with real-time insights and simple controls.
+        </p>
+      </div>
+
       {/* Tabs */}
       <div className="flex space-x-4 border-b">
         <button
