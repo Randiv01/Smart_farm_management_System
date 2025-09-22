@@ -288,14 +288,36 @@ const Stock = () => {
       case 'In Stock':
         return darkMode ? 'bg-status-green-dark text-status-green-textDark' : 'bg-status-green-light text-status-green-textLight';
       case 'Low Stock':
-        return darkMode ? 'bg-status-yellow-dark text-status-yellow-textDark' : 'bg-status-yellow-light text-status-yellow-textLight';
+        return darkMode ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800';
       case 'Out of Stock':
         return darkMode ? 'bg-status-red-dark text-status-red-textDark' : 'bg-status-red-light text-status-red-textLight';
       case 'Expiring Soon':
-        return darkMode ? 'bg-status-yellow-dark text-status-yellow-textDark' : 'bg-status-yellow-light text-status-yellow-textLight';
+        return darkMode ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800';
+      case 'Expired':
+        return darkMode ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800';
       default:
         return darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getRowBackground = (status) => {
+    if (status === 'Low Stock' || status === 'Expiring Soon') {
+      return darkMode ? 'bg-yellow-900/50' : 'bg-yellow-50';
+    }
+    if (status === 'Expired') {
+      return darkMode ? 'bg-red-900/50' : 'bg-red-50';
+    }
+    return darkMode ? 'hover:bg-dark-gray/80' : 'hover:bg-gray-50';
+  };
+
+  const getGridBorder = (status) => {
+    if (status === 'Low Stock' || status === 'Expiring Soon') {
+      return darkMode ? 'border-yellow-700' : 'border-yellow-200';
+    }
+    if (status === 'Expired') {
+      return darkMode ? 'border-red-700' : 'border-red-200';
+    }
+    return darkMode ? 'border-gray-700 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300';
   };
 
   const generateProductInfo = (product) => {
@@ -329,8 +351,15 @@ Market: ${product.market}`;
       email = "plant.manager@example.com";
       phone = "0987654321";
     }
-    const subject = `Low Stock Alert: ${product.name}`;
-    const body = `Dear Management,\n\nThe product "${product.name}" is running low on stock.\nCurrent stock: ${product.stock.quantity} ${product.stock.unit}\nPlease consider refilling it.\n\nBest regards,\nInventory System`;
+    let subject = `Low Stock Alert: ${product.name}`;
+    let body = `Dear Management,\n\nThe product "${product.name}" is running low on stock.\nCurrent stock: ${product.stock.quantity} ${product.stock.unit}\nPlease consider refilling it.\n\nBest regards,\nInventory System`;
+    if (product.status === 'Expiring Soon') {
+      subject = `Expiring Soon Alert: ${product.name}`;
+      body = `Dear Management,\n\nThe product "${product.name}" is expiring soon.\nExpiry date: ${formatDate(product.expiryDate)}\nPlease consider selling or using it soon.\n\nBest regards,\nInventory System`;
+    } else if (product.status === 'Expired') {
+      subject = `Expired Product Alert: ${product.name}`;
+      body = `Dear Management,\n\nThe product "${product.name}" has expired.\nExpiry date: ${formatDate(product.expiryDate)}\nPlease consider removal or disposal.\n\nBest regards,\nInventory System`;
+    }
     window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
     window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(body)}`, '_blank');
   };
@@ -409,9 +438,9 @@ Market: ${product.market}`;
               <option value="Low Stock">Low Stock</option>
               <option value="Out of Stock">Out of Stock</option>
               <option value="Expiring Soon">Expiring Soon</option>
+              <option value="Expired">Expired</option>
             </select>
           </div>
-      
           <div className="flex items-center gap-3">
             <button
               onClick={fetchProducts}
@@ -420,7 +449,6 @@ Market: ${product.market}`;
             >
               <RefreshCw size={20} />
             </button>
-        
             {showExportView ? (
               <button
                 onClick={handleBackToMain}
@@ -438,7 +466,6 @@ Market: ${product.market}`;
                 <Globe size={20} />
               </button>
             )}
-        
             <div className="flex gap-1">
               <button
                 onClick={() => setViewMode('table')}
@@ -453,14 +480,12 @@ Market: ${product.market}`;
                 <Grid size={20} />
               </button>
             </div>
-        
             <button
               onClick={() => {
                 setEditingProduct(null);
                 const creationDate = new Date().toISOString().split('T')[0];
                 const defaultCategory = "Milk Product";
                 const expiryDate = calculateExpiryDate(defaultCategory, creationDate);
-            
                 setFormData({
                   name: "",
                   category: defaultCategory,
@@ -525,7 +550,7 @@ Market: ${product.market}`;
             <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
               {inventory.length > 0 ? (
                 inventory.map((item) => (
-                  <tr key={item._id} className={`${darkMode ? "hover:bg-dark-gray/80" : "hover:bg-gray-50"} transition-colors ${item.status === 'Low Stock' ? `${darkMode ? 'bg-status-red-dark/30' : 'bg-status-red-light/50'}` : ''}`}>
+                  <tr key={item._id} className={`${getRowBackground(item.status)} transition-colors`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.image ? (
                         <img src={item.image} alt={item.name} className="h-12 w-12 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" />
@@ -583,11 +608,11 @@ Market: ${product.market}`;
                         >
                           Refill
                         </button>
-                        {item.status === 'Low Stock' && (
+                        {(item.status === 'Low Stock' || item.status === 'Expiring Soon' || item.status === 'Expired') && (
                           <button
                             onClick={() => handleNotify(item)}
-                            className={`p-2 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
-                            title="Notify Management"
+                            className={`p-2 rounded-md ${item.status === 'Expired' ? (darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100") : (darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100")}`}
+                            title={item.status === 'Expired' ? "Notify Management for Expired Product" : item.status === 'Expiring Soon' ? "Notify Management for Expiring Product" : "Notify Management for Low Stock"}
                           >
                             <AlertCircle size={18} />
                           </button>
@@ -632,16 +657,15 @@ Market: ${product.market}`;
             inventory.map((item) => (
               <div
                 key={item._id}
-                className={`p-5 rounded-lg shadow-sm border flex flex-col h-full ${darkMode ? `bg-dark-card ${item.status === 'Low Stock' ? 'border-status-red-dark' : 'border-gray-700 hover:border-gray-500'}` : `bg-white ${item.status === 'Low Stock' ? 'border-status-red-light' : 'border-gray-200 hover:border-gray-300'}`} transition-all duration-200 hover:shadow-md relative`}
+                className={`p-5 rounded-lg shadow-sm border flex flex-col h-full ${darkMode ? `bg-dark-card ${getGridBorder(item.status)}` : `bg-white ${getGridBorder(item.status)}`} transition-all duration-200 hover:shadow-md relative`}
               >
-                {/* Low Stock Alert Banner */}
-                {item.status === 'Low Stock' && (
-                  <div className={`absolute top-0 left-0 right-0 py-1 text-center text-xs font-bold rounded-t-lg ${darkMode ? 'bg-status-red-dark text-status-red-textDark' : 'bg-status-red-light text-status-red-textLight'}`}>
-                    LOW STOCK - NEEDS REFILL
+                {/* Low Stock or Expired Alert Banner */}
+                {(item.status === 'Low Stock' || item.status === 'Expiring Soon' || item.status === 'Expired') && (
+                  <div className={`absolute top-0 left-0 right-0 py-1 text-center text-xs font-bold rounded-t-lg ${item.status === 'Expired' ? (darkMode ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800') : (darkMode ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800')}`}>
+                    {item.status === 'Expired' ? 'EXPIRED' : 'LOW STOCK / EXPIRING SOON'}
                   </div>
                 )}
-                
-                <div className={`flex justify-between items-start mb-4 ${item.status === 'Low Stock' ? 'mt-4' : ''}`}>
+                <div className={`flex justify-between items-start mb-4 ${(item.status === 'Low Stock' || item.status === 'Expiring Soon' || item.status === 'Expired') ? 'mt-4' : ''}`}>
                   <div className="flex items-center gap-3">
                     {item.image ? (
                       <img src={item.image} alt={item.name} className="h-14 w-14 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" />
@@ -665,15 +689,6 @@ Market: ${product.market}`;
                     >
                       <QrCode size={16} />
                     </button>
-                    {item.status === 'Low Stock' && (
-                      <button
-                        onClick={() => handleNotify(item)}
-                        className={`p-1.5 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
-                        title="Notify Management"
-                      >
-                        <AlertCircle size={16} />
-                      </button>
-                    )}
                   </div>
                 </div>
                 <div className="space-y-3 mb-4">
@@ -717,16 +732,7 @@ Market: ${product.market}`;
                     </div>
                   )}
                 </div>
-                
-                {/* Low Stock Alert at Bottom */}
-                {item.status === 'Low Stock' && (
-                  <div className={`mt-auto py-2 px-3 text-center text-sm font-semibold rounded-md ${darkMode ? 'bg-status-red-dark/30 text-status-red-textDark' : 'bg-status-red-light/50 text-status-red-textLight'} border-l-4 ${darkMode ? 'border-status-red-dark' : 'border-status-red-light'}`}>
-                    <AlertCircle size={14} className="inline mr-1" />
-                    Low Stock Alert
-                  </div>
-                )}
-                
-                <div className="flex justify-between pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between pt-3 mt-auto border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => handleRefill(item)}
                     className={`px-3 py-1.5 text-sm rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
@@ -734,6 +740,15 @@ Market: ${product.market}`;
                     Refill
                   </button>
                   <div className="flex gap-2">
+                    {(item.status === 'Low Stock' || item.status === 'Expiring Soon' || item.status === 'Expired') && (
+                      <button
+                        onClick={() => handleNotify(item)}
+                        className={`p-1.5 rounded-md ${item.status === 'Expired' ? (darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100") : (darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100")}`}
+                        title={item.status === 'Expired' ? "Notify Management for Expired Product" : item.status === 'Expiring Soon' ? "Notify Management for Expiring Product" : "Notify Management for Low Stock"}
+                      >
+                        <AlertCircle size={16} />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleEdit(item)}
                       className={`p-1.5 rounded-md ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
@@ -1086,7 +1101,6 @@ Market: ${product.market}`;
                 <X size={20} />
               </button>
             </div>
-        
             <form onSubmit={handleRefillSubmit}>
               <div className="mb-4">
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -1096,7 +1110,6 @@ Market: ${product.market}`;
                   Current Expiry: {formatDate(refillingProduct.expiryDate)}
                 </label>
               </div>
-          
               <div className="mb-4">
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Refill Quantity *
@@ -1151,7 +1164,6 @@ Market: ${product.market}`;
                 <X size={20} />
               </button>
             </div>
-        
             <div className="flex flex-col items-center">
               <div className="bg-white p-4 rounded-lg mb-4" id="qrcode-container">
                 <QRCodeSVG
@@ -1162,48 +1174,38 @@ Market: ${product.market}`;
                   id="product-qrcode"
                 />
               </div>
-          
               <div className="text-center">
                 <h3 className="font-semibold">{showQRCode.name}</h3>
                 <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
                   Scan this code to view product details
                 </p>
               </div>
-          
               <button
                 onClick={() => {
                   const svgElement = document.getElementById('product-qrcode');
                   if (!svgElement) return;
-              
                   const canvas = document.createElement('canvas');
                   const ctx = canvas.getContext('2d');
-              
                   const size = 200;
                   canvas.width = size;
                   canvas.height = size;
-              
                   const svgData = new XMLSerializer().serializeToString(svgElement);
                   const img = new Image();
                   const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
                   const url = URL.createObjectURL(svgBlob);
-              
                   img.onload = function() {
                     ctx.fillStyle = 'white';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, size, size);
-                
                     const pngUrl = canvas.toDataURL('image/png');
-                
                     const downloadLink = document.createElement('a');
                     downloadLink.href = pngUrl;
                     downloadLink.download = `${showQRCode.name.replace(/\s+/g, '-').toLowerCase()}-qrcode.png`;
                     document.body.appendChild(downloadLink);
                     downloadLink.click();
                     document.body.removeChild(downloadLink);
-                
                     URL.revokeObjectURL(url);
                   };
-              
                   img.src = url;
                 }}
                 className="mt-4 px-4 py-2 bg-btn-blue text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors duration-200"
