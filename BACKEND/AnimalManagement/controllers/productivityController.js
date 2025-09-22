@@ -576,6 +576,8 @@ export const getAllProductivityRecords = async (req, res) => {
 };
 
 // Get productivity totals for different time periods
+// productivityController.js - NEW, CORRECTED FUNCTION
+
 export const getProductivityTotals = async (req, res) => {
   try {
     const { animalTypeId, fieldName } = req.query;
@@ -584,36 +586,52 @@ export const getProductivityTotals = async (req, res) => {
       return res.status(400).json({ message: 'Animal type ID and field name are required' });
     }
 
-    const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
-    const animalIds = animals.map(animal => animal._id);
+    // Find all animals of this type to get their individual IDs and unique batch IDs
+    const animals = await Animal.find({ type: animalTypeId }).select('_id batchId').lean();
+    const animalIds = animals.map(a => a._id);
+    const batchIds = [...new Set(animals.map(a => a.batchId).filter(Boolean))]; // Get unique batch IDs
 
     const now = new Date();
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
-    const weekStart = new Date(new Date().setDate(now.getDate() - 7));
     const monthStart = new Date(new Date().setDate(now.getDate() - 30));
     const yearStart = new Date(now.getFullYear(), 0, 1);
+    const allTimeStart = new Date(0); // For all-time records
+
+    // This is the crucial fix. The query now looks for records matching EITHER
+    // an individual animal ID OR a batch ID.
+    const createQueryForPeriod = (startDate) => ({
+      $and: [
+        { date: { $gte: startDate } },
+        {
+          $or: [
+            { animalId: { $in: animalIds }, isGroup: false },
+            { batchId: { $in: batchIds }, isGroup: true }
+          ]
+        },
+        { [fieldName]: { $exists: true } }
+      ]
+    });
 
     const queries = {
-      daily: { date: { $gte: todayStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
-      weekly: { date: { $gte: weekStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
-      monthly: { date: { $gte: monthStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
-      yearly: { date: { $gte: yearStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
-      allTime: { animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } }
+      daily: createQueryForPeriod(todayStart),
+      monthly: createQueryForPeriod(monthStart),
+      yearly: createQueryForPeriod(yearStart),
+      allTime: createQueryForPeriod(allTimeStart)
     };
 
     const results = await Promise.all(Object.values(queries).map(query =>
-      AnimalProductivity.aggregate([ // Changed
+      AnimalProductivity.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
       ])
     ));
 
-    const [daily, weekly, monthly, yearly, allTime] = results.map(result => result[0]?.total || 0);
+    const [daily, monthly, yearly, allTime] = results.map(result => result[0]?.total || 0);
 
     res.json({
       animalTypeId,
       fieldName,
-      totals: { daily, weekly, monthly, yearly, allTime },
+      totals: { daily, monthly, yearly, allTime },
       animalCount: animals.length
     });
   } catch (error) {
