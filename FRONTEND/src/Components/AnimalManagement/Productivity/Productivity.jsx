@@ -754,7 +754,7 @@ const exportPDF = async () => {
         </div>
       )}
 
-      {/* Summary Cards */}
+{/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}>
           <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
@@ -774,7 +774,9 @@ const exportPDF = async () => {
             <p className="text-2xl font-bold">{animalTypes.length}</p>
           </div>
         </div>
-        {productivityFields.slice(0, 2).map((field) => (
+        
+        {/* CORRECTED LINE IS HERE - .slice(0, 2) has been removed */}
+        {productivityFields.map((field) => (
           <div
             key={field.name}
             className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}
