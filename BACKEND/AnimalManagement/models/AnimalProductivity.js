@@ -59,4 +59,4 @@ productivitySchema.pre('save', function(next) {
   next();
 });
 
-export default mongoose.model('Productivity', productivitySchema);
+export default mongoose.model('AnimalProductivity', productivitySchema);

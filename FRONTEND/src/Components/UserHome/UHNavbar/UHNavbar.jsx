@@ -14,6 +14,7 @@ import {
 import { DarkModeToggle } from '../UHDarkModeToggle/UHDarkModeToggle';
 import { useAuth } from '../UHContext/UHAuthContext';
 import { useCart } from '../UHContext/UHCartContext';
+import { isManager } from '../../../utils/userUtils';
 
 const Navbar = ({ onCartClick }) => {
   
@@ -280,14 +281,19 @@ const Navbar = ({ onCartClick }) => {
                   <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
                     {user?.email}
                   </div>
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={closeMenu}
-                    style={{ textDecoration: 'none' }}
-                  >
-                    My Account
-                  </Link>
+                  
+                  {/* Only show profile for customers, not managers */}
+                  {(!isManager(user)) && (
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={closeMenu}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      My Account
+                    </Link>
+                  )}
+                  
                   <Link
                     to="/orders"
                     className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -399,14 +405,19 @@ const Navbar = ({ onCartClick }) => {
                     <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
                       Logged in as: {user?.email}
                     </div>
-                    <Link
-                      to="/profile"
-                      onClick={closeMenu}
-                      className="block py-2 px-3 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      My Account
-                    </Link>
+                    
+                    {/* Only show profile for customers, not managers */}
+                    {(!isManager(user)) && (
+                      <Link
+                        to="/profile"
+                        onClick={closeMenu}
+                        className="block py-2 px-3 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        My Account
+                      </Link>
+                    )}
+                    
                     <Link
                       to="/orders"
                       onClick={closeMenu}

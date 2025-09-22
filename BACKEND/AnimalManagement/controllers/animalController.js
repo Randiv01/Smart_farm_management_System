@@ -4,6 +4,7 @@ import AnimalType from '../models/AnimalType.js';
 import mongoose from 'mongoose';
 import { canZoneAccommodate, updateZoneOccupancy } from '../utils/zoneOccupancy.js';
 
+
 // Create new animal with auto-generated AnimalID
 export const createAnimal = async (req, res) => {
   try {
@@ -30,18 +31,49 @@ export const createAnimal = async (req, res) => {
 
     const qrCode = generateQR ? uuidv4() : undefined;
 
-    // Auto-generate AnimalID
-    const lastAnimal = await Animal.find({ type: animalType._id })
-      .sort({ createdAt: -1 })
-      .limit(1);
-
+    // FIXED: Better animal ID generation with proper error handling
     let nextNumber = 1;
-    if (lastAnimal.length > 0 && lastAnimal[0].animalId) {
-      const lastIdParts = lastAnimal[0].animalId.split('-');
-      nextNumber = parseInt(lastIdParts[2]) + 1;
-    }
+    let animalId;
+    let attempts = 0;
+    const maxAttempts = 10;
 
-    const animalId = `MO-${animalType.typeId}-${String(nextNumber).padStart(3, '0')}`;
+    do {
+      // Get the highest animal ID for this type
+      const lastAnimal = await Animal.findOne({ 
+        type: animalType._id,
+        animalId: new RegExp(`^MO-${animalType.typeId}-`)
+      })
+      .sort({ animalId: -1 })
+      .select('animalId');
+
+      if (lastAnimal && lastAnimal.animalId) {
+        const lastIdParts = lastAnimal.animalId.split('-');
+        if (lastIdParts.length === 3) {
+          const lastNumber = parseInt(lastIdParts[2]);
+          if (!isNaN(lastNumber)) {
+            nextNumber = lastNumber + 1;
+          }
+        }
+      }
+
+      animalId = `MO-${animalType.typeId}-${String(nextNumber).padStart(3, '0')}`;
+      
+      // Check if this ID already exists (double-check)
+      const existingAnimal = await Animal.findOne({ animalId });
+      if (!existingAnimal) {
+        break; // ID is available
+      }
+      
+      nextNumber++;
+      attempts++;
+      
+    } while (attempts < maxAttempts);
+
+    if (attempts >= maxAttempts) {
+      return res.status(500).json({ 
+        message: 'Failed to generate unique animal ID after multiple attempts' 
+      });
+    }
 
     const animal = new Animal({ 
       type: animalType._id, 
@@ -62,6 +94,51 @@ export const createAnimal = async (req, res) => {
     res.status(201).json(animal);
   } catch (error) {
     console.error('Create animal error:', error);
+    if (error.code === 11000) {
+      // If we still get a duplicate error, try one more time with a different approach
+      try {
+        // Emergency fallback: find the absolute highest number across all animals
+        const allAnimals = await Animal.find({
+          animalId: new RegExp(`^MO-${animalType.typeId}-`)
+        }).select('animalId');
+        
+        let maxNumber = 0;
+        allAnimals.forEach(animal => {
+          const parts = animal.animalId.split('-');
+          if (parts.length === 3) {
+            const num = parseInt(parts[2]);
+            if (!isNaN(num) && num > maxNumber) {
+              maxNumber = num;
+            }
+          }
+        });
+        
+        const animalId = `MO-${animalType.typeId}-${String(maxNumber + 1).padStart(3, '0')}`;
+        
+        // Retry with the new ID
+        const animal = new Animal({ 
+          type: animalType._id, 
+          data, 
+          qrCode, 
+          animalId,
+          assignedZone: zoneId || null,
+          batchId: batchId || null
+        });
+        
+        await animal.save();
+        
+        if (zoneId) {
+          await updateZoneOccupancy(zoneId, 1);
+        }
+        
+        return res.status(201).json(animal);
+      } catch (fallbackError) {
+        return res.status(500).json({ 
+          message: 'Critical error in animal ID generation',
+          error: fallbackError.message 
+        });
+      }
+    }
     res.status(400).json({ message: error.message });
   }
 };
@@ -93,15 +170,20 @@ export const createBatchAnimals = async (req, res) => {
     const animals = [];
     const batchIdentifier = batchId || `BATCH-${Date.now()}`;
     
-    // Get last animal ID to start numbering from there
-    const lastAnimal = await Animal.find({ type: animalType._id })
-      .sort({ createdAt: -1 })
-      .limit(1);
+    // FIXED: Get last animal ID to start numbering from there
+    const lastAnimal = await Animal.findOne({ type: animalType._id })
+      .sort({ animalId: -1 }) // Sort by animalId instead of createdAt
+      .select('animalId');
 
     let nextNumber = 1;
-    if (lastAnimal.length > 0 && lastAnimal[0].animalId) {
-      const lastIdParts = lastAnimal[0].animalId.split('-');
-      nextNumber = parseInt(lastIdParts[2]) + 1;
+    if (lastAnimal && lastAnimal.animalId) {
+      const lastIdParts = lastAnimal.animalId.split('-');
+      if (lastIdParts.length >= 3) {
+        const lastNumber = parseInt(lastIdParts[2]);
+        if (!isNaN(lastNumber)) {
+          nextNumber = lastNumber + 1;
+        }
+      }
     }
 
     // Create all animals in the batch - NO individual QR codes for batch animals
@@ -140,6 +222,12 @@ export const createBatchAnimals = async (req, res) => {
     });
   } catch (error) {
     console.error('Create batch animals error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Duplicate animal ID in batch. Please try again.',
+        error: error.message 
+      });
+    }
     res.status(400).json({ message: error.message });
   }
 };

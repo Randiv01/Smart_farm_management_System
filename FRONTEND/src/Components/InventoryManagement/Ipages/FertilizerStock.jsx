@@ -18,32 +18,26 @@ import {
   Zap,
   Clock,
   Mail,
-  MessageSquare
+  MessageSquare,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 import { useITheme } from "../Icontexts/IThemeContext";
 import axios from "axios";
-import { Bar } from "react-chartjs-2";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  Title,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   Legend,
-} from 'chart.js';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  Title,
-  Tooltip,
-  Legend
-);
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const FertilizerStock = () => {
   const { theme } = useITheme();
@@ -61,7 +55,7 @@ const FertilizerStock = () => {
   const [editingFertilizer, setEditingFertilizer] = useState(null);
   const [refillingFertilizer, setRefillingFertilizer] = useState(null);
   const [usingFertilizer, setUsingFertilizer] = useState(null);
-  const [selectedFertilizerForChart, setSelectedFertilizerForChart] = useState(null);
+  const [showChart, setShowChart] = useState(true); // Controls chart visibility
   const [refillQuantity, setRefillQuantity] = useState("");
   const [useQuantity, setUseQuantity] = useState("");
   const [formData, setFormData] = useState({
@@ -70,11 +64,21 @@ const FertilizerStock = () => {
     remaining: "",
     unit: "kg",
     fertilizerType: "Organic",
-    shelfLife: "365"
+    shelfLife: "365",
   });
-  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+
+  // Color palette consistent with AnimalFoodStock
+  const COLORS = {
+    critical: darkMode ? "#fca5a5" : "#ef4444", // Red shades
+    low: darkMode ? "#fdba74" : "#f97316", // Orange shades
+    good: darkMode ? "#86efac" : "#22c55e", // Green shades
+    background: darkMode ? "#1f2937" : "#ffffff",
+    text: darkMode ? "#e5e7eb" : "#374151",
+    grid: darkMode ? "#4b5563" : "#e5e7eb",
+  };
 
   // Clear success messages after 3 seconds
   useEffect(() => {
@@ -86,24 +90,31 @@ const FertilizerStock = () => {
     }
   }, [success]);
 
-  // Fetch fertilizers
+  // Fetch fertilizers from API
   useEffect(() => {
     fetchFertilizers();
   }, []);
 
-  // Set initial chart selection
-  useEffect(() => {
-    if (selectedFertilizerForChart === null && fertilizers.length > 0) {
-      setSelectedFertilizerForChart('all');
+  const fetchFertilizers = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get("http://localhost:5000/api/Ifertilizerstock");
+      setFertilizers(response.data);
+      setError("");
+    } catch (error) {
+      console.error("Error fetching fertilizers:", error);
+      setError("Failed to load fertilizers. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  }, [fertilizers]);
+  };
 
   // Calculate expiry date based on shelf life
   const calculateExpiryDate = (shelfLifeMonths) => {
     const today = new Date();
     const expiryDate = new Date(today);
     expiryDate.setMonth(expiryDate.getMonth() + parseInt(shelfLifeMonths));
-    return expiryDate.toISOString().split('T')[0];
+    return expiryDate.toISOString().split("T")[0];
   };
 
   // Calculate days until expiry
@@ -117,8 +128,8 @@ const FertilizerStock = () => {
   // Get days left text and class
   const getDaysLeftText = (days) => {
     if (days < 0) return `Expired ${Math.abs(days)} days ago`;
-    if (days === 0) return 'Expires today';
-    return `${days} day${days > 1 ? 's' : ''} left`;
+    if (days === 0) return "Expires today";
+    return `${days} day${days > 1 ? "s" : ""} left`;
   };
 
   const getDaysLeftClass = (days) => {
@@ -144,69 +155,97 @@ const FertilizerStock = () => {
     return { text: "Good", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" };
   };
 
-  // Fetch fertilizers from API
-  const fetchFertilizers = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get("http://localhost:5000/api/Ifertilizerstock");
-      setFertilizers(response.data);
-      setError("");
-    } catch (error) {
-      console.error("Error fetching fertilizers:", error);
-      setError("Failed to load fertilizers. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  // Prepare chart data for stock distribution (Pie Chart)
+  const getStockChartData = () => {
+    const critical = filteredFertilizers.filter((fertilizer) => (fertilizer.remaining / fertilizer.quantity) * 100 <= 10).length;
+    const low = filteredFertilizers.filter((fertilizer) => {
+      const percentage = (fertilizer.remaining / fertilizer.quantity) * 100;
+      return percentage > 10 && percentage <= 30;
+    }).length;
+    const good = filteredFertilizers.filter((fertilizer) => (fertilizer.remaining / fertilizer.quantity) * 100 > 30).length;
+
+    return [
+      { name: "Critical (≤10%)", value: critical, color: COLORS.critical },
+      { name: "Low (≤30%)", value: low, color: COLORS.low },
+      { name: "Good (>30%)", value: good, color: COLORS.good },
+    ].filter((item) => item.value > 0);
+  };
+
+  // Prepare fertilizer type-wise stock data (Bar Chart)
+  const getFertilizerTypeWiseData = () => {
+    const uniqueFertilizerTypes = [...new Set(filteredFertilizers.map((fertilizer) => fertilizer.fertilizerType))];
+
+    return uniqueFertilizerTypes.map((type) => {
+      const typeFertilizers = filteredFertilizers.filter((fertilizer) => fertilizer.fertilizerType === type);
+      const critical = typeFertilizers.filter((fertilizer) => (fertilizer.remaining / fertilizer.quantity) * 100 <= 10).length;
+      const low = typeFertilizers.filter((fertilizer) => {
+        const percentage = (fertilizer.remaining / fertilizer.quantity) * 100;
+        return percentage > 10 && percentage <= 30;
+      }).length;
+      const good = typeFertilizers.filter((fertilizer) => (fertilizer.remaining / fertilizer.quantity) * 100 > 30).length;
+
+      return {
+        type,
+        critical,
+        low,
+        good,
+        total: typeFertilizers.length,
+      };
+    }).filter((type) => type.total > 0);
   };
 
   // Filter and sort fertilizers
   const filteredAndSortedFertilizers = () => {
-    let filtered = fertilizers.filter(fertilizer =>
-      (fertilizer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fertilizer.fertilizerType.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (fertilizerTypeFilter === "All Types" || fertilizer.fertilizerType === fertilizerTypeFilter)
+    let filtered = fertilizers.filter(
+      (fertilizer) =>
+        (fertilizer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          fertilizer.fertilizerType.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (fertilizerTypeFilter === "All Types" || fertilizer.fertilizerType === fertilizerTypeFilter)
     );
 
-    // Apply tab filters
     if (activeTab !== "all") {
-      filtered = filtered.filter(fertilizer => {
+      filtered = filtered.filter((fertilizer) => {
         const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
         const percentage = (fertilizer.remaining / fertilizer.quantity) * 100;
-      
-        if (activeTab === 'expired') return days < 0;
-        if (activeTab === 'expiringSoon') return days >= 0 && days <= 30;
-        if (activeTab === 'lowStock') return percentage <= 30;
-        if (activeTab === 'criticalStock') return percentage <= 10;
+        if (activeTab === "expired") return days < 0;
+        if (activeTab === "expiringSoon") return days >= 0 && days <= 30;
+        if (activeTab === "lowStock") return percentage <= 30;
+        if (activeTab === "criticalStock") return percentage <= 10;
         return true;
       });
     }
 
-    // Apply additional status filters
     if (statusFilter) {
-      filtered = filtered.filter(fertilizer => {
+      filtered = filtered.filter((fertilizer) => {
         const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
         const percentage = (fertilizer.remaining / fertilizer.quantity) * 100;
-        if (statusFilter === 'expired') return days < 0;
-        if (statusFilter === 'expiringSoon') return days >= 0 && days <= 30;
-        if (statusFilter === 'lowStock') return percentage <= 30;
-        if (statusFilter === 'criticalStock') return percentage <= 10;
+        if (statusFilter === "expired") return days < 0;
+        if (statusFilter === "expiringSoon") return days >= 0 && days <= 30;
+        if (statusFilter === "lowStock") return percentage <= 30;
+        if (statusFilter === "criticalStock") return percentage <= 10;
         return true;
       });
     }
 
     if (sortConfig.key) {
       filtered.sort((a, b) => {
-        let aValue = sortConfig.key === 'expiryDate' ? new Date(a.expiryDate) :
-                    sortConfig.key === 'remainingPercentage' ? (a.remaining / a.quantity) :
-                    a[sortConfig.key];
-        let bValue = sortConfig.key === 'expiryDate' ? new Date(b.expiryDate) :
-                    sortConfig.key === 'remainingPercentage' ? (b.remaining / b.quantity) :
-                    b[sortConfig.key];
-      
-        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        let aValue =
+          sortConfig.key === "expiryDate"
+            ? new Date(a.expiryDate)
+            : sortConfig.key === "remainingPercentage"
+            ? a.remaining / a.quantity
+            : a[sortConfig.key];
+        let bValue =
+          sortConfig.key === "expiryDate"
+            ? new Date(b.expiryDate)
+            : sortConfig.key === "remainingPercentage"
+            ? b.remaining / b.quantity
+            : b[sortConfig.key];
+
+        if (typeof aValue === "string") aValue = aValue.toLowerCase();
+        if (typeof bValue === "string") bValue = bValue.toLowerCase();
+        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
@@ -217,9 +256,9 @@ const FertilizerStock = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -231,20 +270,16 @@ const FertilizerStock = () => {
       remaining: fertilizer.remaining,
       unit: fertilizer.unit,
       fertilizerType: fertilizer.fertilizerType,
-      shelfLife: "365"
+      shelfLife: "365",
     });
     setShowAddForm(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
     try {
       const expiryDate = calculateExpiryDate(formData.shelfLife);
-      const payload = {
-        ...formData,
-        expiryDate
-      };
+      const payload = { ...formData, expiryDate };
       if (editingFertilizer) {
         await axios.put(`http://localhost:5000/api/Ifertilizerstock/${editingFertilizer._id}`, payload);
         setSuccess("Fertilizer updated successfully!");
@@ -252,7 +287,6 @@ const FertilizerStock = () => {
         await axios.post("http://localhost:5000/api/Ifertilizerstock", payload);
         setSuccess("Fertilizer added successfully!");
       }
-    
       setShowAddForm(false);
       setEditingFertilizer(null);
       resetForm();
@@ -270,15 +304,12 @@ const FertilizerStock = () => {
       remaining: "",
       unit: "kg",
       fertilizerType: "Organic",
-      shelfLife: "365"
+      shelfLife: "365",
     });
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this fertilizer?")) {
-      return;
-    }
-  
+    if (!window.confirm("Are you sure you want to delete this fertilizer?")) return;
     try {
       await axios.delete(`http://localhost:5000/api/Ifertilizerstock/${id}`);
       setSuccess("Fertilizer deleted successfully!");
@@ -297,16 +328,14 @@ const FertilizerStock = () => {
 
   const handleRefillSubmit = async (e) => {
     e.preventDefault();
-  
-    if (parseInt(refillQuantity) <= 0 || parseInt(refillQuantity) > (refillingFertilizer.quantity - refillingFertilizer.remaining)) {
+    if (parseInt(refillQuantity) <= 0 || parseInt(refillQuantity) > refillingFertilizer.quantity - refillingFertilizer.remaining) {
       setError("Invalid refill quantity.");
       return;
     }
     try {
       await axios.patch(`http://localhost:5000/api/Ifertilizerstock/refill/${refillingFertilizer._id}`, {
-        refillQuantity: parseInt(refillQuantity)
+        refillQuantity: parseInt(refillQuantity),
       });
-    
       setShowRefillForm(false);
       setRefillingFertilizer(null);
       setRefillQuantity("");
@@ -326,7 +355,6 @@ const FertilizerStock = () => {
 
   const handleUseSubmit = async (e) => {
     e.preventDefault();
-  
     if (parseInt(useQuantity) <= 0 || parseInt(useQuantity) > usingFertilizer.remaining) {
       setError("Invalid use quantity.");
       return;
@@ -334,9 +362,8 @@ const FertilizerStock = () => {
     try {
       await axios.patch(`http://localhost:5000/api/Ifertilizerstock/use/${usingFertilizer._id}`, {
         quantityUsed: parseInt(useQuantity),
-        recordedBy: "User"
+        recordedBy: "User",
       });
-    
       setShowUseForm(false);
       setUsingFertilizer(null);
       setUseQuantity("");
@@ -348,124 +375,42 @@ const FertilizerStock = () => {
     }
   };
 
-  const handleChartFertilizerChange = (e) => {
-    const value = e.target.value;
-    if (value === 'all') {
-      setSelectedFertilizerForChart('all');
-    } else {
-      const fertilizer = fertilizers.find(f => f._id === value);
-      setSelectedFertilizerForChart(fertilizer);
+  const handleSendEmail = (fertilizer) => {
+    try {
+      const email = "recipient@example.com";
+      const subject = `Low Stock Alert: ${fertilizer.name}`;
+      const body = `The stock for ${fertilizer.name} is running low. Current stock: ${fertilizer.remaining} ${fertilizer.unit}. Please consider refilling.`;
+      window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setSuccess(`Opening email client for ${fertilizer.name}...`);
+    } catch (error) {
+      console.error("Error opening email:", error);
+      setError("Failed to open email client. Please try again.");
+    }
+  };
+
+  const handleSendWhatsApp = (fertilizer) => {
+    try {
+      const phone = "1234567890";
+      const message = `Low Stock Alert: ${fertilizer.name} has ${fertilizer.remaining} ${fertilizer.unit} remaining. Please consider refilling.`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+      setSuccess(`Opening WhatsApp for ${fertilizer.name}...`);
+    } catch (error) {
+      console.error("Error opening WhatsApp:", error);
+      setError("Failed to open WhatsApp. Please try again.");
     }
   };
 
   const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
 
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return null;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={16} className="inline ml-1" /> : <ChevronDown size={16} className="inline ml-1" />;
-  };
-
-  // Compute chart data for stock levels
-  const chartData = (() => {
-    if (selectedFertilizerForChart === 'all') {
-      return {
-        labels: fertilizers.map(f => f.name),
-        datasets: [
-          {
-            label: 'Remaining Stock',
-            data: fertilizers.map(f => f.remaining),
-            backgroundColor: 'rgba(75, 192, 192, 0.6)',
-            borderColor: 'rgba(75, 192, 192, 1)',
-            borderWidth: 1
-          }
-        ]
-      };
-    } else if (selectedFertilizerForChart) {
-      const { quantity, remaining } = selectedFertilizerForChart;
-      const used = quantity - remaining;
-      return {
-        labels: ['Total Stock', 'Remaining', 'Used'],
-        datasets: [
-          {
-            label: 'Stock Level',
-            data: [quantity, remaining, used],
-            backgroundColor: [
-              'rgba(54, 162, 235, 0.6)',
-              'rgba(75, 192, 192, 0.6)',
-              'rgba(255, 99, 132, 0.6)'
-            ],
-            borderColor: [
-              'rgba(54, 162, 235, 1)',
-              'rgba(75, 192, 192, 1)',
-              'rgba(255, 99, 132, 1)'
-            ],
-            borderWidth: 1
-          }
-        ]
-      };
-    }
-    return { labels: [], datasets: [] };
-  })();
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: darkMode ? '#e5e7eb' : '#1f2937'
-        }
-      },
-      title: {
-        display: true,
-        color: darkMode ? '#e5e7eb' : '#1f2937',
-        font: { size: 16 },
-        text: selectedFertilizerForChart === 'all'
-          ? 'Stock Levels for All Fertilizers'
-          : `Stock Breakdown for ${selectedFertilizerForChart?.name || 'Selected Fertilizer'}`
-      },
-      tooltip: {
-        backgroundColor: darkMode ? '#1f2937' : '#ffffff',
-        titleColor: darkMode ? '#e5e7eb' : '#1f2937',
-        bodyColor: darkMode ? '#e5e7eb' : '#1f2937'
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Quantity',
-          color: darkMode ? '#e5e7eb' : '#1f2937'
-        },
-        grid: {
-          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-        },
-        ticks: {
-          color: darkMode ? '#e5e7eb' : '#1f2937'
-        }
-      },
-      x: {
-        title: {
-          display: true,
-          text: 'Fertilizer',
-          color: darkMode ? '#e5e7eb' : '#1f2937'
-        },
-        grid: {
-          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-        },
-        ticks: {
-          color: darkMode ? '#e5e7eb' : '#1f2937'
-        }
-      }
-    }
+    return sortConfig.direction === "asc" ? <ChevronUp size={16} className="inline ml-1" /> : <ChevronDown size={16} className="inline ml-1" />;
   };
 
   const exportToPDF = () => {
@@ -474,95 +419,80 @@ const FertilizerStock = () => {
         setError("No data available to export to PDF.");
         return;
       }
-
       const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
-
-      // Adding title
       doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Fertilizer Stock Report', 14, 20);
-
-      // Adding metadata
+      doc.setFont("helvetica", "bold");
+      doc.text("Fertilizer Stock Report", 14, 20);
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont("helvetica", "normal");
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
       doc.text(`Total Items: ${filteredFertilizers.length}`, 14, 34);
-
-      // Define table headers
-      const headers = [['Name', 'Quantity', 'Remaining', 'Unit', 'Type', 'Expiry Date', 'Status']];
-
-      // Prepare table data
-      const data = filteredFertilizers.map(fertilizer => {
+      const headers = [["Name", "Quantity", "Remaining", "Unit", "Type", "Expiry Date", "Status"]];
+      const data = filteredFertilizers.map((fertilizer) => {
         const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
         return [
-          String(fertilizer.name || 'N/A'),
+          String(fertilizer.name || "N/A"),
           String(fertilizer.quantity || 0),
           String(fertilizer.remaining || 0),
-          String(fertilizer.unit || 'N/A'),
-          String(fertilizer.fertilizerType || 'N/A'),
-          fertilizer.expiryDate ? new Date(fertilizer.expiryDate).toLocaleDateString() : 'N/A',
-          String(getDaysLeftText(days))
+          String(fertilizer.unit || "N/A"),
+          String(fertilizer.fertilizerType || "N/A"),
+          fertilizer.expiryDate ? new Date(fertilizer.expiryDate).toLocaleDateString() : "N/A",
+          String(getDaysLeftText(days)),
         ];
       });
-
-      // Generate table using the functional API
       autoTable(doc, {
         head: headers,
         body: data,
         startY: 40,
-        theme: 'striped',
+        theme: "striped",
         headStyles: {
           fillColor: darkMode ? [55, 65, 81] : [200, 200, 200],
           textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
-          fontStyle: 'bold',
-          fontSize: 10
+          fontStyle: "bold",
+          fontSize: 10,
         },
         bodyStyles: {
           fontSize: 9,
           textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
-          fillColor: darkMode ? [31, 41, 55] : [255, 255, 255]
+          fillColor: darkMode ? [31, 41, 55] : [255, 255, 255],
         },
         alternateRowStyles: {
-          fillColor: darkMode ? [40, 50, 65] : [240, 240, 240]
+          fillColor: darkMode ? [40, 50, 65] : [240, 240, 240],
         },
         columnStyles: {
-          0: { cellWidth: 40 }, // Name
-          1: { cellWidth: 25 }, // Quantity
-          2: { cellWidth: 25 }, // Remaining
-          3: { cellWidth: 20 }, // Unit
-          4: { cellWidth: 30 }, // Type
-          5: { cellWidth: 25 }, // Expiry Date
-          6: { cellWidth: 35 }  // Status
+          0: { cellWidth: 40 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 35 },
         },
         margin: { top: 40, left: 14, right: 14 },
         styles: {
           cellPadding: 2,
-          halign: 'left',
-          valign: 'middle',
-          overflow: 'linebreak'
+          halign: "left",
+          valign: "middle",
+          overflow: "linebreak",
         },
         didParseCell: (data) => {
           if (data.cell.text && data.cell.text[0] === undefined) {
-            data.cell.text = ['N/A'];
+            data.cell.text = ["N/A"];
           }
-        }
+        },
       });
-
-      // Add footer
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(100);
-        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: "right" });
       }
-
-      // Save the PDF
-      doc.save(`fertilizer_stock_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`fertilizer_stock_report_${new Date().toISOString().split("T")[0]}.pdf`);
       setSuccess("PDF downloaded successfully!");
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -570,49 +500,16 @@ const FertilizerStock = () => {
     }
   };
 
-  // Handle sending email
-  const handleSendEmail = (fertilizer) => {
-    try {
-      const email = 'recipient@example.com';
-      const subject = `Low Stock Alert: ${fertilizer.name}`;
-      const body = `The stock for ${fertilizer.name} is running low. Current stock: ${fertilizer.remaining} ${fertilizer.unit}. Please consider refilling.`;
-      const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-      window.location.href = mailtoLink;
-    
-      setSuccess(`Opening email client for ${fertilizer.name}...`);
-    } catch (error) {
-      console.error("Error opening email:", error);
-      setError("Failed to open email client. Please try again.");
-    }
-  };
-
-  // Handle sending WhatsApp message
-  const handleSendWhatsApp = (fertilizer) => {
-    try {
-      const phone = '1234567890';
-      const message = `Low Stock Alert: ${fertilizer.name} has ${fertilizer.remaining} ${fertilizer.unit} remaining. Please consider refilling.`;
-      const whatsappLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    
-      window.open(whatsappLink, '_blank');
-    
-      setSuccess(`Opening WhatsApp for ${fertilizer.name}...`);
-    } catch (error) {
-      console.error("Error opening WhatsApp:", error);
-      setError("Failed to open WhatsApp. Please try again.");
-    }
-  };
-
   // Calculate summary stats
   const getSummary = () => {
     const totalFertilizers = fertilizers.length;
-    const lowStock = fertilizers.filter(fertilizer => (fertilizer.remaining / fertilizer.quantity) * 100 <= 30).length;
-    const criticalStock = fertilizers.filter(fertilizer => (fertilizer.remaining / fertilizer.quantity) * 100 <= 10).length;
-    const expiringSoon = fertilizers.filter(fertilizer => {
+    const lowStock = fertilizers.filter((fertilizer) => (fertilizer.remaining / fertilizer.quantity) * 100 <= 30).length;
+    const criticalStock = fertilizers.filter((fertilizer) => (fertilizer.remaining / fertilizer.quantity) * 100 <= 10).length;
+    const expiringSoon = fertilizers.filter((fertilizer) => {
       const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
       return days >= 0 && days <= 30;
     }).length;
-    const expired = fertilizers.filter(fertilizer => {
+    const expired = fertilizers.filter((fertilizer) => {
       const days = calculateDaysUntilExpiry(fertilizer.expiryDate);
       return days < 0;
     }).length;
@@ -623,7 +520,7 @@ const FertilizerStock = () => {
 
   if (loading) {
     return (
-      <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+      <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
           <p className="mt-4 text-lg">Loading fertilizers...</p>
@@ -633,7 +530,7 @@ const FertilizerStock = () => {
   }
 
   return (
-    <div className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-full p-6 ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
@@ -658,42 +555,10 @@ const FertilizerStock = () => {
           <span>{error}</span>
         </div>
       )}
-      {/* Chart Section */}
-      <div className={`p-6 rounded-xl shadow-lg mb-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            Stock Level Chart
-          </h2>
-          <select
-            value={selectedFertilizerForChart?._id || selectedFertilizerForChart || ''}
-            onChange={handleChartFertilizerChange}
-            className={`px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
-          >
-            <option value="" disabled>Select a fertilizer</option>
-            <option value="all">All Fertilizers</option>
-            {fertilizers.map(fertilizer => (
-              <option key={fertilizer._id} value={fertilizer._id}>
-                {fertilizer.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="h-[400px]">
-          {chartData.labels.length > 0 ? (
-            <Bar data={chartData} options={chartOptions} />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <Package size={48} className="text-gray-400 mb-4" />
-              <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No stock data available yet.</p>
-              <p className={`text-sm mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>Select a fertilizer to see stock levels here.</p>
-            </div>
-          )}
-        </div>
-      </div>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`${darkMode ? "bg-blue-900/30" : "bg-blue-100"} p-3 rounded-full`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
             <Package className="text-blue-500" size={24} />
           </div>
           <div>
@@ -701,9 +566,8 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold">{summary.totalFertilizers}</p>
           </div>
         </div>
-      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`${darkMode ? "bg-orange-900/30" : "bg-orange-100"} p-3 rounded-full`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-orange-900/30" : "bg-orange-100"}`}>
             <AlertCircle className="text-orange-500" size={24} />
           </div>
           <div>
@@ -711,9 +575,8 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{summary.lowStock}</p>
           </div>
         </div>
-      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`${darkMode ? "bg-red-900/30" : "bg-red-100"} p-3 rounded-full`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-red-900/30" : "bg-red-100"}`}>
             <AlertCircle className="text-red-500" size={24} />
           </div>
           <div>
@@ -721,9 +584,8 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.criticalStock}</p>
           </div>
         </div>
-      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"} p-3 rounded-full`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}>
             <Clock className="text-yellow-500" size={24} />
           </div>
           <div>
@@ -731,9 +593,8 @@ const FertilizerStock = () => {
             <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{summary.expiringSoon}</p>
           </div>
         </div>
-      
         <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`${darkMode ? "bg-red-900/30" : "bg-red-100"} p-3 rounded-full`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-red-900/30" : "bg-red-100"}`}>
             <Calendar className="text-red-500" size={24} />
           </div>
           <div>
@@ -746,41 +607,41 @@ const FertilizerStock = () => {
       <div className="flex flex-wrap gap-2 mb-6">
         <button
           onClick={() => setActiveTab("all")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "all"
-            ? "bg-green-600 text-white"
-            : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "all" ? "bg-green-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
         >
           All Items
         </button>
         <button
           onClick={() => setActiveTab("lowStock")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "lowStock"
-            ? "bg-orange-600 text-white"
-            : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "lowStock" ? "bg-orange-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
         >
           Low Stock
         </button>
         <button
           onClick={() => setActiveTab("criticalStock")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "criticalStock"
-            ? "bg-red-600 text-white"
-            : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "criticalStock" ? "bg-red-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
         >
           Critical Stock
         </button>
         <button
           onClick={() => setActiveTab("expiringSoon")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "expiringSoon"
-            ? "bg-yellow-600 text-white"
-            : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "expiringSoon" ? "bg-yellow-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
         >
           Expiring Soon
         </button>
         <button
           onClick={() => setActiveTab("expired")}
-          className={`px-4 py-2 rounded-lg transition-all ${activeTab === "expired"
-            ? "bg-red-600 text-white"
-            : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "expired" ? "bg-red-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
         >
           Expired
         </button>
@@ -802,7 +663,6 @@ const FertilizerStock = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`mt-3 flex items-center gap-2 text-sm ${darkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-800"} transition-colors`}
@@ -810,7 +670,6 @@ const FertilizerStock = () => {
               <Filter size={16} />
               {showFilters ? "Hide Filters" : "Show Filters"}
             </button>
-          
             {showFilters && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
@@ -845,7 +704,6 @@ const FertilizerStock = () => {
               </div>
             )}
           </div>
-        
           <div className="flex items-center gap-3">
             <button
               onClick={fetchFertilizers}
@@ -862,6 +720,13 @@ const FertilizerStock = () => {
               <Download size={20} />
             </button>
             <button
+              onClick={() => setShowChart(!showChart)}
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title={showChart ? "Hide Charts" : "Show Charts"}
+            >
+              <PieChartIcon size={20} />
+            </button>
+            <button
               onClick={() => {
                 setEditingFertilizer(null);
                 resetForm();
@@ -875,6 +740,85 @@ const FertilizerStock = () => {
           </div>
         </div>
       </div>
+      {/* Chart Section */}
+      {showChart && (
+        <div className={`mb-6 p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <PieChartIcon size={20} />
+            Stock Overview
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Pie Chart */}
+            <div className={`${darkMode ? "bg-gray-800/50" : "bg-gray-50"} p-4 rounded-md`}>
+              <h4 className="text-md font-medium mb-3 text-center">Stock by Status</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getStockChartData()}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, value }) => (value > 0 ? `${name}: ${value}` : null)}
+                    >
+                      {getStockChartData().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
+                        border: `1px solid ${COLORS.grid}`,
+                        borderRadius: "4px",
+                        padding: "8px",
+                        color: COLORS.text,
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            {/* Bar Chart */}
+            <div className={`${darkMode ? "bg-gray-800/50" : "bg-gray-50"} p-4 rounded-md`}>
+              <h4 className="text-md font-medium mb-3 text-center">Stock by Fertilizer Type</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={getFertilizerTypeWiseData()}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 0,
+                      bottom: 25,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+                    <XAxis dataKey="type" stroke={COLORS.text} angle={-45} textAnchor="end" height={60} />
+                    <YAxis stroke={COLORS.text} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
+                        border: `1px solid ${COLORS.grid}`,
+                        borderRadius: "4px",
+                        padding: "8px",
+                        color: COLORS.text,
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Bar dataKey="critical" stackId="a" fill={COLORS.critical} name="Critical (≤10%)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="low" stackId="a" fill={COLORS.low} name="Low (≤30%)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="good" stackId="a" fill={COLORS.good} name="Good (>30%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Results Count */}
       <div className={`mb-4 flex justify-between items-center ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
         <p className="text-sm">
@@ -902,26 +846,26 @@ const FertilizerStock = () => {
               <tr>
                 <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort('name')}
+                  onClick={() => requestSort("name")}
                 >
                   <div className="flex items-center">
-                    Fertilizer Name {getSortIcon('name')}
+                    Fertilizer Name {getSortIcon("name")}
                   </div>
                 </th>
                 <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort('quantity')}
+                  onClick={() => requestSort("quantity")}
                 >
                   <div className="flex items-center">
-                    Quantity {getSortIcon('quantity')}
+                    Quantity {getSortIcon("quantity")}
                   </div>
                 </th>
                 <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort('remainingPercentage')}
+                  onClick={() => requestSort("remainingPercentage")}
                 >
                   <div className="flex items-center">
-                    Remaining {getSortIcon('remainingPercentage')}
+                    Remaining {getSortIcon("remainingPercentage")}
                   </div>
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">
@@ -932,10 +876,10 @@ const FertilizerStock = () => {
                 </th>
                 <th
                   className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort('expiryDate')}
+                  onClick={() => requestSort("expiryDate")}
                 >
                   <div className="flex items-center">
-                    Expiry Date {getSortIcon('expiryDate')}
+                    Expiry Date {getSortIcon("expiryDate")}
                   </div>
                 </th>
                 <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider">
@@ -949,10 +893,24 @@ const FertilizerStock = () => {
                   const daysLeft = calculateDaysUntilExpiry(fertilizer.expiryDate);
                   const remainingPercentage = (fertilizer.remaining / fertilizer.quantity) * 100;
                   const stockLevelBadge = getStockLevelBadge(fertilizer.remaining, fertilizer.quantity);
-                  const rowBg = remainingPercentage <= 10 ? (darkMode ? 'bg-red-900/10' : 'bg-red-50/50') :
-                                remainingPercentage <= 30 ? (darkMode ? 'bg-orange-900/10' : 'bg-orange-50/50') :
-                                daysLeft < 0 ? (darkMode ? 'bg-red-900/10' : 'bg-red-50/50') :
-                                daysLeft <= 30 ? (darkMode ? 'bg-yellow-900/10' : 'bg-yellow-50/50') : '';
+                  const rowBg =
+                    remainingPercentage <= 10
+                      ? darkMode
+                        ? "bg-red-900/10"
+                        : "bg-red-50/50"
+                      : remainingPercentage <= 30
+                      ? darkMode
+                        ? "bg-orange-900/10"
+                        : "bg-orange-50/50"
+                      : daysLeft < 0
+                      ? darkMode
+                        ? "bg-red-900/10"
+                        : "bg-red-50/50"
+                      : daysLeft <= 30
+                      ? darkMode
+                        ? "bg-yellow-900/10"
+                        : "bg-yellow-50/50"
+                      : "";
                   return (
                     <tr key={fertilizer._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-all ${rowBg}`}>
                       <td className="px-6 py-4 font-medium">
@@ -967,8 +925,7 @@ const FertilizerStock = () => {
                           <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 mt-1">
                             <div
                               className={`h-1.5 rounded-full ${
-                                remainingPercentage <= 10 ? 'bg-red-500' :
-                                remainingPercentage <= 30 ? 'bg-orange-500' : 'bg-green-500'
+                                remainingPercentage <= 10 ? "bg-red-500" : remainingPercentage <= 30 ? "bg-orange-500" : "bg-green-500"
                               }`}
                               style={{ width: `${remainingPercentage}%` }}
                             ></div>
@@ -986,9 +943,7 @@ const FertilizerStock = () => {
                           {stockLevelBadge.text}
                         </span>
                         <div className="text-xs mt-1">
-                          <span className={getDaysLeftClass(daysLeft)}>
-                            {getDaysLeftText(daysLeft)}
-                          </span>
+                          <span className={getDaysLeftClass(daysLeft)}>{getDaysLeftText(daysLeft)}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -996,9 +951,7 @@ const FertilizerStock = () => {
                           {fertilizer.fertilizerType}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        {new Date(fertilizer.expiryDate).toLocaleDateString()}
-                      </td>
+                      <td className="px-6 py-4">{new Date(fertilizer.expiryDate).toLocaleDateString()}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-1">
                           <button
@@ -1110,7 +1063,6 @@ const FertilizerStock = () => {
                   placeholder="Enter fertilizer name"
                 />
               </div>
-            
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -1127,7 +1079,6 @@ const FertilizerStock = () => {
                     placeholder="Total quantity"
                   />
                 </div>
-              
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                     Initial Stock *
@@ -1150,7 +1101,6 @@ const FertilizerStock = () => {
                   )}
                 </div>
               </div>
-            
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -1170,7 +1120,6 @@ const FertilizerStock = () => {
                     <option value="liter">liter</option>
                   </select>
                 </div>
-              
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                     Fertilizer Type *
@@ -1189,7 +1138,6 @@ const FertilizerStock = () => {
                   </select>
                 </div>
               </div>
-            
               <div className="mb-5">
                 <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Shelf Life *
@@ -1253,7 +1201,6 @@ const FertilizerStock = () => {
                 <X size={20} />
               </button>
             </div>
-          
             <form onSubmit={handleRefillSubmit}>
               <div className="mb-5">
                 <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-100"} mb-4`}>
@@ -1275,7 +1222,6 @@ const FertilizerStock = () => {
                   </div>
                 </div>
               </div>
-            
               <div className="mb-5">
                 <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Refill Quantity *
@@ -1335,7 +1281,6 @@ const FertilizerStock = () => {
                 <X size={20} />
               </button>
             </div>
-          
             <form onSubmit={handleUseSubmit}>
               <div className="mb-5">
                 <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-100"} mb-4`}>
@@ -1343,7 +1288,6 @@ const FertilizerStock = () => {
                   <p className="font-semibold text-2xl">{usingFertilizer.remaining} {usingFertilizer.unit}</p>
                 </div>
               </div>
-            
               <div className="mb-5">
                 <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Quantity Used *

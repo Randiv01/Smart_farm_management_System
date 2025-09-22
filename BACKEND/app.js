@@ -55,10 +55,11 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------- Uploads Setup -----------------------
+const animalUploadsDir = path.join(__dirname, "AnimalManagement", "Uploads");
 const uploadsDir = path.join(__dirname, "uploads");
 const healthUploadsDir = path.join(
   __dirname,
@@ -76,11 +77,13 @@ const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 
 // Serve static folders
 app.use("/uploads", express.static(uploadsDir));
-// Serve with both capitalizations to match any frontend usage
+app.use("/animal-uploads", express.static(animalUploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/Health_Uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
+app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
 
+// ----------------------- Batch Expiry Notification Function -----------------------
 const checkExpiryNotifications = async () => {
   try {
     const now = new Date();
@@ -104,10 +107,11 @@ const checkExpiryNotifications = async () => {
   }
 };
 
-// NEW: Set up interval for expiry checks (every 12 hours)
+// Set up interval for expiry checks (every 12 hours)
 setInterval(checkExpiryNotifications, 12 * 60 * 60 * 1000);
 
 // ----------------------- Multer setup -----------------------
+// This is just a fallback, userRoutes has its own multer configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
@@ -138,11 +142,11 @@ import {
   sendMedicalRequest,
   testEmail,
 } from "./AnimalManagement/controllers/medicalRequestController.js";
-import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
+import animalProductivityRouter from "./AnimalManagement/routes/animalProductivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
 import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
-import HarvestHistory from ".//AnimalManagement/models/HarvestHistory.js";
+import HarvestHistory from "./AnimalManagement/models/HarvestHistory.js";
 
 // Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
@@ -178,7 +182,6 @@ import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
-
 // ----------------------- Debug env variables -----------------------
 console.log(
   "OPENAI_API_KEY loaded:",
@@ -199,7 +202,7 @@ app.use("/emergency", emergencyRoutes);
 app.use("/api/users", userRoutes);
 // IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
 app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
-app.use("/productivity", productivityRouter);
+app.use("/animal-productivity", animalProductivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 app.use("/api/meats", meatRoutes);
@@ -238,8 +241,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 
-
-// Customer Profile Image Upload
+// Customer Profile Image Upload (fallback route)
 app.use(
   "/api/customers/profile-upload",
   upload.single("profileImage"),
@@ -297,6 +299,14 @@ app.use((req, res, next) => {
 // ----------------------- Error Handling Middleware -----------------------
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
+  
+  // Handle multer errors specifically
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: "File too large. Maximum size is 5MB." });
+    }
+  }
+  
   const status = err.status || 500;
   res.status(status).json({ error: err.message || "Internal server error" });
 });

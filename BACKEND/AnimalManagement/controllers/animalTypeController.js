@@ -1,4 +1,3 @@
-// controllers/animalTypeController.js
 import AnimalType from '../models/AnimalType.js';
 import fs from 'fs';
 import path from 'path';
@@ -63,7 +62,7 @@ export const createAnimalType = async (req, res) => {
     // Handle file upload
     let bannerImage;
     if (req.file) {
-      bannerImage = `/uploads/${req.file.filename}`;
+      bannerImage = `/animal-uploads/${req.file.filename}`; // Updated path
     }
 
     // Auto-generate TypeID
@@ -80,7 +79,7 @@ export const createAnimalType = async (req, res) => {
       managementType: managementType || 'individual',
       bannerImage,
       categories: parsedCategories,
-      productivityFields: parsedProductivityFields, // Save productivity fields
+      productivityFields: parsedProductivityFields,
       caretakers: parsedCaretakers,
       caretakerName: caretakerName || ''
     });
@@ -209,7 +208,7 @@ export const updateAnimalType = async (req, res) => {
         const oldImagePath = path.join(__dirname, '..', animalType.bannerImage);
         if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
       }
-      updateData.bannerImage = `/uploads/${req.file.filename}`;
+      updateData.bannerImage = `/animal-uploads/${req.file.filename}`; // Updated path
     }
 
     // Remove undefined fields
