@@ -74,7 +74,7 @@ const defaultIndividualCategories = [
         name: "reproductiveStatus",
         label: "Reproductive Status",
         type: "select",
-        options: ["Not Pregnant", "Pregnant", "Lactating", "Ready for Breeding", "Unknown,None(male)"],
+        options: ["Not Pregnant", "Pregnant", "Lactating", "Ready for Breeding", "Unknown","None(Male)"],
         required: false,readOnly: true
       },
     ],
