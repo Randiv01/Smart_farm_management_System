@@ -603,17 +603,6 @@ const handleMedicalRequest = async () => {
 
         {/* Doctor Selection */}
         <div className={`mb-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md`}>
-          <div className="flex flex-wrap justify-between items-center gap-4 mb-3">
-            <label className="block font-medium">
-              Select Doctor for Emergency Requests:
-            </label>
-            <button
-              onClick={openAddDoctorModal}
-              className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
-            >
-              + Add New Doctor
-            </button>
-          </div>
           
           <div className="flex gap-2 items-center">
             <select
@@ -630,30 +619,12 @@ const handleMedicalRequest = async () => {
               ) : (
                 doctors.map((doctor) => (
                   <option key={doctor._id} value={doctor._id}>
-                    Dr. {doctor.name} - {doctor.specialization} ({doctor.email})
+                    {doctor.fullName} - {doctor.specializations?.[0]} ({doctor.email})
                   </option>
+
                 ))
               )}
             </select>
-            
-            {selectedDoctor && (
-              <div className="flex gap-1">
-                <button
-                  onClick={() => openEditDoctorModal(doctors.find(d => d._id === selectedDoctor))}
-                  className="p-2 rounded bg-yellow-600 text-white hover:bg-yellow-700"
-                  title="Edit Doctor"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => handleRemoveDoctor(selectedDoctor)}
-                  className="p-2 rounded bg-red-600 text-white hover:bg-red-700"
-                  title="Remove Doctor"
-                >
-                  🗑️
-                </button>
-              </div>
-            )}
           </div>
         </div>
 

@@ -725,7 +725,7 @@ export default function MeatProductivityDashboard() {
   };
 
   return (
-    <div className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50"} font-sans`}>
+    <div className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "light-beige"} font-sans`}>
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
