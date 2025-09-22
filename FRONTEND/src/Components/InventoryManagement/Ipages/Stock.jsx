@@ -129,12 +129,6 @@ const Stock = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Helper function to display category group in UI
-  const displayCategory = (category) => {
-    if (['Vegetables', 'Fruits'].includes(category)) return 'Plant Product';
-    return 'Animal Product';
-  };
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     let updatedFormData = {...formData};
@@ -496,121 +490,134 @@ Market: ${product.market}`;
       {/* Table View */}
       {viewMode === 'table' && (
         <div className={`rounded-lg shadow-sm overflow-hidden ${darkMode ? "bg-dark-card" : "bg-white"}`}>
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <table className="min-w-full">
             <thead className={darkMode ? "bg-dark-gray" : "bg-gray-50"}>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   IMAGE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   PRODUCT
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   CATEGORY
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   STOCK
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   PRICE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   EXPIRY DATE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   MARKET
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                   STATUS
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-sm font-semibold uppercase tracking-wider">
                   ACTIONS
                 </th>
               </tr>
             </thead>
-            <tbody className={`divide-y ${darkMode ? "divide-gray-700 bg-dark-card" : "divide-gray-200 bg-white"}`}>
+            <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
               {inventory.length > 0 ? (
                 inventory.map((item) => (
-                  <tr key={item._id} className={item.status === 'Low Stock' ? `${darkMode ? 'bg-status-red-dark/30' : 'bg-status-red-light'}` : ''}>
+                  <tr key={item._id} className={`${darkMode ? "hover:bg-dark-gray/80" : "hover:bg-gray-50"} transition-colors ${item.status === 'Low Stock' ? `${darkMode ? 'bg-status-red-dark/30' : 'bg-status-red-light/50'}` : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.image ? (
-                        <img src={item.image} alt={item.name} className="h-10 w-10 rounded-full object-cover" />
+                        <img src={item.image} alt={item.name} className="h-12 w-12 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center">
-                          <ImageIcon size={16} className="text-gray-500" />
+                        <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center border-2 border-gray-300 dark:border-gray-600">
+                          <ImageIcon size={20} className="text-gray-500" />
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium">{item.name}</div>
+                      {item.description && (
+                        <div className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {item.description.length > 30 ? `${item.description.substring(0, 30)}...` : item.description}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-blue-dark text-status-blue-textDark" : "bg-status-blue-light text-status-blue-textLight"}`}>
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-blue-dark text-status-blue-textDark" : "bg-status-blue-light text-status-blue-textLight"}`}>
                         {item.category}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {formatStock(item.stock)}
+                      <span className="font-semibold">{formatStock(item.stock)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      ${item.price}
+                      <span className="font-bold text-green-600 dark:text-green-400">${item.price}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {formatDate(item.expiryDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-purple-dark text-status-purple-textDark" : "bg-status-purple-light text-status-purple-textLight"}`}>
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-purple-dark text-status-purple-textDark" : "bg-status-purple-light text-status-purple-textLight"}`}>
                         {item.market}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)}`}>
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)}`}>
                         {item.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => setShowQRCode(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-btn-blue hover:bg-dark-gray" : "text-btn-blue hover:bg-gray-100"}`}
-                        title="View QR Code"
-                      >
-                        <QrCode size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleRefill(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
-                        title="Refill Stock"
-                      >
-                        Refill
-                      </button>
-                      {item.status === 'Low Stock' && (
+                      <div className="flex justify-end items-center gap-2">
                         <button
-                          onClick={() => handleNotify(item)}
-                          className={`p-1 rounded-md mr-2 ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
-                          title="Notify Management"
+                          onClick={() => setShowQRCode(item)}
+                          className={`p-2 rounded-md ${darkMode ? "text-btn-blue hover:bg-dark-gray" : "text-btn-blue hover:bg-gray-100"}`}
+                          title="View QR Code"
                         >
-                          <AlertCircle size={16} />
+                          <QrCode size={18} />
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item._id)}
-                        className={`p-1 rounded-md ${darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100"}`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                        <button
+                          onClick={() => handleRefill(item)}
+                          className={`p-2 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
+                          title="Refill Stock"
+                        >
+                          Refill
+                        </button>
+                        {item.status === 'Low Stock' && (
+                          <button
+                            onClick={() => handleNotify(item)}
+                            className={`p-2 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
+                            title="Notify Management"
+                          >
+                            <AlertCircle size={18} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className={`p-2 rounded-md ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item._id)}
+                          className={`p-2 rounded-md ${darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100"}`}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center">
-                    No products found
+                  <td colSpan={9} className="px-6 py-8 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <ShoppingBag size={48} className="text-gray-400 mb-2" />
+                      <p className="text-lg font-medium">No products found</p>
+                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Try adjusting your search or filter criteria
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -620,24 +627,31 @@ Market: ${product.market}`;
       )}
       {/* Grid View */}
       {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {inventory.length > 0 ? (
             inventory.map((item) => (
               <div
                 key={item._id}
-                className={`p-4 rounded-lg shadow-sm border-2 ${darkMode ? `bg-dark-card ${item.status === 'Low Stock' ? 'border-status-red-dark bg-status-red-dark/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-status-red-light bg-status-red-light' : 'border-gray-200'}`}`}
+                className={`p-5 rounded-lg shadow-sm border flex flex-col h-full ${darkMode ? `bg-dark-card ${item.status === 'Low Stock' ? 'border-status-red-dark' : 'border-gray-700 hover:border-gray-500'}` : `bg-white ${item.status === 'Low Stock' ? 'border-status-red-light' : 'border-gray-200 hover:border-gray-300'}`} transition-all duration-200 hover:shadow-md relative`}
               >
-                <div className="flex justify-between items-start mb-4">
+                {/* Low Stock Alert Banner */}
+                {item.status === 'Low Stock' && (
+                  <div className={`absolute top-0 left-0 right-0 py-1 text-center text-xs font-bold rounded-t-lg ${darkMode ? 'bg-status-red-dark text-status-red-textDark' : 'bg-status-red-light text-status-red-textLight'}`}>
+                    LOW STOCK - NEEDS REFILL
+                  </div>
+                )}
+                
+                <div className={`flex justify-between items-start mb-4 ${item.status === 'Low Stock' ? 'mt-4' : ''}`}>
                   <div className="flex items-center gap-3">
                     {item.image ? (
-                      <img src={item.image} alt={item.name} className="h-12 w-12 rounded-full object-cover" />
+                      <img src={item.image} alt={item.name} className="h-14 w-14 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" />
                     ) : (
-                      <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center">
-                        <ImageIcon size={20} className="text-gray-500" />
+                      <div className="h-14 w-14 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center border-2 border-gray-300 dark:border-gray-600">
+                        <ImageIcon size={24} className="text-gray-500" />
                       </div>
                     )}
                     <div>
-                      <h3 className="text-lg font-medium">{item.name}</h3>
+                      <h3 className="text-lg font-semibold">{item.name}</h3>
                       <span className={`px-2 py-1 mt-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-blue-dark text-status-blue-textDark" : "bg-status-blue-light text-status-blue-textLight"}`}>
                         {item.category}
                       </span>
@@ -646,55 +660,34 @@ Market: ${product.market}`;
                   <div className="flex gap-1">
                     <button
                       onClick={() => setShowQRCode(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-btn-blue hover:bg-dark-gray" : "text-btn-blue hover:bg-gray-100"}`}
+                      className={`p-1.5 rounded-md ${darkMode ? "text-btn-blue hover:bg-dark-gray" : "text-btn-blue hover:bg-gray-100"}`}
                       title="View QR Code"
                     >
                       <QrCode size={16} />
                     </button>
-                    <button
-                      onClick={() => handleRefill(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
-                      title="Refill Stock"
-                    >
-                      Refill
-                    </button>
                     {item.status === 'Low Stock' && (
                       <button
                         onClick={() => handleNotify(item)}
-                        className={`p-1 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
+                        className={`p-1.5 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
                         title="Notify Management"
                       >
                         <AlertCircle size={16} />
                       </button>
                     )}
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
-                      title="Edit Product"
-                      >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item._id)}
-                      className={`p-1 rounded-md ${darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100"}`}
-                      title="Delete Product"
-                    >
-                      <Trash2 size={16} />
-                    </button>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3 mb-4">
                   <div className="flex justify-between">
                     <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
                       Stock:
                     </span>
-                    <span>{formatStock(item.stock)}</span>
+                    <span className="font-medium">{formatStock(item.stock)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
                       Price:
                     </span>
-                    <span>${item.price}</span>
+                    <span className="font-bold text-green-600 dark:text-green-400">${item.price}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
@@ -719,16 +712,53 @@ Market: ${product.market}`;
                     </span>
                   </div>
                   {item.description && (
-                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
                       {item.description}
                     </div>
                   )}
                 </div>
+                
+                {/* Low Stock Alert at Bottom */}
+                {item.status === 'Low Stock' && (
+                  <div className={`mt-auto py-2 px-3 text-center text-sm font-semibold rounded-md ${darkMode ? 'bg-status-red-dark/30 text-status-red-textDark' : 'bg-status-red-light/50 text-status-red-textLight'} border-l-4 ${darkMode ? 'border-status-red-dark' : 'border-status-red-light'}`}>
+                    <AlertCircle size={14} className="inline mr-1" />
+                    Low Stock Alert
+                  </div>
+                )}
+                
+                <div className="flex justify-between pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => handleRefill(item)}
+                    className={`px-3 py-1.5 text-sm rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
+                  >
+                    Refill
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className={`p-1.5 rounded-md ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
+                      title="Edit Product"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item._id)}
+                      className={`p-1.5 rounded-md ${darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100"}`}
+                      title="Delete Product"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
             ))
           ) : (
-            <div className={`col-span-3 p-8 text-center ${darkMode ? "bg-dark-card" : "bg-white"} rounded-lg`}>
-              No products found
+            <div className={`col-span-full p-8 text-center ${darkMode ? "bg-dark-card" : "bg-white"} rounded-lg border border-dashed ${darkMode ? "border-gray-700" : "border-gray-300"}`}>
+              <ShoppingBag size={48} className="mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No products found</h3>
+              <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                Try adjusting your search or filter criteria
+              </p>
             </div>
           )}
         </div>
@@ -739,17 +769,23 @@ Market: ${product.market}`;
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-300 dark:bg-dark-gray text-gray-500' : 'bg-btn-teal text-white hover:bg-green-700'}`}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${currentPage === 1 ? 'bg-gray-300 dark:bg-dark-gray text-gray-500' : 'bg-btn-teal text-white hover:bg-green-700'}`}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
             Previous
           </button>
-          <span>Page {currentPage} of {totalPages}</span>
+          <span className={`font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Page {currentPage} of {totalPages}</span>
           <button
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-300 dark:bg-dark-gray text-gray-500' : 'bg-btn-teal text-white hover:bg-green-700'}`}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${currentPage === totalPages ? 'bg-gray-300 dark:bg-dark-gray text-gray-500' : 'bg-btn-teal text-white hover:bg-green-700'}`}
           >
             Next
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         </div>
       )}
