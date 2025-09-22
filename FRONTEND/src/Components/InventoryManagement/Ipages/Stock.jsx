@@ -292,13 +292,13 @@ const Stock = () => {
   const getStatusColor = (status) => {
     switch(status) {
       case 'In Stock':
-        return darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800';
+        return darkMode ? 'bg-status-green-dark text-status-green-textDark' : 'bg-status-green-light text-status-green-textLight';
       case 'Low Stock':
-        return darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800';
+        return darkMode ? 'bg-status-yellow-dark text-status-yellow-textDark' : 'bg-status-yellow-light text-status-yellow-textLight';
       case 'Out of Stock':
-        return darkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800';
+        return darkMode ? 'bg-status-red-dark text-status-red-textDark' : 'bg-status-red-light text-status-red-textLight';
       case 'Expiring Soon':
-        return darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-800';
+        return darkMode ? 'bg-status-yellow-dark text-status-yellow-textDark' : 'bg-status-yellow-light text-status-yellow-textLight';
       default:
         return darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800';
     }
@@ -343,7 +343,7 @@ Market: ${product.market}`;
 
   if (loading) {
     return (
-      <div className={`min-h-full p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+      <div className={`min-h-full p-6 flex items-center justify-center ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4">Loading products...</p>
@@ -353,7 +353,7 @@ Market: ${product.market}`;
   }
 
   return (
-    <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-full p-6 ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">
@@ -365,13 +365,13 @@ Market: ${product.market}`;
       </div>
       {/* Error Message */}
       {error && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-800"}`}>
+        <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-status-red-dark text-status-red-textDark" : "bg-status-red-light text-status-red-textLight"}`}>
           <AlertCircle size={20} className="mr-2" />
           {error}
         </div>
       )}
       {/* Search and Actions */}
-      <div className={`p-4 rounded-lg shadow-sm mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+      <div className={`p-4 rounded-lg shadow-sm mb-6 ${darkMode ? "bg-dark-card" : "bg-white"}`}>
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-4 flex-1 min-w-[300px]">
             <div className="relative flex-1">
@@ -382,7 +382,7 @@ Market: ${product.market}`;
               <input
                 type="text"
                 placeholder="Search products..."
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -396,7 +396,7 @@ Market: ${product.market}`;
                 setCategoryFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
             >
               <option value="All">All Categories</option>
               <option value="Animal Product">Animal Products</option>
@@ -408,7 +408,7 @@ Market: ${product.market}`;
                 setStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
             >
               <option value="All">All Statuses</option>
               <option value="In Stock">In Stock</option>
@@ -421,7 +421,7 @@ Market: ${product.market}`;
           <div className="flex items-center gap-3">
             <button
               onClick={fetchProducts}
-              className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+              className={`p-2 rounded-lg ${darkMode ? "hover:bg-dark-gray" : "hover:bg-gray-100"}`}
               title="Refresh"
             >
               <RefreshCw size={20} />
@@ -430,7 +430,7 @@ Market: ${product.market}`;
             {showExportView ? (
               <button
                 onClick={handleBackToMain}
-                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                className={`p-2 rounded-lg ${darkMode ? "hover:bg-dark-gray" : "hover:bg-gray-100"}`}
                 title="Back to All Products"
               >
                 <ShoppingBag size={20} />
@@ -438,7 +438,7 @@ Market: ${product.market}`;
             ) : (
               <button
                 onClick={handleExportClick}
-                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                className={`p-2 rounded-lg ${darkMode ? "hover:bg-dark-gray" : "hover:bg-gray-100"}`}
                 title="View Export Market Products"
               >
                 <Globe size={20} />
@@ -448,13 +448,13 @@ Market: ${product.market}`;
             <div className="flex gap-1">
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-2 rounded-lg ${viewMode === 'table' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
+                className={`p-2 rounded-lg ${viewMode === 'table' ? 'bg-status-green-light text-status-green-textLight dark:bg-status-green-dark dark:text-status-green-textDark' : 'bg-gray-100 text-gray-600 dark:bg-dark-gray dark:text-gray-300'}`}
               >
                 <List size={20} />
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
+                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-status-green-light text-status-green-textLight dark:bg-status-green-dark dark:text-status-green-textDark' : 'bg-gray-100 text-gray-600 dark:bg-dark-gray dark:text-gray-300'}`}
               >
                 <Grid size={20} />
               </button>
@@ -485,7 +485,7 @@ Market: ${product.market}`;
                 setFormErrors({});
                 setShowAddForm(true);
               }}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors duration-200"
+              className="bg-btn-teal hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors duration-200"
             >
               <Plus size={16} />
               Add Product
@@ -495,9 +495,9 @@ Market: ${product.market}`;
       </div>
       {/* Table View */}
       {viewMode === 'table' && (
-        <div className={`rounded-lg shadow-sm overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className={`rounded-lg shadow-sm overflow-hidden ${darkMode ? "bg-dark-card" : "bg-white"}`}>
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
+            <thead className={darkMode ? "bg-dark-gray" : "bg-gray-50"}>
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   IMAGE
@@ -528,15 +528,15 @@ Market: ${product.market}`;
                 </th>
               </tr>
             </thead>
-            <tbody className={`divide-y ${darkMode ? "divide-gray-700 bg-gray-800" : "divide-gray-200 bg-white"}`}>
+            <tbody className={`divide-y ${darkMode ? "divide-gray-700 bg-dark-card" : "divide-gray-200 bg-white"}`}>
               {inventory.length > 0 ? (
                 inventory.map((item) => (
-                  <tr key={item._id} className={item.status === 'Low Stock' ? `${darkMode ? 'bg-red-900/30' : 'bg-red-100'}` : ''}>
+                  <tr key={item._id} className={item.status === 'Low Stock' ? `${darkMode ? 'bg-status-red-dark/30' : 'bg-status-red-light'}` : ''}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {item.image ? (
                         <img src={item.image} alt={item.name} className="h-10 w-10 rounded-full object-cover" />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                        <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center">
                           <ImageIcon size={16} className="text-gray-500" />
                         </div>
                       )}
@@ -545,7 +545,7 @@ Market: ${product.market}`;
                       <div className="font-medium">{item.name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-blue-dark text-status-blue-textDark" : "bg-status-blue-light text-status-blue-textLight"}`}>
                         {item.category}
                       </span>
                     </td>
@@ -559,7 +559,7 @@ Market: ${product.market}`;
                       {formatDate(item.expiryDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-purple-900 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-purple-dark text-status-purple-textDark" : "bg-status-purple-light text-status-purple-textLight"}`}>
                         {item.market}
                       </span>
                     </td>
@@ -571,14 +571,14 @@ Market: ${product.market}`;
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => setShowQRCode(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
+                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-btn-blue hover:bg-dark-gray" : "text-btn-blue hover:bg-gray-100"}`}
                         title="View QR Code"
                       >
                         <QrCode size={16} />
                       </button>
                       <button
                         onClick={() => handleRefill(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
+                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
                         title="Refill Stock"
                       >
                         Refill
@@ -586,7 +586,7 @@ Market: ${product.market}`;
                       {item.status === 'Low Stock' && (
                         <button
                           onClick={() => handleNotify(item)}
-                          className={`p-1 rounded-md mr-2 ${darkMode ? "text-orange-400 hover:bg-gray-700" : "text-orange-600 hover:bg-gray-100"}`}
+                          className={`p-1 rounded-md mr-2 ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
                           title="Notify Management"
                         >
                           <AlertCircle size={16} />
@@ -594,13 +594,13 @@ Market: ${product.market}`;
                       )}
                       <button
                         onClick={() => handleEdit(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-indigo-400 hover:bg-gray-700" : "text-indigo-600 hover:bg-gray-100"}`}
+                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
                       >
                         <Edit size={16} />
                       </button>
                       <button
                         onClick={() => handleDelete(item._id)}
-                        className={`p-1 rounded-md ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-600 hover:bg-gray-100"}`}
+                        className={`p-1 rounded-md ${darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100"}`}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -625,20 +625,20 @@ Market: ${product.market}`;
             inventory.map((item) => (
               <div
                 key={item._id}
-                className={`p-4 rounded-lg shadow-sm border-2 ${darkMode ? `bg-gray-800 ${item.status === 'Low Stock' ? 'border-red-700 bg-red-900/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`}`}
+                className={`p-4 rounded-lg shadow-sm border-2 ${darkMode ? `bg-dark-card ${item.status === 'Low Stock' ? 'border-status-red-dark bg-status-red-dark/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-status-red-light bg-status-red-light' : 'border-gray-200'}`}`}
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     {item.image ? (
                       <img src={item.image} alt={item.name} className="h-12 w-12 rounded-full object-cover" />
                     ) : (
-                      <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                      <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center">
                         <ImageIcon size={20} className="text-gray-500" />
                       </div>
                     )}
                     <div>
                       <h3 className="text-lg font-medium">{item.name}</h3>
-                      <span className={`px-2 py-1 mt-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+                      <span className={`px-2 py-1 mt-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-status-blue-dark text-status-blue-textDark" : "bg-status-blue-light text-status-blue-textLight"}`}>
                         {item.category}
                       </span>
                     </div>
@@ -646,14 +646,14 @@ Market: ${product.market}`;
                   <div className="flex gap-1">
                     <button
                       onClick={() => setShowQRCode(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
+                      className={`p-1 rounded-md ${darkMode ? "text-btn-blue hover:bg-dark-gray" : "text-btn-blue hover:bg-gray-100"}`}
                       title="View QR Code"
                     >
                       <QrCode size={16} />
                     </button>
                     <button
                       onClick={() => handleRefill(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
+                      className={`p-1 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
                       title="Refill Stock"
                     >
                       Refill
@@ -661,7 +661,7 @@ Market: ${product.market}`;
                     {item.status === 'Low Stock' && (
                       <button
                         onClick={() => handleNotify(item)}
-                        className={`p-1 rounded-md ${darkMode ? "text-orange-400 hover:bg-gray-700" : "text-orange-600 hover:bg-gray-100"}`}
+                        className={`p-1 rounded-md ${darkMode ? "text-btn-yellow hover:bg-dark-gray" : "text-btn-yellow hover:bg-gray-100"}`}
                         title="Notify Management"
                       >
                         <AlertCircle size={16} />
@@ -669,14 +669,14 @@ Market: ${product.market}`;
                     )}
                     <button
                       onClick={() => handleEdit(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-indigo-400 hover:bg-gray-700" : "text-indigo-600 hover:bg-gray-100"}`}
+                      className={`p-1 rounded-md ${darkMode ? "text-indigo-400 hover:bg-dark-gray" : "text-indigo-600 hover:bg-gray-100"}`}
                       title="Edit Product"
-                    >
+                      >
                       <Edit size={16} />
                     </button>
                     <button
                       onClick={() => handleDelete(item._id)}
-                      className={`p-1 rounded-md ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-600 hover:bg-gray-100"}`}
+                      className={`p-1 rounded-md ${darkMode ? "text-btn-red hover:bg-dark-gray" : "text-btn-red hover:bg-gray-100"}`}
                       title="Delete Product"
                     >
                       <Trash2 size={16} />
@@ -706,7 +706,7 @@ Market: ${product.market}`;
                     <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
                       Market:
                     </span>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${darkMode ? "bg-purple-900 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${darkMode ? "bg-status-purple-dark text-status-purple-textDark" : "bg-status-purple-light text-status-purple-textLight"}`}>
                       {item.market}
                     </span>
                   </div>
@@ -727,7 +727,7 @@ Market: ${product.market}`;
               </div>
             ))
           ) : (
-            <div className={`col-span-3 p-8 text-center ${darkMode ? "bg-gray-800" : "bg-white"} rounded-lg`}>
+            <div className={`col-span-3 p-8 text-center ${darkMode ? "bg-dark-card" : "bg-white"} rounded-lg`}>
               No products found
             </div>
           )}
@@ -739,7 +739,7 @@ Market: ${product.market}`;
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-300 dark:bg-gray-700 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+            className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-300 dark:bg-dark-gray text-gray-500' : 'bg-btn-teal text-white hover:bg-green-700'}`}
           >
             Previous
           </button>
@@ -747,7 +747,7 @@ Market: ${product.market}`;
           <button
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-300 dark:bg-gray-700 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+            className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-300 dark:bg-dark-gray text-gray-500' : 'bg-btn-teal text-white hover:bg-green-700'}`}
           >
             Next
           </button>
@@ -756,7 +756,7 @@ Market: ${product.market}`;
       {/* Add/Edit Product Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className={`rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-8 ${darkMode ? "bg-dark-card" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">
                 {editingProduct ? (formData.market === "Export" ? "Edit Export Product" : "Edit Product") : (formData.market === "Export" ? "Add Export Product" : "Add New Product")}
@@ -787,13 +787,13 @@ Market: ${product.market}`;
                     {imagePreview ? (
                       <img src={imagePreview} alt="Preview" className="h-20 w-20 rounded-full object-cover border-2 border-green-500" />
                     ) : (
-                      <div className="h-20 w-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                      <div className="h-20 w-20 rounded-full bg-gray-200 dark:bg-dark-gray flex items-center justify-center">
                         <ImageIcon size={24} className="text-gray-500" />
                       </div>
                     )}
                   </div>
                   <label className="cursor-pointer">
-                    <span className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 transition-colors duration-200">
+                    <span className="bg-btn-teal hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 transition-colors duration-200">
                       <Upload size={16} />
                       {imagePreview ? "Change Image" : "Upload Image"}
                     </span>
@@ -823,7 +823,7 @@ Market: ${product.market}`;
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       required
                       placeholder="e.g., Organic Honey"
                     />
@@ -842,7 +842,7 @@ Market: ${product.market}`;
                       name="description"
                       value={formData.description}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       placeholder="e.g., Fresh organic honey from local bees"
                       rows={3}
                     />
@@ -859,7 +859,7 @@ Market: ${product.market}`;
                         name="category"
                         value={formData.category}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                        className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       >
                         <optgroup label="Animal Products">
                           <option value="Milk Product">Milk Product</option>
@@ -885,7 +885,7 @@ Market: ${product.market}`;
                         name="market"
                         value={formData.market}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                        className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       >
                         <option value="Local">Local</option>
                         <option value="Export">Export</option>
@@ -913,7 +913,7 @@ Market: ${product.market}`;
                       name="quantity"
                       value={formData.stock.quantity}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       required
                       min="0"
                       placeholder="e.g., 100"
@@ -933,7 +933,7 @@ Market: ${product.market}`;
                       name="unit"
                       value={formData.stock.unit}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                     >
                       <option value="kg">kg</option>
                       <option value="liter">liter</option>
@@ -956,7 +956,7 @@ Market: ${product.market}`;
                     name="price"
                     value={formData.price}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                     required
                     min="0"
                     step="0.01"
@@ -983,7 +983,7 @@ Market: ${product.market}`;
                       name="creationDate"
                       value={formData.creationDate}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                       required
                     />
                   </div>
@@ -999,7 +999,7 @@ Market: ${product.market}`;
                       name="expiryDate"
                       value={formData.expiryDate}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500 opacity-50 cursor-not-allowed`}
+                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500 opacity-50 cursor-not-allowed`}
                       required
                       readOnly
                     />
@@ -1019,13 +1019,13 @@ Market: ${product.market}`;
                     setImagePreview(null);
                     setFormErrors({});
                   }}
-                  className={`px-6 py-2 rounded-md ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
+                  className={`px-6 py-2 rounded-md ${darkMode ? "bg-dark-gray text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200"
+                  className="px-6 py-2 bg-btn-teal text-white rounded-md hover:bg-green-700 transition-colors duration-200"
                 >
                   {editingProduct ? "Update Product" : "Add Product"}
                 </button>
@@ -1037,7 +1037,7 @@ Market: ${product.market}`;
       {/* Refill Modal */}
       {showRefillForm && refillingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-lg shadow-lg max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className={`rounded-lg shadow-lg max-w-md w-full p-6 ${darkMode ? "bg-dark-card" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Refill {refillingProduct.name}</h2>
               <button
@@ -1069,7 +1069,7 @@ Market: ${product.market}`;
                   type="number"
                   value={refillQuantity}
                   onChange={(e) => setRefillQuantity(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                  className={`w-full px-3 py-2 rounded-md border ${darkMode ? "bg-dark-gray border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
                   required
                   min="1"
                   placeholder="Enter quantity to add"
@@ -1087,13 +1087,13 @@ Market: ${product.market}`;
                     setShowRefillForm(false);
                     setRefillingProduct(null);
                   }}
-                  className={`px-4 py-2 rounded-md ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
+                  className={`px-4 py-2 rounded-md ${darkMode ? "bg-dark-gray text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200"
+                  className="px-4 py-2 bg-btn-teal text-white rounded-md hover:bg-green-700 transition-colors duration-200"
                 >
                   Refill
                 </button>
@@ -1105,7 +1105,7 @@ Market: ${product.market}`;
       {/* QR Code Modal */}
       {showQRCode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-lg shadow-lg max-w-sm w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <div className={`rounded-lg shadow-lg max-w-sm w-full p-6 ${darkMode ? "bg-dark-card" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Product QR Code</h2>
               <button
@@ -1170,7 +1170,7 @@ Market: ${product.market}`;
               
                   img.src = url;
                 }}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors duration-200"
+                className="mt-4 px-4 py-2 bg-btn-blue text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors duration-200"
               >
                 <Download size={16} />
                 Download QR Code
