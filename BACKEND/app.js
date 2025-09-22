@@ -178,6 +178,7 @@ import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 
+
 // ----------------------- Debug env variables -----------------------
 console.log(
   "OPENAI_API_KEY loaded:",
@@ -236,6 +237,7 @@ app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
+
 
 // Customer Profile Image Upload
 app.use(
