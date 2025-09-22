@@ -378,82 +378,68 @@ export default function AnimalHealth() {
 
         {/* Animal Types - Prioritized by Emergency Status */}
         <section className="mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-              Animals by Type
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-              <span className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 px-2 py-1 rounded-full">
-                {filteredAnimalTypes.length} types
-              </span>
-              <span>Sorted by {sortBy === "emergency" ? "emergency cases" : sortBy === "name" ? "name" : "population"}</span>
-            </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  {filteredAnimalTypes.map(type => (
+    <div
+      key={type._id}
+      onClick={() => navigate(`/AnimalManagement/HealthReport/${type.name.toLowerCase()}`)}
+      className={`overflow-hidden rounded-xl shadow-md transition-all hover:shadow-lg cursor-pointer ${
+        darkMode ? "bg-gray-800 hover:bg-gray-750" : "bg-white hover:bg-gray-50"
+      }`}
+    >
+      <div className="relative">
+        <img
+          src={type.bannerImage ? `http://localhost:5000${type.bannerImage}` : "/images/default.jpg"}
+          alt={type.name}
+          className="w-full h-40 object-cover"
+        />
+        {type.emergencyCount > 0 && (
+          <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+            <AlertTriangle size={12} />
+            {type.emergencyCount} Emergency
           </div>
-          
-          {filteredAnimalTypes.length === 0 ? (
-            <div className={`p-8 rounded-xl text-center ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-              <p className="text-gray-500 dark:text-gray-400">No animal types found matching your search criteria.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredAnimalTypes.map(type => (
-                <div
-                  key={type._id}
-                  className={`overflow-hidden rounded-xl shadow-md transition-all hover:shadow-lg ${
-                    darkMode ? "bg-gray-800 hover:bg-gray-750" : "bg-white hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="relative">
-                    <img
-                      src={type.bannerImage ? `http://localhost:5000${type.bannerImage}` : "/images/default.jpg"}
-                      alt={type.name}
-                      className="w-full h-40 object-cover"
-                    />
-                    {type.emergencyCount > 0 && (
-                      <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        {type.emergencyCount} Emergency
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="text-lg font-bold text-gray-800 dark:text-white truncate">{type.name}</h4>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        type.emergencyCount > 0 ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200" : 
-                        "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200"
-                      }`}>
-                        {type.totalCount} animals
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      {healthStatusPriority.slice(0, 4).map(status => (
-                        type.healthCounts[status] > 0 && (
-                          <div key={status} className={`flex items-center justify-between p-2 rounded text-xs ${getStatusColor(status)}`}>
-                            <span className="truncate flex items-center gap-1">
-                              <div className={`w-2 h-2 rounded-full ${getStatusIconColor(status)}`}></div>
-                              {status.split(" ")[0]}
-                            </span>
-                            <span className="font-bold ml-1">{type.healthCounts[status]}</span>
-                          </div>
-                        )
-                      ))}
-                    </div>
-                    
-                    <button
-                      onClick={() => navigate(`/AnimalManagement/HealthReport/${type.name.toLowerCase()}`)}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
-                    >
-                      <Eye size={16} />
-                      View Health Info
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        )}
+      </div>
+      <div className="p-4">
+        <div className="flex justify-between items-center mb-3">
+         <h4 className="text-lg font-bold text-gray-800 dark:text-white truncate">
+            {type.name && type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+          </h4>
+
+          <span className={`text-xs px-2 py-1 rounded-full ${
+            type.emergencyCount > 0 ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200" : 
+            "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200"
+          }`}>
+            {type.totalCount} animals
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {healthStatusPriority.slice(0, 4).map(status => (
+            type.healthCounts[status] > 0 && (
+              <div key={status} className={`flex items-center justify-between p-2 rounded text-xs ${getStatusColor(status)}`}>
+                <span className="truncate flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${getStatusIconColor(status)}`}></div>
+                  {status.split(" ")[0]}
+                </span>
+                <span className="font-bold ml-1">{type.healthCounts[status]}</span>
+              </div>
+            )
+          ))}
+        </div>
+        
+        {/* The onClick is removed from the button, as the parent div now handles it */}
+        <div
+          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg"
+        >
+          <Eye size={16} />
+          View Health Info
+          <ChevronRight size={16} />
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
         </section>
 
 

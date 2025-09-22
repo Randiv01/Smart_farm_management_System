@@ -90,6 +90,21 @@ export default function AnimalProductivityDashboard() {
   const [message, setMessage] = useState({ text: "", type: "" });
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [showFilters, setShowFilters] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const capitalize = (s) => (s && s.length ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '');
+
+// 2. ADD THIS HELPER FUNCTION TO RELIABLY LOAD THE LOGO
+const getImageBase64 = async (url) => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
   useEffect(() => {
     document.title = "Animal Productivity - Animal Manager";
@@ -102,120 +117,124 @@ export default function AnimalProductivityDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchData = async () => {
-    try {
+ const fetchData = async (isBackgroundRefresh = false) => { // Correction 1: Add the parameter here
+  try {
+    if (!isBackgroundRefresh) {
       setGlobalLoading(true);
-      setError(null);
+    } else {
+      setIsRefreshing(true);
+    }
+    setError(null);
 
-      // This Promise.all now uses the new '/productivity' endpoint we created
-      const [typesRes, animalsRes, productivityRes, analyticsRes] = await Promise.all([
-        axios.get("http://localhost:5000/animal-types"),
-        axios.get("http://localhost:5000/animals"),
-        axios.get("http://localhost:5000/productivity"), // This now works and gets ALL records
-        axios.get("http://localhost:5000/productivity/analytics?timeframe=month&groupBy=day"),
-      ]);
+    // This Promise.all now uses the new '/productivity' endpoint we created
+   const [typesRes, animalsRes, productivityRes, analyticsRes] = await Promise.all([
+  axios.get("http://localhost:5000/animal-types"),
+  axios.get("http://localhost:5000/animals"),
+  axios.get("http://localhost:5000/animal-productivity"),
+  axios.get("http://localhost:5000/animal-productivity/analytics?timeframe=month&groupBy=day"),
+]);
 
-      const types = typesRes.data;
-      const allAnimals = animalsRes.data;
-      const allProductivityRecords = productivityRes.data.allRecords || []; // Correctly gets all records
-      const analyticsData = analyticsRes.data;
+    // ... (all of your data processing logic stays exactly the same here) ...
+    
+    const types = typesRes.data;
+    const allAnimals = animalsRes.data;
+    const allProductivityRecords = productivityRes.data.allRecords || [];
+    const analyticsData = analyticsRes.data;
 
-      setAnimals(allAnimals);
-      setProductivityRecords(allProductivityRecords);
-      setProductivityAnalytics(analyticsData);
+    setAnimals(allAnimals);
+    setProductivityRecords(allProductivityRecords);
+    setProductivityAnalytics(analyticsData);
 
-      const allProductivityFields = [];
-      const fieldNames = new Set();
-      types.forEach((type) => {
+    const allProductivityFields = [];
+    const fieldNames = new Set();
+    types.forEach((type) => {
+      if (type.productivityFields) {
+        type.productivityFields.forEach((field) => {
+          if (!fieldNames.has(field.name)) {
+            fieldNames.add(field.name);
+            allProductivityFields.push(field);
+          }
+        });
+      }
+    });
+    setProductivityFields(allProductivityFields);
+
+    const typesWithStats = types.map((type) => {
+      const animalsOfType = allAnimals.filter(a => {
+        if (!a.type) return false;
+        const typeId = typeof a.type === 'object' ? a.type._id : a.type;
+        return typeId === type._id;
+      });
+
+      const animalIdsOfType = new Set(animalsOfType.map(a => a._id.toString()));
+      const batchIdsOfType = new Set(animalsOfType.filter(a => a.batchId).map(a => a.batchId));
+      
+      const recordsForType = allProductivityRecords.filter(record => {
+        if (record.batchId && batchIdsOfType.has(record.batchId)) {
+          return true;
+        }
+        if (record.animalId) {
+          const recordAnimalIdStr = typeof record.animalId === 'object'
+            ? record.animalId._id?.toString()
+            : record.animalId.toString();
+          return animalIdsOfType.has(recordAnimalIdStr);
+        }
+        return false;
+      });
+
+      const productivity = {};
+      if (type.productivityFields) {
+        type.productivityFields.forEach(field => {
+          productivity[field.name] = 0;
+        });
+      }
+      
+      recordsForType.forEach(record => {
         if (type.productivityFields) {
-          type.productivityFields.forEach((field) => {
-            if (!fieldNames.has(field.name)) {
-              fieldNames.add(field.name);
-              allProductivityFields.push(field);
+          type.productivityFields.forEach(field => {
+            if (record[field.name] && typeof record[field.name] === 'number') {
+              productivity[field.name] += record[field.name];
             }
           });
         }
       });
-      setProductivityFields(allProductivityFields);
 
-      const typesWithStats = types.map((type) => {
-        // Robustly filter animals belonging to the current type
-        const animalsOfType = allAnimals.filter(a => {
-          if (!a.type) return false;
-          const typeId = typeof a.type === 'object' ? a.type._id : a.type;
-          return typeId === type._id;
-        });
+      return {
+        ...type,
+        totalCount: animalsOfType.length,
+        productivity,
+        bannerImage: type.bannerImage,
+        productivityFields: type.productivityFields || [],
+      };
+    });
 
-        const animalIdsOfType = new Set(animalsOfType.map(a => a._id.toString()));
-        const batchIdsOfType = new Set(animalsOfType.filter(a => a.batchId).map(a => a.batchId));
-        
-        const recordsForType = allProductivityRecords.filter(record => {
-  // First, check if it's a batch record
-  if (record.batchId && batchIdsOfType.has(record.batchId)) {
-    return true;
-  }
-  
-  // Next, handle individual animal records robustly
-  if (record.animalId) {
-    // This handles if record.animalId is a full object OR just a string ID
-    const recordAnimalIdStr = typeof record.animalId === 'object'
-      ? record.animalId._id?.toString()
-      : record.animalId.toString();
-      
-    return animalIdsOfType.has(recordAnimalIdStr);
-  }
+    setAnimalTypes(typesWithStats);
+    setTotalAnimals(allAnimals.length);
 
-  return false;
-});
+    const overall = {};
+    allProductivityFields.forEach((field) => {
+      overall[field.name] = allProductivityRecords.reduce((sum, record) => {
+        return sum + (Number(record[field.name]) || 0);
+      }, 0);
+    });
+    setProductivityStats(overall);
+    
+    generateTrendData(allProductivityRecords, allProductivityFields);
+    generateInsights(typesWithStats, overall, analyticsData);
 
-        const productivity = {};
-        if (type.productivityFields) {
-            type.productivityFields.forEach(field => {
-                productivity[field.name] = 0;
-            });
-        }
-        
-        recordsForType.forEach(record => {
-            if (type.productivityFields) {
-                type.productivityFields.forEach(field => {
-                    if (record[field.name] && typeof record[field.name] === 'number') {
-                        productivity[field.name] += record[field.name];
-                    }
-                });
-            }
-        });
-
-        return {
-          ...type,
-          totalCount: animalsOfType.length,
-          productivity,
-          bannerImage: type.bannerImage,
-          productivityFields: type.productivityFields || [],
-        };
-      });
-
-      setAnimalTypes(typesWithStats);
-      setTotalAnimals(allAnimals.length);
-
-      const overall = {};
-      allProductivityFields.forEach((field) => {
-        overall[field.name] = allProductivityRecords.reduce((sum, record) => {
-          return sum + (Number(record[field.name]) || 0);
-        }, 0);
-      });
-      setProductivityStats(overall);
-      
-      generateTrendData(allProductivityRecords, allProductivityFields);
-      generateInsights(typesWithStats, overall, analyticsData);
-
-    } catch (err) {
-      console.error("Failed to fetch productivity data:", err);
-      setError("Failed to load productivity data. Please try again.");
-      setMessage({ text: "Failed to load data", type: "error" });
-    } finally {
+  } catch (err) {
+    console.error("Failed to fetch productivity data:", err);
+    setError("Failed to load productivity data. Please try again.");
+    setMessage({ text: "Failed to load data", type: "error" });
+  } finally {
+    // Correction 2: Add this logic to turn off the correct loader
+    if (!isBackgroundRefresh) {
       setGlobalLoading(false);
+    } else {
+      setIsRefreshing(false);
     }
-  };
+  }
+};
 
 
   // --- END: CORRECTED FETCH AND AGGREGATION LOGIC ---
@@ -419,41 +438,125 @@ export default function AnimalProductivityDashboard() {
     ],
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    const date = new Date().toLocaleDateString();
+const exportPDF = async () => {
+    try {
+      const logoBase64 = await getImageBase64('/logo512.png');
+      const doc = new jsPDF();
+      const reportDate = new Date().toLocaleDateString();
+      const reportDateTime = new Date().toLocaleString();
 
-    doc.setFontSize(18);
-    doc.text("Animal Productivity Report", 14, 16);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Generated on ${date}`, 14, 23);
+      // --- Reusable Header ---
+      const header = () => {
+        doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
+        doc.setFontSize(18);
+        doc.setFont("helvetica", 'bold');
+        doc.text('Mount Olive Farm House', 45, 18);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", 'normal');
+        doc.text('No. 45, Green Valley Road, Nuwaraeliya, Sri Lanka', 45, 25);
+        doc.text('Phone: +94 81 249 2134 | Email: info@mountolivefarm.com', 45, 30);
+      };
 
-    autoTable(doc, {
-      startY: 30,
-      head: [["Metric", "Value", "Unit"]],
-      body: productivityFields.map((field) => [
-        field.label,
-        (productivityStats[field.name] || 0).toLocaleString(),
-        field.unit,
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+      // --- Reusable Footer ---
+      const footer = () => {
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        // Position footer at the bottom
+        const pageHeight = doc.internal.pageSize.height;
+        doc.text(`Page ${doc.internal.getCurrentPageInfo().pageNumber} of ${pageCount}`, doc.internal.pageSize.width / 2, pageHeight - 15, { align: 'center' });
+        doc.text(`Report generated on ${reportDateTime}`, doc.internal.pageSize.width / 2, pageHeight - 10, { align: 'center' });
+      };
 
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 10,
-      head: [["Animal Type", "Count", ...productivityFields.map((f) => f.label)]],
-      body: animalTypes.map((type) => [
-        type.name,
+      // --- Document Title and Intro ---
+      doc.setFontSize(16);
+      doc.setFont("helvetica", 'bold');
+      doc.text('ANIMAL PRODUCTIVITY REPORT', 105, 50, { align: 'center' });
+      doc.setLineWidth(0.5);
+      doc.line(14, 55, 196, 55);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", 'normal');
+      doc.text(`Report Date: ${reportDate}`, 14, 65);
+
+      // --- 1. Overall Summary Table ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", 'bold');
+      doc.text("Overall Farm Productivity Summary", 14, 75);
+      
+      autoTable(doc, {
+        startY: 80,
+        head: [["Metric", "Total Value", "Unit"]],
+        body: productivityFields.map((field) => [
+          field.label,
+          (productivityStats[field.name] || 0).toLocaleString(),
+          field.unit,
+        ]),
+        theme: "grid",
+        headStyles: { 
+          fillColor: [60, 141, 188], // This is the blue color from your example
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 3
+        },
+        margin: { left: 14, right: 14 },
+        didDrawPage: (data) => {
+          // Add header and footer to each page
+          header();
+          footer();
+        }
+      });
+
+      // --- 2. Detailed Breakdown Table ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", 'bold');
+      doc.text("Productivity Breakdown by Animal Type", 14, doc.lastAutoTable.finalY + 15);
+
+      const tableBody = sortedAnimalTypes.map((type) => [
+        capitalize(type.name),
         type.totalCount,
         ...productivityFields.map((field) => (type.productivity[field.name] || 0).toLocaleString()),
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+      ]);
 
-    doc.save(`productivity-report-${date.replace(/\//g, "-")}.pdf`);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [["Animal Type", "Count", ...productivityFields.map((f) => f.label)]],
+        body: tableBody,
+        theme: "striped",
+        headStyles: { 
+          fillColor: [60, 141, 188], // This is the blue color from your example
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 3
+        },
+        margin: { left: 14, right: 14 },
+        didDrawPage: (data) => {
+          // Add header and footer to each page
+          header();
+          footer();
+        }
+      });
+      
+      // Call footer on the last page manually if autoTable didn't create a new page
+      const finalPageNum = doc.internal.getNumberOfPages();
+      const lastAutoTablePageNum = doc.lastAutoTable.pageCount;
+      if (finalPageNum === lastAutoTablePageNum) {
+        footer();
+      }
+
+      // --- SAVE THE DOCUMENT ---
+      doc.save(`Productivity-Report-${reportDate.replace(/\//g, "-")}.pdf`);
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setMessage({ text: "Error creating the PDF. Please try again.", type: "error" });
+    }
   };
 
   const getMainProductivityMetrics = (animalType) => {
@@ -544,31 +647,34 @@ export default function AnimalProductivityDashboard() {
       </div>
 
       {/* Filters */}
-      <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-6`}>
-        <div className="relative mb-4">
-          <Search
-            size={20}
-            className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
-          />
-          <input
-            type="text"
-            placeholder="Search by animal type..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={`w-full pl-10 pr-4 py-2.5 rounded-lg border ${
-              darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
-            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-          />
-        </div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Filter size={20} />
-            Advanced Filters
-          </h3>
+      <div className={`p-5 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-5`}>
+        {/* One parent div with flexbox to align items horizontally */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-auto flex-1">
+            <Search
+              size={20}
+              className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+            />
+            <input
+              type="text"
+              placeholder="Search by animal type..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`w-full pl-10 pr-4 py-2 text-sm rounded-lg border ${
+                darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+              } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+            />
+          </div>
+
+          {/* Filter Button */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`text-sm ${darkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-800"} transition-colors`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg ${
+              darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            } transition-colors w-full sm:w-auto justify-center sm:justify-start flex-shrink-0`}
           >
+            <Filter size={20} />
             {showFilters ? "Hide Filters" : "Show Filters"}
           </button>
         </div>
@@ -579,7 +685,7 @@ export default function AnimalProductivityDashboard() {
               <select
                 value={selectedManagementType}
                 onChange={(e) => setSelectedManagementType(e.target.value)}
-                className={`w-full px-3 py-2.5 rounded-lg border ${
+                 className={`w-full px-3 py-2 text-sm rounded-lg border ${
                   darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
                 } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
               >
@@ -594,7 +700,7 @@ export default function AnimalProductivityDashboard() {
               <select
                 value={selectedField}
                 onChange={(e) => setSelectedField(e.target.value)}
-                className={`w-full px-3 py-2.5 rounded-lg border ${
+                className={`w-full px-3 py-2 text-sm rounded-lg border ${
                   darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
                 } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
               >
@@ -613,7 +719,7 @@ export default function AnimalProductivityDashboard() {
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className={`flex-1 px-3 py-2.5 rounded-lg border ${
+                   className={`w-full px-3 py-2 text-sm rounded-lg border ${
                     darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
                   } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                 />
@@ -622,7 +728,7 @@ export default function AnimalProductivityDashboard() {
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className={`flex-1 px-3 py-2.5 rounded-lg border ${
+                   className={`w-full px-3 py-2 text-sm rounded-lg border ${
                     darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
                   } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                 />
@@ -717,15 +823,17 @@ export default function AnimalProductivityDashboard() {
             <RefreshCw size={18} />
             Refresh
           </button>
-          <button
-            onClick={() => setShowAnalytics(!showAnalytics)}
-            className={`px-5 py-2.5 rounded-full flex items-center gap-2 ${
-              showAnalytics ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            } transition-all`}
-          >
-            {showAnalytics ? <EyeOff size={18} /> : <BarChart2 size={18} />}
-            {showAnalytics ? "Hide Analytics" : "Show Analytics"}
-          </button>
+         <button
+  onClick={() => setShowAnalytics(!showAnalytics)}
+  className={`px-5 py-2.5 rounded-full flex items-center gap-2 font-semibold text-soft-white transition-all duration-300 ease-in-out transform hover:scale-105 ${
+    showAnalytics
+      ? "bg-btn-gray hover:opacity-90"
+      : "bg-btn-teal hover:opacity-90 shadow-lg"
+  }`}
+>
+  {showAnalytics ? <EyeOff size={18} /> : <BarChart2 size={18} />}
+  {showAnalytics ? "Hide Analytics" : "Show Analytics"}
+</button>
           <button
             onClick={exportPDF}
             className={`px-5 py-2.5 rounded-full flex items-center gap-2 ${
@@ -775,7 +883,7 @@ export default function AnimalProductivityDashboard() {
                 <h3 className="text-lg font-semibold">Productivity by Animal Type</h3>
                 <BarChart2 className="text-gray-500 dark:text-gray-400" size={20} />
               </div>
-              <div className="h-80">
+              <div className="h-64">
                 <Bar
                   data={productivityChartData}
                   options={{
@@ -816,7 +924,7 @@ export default function AnimalProductivityDashboard() {
                 <h3 className="text-lg font-semibold">Management Type Distribution</h3>
                 <PieChart className="text-gray-500 dark:text-gray-400" size={20} />
               </div>
-              <div className="h-80">
+              <div className="h-64">
                 <Doughnut
                   data={managementTypeData}
                   options={{
@@ -838,7 +946,7 @@ export default function AnimalProductivityDashboard() {
                 <h3 className="text-lg font-semibold">Productivity Trends (Last 12 Months)</h3>
                 <TrendingUp className="text-gray-500 dark:text-gray-400" size={20} />
               </div>
-              <div className="h-80">
+              <div className="h-64">
                 <Line
                   data={trendChartData}
                   options={{
@@ -879,7 +987,7 @@ export default function AnimalProductivityDashboard() {
                 <h3 className="text-lg font-semibold">Productivity by Management Type</h3>
                 <BarChart2 className="text-gray-500 dark:text-gray-400" size={20} />
               </div>
-              <div className="h-80">
+              <div className="h-64">
                 <Bar
                   data={productivityByManagementData}
                   options={{
@@ -952,64 +1060,66 @@ export default function AnimalProductivityDashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {sortedAnimalTypes.map((type) => (
-              <div
-                key={type._id}
-                className={`rounded-2xl shadow-lg overflow-hidden transition-all hover:shadow-xl hover:scale-105 ${
-                  darkMode ? "bg-gray-800" : "bg-white"
-                }`}
-              >
-                <div className="relative h-40 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                  {type.bannerImage ? (
-                    <img
-                      src={`http://localhost:5000${type.bannerImage}`}
-                      alt={type.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-5xl">{getAnimalIcon(type.name)}</span>
-                  )}
-                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
-                    {type.totalCount} animals
-                  </div>
-                </div>
-                <div className="p-5">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-lg font-semibold flex items-center gap-2">
-                      <span>{getAnimalIcon(type.name)}</span>
-                      {type.name}
-                    </h4>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full capitalize ${
-                        type.managementType === "individual"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200"
-                          : type.managementType === "batch"
-                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
-                          : "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200"
-                      }`}
-                    >
-                      {type.managementType}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{getMainProductivityMetrics(type)}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Avg: {getProductivityPerAnimal(type)} per animal
-                  </p>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/AnimalManagement/AnimalProductivity/${type.name.toLowerCase()}`);
-                    }}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Eye size={16} />
-                    View Productivity
-                  </button>
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {sortedAnimalTypes.map((type) => (
+            <div
+              key={type._id}
+              onClick={() => navigate(`/AnimalManagement/AnimalProductivity/${type.name.toLowerCase()}`)}
+              className={`rounded-2xl shadow-lg overflow-hidden transition-all hover:shadow-xl hover:scale-105 cursor-pointer ${
+                darkMode ? "bg-gray-800" : "bg-white"
+              }`}
+            >
+              <div className="relative h-40 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                {type.bannerImage ? (
+                  <img
+                    src={`http://localhost:5000${type.bannerImage}`}
+                    alt={type.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-5xl">{getAnimalIcon(type.name)}</span>
+                )}
+                <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                  {type.totalCount} animals
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="p-5">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-lg font-semibold flex items-center gap-2">
+                    <span>
+                      {getAnimalIcon(type.name)} {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                    </span>
+                  </h4>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full capitalize ${
+                      type.managementType === "individual"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200"
+                        : type.managementType === "batch"
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
+                        : "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200"
+                    }`}
+                  >
+                    {type.managementType}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 h-10 overflow-hidden">{getMainProductivityMetrics(type)}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Avg: {getProductivityPerAnimal(type)} per animal
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/AnimalManagement/AnimalProductivity/${type.name.toLowerCase()}`);
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <Eye size={16} />
+                  View Productivity
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
         )}
       </div>
     </div>

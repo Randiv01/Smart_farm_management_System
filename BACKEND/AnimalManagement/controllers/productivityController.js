@@ -1,4 +1,4 @@
-import Productivity from '../models/Productivity.js';
+import AnimalProductivity from '../models/AnimalProductivity.js'; // Changed from 'Productivity'
 import Animal from '../models/Animal.js';
 import AnimalType from '../models/AnimalType.js';
 import mongoose from 'mongoose';
@@ -8,7 +8,6 @@ export const createProductivityRecord = async (req, res) => {
   try {
     const { animalId, batchId, isGroup, date, notes, recordedBy, ...productivityData } = req.body;
 
-    // Validate required fields
     if (!animalId && !batchId) {
       return res.status(400).json({ message: 'Animal ID or Batch ID is required' });
     }
@@ -17,16 +16,13 @@ export const createProductivityRecord = async (req, res) => {
     let animal;
     let batchAnimals = [];
 
-    // Get animal type information for validation
     if (isGroup && batchId) {
-      // For batch records, get the first animal to determine type
       batchAnimals = await Animal.find({ batchId }).populate('type').lean();
       if (batchAnimals.length === 0) {
         return res.status(404).json({ message: 'Batch not found or empty' });
       }
       animalType = batchAnimals[0].type;
     } else if (animalId) {
-      // For individual records
       animal = await Animal.findById(animalId).populate('type').lean();
       if (!animal) {
         return res.status(404).json({ message: 'Animal not found' });
@@ -34,11 +30,9 @@ export const createProductivityRecord = async (req, res) => {
       animalType = animal.type;
     }
 
-    // Validate productivity data against animal type's productivity fields
     if (animalType && animalType.productivityFields) {
       const validationErrors = [];
       
-      // Check required fields and data types
       animalType.productivityFields.forEach(field => {
         if (field.required && !productivityData[field.name]) {
           validationErrors.push(`${field.label} is required`);
@@ -51,7 +45,6 @@ export const createProductivityRecord = async (req, res) => {
         }
       });
       
-      // Check for extra fields
       Object.keys(productivityData).forEach(key => {
         if (!animalType.productivityFields.find(f => f.name === key)) {
           validationErrors.push(`Field '${key}' is not defined for this animal type`);
@@ -63,7 +56,6 @@ export const createProductivityRecord = async (req, res) => {
       }
     }
 
-    // Prepare record data
     const recordData = {
       animalId: isGroup ? null : animalId,
       batchId: isGroup ? batchId : null,
@@ -74,11 +66,10 @@ export const createProductivityRecord = async (req, res) => {
       ...productivityData
     };
 
-    const record = new Productivity(recordData);
+    const record = new AnimalProductivity(recordData); // Changed
     await record.save();
 
-    // Populate related data for response
-    const populatedRecord = await Productivity.findById(record._id)
+    const populatedRecord = await AnimalProductivity.findById(record._id) // Changed
       .populate('animalId', 'animalId data')
       .populate({
         path: 'animalId',
@@ -109,22 +100,19 @@ export const getAnimalProductivity = async (req, res) => {
 
     let query = { animalId, isGroup: false };
 
-    // Add date range filter
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Add product type filter
     if (productType) query.productType = productType;
 
-    const records = await Productivity.find(query)
+    const records = await AnimalProductivity.find(query) // Changed
       .populate('animalId', 'animalId data')
       .sort({ date: -1 })
       .lean();
 
-    // Calculate totals and averages
     const fieldTotals = {};
     const fieldAverages = {};
     
@@ -160,27 +148,23 @@ export const getBatchProductivity = async (req, res) => {
 
     let query = { batchId, isGroup: true };
 
-    // Add date range filter
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Add product type filter
     if (productType) query.productType = productType;
 
-    const records = await Productivity.find(query)
+    const records = await AnimalProductivity.find(query) // Changed
       .sort({ date: -1 })
       .lean();
 
-    // Get batch animals
     const batchAnimals = await Animal.find({ batchId })
       .populate('type', 'name productivityFields')
       .select('animalId data type')
       .lean();
 
-    // Calculate field totals and averages
     const fieldTotals = {};
     const fieldAverages = {};
     
@@ -212,31 +196,19 @@ export const getProductivityAnalytics = async (req, res) => {
   try {
     const { animalTypeId, timeframe = 'month', groupBy = 'day' } = req.query;
     
-    // Calculate date range
     const now = new Date();
     let startDate;
     
     switch (timeframe) {
-      case 'day':
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        break;
-      default:
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      case 'day': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
+      case 'week': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+      case 'month': startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()); break;
+      case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
+      default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
-    // Build query
     let query = { date: { $gte: startDate, $lte: now } };
 
-    // Filter by animal type
     if (animalTypeId) {
       const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
       const animalIds = animals.map(animal => animal._id);
@@ -246,7 +218,7 @@ export const getProductivityAnalytics = async (req, res) => {
       ];
     }
 
-    const records = await Productivity.find(query)
+    const records = await AnimalProductivity.find(query) // Changed
       .populate({
         path: 'animalId',
         populate: {
@@ -257,49 +229,33 @@ export const getProductivityAnalytics = async (req, res) => {
       .sort({ date: 1 })
       .lean();
 
-    // Get animal type info
     let animalType;
     if (animalTypeId) {
       animalType = await AnimalType.findById(animalTypeId).lean();
     }
 
-    // Group records by date
     const analytics = {};
     const dates = [];
     
     records.forEach(record => {
       let dateKey;
-      
       switch (groupBy) {
-        case 'hour':
-          dateKey = record.date.toISOString().slice(0, 13);
-          break;
-        case 'day':
-          dateKey = record.date.toISOString().split('T')[0];
-          break;
+        case 'hour': dateKey = record.date.toISOString().slice(0, 13); break;
+        case 'day': dateKey = record.date.toISOString().split('T')[0]; break;
         case 'week':
           const weekNum = Math.ceil((record.date.getDate() + 6) / 7);
           dateKey = `${record.date.getFullYear()}-W${weekNum}`;
           break;
-        case 'month':
-          dateKey = record.date.toISOString().slice(0, 7);
-          break;
-        default:
-          dateKey = record.date.toISOString().split('T')[0];
+        case 'month': dateKey = record.date.toISOString().slice(0, 7); break;
+        default: dateKey = record.date.toISOString().split('T')[0];
       }
       
       if (!analytics[dateKey]) {
-        analytics[dateKey] = {
-          date: dateKey,
-          records: 0,
-          values: {},
-          animals: new Set()
-        };
+        analytics[dateKey] = { date: dateKey, records: 0, values: {}, animals: new Set() };
         dates.push(dateKey);
       }
       
       analytics[dateKey].records++;
-      
       if (record.animalId) {
         analytics[dateKey].animals.add(record.animalId._id.toString());
       }
@@ -308,13 +264,8 @@ export const getProductivityAnalytics = async (req, res) => {
         animalType.productivityFields.forEach(field => {
           if (record[field.name] !== undefined) {
             if (!analytics[dateKey].values[field.name]) {
-              analytics[dateKey].values[field.name] = {
-                total: 0,
-                count: 0,
-                average: 0
-              };
+              analytics[dateKey].values[field.name] = { total: 0, count: 0, average: 0 };
             }
-            
             analytics[dateKey].values[field.name].total += Number(record[field.name]) || 0;
             analytics[dateKey].values[field.name].count++;
           }
@@ -322,18 +273,15 @@ export const getProductivityAnalytics = async (req, res) => {
       }
     });
     
-    // Calculate averages
     Object.keys(analytics).forEach(dateKey => {
       Object.keys(analytics[dateKey].values).forEach(fieldName => {
         const fieldData = analytics[dateKey].values[fieldName];
         fieldData.average = fieldData.count > 0 ? fieldData.total / fieldData.count : 0;
       });
-      
       analytics[dateKey].animalCount = analytics[dateKey].animals.size;
-      delete analytics[dateKey].animals; // Remove Set for cleaner response
+      delete analytics[dateKey].animals;
     });
 
-    // Convert to array sorted by date
     const analyticsArray = dates.sort().map(dateKey => analytics[dateKey]);
 
     res.json({
@@ -341,11 +289,7 @@ export const getProductivityAnalytics = async (req, res) => {
       groupBy,
       startDate,
       endDate: now,
-      animalType: animalType ? {
-        _id: animalType._id,
-        name: animalType.name,
-        productivityFields: animalType.productivityFields
-      } : null,
+      animalType: animalType ? { _id: animalType._id, name: animalType.name, productivityFields: animalType.productivityFields } : null,
       analytics: analyticsArray,
       totalRecords: records.length
     });
@@ -360,31 +304,19 @@ export const getProductivitySummary = async (req, res) => {
   try {
     const { animalType, period = 'month' } = req.query;
     
-    // Calculate date range
     const now = new Date();
     let startDate;
     
     switch (period) {
-      case 'day':
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        break;
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      case 'day': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
+      case 'week': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+      case 'month': startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()); break;
+      case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
+      default: startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     }
 
-    // Build query
     let query = { date: { $gte: startDate } };
 
-    // Filter by animal type
     if (animalType) {
       const animals = await Animal.find({ type: animalType }).select('_id').lean();
       const animalIds = animals.map(animal => animal._id);
@@ -394,7 +326,7 @@ export const getProductivitySummary = async (req, res) => {
       ];
     }
 
-    const records = await Productivity.find(query)
+    const records = await AnimalProductivity.find(query) // Changed
       .populate({
         path: 'animalId',
         populate: {
@@ -405,15 +337,10 @@ export const getProductivitySummary = async (req, res) => {
       .sort({ date: -1 })
       .lean();
 
-    // Group by product type
     const summaryByProduct = records.reduce((acc, record) => {
       const productType = record.productType || 'default';
       if (!acc[productType]) {
-        acc[productType] = {
-          totalQuantity: 0,
-          records: [],
-          averagePerDay: 0
-        };
+        acc[productType] = { totalQuantity: 0, records: [], averagePerDay: 0 };
       }
       
       let quantity = 0;
@@ -431,11 +358,9 @@ export const getProductivitySummary = async (req, res) => {
       return acc;
     }, {});
 
-    // Calculate daily averages
     const daysDiff = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24));
     Object.keys(summaryByProduct).forEach(productType => {
-      summaryByProduct[productType].averagePerDay = 
-        summaryByProduct[productType].totalQuantity / Math.max(1, daysDiff);
+      summaryByProduct[productType].averagePerDay = summaryByProduct[productType].totalQuantity / Math.max(1, daysDiff);
     });
 
     res.json({
@@ -459,8 +384,7 @@ export const updateProductivityRecord = async (req, res) => {
     const { id } = req.params;
     const { date, notes, recordedBy, ...productivityData } = req.body;
 
-    // Validate record exists
-    const existingRecord = await Productivity.findById(id)
+    const existingRecord = await AnimalProductivity.findById(id) // Changed
       .populate({
         path: 'animalId',
         populate: {
@@ -473,7 +397,6 @@ export const updateProductivityRecord = async (req, res) => {
       return res.status(404).json({ message: 'Productivity record not found' });
     }
 
-    // Validate productivity data
     if (existingRecord.animalId?.type?.productivityFields) {
       const validationErrors = [];
       const animalType = existingRecord.animalId.type;
@@ -498,7 +421,7 @@ export const updateProductivityRecord = async (req, res) => {
       updatedAt: new Date()
     };
 
-    const updatedRecord = await Productivity.findByIdAndUpdate(
+    const updatedRecord = await AnimalProductivity.findByIdAndUpdate( // Changed
       id,
       updateData,
       { new: true, runValidators: true }
@@ -525,7 +448,7 @@ export const deleteProductivityRecord = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedRecord = await Productivity.findByIdAndDelete(id).lean();
+    const deletedRecord = await AnimalProductivity.findByIdAndDelete(id).lean(); // Changed
 
     if (!deletedRecord) {
       return res.status(404).json({ message: 'Productivity record not found' });
@@ -546,31 +469,19 @@ export const getProductivityTrends = async (req, res) => {
   try {
     const { animalTypeId, timeframe = '30days' } = req.query;
 
-    // Calculate date range
     const now = new Date();
     let startDate;
     
     switch (timeframe) {
-      case '7days':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '30days':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case '90days':
-        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        break;
-      default:
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      case '7days': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+      case '30days': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+      case '90days': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+      case 'year': startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break;
+      default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
-    // Build query
     let query = { date: { $gte: startDate, $lte: now } };
 
-    // Filter by animal type
     if (animalTypeId) {
       const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
       const animalIds = animals.map(animal => animal._id);
@@ -580,7 +491,7 @@ export const getProductivityTrends = async (req, res) => {
       ];
     }
 
-    const records = await Productivity.find(query)
+    const records = await AnimalProductivity.find(query) // Changed
       .populate({
         path: 'animalId',
         populate: {
@@ -591,22 +502,15 @@ export const getProductivityTrends = async (req, res) => {
       .sort({ date: 1 })
       .lean();
 
-    // Get animal type info
     let animalType;
     if (animalTypeId) {
       animalType = await AnimalType.findById(animalTypeId).lean();
     }
 
-    // Group by date
     const trends = records.reduce((acc, record) => {
       const dateStr = record.date.toISOString().split('T')[0];
       if (!acc[dateStr]) {
-        acc[dateStr] = {
-          date: dateStr,
-          totalQuantity: 0,
-          records: [],
-          animalCount: new Set()
-        };
+        acc[dateStr] = { date: dateStr, totalQuantity: 0, records: [], animalCount: new Set() };
       }
       
       let quantity = 0;
@@ -629,7 +533,6 @@ export const getProductivityTrends = async (req, res) => {
       return acc;
     }, {});
 
-    // Convert to array and calculate averages
     const trendsArray = Object.values(trends).map(day => ({
       ...day,
       averagePerAnimal: day.animalCount.size > 0 ? day.totalQuantity / day.animalCount.size : 0,
@@ -640,10 +543,7 @@ export const getProductivityTrends = async (req, res) => {
       timeframe,
       startDate,
       endDate: now,
-      animalType: animalType ? {
-        _id: animalType._id,
-        name: animalType.name
-      } : null,
+      animalType: animalType ? { _id: animalType._id, name: animalType.name } : null,
       trends: trendsArray,
       totalRecords: records.length,
       totalQuantity: trendsArray.reduce((sum, day) => sum + day.totalQuantity, 0)
@@ -656,7 +556,7 @@ export const getProductivityTrends = async (req, res) => {
 
 export const getAllProductivityRecords = async (req, res) => {
   try {
-    const records = await Productivity.find({})
+    const records = await AnimalProductivity.find({}) // Changed
       .populate({
         path: 'animalId',
         populate: {
@@ -684,92 +584,36 @@ export const getProductivityTotals = async (req, res) => {
       return res.status(400).json({ message: 'Animal type ID and field name are required' });
     }
 
-    // Get all animals of this type
     const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
     const animalIds = animals.map(animal => animal._id);
 
-    // Calculate date ranges
     const now = new Date();
-    const todayStart = new Date(now.setHours(0, 0, 0, 0));
-    
-    const weekStart = new Date(now);
-    weekStart.setDate(weekStart.getDate() - 7);
-    
-    const monthStart = new Date(now);
-    monthStart.setDate(monthStart.getDate() - 30);
-    
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+    const weekStart = new Date(new Date().setDate(now.getDate() - 7));
+    const monthStart = new Date(new Date().setDate(now.getDate() - 30));
     const yearStart = new Date(now.getFullYear(), 0, 1);
 
-    // Build queries for different time periods
     const queries = {
-      daily: { 
-        date: { $gte: todayStart, $lte: now },
-        animalId: { $in: animalIds },
-        isGroup: false,
-        [fieldName]: { $exists: true }
-      },
-      weekly: { 
-        date: { $gte: weekStart, $lte: now },
-        animalId: { $in: animalIds },
-        isGroup: false,
-        [fieldName]: { $exists: true }
-      },
-      monthly: { 
-        date: { $gte: monthStart, $lte: now },
-        animalId: { $in: animalIds },
-        isGroup: false,
-        [fieldName]: { $exists: true }
-      },
-      yearly: { 
-        date: { $gte: yearStart, $lte: now },
-        animalId: { $in: animalIds },
-        isGroup: false,
-        [fieldName]: { $exists: true }
-      },
-      allTime: { 
-        animalId: { $in: animalIds },
-        isGroup: false,
-        [fieldName]: { $exists: true }
-      }
+      daily: { date: { $gte: todayStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
+      weekly: { date: { $gte: weekStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
+      monthly: { date: { $gte: monthStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
+      yearly: { date: { $gte: yearStart }, animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } },
+      allTime: { animalId: { $in: animalIds }, isGroup: false, [fieldName]: { $exists: true } }
     };
 
-    // Execute all queries in parallel
-    const results = await Promise.all([
-      Productivity.aggregate([
-        { $match: queries.daily },
-        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
-      ]),
-      Productivity.aggregate([
-        { $match: queries.weekly },
-        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
-      ]),
-      Productivity.aggregate([
-        { $match: queries.monthly },
-        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
-      ]),
-      Productivity.aggregate([
-        { $match: queries.yearly },
-        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
-      ]),
-      Productivity.aggregate([
-        { $match: queries.allTime },
+    const results = await Promise.all(Object.values(queries).map(query =>
+      AnimalProductivity.aggregate([ // Changed
+        { $match: query },
         { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
       ])
-    ]);
+    ));
 
-    // Extract totals
-    const totals = {
-      daily: results[0][0]?.total || 0,
-      weekly: results[1][0]?.total || 0,
-      monthly: results[2][0]?.total || 0,
-      yearly: results[3][0]?.total || 0,
-      allTime: results[4][0]?.total || 0
-    };
+    const [daily, weekly, monthly, yearly, allTime] = results.map(result => result[0]?.total || 0);
 
     res.json({
       animalTypeId,
       fieldName,
-      totals,
+      totals: { daily, weekly, monthly, yearly, allTime },
       animalCount: animals.length
     });
   } catch (error) {
