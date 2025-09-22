@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Plus, Edit, Trash } from 'lucide-react';
 import Modal from '../P-Modal.jsx';
 import { useTheme } from '../context/ThemeContext';
+import Loader from '../Loader/Loader';
 import "../styles/theme.css";
 
 import {
@@ -17,6 +18,7 @@ const Productivity = () => {
   const [editingRecord, setEditingRecord] = useState(null);
   const [selectedPlant, setSelectedPlant] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
 
   // Theme-based colors
   const bgCard = theme === 'dark' ? 'bg-[#2d2d2d]' : 'bg-white';
@@ -28,10 +30,13 @@ const Productivity = () => {
   // Fetch records from backend
   const fetchRecords = async (plantType = '') => {
     try {
+      setLoading(true);
       const res = await axios.get(`http://localhost:5000/api/productivity${plantType ? `?plantType=${plantType}` : ''}`);
       setRecords(res.data || []);
     } catch (err) {
       console.error('Fetch error:', err.response || err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,6 +95,11 @@ const Productivity = () => {
       });
     return months.map((month, idx) => ({ month, yield: monthMap[idx] || 0 }));
   };
+
+  // Show loader while data is being fetched
+  if (loading) {
+    return <Loader darkMode={theme === 'dark'} />;
+  }
 
   return (
     <div className={`flex flex-col gap-6 p-4 ${textColor}`}>
