@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2 } from "lucide-react";
+import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
+} from 'recharts';
 
 const Orders = () => {
   const { theme } = useITheme();
@@ -19,6 +23,9 @@ const Orders = () => {
   const [emailSearch, setEmailSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [chartData, setChartData] = useState({});
+  const [activeChartTab, setActiveChartTab] = useState("profit");
+  const [showChart, setShowChart] = useState(true);
 
   const statusOptions = [
     { value: "all", label: "All Orders" },
@@ -39,10 +46,26 @@ const Orders = () => {
     cancelled: []
   };
 
+  // Chart color schemes for dark/light mode
+  const COLORS = {
+    delivered: darkMode ? '#86efac' : '#22c55e', // Green shades
+    processing: darkMode ? '#fde047' : '#eab308', // Yellow shades
+    pending: darkMode ? '#fdba74' : '#f97316', // Orange shades
+    shipped: darkMode ? '#a5b4fc' : '#6366f1', // Indigo shades
+    cancelled: darkMode ? '#fca5a5' : '#ef4444', // Red shades
+    primary: darkMode ? '#86efac' : '#22c55e',
+    secondary: darkMode ? '#107703ff' : '#02751eff',
+    accent: darkMode ? '#1ef81eff' : '#4bf916ff',
+    background: darkMode ? '#1f2937' : '#ffffff',
+    text: darkMode ? '#e5e7eb' : '#374151',
+    grid: darkMode ? '#4b5563' : '#e5e7eb'
+  };
+
   // Fetch orders from API
   useEffect(() => {
     fetchOrders();
     fetchStats();
+    fetchChartData();
   }, [selectedStatus, searchTerm, currentPage, emailSearch]);
 
   const fetchOrders = async () => {
@@ -90,6 +113,52 @@ const Orders = () => {
     }
   };
 
+  const fetchChartData = async () => {
+    try {
+      // Mock chart data - you'll need to implement actual API endpoints for this
+      const monthlyData = [
+        { month: 'Jan', revenue: 4500, profit: 3200, orders: 45 },
+        { month: 'Feb', revenue: 5200, profit: 3800, orders: 52 },
+        { month: 'Mar', revenue: 4800, profit: 3500, orders: 48 },
+        { month: 'Apr', revenue: 6100, profit: 4500, orders: 61 },
+        { month: 'May', revenue: 5800, profit: 4200, orders: 58 },
+        { month: 'Jun', revenue: 7200, profit: 5300, orders: 72 },
+        { month: 'Jul', revenue: 6900, profit: 5100, orders: 69 },
+        { month: 'Aug', revenue: 7800, profit: 5800, orders: 78 },
+        { month: 'Sep', revenue: 8200, profit: 6200, orders: 82 },
+        { month: 'Oct', revenue: 7500, profit: 5600, orders: 75 },
+        { month: 'Nov', revenue: 8900, profit: 6700, orders: 89 },
+        { month: 'Dec', revenue: 9500, profit: 7200, orders: 95 }
+      ];
+
+      const statusDistribution = [
+        { name: 'Delivered', value: 65, color: COLORS.delivered },
+        { name: 'Processing', value: 15, color: COLORS.processing },
+        { name: 'Pending', value: 10, color: COLORS.pending },
+        { name: 'Shipped', value: 8, color: COLORS.shipped },
+        { name: 'Cancelled', value: 2, color: COLORS.cancelled }
+      ];
+
+      const weeklyTrend = [
+        { day: 'Mon', profit: 1200, revenue: 1500 },
+        { day: 'Tue', profit: 1800, revenue: 2200 },
+        { day: 'Wed', profit: 1500, revenue: 1900 },
+        { day: 'Thu', profit: 2200, revenue: 2800 },
+        { day: 'Fri', profit: 2500, revenue: 3200 },
+        { day: 'Sat', profit: 3000, revenue: 3800 },
+        { day: 'Sun', profit: 2800, revenue: 3500 }
+      ];
+
+      setChartData({
+        monthly: monthlyData,
+        statusDistribution,
+        weeklyTrend
+      });
+    } catch (error) {
+      console.error("Error fetching chart data:", error);
+    }
+  };
+
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
@@ -114,11 +183,8 @@ const Orders = () => {
         withCredentials: true
       });
      
-      // Refresh orders list
       fetchOrders();
       fetchStats();
-     
-      // Show success message
       alert(`Order status updated to ${newStatus}`);
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -136,11 +202,8 @@ const Orders = () => {
         withCredentials: true
       });
      
-      // Refresh orders list and stats
       fetchOrders();
       fetchStats();
-     
-      // Show success message
       alert("Order deleted successfully");
     } catch (error) {
       console.error("Error deleting order:", error);
@@ -208,6 +271,132 @@ const Orders = () => {
     });
   };
 
+  // Chart components
+  const renderProfitChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <AreaChart data={chartData.monthly}>
+        <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+        <XAxis dataKey="month" stroke={COLORS.text} />
+        <YAxis stroke={COLORS.text} />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
+          }}
+        />
+        <Legend />
+        <Area 
+          type="monotone" 
+          dataKey="profit" 
+          stroke={COLORS.primary} 
+          fill={COLORS.primary}
+          fillOpacity={0.3}
+          name="Profit"
+        />
+        <Area 
+          type="monotone" 
+          dataKey="revenue" 
+          stroke={COLORS.secondary} 
+          fill={COLORS.secondary}
+          fillOpacity={0.3}
+          name="Revenue"
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+
+  const renderOrderTrendsChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={chartData.monthly}>
+        <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+        <XAxis dataKey="month" stroke={COLORS.text} />
+        <YAxis stroke={COLORS.text} />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
+          }}
+        />
+        <Legend />
+        <Line 
+          type="monotone" 
+          dataKey="orders" 
+          stroke={COLORS.accent} 
+          strokeWidth={3}
+          dot={{ fill: COLORS.accent, strokeWidth: 2, r: 4 }}
+          name="Orders"
+        />
+        <Line 
+          type="monotone" 
+          dataKey="revenue" 
+          stroke={COLORS.secondary} 
+          strokeWidth={2}
+          dot={{ fill: COLORS.secondary, strokeWidth: 2, r: 4 }}
+          name="Revenue"
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+
+  const renderWeeklyPerformanceChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={chartData.weeklyTrend}>
+        <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+        <XAxis dataKey="day" stroke={COLORS.text} />
+        <YAxis stroke={COLORS.text} />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
+          }}
+        />
+        <Legend />
+        <Bar dataKey="profit" fill={COLORS.primary} name="Profit" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="revenue" fill={COLORS.secondary} name="Revenue" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  const renderStatusDistributionChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <RechartsPieChart>
+        <Pie
+          data={chartData.statusDistribution}
+          cx="50%"
+          cy="50%"
+          innerRadius={60}
+          outerRadius={80}
+          paddingAngle={5}
+          dataKey="value"
+          label={({ name, value }) => value > 0 ? `${name}: ${value}` : null}
+        >
+          {chartData.statusDistribution.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={entry.color} />
+          ))}
+        </Pie>
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
+          }}
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      </RechartsPieChart>
+    </ResponsiveContainer>
+  );
+
   if (loading) {
     return (
       <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
@@ -220,13 +409,13 @@ const Orders = () => {
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
-      {/* Header */}
+    <div className={`min-h-full p-6 ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
       <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Order Management</h1>
           <p className={darkMode ? "text-gray-400" : "text-gray-600"}>
-            View and manage all customer orders
+            View and manage all customer orders with detailed analytics
           </p>
         </div>
 
@@ -301,6 +490,47 @@ const Orders = () => {
           </motion.div>
         </div>
 
+        {/* Charts Section */}
+        {showChart && (
+          <div className={`mb-8 rounded-xl shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold flex items-center">
+                  <BarChart3 className="mr-2" size={24} />
+                  Analytics & Insights
+                </h2>
+                <div className="flex space-x-2">
+                  {['profit', 'trends', 'weekly', 'status'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveChartTab(tab)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        activeChartTab === tab
+                          ? 'bg-green-600 text-white'
+                          : darkMode
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {tab === 'profit' && 'Profit vs Revenue'}
+                      {tab === 'trends' && 'Order Trends'}
+                      {tab === 'weekly' && 'Weekly Performance'}
+                      {tab === 'status' && 'Status Distribution'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {activeChartTab === 'profit' && renderProfitChart()}
+              {activeChartTab === 'trends' && renderOrderTrendsChart()}
+              {activeChartTab === 'weekly' && renderWeeklyPerformanceChart()}
+              {activeChartTab === 'status' && renderStatusDistributionChart()}
+            </div>
+          </div>
+        )}
+
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <div className="flex flex-col md:flex-row gap-4 w-full">
@@ -334,6 +564,13 @@ const Orders = () => {
           </div>
          
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowChart(!showChart)}
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title={showChart ? "Hide Charts" : "Show Charts"}
+            >
+              <PieChartIcon size={20} />
+            </button>
             <Filter size={20} className={darkMode ? "text-gray-400" : "text-gray-500"} />
             <select
               value={selectedStatus}
@@ -404,7 +641,6 @@ const Orders = () => {
                               View Details
                             </button>
                            
-                            {/* Status Update Dropdown */}
                             {statusTransitions[order.status] && statusTransitions[order.status].length > 0 && (
                               <div className="relative inline-block text-left">
                                 <select
@@ -429,7 +665,6 @@ const Orders = () => {
                               </div>
                             )}
                            
-                            {/* Send Notification Button */}
                             <button
                               onClick={() => sendStatusEmail(order._id, order.customer.email, order.status)}
                               className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-left text-xs flex items-center"
@@ -438,7 +673,6 @@ const Orders = () => {
                               Notify Customer
                             </button>
                            
-                            {/* Delete Order Button */}
                             <button
                               onClick={() => deleteOrder(order._id)}
                               disabled={updatingStatus === order._id}
@@ -463,9 +697,7 @@ const Orders = () => {
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className={`p-2 rounded-md ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''} ${
-                      darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'
-                    }`}
+                    className={`p-2 rounded-md ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''} ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'}`}
                   >
                     Previous
                   </button>
@@ -489,9 +721,7 @@ const Orders = () => {
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className={`p-2 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''} ${
-                      darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'
-                    }`}
+                    className={`p-2 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''} ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'}`}
                   >
                     Next
                   </button>

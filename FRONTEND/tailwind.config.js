@@ -11,6 +11,7 @@ module.exports = {
         "dark-card": "#1f2937",
         "dark-text": "#f9fafb",
         "dark-gray": "#374151",
+        
         // Additional button-specific colors
         "btn-blue": "#2563eb",       // download / export / info actions
         "btn-teal": "#059669",       // add another / accent actions

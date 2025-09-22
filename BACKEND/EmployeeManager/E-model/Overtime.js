@@ -25,6 +25,14 @@ const overtimeSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  // NEW: Human-friendly OVERTIME ID
+  overtimeId: {
+    type: String,
+    unique: true,
+    index: true,
+    sparse: true, // tolerate old rows until backfilled
+    trim: true
+  },
   status: {
     type: String,
     enum: ["Pending", "Approved", "Rejected"],

@@ -1,4 +1,3 @@
-// BACKEND/EmployeeManager/E-control/leaveController.js
 import Leave from "../E-model/Leave.js";
 import EventEmitter from "events";
 
@@ -139,17 +138,65 @@ export const getDistribution = async (req, res, next) => {
   }
 };
 
+/**
+ * ✅ FIXED: real monthly trend by date range, not by stored `year`.
+ * GET /api/leaves/trend?year=2025&status=Approved|Pending|Rejected|All%20Status&type=Annual|Sick|Casual|Other|All%20Types&empId=EMPID001
+ */
+export const getTrend = async (req, res, next) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const start = new Date(year, 0, 1, 0, 0, 0, 0);
+    const end = new Date(year, 11, 31, 23, 59, 59, 999);
+
+    const match = {
+      from: { $gte: start, $lte: end },
+    };
+    if (req.query.status && req.query.status !== "All Status") match.status = req.query.status;
+    if (req.query.type && req.query.type !== "All Types") match.type = req.query.type;
+    if (req.query.empId) match.empId = req.query.empId;
+
+    const agg = await Leave.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $month: "$from" },
+          leaves: { $sum: 1 },
+          approved: {
+            $sum: { $cond: [{ $eq: ["$status", "Approved"] }, 1, 0] },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // always return 12 months
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      leaves: 0,
+      approved: 0,
+    }));
+    agg.forEach((row) => {
+      const m = row._id;
+      months[m - 1] = { month: m, leaves: row.leaves, approved: row.approved };
+    });
+
+    res.json({ year, months });
+  } catch (e) {
+    next(e);
+  }
+};
+
 // GET /api/leaves/upcoming
 export const getUpcoming = async (req, res, next) => {
   try {
     const from = req.query.from ? new Date(req.query.from) : new Date();
-    const list = await Leave.find({
+    const q = {
       from: { $gte: from },
       status: { $in: ["Pending", "Approved"] },
-    })
-      .sort("from")
-      .limit(50)
-      .lean();
+    };
+    if (req.query.empId) q.empId = req.query.empId;
+
+    const list = await Leave.find(q).sort("from").limit(50).lean();
     res.json(list);
   } catch (e) {
     next(e);

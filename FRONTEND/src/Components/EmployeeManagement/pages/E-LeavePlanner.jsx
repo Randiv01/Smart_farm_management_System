@@ -1,33 +1,19 @@
 // src/pages/E-LeavePlanner.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { 
-  Calendar, Plus, FileDown, Edit, Trash2, X, Search, Filter, 
-  BarChart3, PieChart as PieChartIcon, Download, User, Clock, AlertCircle 
+import {
+  Calendar, Plus, Edit, Trash2, X, Search, Download,
+  BarChart3, User, Clock, AlertCircle
 } from "lucide-react";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  ComposedChart
+  PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip,
+  AreaChart, Area, CartesianGrid, XAxis, YAxis
 } from "recharts";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import autoTable from "jspdf-autotable";
 
 const API = "http://localhost:5000/api/leaves";
 
-// Custom components for better organization
 const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
   <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 flex flex-col`}>
     <div className="flex items-center justify-between mb-2">
@@ -43,150 +29,196 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
   </div>
 );
 
-const ChartContainer = ({ title, children, darkMode, className = "" }) => (
-  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 ${className}`}>
+const ChartContainer = React.forwardRef(({ title, children, darkMode, className = "" }, ref) => (
+  <div ref={ref} className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 ${className}`}>
     <h4 className="font-medium mb-4">{title}</h4>
-    <div className="h-64">
-      {children}
-    </div>
+    <div className="h-64">{children}</div>
   </div>
-);
+));
 
 export const ELeavePlanner = ({ darkMode }) => {
   const [activeTab, setActiveTab] = useState("requests");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [typeFilter, setTypeFilter] = useState("All Types");
-  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
-  const [empSearch, setEmpSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [leaves, setLeaves] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({
-    pending: 0,
-    approved: 0,
-    rejected: 0,
-    total: 0
-  });
+  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
 
-  // Form popup
+  const [tableSearch, setTableSearch] = useState("");
+
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
-    empId: "",
-    name: "",
-    type: "Annual",
-    from: "",
-    to: "",
-    days: "",
-    reason: "",
-    status: "Pending",
+    empId: "", name: "", type: "Annual", from: "", to: "", days: "", reason: "", status: "Pending",
   });
 
-  // Chart/Balance refs (for PDF)
+  // analytics
+  const [trendData, setTrendData] = useState([]);
+  const [balanceEmp, setBalanceEmp] = useState("");
+  const [balance, setBalance] = useState(null);
+  const [upcomingEmp, setUpcomingEmp] = useState("");
+
+  const empIdOptions = useMemo(
+    () => Array.from(new Set(leaves.map(l => l.empId))).sort(),
+    [leaves]
+  );
+
   const distRef = useRef(null);
+  const statusRef = useRef(null);
   const balanceRef = useRef(null);
   const trendRef = useRef(null);
 
-  // Fetch leaves
+  const buildQuery = () => {
+    const p = new URLSearchParams();
+    if (statusFilter !== "All Status") p.append("status", statusFilter);
+    if (typeFilter !== "All Types") p.append("type", typeFilter);
+    if (yearFilter) p.append("year", yearFilter);
+    return p.toString();
+  };
+
   const loadLeaves = async () => {
     setLoading(true);
     try {
-      const p = new URLSearchParams();
-      if (statusFilter !== "All Status") p.append("status", statusFilter);
-      if (typeFilter !== "All Types") p.append("type", typeFilter);
-      if (yearFilter) p.append("year", yearFilter);
-      
-      const res = await fetch(`${API}?${p.toString()}`);
+      const res = await fetch(`${API}?${buildQuery()}`);
       const data = await res.json();
       setLeaves(data);
-      
-      // Calculate stats
+
       const pending = data.filter(l => l.status === "Pending").length;
       const approved = data.filter(l => l.status === "Approved").length;
       const rejected = data.filter(l => l.status === "Rejected").length;
-      
-      setStats({
-        pending,
-        approved,
-        rejected,
-        total: data.length
-      });
-    } catch (error) {
-      console.error("Error loading leaves:", error);
+      setStats({ pending, approved, rejected, total: data.length });
+    } catch (e) {
+      console.error("Error loading leaves:", e);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch upcoming leaves
-  const loadUpcoming = async () => {
+  // ------- Monthly Trend helpers (fallback if API empty) -------
+  const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const zeroTrend = () =>
+    Array.from({ length: 12 }, (_, i) => ({ month: monthLabels[i], leaves: 0, approved: 0 }));
+
+  const computeTrendFromLeaves = () => {
+    const y = Number(yearFilter);
+    const rows = zeroTrend();
+    const passStatus = (s) =>
+      statusFilter === "All Status" ? true : s === statusFilter;
+    const passType = (t) =>
+      typeFilter === "All Types" ? true : t === typeFilter;
+
+    leaves.forEach((l) => {
+      const d = new Date(l.from);
+      if (d.getFullYear() !== y) return;
+      if (!passStatus(l.status) || !passType(l.type)) return;
+      const idx = d.getMonth();
+      rows[idx].leaves += 1;
+      if (l.status === "Approved") rows[idx].approved += 1;
+    });
+    return rows;
+  };
+
+  // ✅ real monthly trend (tries API, falls back to local compute)
+  const loadTrend = async () => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await fetch(`${API}/upcoming?from=${today}`);
-      const data = await res.json();
-      setUpcoming(data.slice(0, 9));
-    } catch (error) {
-      console.error("Error loading upcoming leaves:", error);
+      const qp = new URLSearchParams({ year: yearFilter });
+      if (statusFilter !== "All Status") qp.append("status", statusFilter);
+      if (typeFilter !== "All Types") qp.append("type", typeFilter);
+
+      let data = zeroTrend();
+
+      const res = await fetch(`${API}/trend?${qp.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.months?.length) {
+          data = json.months.map((m) => ({
+            month: monthLabels[(m.month ?? 1) - 1],
+            leaves: m.leaves || 0,
+            approved: m.approved || 0,
+          }));
+        }
+      }
+
+      const allZero = data.every(d => (d.leaves || 0) === 0 && (d.approved || 0) === 0);
+      setTrendData(allZero ? computeTrendFromLeaves() : data);
+    } catch (e) {
+      console.error("Error loading trend:", e);
+      setTrendData(computeTrendFromLeaves());
     }
   };
 
-  // SSE real-time stream
+  const loadUpcoming = async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const p = new URLSearchParams({ from: today });
+      if (upcomingEmp) p.append("empId", upcomingEmp);
+      const res = await fetch(`${API}/upcoming?${p.toString()}`);
+      const data = await res.json();
+      setUpcoming(data.slice(0, 30));
+    } catch (e) {
+      console.error("Error loading upcoming:", e);
+    }
+  };
+
+  const loadBalance = async () => {
+    if (!balanceEmp) { setBalance(null); return; }
+    try {
+      const res = await fetch(`${API}/balance?empId=${balanceEmp}&year=${yearFilter}`);
+      const data = await res.json();
+      setBalance(data?.balance || null);
+    } catch (e) {
+      console.error("Error fetching balance:", e);
+      setBalance(null);
+    }
+  };
+
+  // initial + live
   useEffect(() => {
     loadLeaves();
-    loadUpcoming();
-    
+    loadTrend();
     const es = new EventSource(`${API}/stream`);
-    es.addEventListener("change", (ev) => {
-      try {
-        const payload = JSON.parse(ev.data);
-        loadLeaves();
-        loadUpcoming();
-      } catch (_) {}
+    es.addEventListener("change", () => {
+      loadLeaves();
+      loadTrend();
+      loadUpcoming();
+      loadBalance();
     });
-    es.onerror = () => {
-      // silently ignore; EventSource will retry
-    };
+    es.onerror = () => {};
     return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, typeFilter, yearFilter]);
 
-  // Submit create/update
+  useEffect(() => {
+    if (!trendData.length || trendData.every(m => m.leaves === 0 && m.approved === 0)) {
+      setTrendData(computeTrendFromLeaves());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaves]);
+
+  useEffect(() => { loadUpcoming(); }, [upcomingEmp, yearFilter]);
+  useEffect(() => { loadBalance(); }, [balanceEmp, yearFilter]);
+
+  // CRUD
   const submitForm = async (e) => {
     e.preventDefault();
     try {
-      const body = {
-        ...form,
-        days: form.days ? Number(form.days) : undefined,
-      };
-
+      const body = { ...form, days: form.days ? Number(form.days) : undefined };
       const method = editing ? "PUT" : "POST";
       const url = editing ? `${API}/${editing._id}` : API;
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         alert(`Failed: ${err.error || res.statusText}`);
         return;
       }
-
       setShowForm(false);
       setEditing(null);
-      setForm({
-        empId: "",
-        name: "",
-        type: "Annual",
-        from: "",
-        to: "",
-        days: "",
-        reason: "",
-        status: "Pending",
-      });
-    } catch (error) {
-      console.error("Error submitting form:", error);
+      setForm({ empId:"", name:"", type:"Annual", from:"", to:"", days:"", reason:"", status:"Pending" });
+    } catch (e) {
+      console.error("Error submitting form:", e);
       alert("Error submitting form. Please try again.");
     }
   };
@@ -208,140 +240,236 @@ export const ELeavePlanner = ({ darkMode }) => {
 
   const onDelete = async (row) => {
     if (!window.confirm("Are you sure you want to delete this leave request?")) return;
-    try {
-      await fetch(`${API}/${row._id}`, { method: "DELETE" });
-    } catch (error) {
-      console.error("Error deleting leave:", error);
+    try { await fetch(`${API}/${row._id}`, { method: "DELETE" }); }
+    catch (e) {
+      console.error("Error deleting leave:", e);
       alert("Error deleting leave request. Please try again.");
     }
   };
 
-  // Derived chart data from current leaves list
+  // charts: distribution + status
   const leaveData = useMemo(() => {
     const sums = { Annual: 0, Sick: 0, Casual: 0, Other: 0 };
-    leaves.forEach((l) => {
-      sums[l.type] = (sums[l.type] || 0) + (l.days || 0);
-    });
+    leaves.forEach((l) => { sums[l.type] = (sums[l.type] || 0) + (l.days || 0); });
     return [
-      { name: "Annual Leave", raw: sums.Annual, key: "Annual", color: "#3b82f6" },
-      { name: "Sick Leave", raw: sums.Sick, key: "Sick", color: "#ef4444" },
-      { name: "Casual Leave", raw: sums.Casual, key: "Casual", color: "#f59e0b" },
-      { name: "Other", raw: sums.Other, key: "Other", color: "#8b5cf6" },
-    ].map((x) => ({ name: x.name, value: x.raw, color: x.color }));
+      { name: "Annual Leave", value: sums.Annual, color: "#3b82f6" },
+      { name: "Sick Leave",   value: sums.Sick,   color: "#ef4444" },
+      { name: "Casual Leave", value: sums.Casual, color: "#f59e0b" },
+      { name: "Other",        value: sums.Other,  color: "#8b5cf6" },
+    ];
   }, [leaves]);
 
-  // Status distribution data
-  const statusData = useMemo(() => [
-    { name: "Pending", value: stats.pending, color: "#f59e0b" },
+  const statusData = useMemo(() => ([
+    { name: "Pending",  value: stats.pending,  color: "#f59e0b" },
     { name: "Approved", value: stats.approved, color: "#10b981" },
     { name: "Rejected", value: stats.rejected, color: "#ef4444" },
-  ], [stats]);
+  ]), [stats]);
 
-  // Monthly trend data (mock data for demonstration)
-  const monthlyTrendData = useMemo(() => {
-    return [
-      { month: "Jan", leaves: 12, approved: 10 },
-      { month: "Feb", leaves: 18, approved: 15 },
-      { month: "Mar", leaves: 15, approved: 12 },
-      { month: "Apr", leaves: 22, approved: 18 },
-      { month: "May", leaves: 17, approved: 14 },
-      { month: "Jun", leaves: 20, approved: 16 },
-      { month: "Jul", leaves: 25, approved: 20 },
-      { month: "Aug", leaves: 19, approved: 16 },
-      { month: "Sep", leaves: 23, approved: 19 },
-      { month: "Oct", leaves: 16, approved: 14 },
-      { month: "Nov", leaves: 21, approved: 18 },
-      { month: "Dec", leaves: 24, approved: 20 },
-    ];
-  }, []);
+  const filteredLeaves = useMemo(() => {
+    if (!tableSearch.trim()) return leaves;
+    const t = tableSearch.toLowerCase();
+    return leaves.filter(r =>
+      r.name?.toLowerCase().includes(t) || r.empId?.toLowerCase().includes(t)
+    );
+  }, [tableSearch, leaves]);
 
-  // Balance data
-  const [balance, setBalance] = useState(null);
-  const fetchBalance = async () => {
-    if (!empSearch) {
-      setBalance(null);
-      return;
-    }
-    try {
-      const res = await fetch(`${API}/balance?empId=${empSearch}&year=${yearFilter}`);
-      const data = await res.json();
-      if (data && data.balance) setBalance(data.balance);
-    } catch (error) {
-      console.error("Error fetching balance:", error);
-    }
-  };
+  /* --------------------- PDF (polished design + dark-green theme) --------------------- */
 
-  useEffect(() => {
-    fetchBalance();
-  }, [empSearch, yearFilter, leaves.length]);
-
-  // PDF generation
   const generatePDF = async () => {
-    if (!empSearch) {
-      alert("Please enter an Employee ID to generate the report.");
-      return;
-    }
-    
-    try {
-      const pdf = new jsPDF("p", "pt", "a4");
-      pdf.setFontSize(16);
-      pdf.text(`Leave Report - ${empSearch} (${yearFilter})`, 40, 40);
+    const DARK_GREEN = "#2e7d32";        // requested brand color
+    const BRAND_RGB = [46, 125, 50];     // rgb for #2e7d32
 
-      // Capture Distribution
-      if (distRef.current) {
-        const canvas1 = await html2canvas(distRef.current);
-        const img1 = canvas1.toDataURL("image/png");
-        pdf.addImage(img1, "PNG", 40, 60, 520, 280, undefined, "FAST");
+    const pdf = new jsPDF("p", "pt", "a4");
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const M = 36; // margin
+    const brand = { primary: BRAND_RGB, green: [16, 185, 129], gray: [107, 114, 128] };
+
+    // Helpers
+    const fmtDate = (d = new Date()) =>
+      d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+    const header = (title = "Leave Analytics Report") => {
+      pdf.setFillColor(...brand.primary);
+      pdf.rect(0, 0, pageW, 64, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(16);
+      pdf.text("Mount Olive Farm House", M, 32);
+      pdf.setFontSize(22);
+      pdf.text(title, M, 54);
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(12);
+      pdf.text(`Year: ${yearFilter}`, pageW - M, 32, { align: "right" });
+      pdf.text(`Generated: ${fmtDate()}`, pageW - M, 54, { align: "right" });
+      pdf.setTextColor(33, 37, 41);
+    };
+
+    let pageNo = 1;
+    const footer = () => {
+      pdf.setDrawColor(230); pdf.setLineWidth(0.5);
+      pdf.line(M, pageH - 40, pageW - M, pageH - 40);
+      pdf.setFontSize(10); pdf.setTextColor(...brand.gray);
+      pdf.text("Generated by EmpManager v1.0", M, pageH - 20);
+      pdf.text(String(pageNo), pageW - M, pageH - 20, { align: "right" });
+      pageNo++;
+    };
+
+    // capture helper — higher scale for sharpness
+    const capture = async (node) => {
+      if (!node) return null;
+      const canvas = await html2canvas(node, { scale: 3, backgroundColor: "#ffffff" });
+      return canvas.toDataURL("image/png");
+    };
+
+    // SAFE image placement using getImageProperties (prevents invalid coords)
+    const placeImage = (imgData, x, y, maxW, maxH) => {
+      if (!imgData || !maxW || !maxH) return { w: 0, h: 0 };
+      try {
+        const props = pdf.getImageProperties(imgData);
+        let w = props?.width || maxW;
+        let h = props?.height || maxH;
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.max(1, w * ratio);
+        h = Math.max(1, h * ratio);
+        const px = x + (maxW - w) / 2;
+        const py = y + (maxH - h) / 2;
+        pdf.addImage(imgData, "PNG", px, py, w, h, undefined, "FAST");
+        return { w, h };
+      } catch {
+        pdf.addImage(imgData, "PNG", x, y, maxW, maxH, undefined, "FAST");
+        return { w: maxW, h: maxH };
       }
+    };
 
-      // Capture Balance
-      if (balanceRef.current) {
-        const canvas2 = await html2canvas(balanceRef.current);
-        const img2 = canvas2.toDataURL("image/png");
-        pdf.addPage();
-        pdf.text(`Leave Balance - ${empSearch}`, 40, 40);
-        pdf.addImage(img2, "PNG", 40, 60, 520, 280, undefined, "FAST");
-      }
+    // Quick summaries
+    const typeTotals = leaveData.map(d => ({ type: d.name, totalDays: d.value }));
+    const totalDays = Math.max(1, typeTotals.reduce((s, r) => s + (r.totalDays || 0), 0));
+    const typeRows = typeTotals.map(r => ([
+      r.type,
+      (r.totalDays || 0).toString(),
+      `${Math.round(((r.totalDays || 0) / totalDays) * 100)}%`
+    ]));
+    const statusRows = [
+      ["Approved", stats.approved],
+      ["Pending",  stats.pending],
+      ["Rejected", stats.rejected],
+      ["Total Requests", stats.total]
+    ];
 
-      // Capture Trend
-      if (trendRef.current) {
-        const canvas3 = await html2canvas(trendRef.current);
-        const img3 = canvas3.toDataURL("image/png");
-        pdf.addPage();
-        pdf.text(`Monthly Leave Trend - ${yearFilter}`, 40, 40);
-        pdf.addImage(img3, "PNG", 40, 60, 520, 280, undefined, "FAST");
-      }
+    /* -------- Cover Page -------- */
+    header("Leave Analytics Report");
+    // stat cards
+    const cardW = (pageW - M * 2 - 24) / 2;
+    const cardH = 64;
+    pdf.setFont("helvetica", "bold"); pdf.setFontSize(12);
+    const drawCard = (x, y, label, value, colorRGB) => {
+      pdf.setFillColor(245); pdf.roundedRect(x, y, cardW, cardH, 8, 8, "F");
+      pdf.setDrawColor(...colorRGB); pdf.roundedRect(x, y, cardW, cardH, 8, 8);
+      pdf.setTextColor(...colorRGB); pdf.text(label, x + 14, y + 22);
+      pdf.setFontSize(20); pdf.text(String(value), x + 14, y + 46);
+      pdf.setFontSize(12);
+      pdf.setTextColor(33, 37, 41);
+    };
+    drawCard(M, 84, "Total Leaves", stats.total, [59, 130, 246]);
+    drawCard(M + cardW + 24, 84, "Approved", stats.approved, [16, 185, 129]);
+    drawCard(M, 84 + cardH + 16, "Pending", stats.pending, [245, 158, 11]);
+    drawCard(M + cardW + 24, 84 + cardH + 16, "Rejected", stats.rejected, [239, 68, 68]);
 
-      // Upcoming
-      pdf.addPage();
-      pdf.text(`Upcoming Leaves`, 40, 40);
-      pdf.setFontSize(11);
-      let y = 70;
-      upcoming.slice(0, 20).forEach((u) => {
-        const line = `${u.name} (${u.empId}) - ${u.type} | ${new Date(
-          u.from
-        ).toLocaleDateString()} - ${new Date(u.to).toLocaleDateString()} | ${u.days} days | ${u.status}`;
-        pdf.text(line, 40, y);
-        y += 18;
+    // tables
+    autoTable(pdf, {
+      startY: 84 + cardH * 2 + 36,
+      styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: brand.primary },
+      head: [["Status Summary", "Count"]],
+      body: statusRows,
+      theme: "striped",
+      tableWidth: (pageW - M * 2 - 16) / 2,
+      margin: { left: M, right: M }
+    });
+
+    autoTable(pdf, {
+      startY: 84 + cardH * 2 + 36,
+      styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: brand.primary },
+      head: [["Leave Type", "Days", "%"]],
+      body: typeRows,
+      theme: "striped",
+      tableWidth: (pageW - M * 2 - 16) / 2,
+      margin: { left: M + (pageW - M * 2 - 16) / 2 + 16, right: M }
+    });
+    footer();
+
+    /* -------- Charts Page (bigger charts) -------- */
+    pdf.addPage();
+    header("Distribution & Status");
+    const distImg = await capture(distRef.current);
+    const statusImg = await capture(statusRef.current);
+
+    // make each chart taller for visibility
+    const slotW = (pageW - M * 2 - 16) / 2;
+    const slotH = 360; // ↑ bigger than before
+    if (distImg) placeImage(distImg, M, 84, slotW, slotH);
+    if (statusImg) placeImage(statusImg, M + slotW + 16, 84, slotW, slotH);
+    footer();
+
+    /* -------- Trend Page -------- */
+    pdf.addPage();
+    header("Monthly Leave Trend");
+    const trendImg = await capture(trendRef.current);
+    if (trendImg) placeImage(trendImg, M, 84, pageW - M * 2, 340);
+    footer();
+
+    /* -------- Leave Balance + Upcoming -------- */
+    pdf.addPage();
+    header("Balance & Upcoming Leaves");
+
+    // Balance table — no tip, only the table when available
+    if (balance) {
+      const b = balance;
+      autoTable(pdf, {
+        startY: 84,
+        styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
+        headStyles: { fillColor: brand.primary },
+        head: [[`Leave Balance — ${balanceEmp}`, "Total", "Used", "Remaining"]],
+        body: [
+          ["Annual", b.Annual?.total ?? 0, b.Annual?.used ?? 0, b.Annual?.remaining ?? 0],
+          ["Sick",   b.Sick?.total ?? 0,   b.Sick?.used ?? 0,   b.Sick?.remaining ?? 0],
+          ["Casual", b.Casual?.total ?? 0, b.Casual?.used ?? 0, b.Casual?.remaining ?? 0],
+          ["Other",  b.Other?.total ?? 0,  b.Other?.used ?? 0,  b.Other?.remaining ?? 0]
+        ],
+        theme: "striped",
+        margin: { left: M, right: M },
+        tableWidth: (pageW - M * 2)
       });
-
-      pdf.save(`leave-report-${empSearch}-${yearFilter}.pdf`);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Error generating PDF. Please try again.");
     }
+
+    const startY = pdf.lastAutoTable?.finalY ? pdf.lastAutoTable.finalY + 24 : 84;
+    autoTable(pdf, {
+      startY,
+      styles: { font: "helvetica", fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: brand.primary },
+      head: [["Employee", "Emp ID", "Type", "From", "To", "Days", "Status"]],
+      body: upcoming.slice(0, 25).map(u => ([
+        u.name, u.empId, u.type,
+        new Date(u.from).toLocaleDateString(),
+        new Date(u.to).toLocaleDateString(),
+        String(u.days), u.status
+      ])),
+      theme: "striped",
+      margin: { left: M, right: M }
+    });
+
+    footer();
+
+    pdf.save(`leave-report-${yearFilter}.pdf`);
   };
 
-  // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label, darkMode }) => {
+  const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className={`p-3 rounded-md shadow-md ${darkMode ? 'bg-gray-700' : 'bg-white'} border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
           <p className="font-medium">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={`item-${index}`} style={{ color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
+          {payload.map((e, i) => (
+            <p key={i} style={{ color: e.color }}>{e.name}: {e.value}</p>
           ))}
         </div>
       );
@@ -355,9 +483,7 @@ export const ELeavePlanner = ({ darkMode }) => {
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Leave Management System</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {activeTab === "requests" 
-            ? "Manage and track employee leave requests" 
-            : "View leave analytics and summary reports"}
+          {activeTab === "requests" ? "Manage and track employee leave requests" : "View leave analytics and summary reports"}
         </p>
       </div>
 
@@ -366,80 +492,34 @@ export const ELeavePlanner = ({ darkMode }) => {
         <button
           onClick={() => setActiveTab("requests")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
-            activeTab === "requests"
-              ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400"
-              : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
+            activeTab === "requests" ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400" : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
           }`}
         >
-          <Calendar size={18} />
-          <span>Leave Requests</span>
+          <Calendar size={18} /><span>Leave Requests</span>
         </button>
         <button
           onClick={() => setActiveTab("summary")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
-            activeTab === "summary"
-              ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400"
-              : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
+            activeTab === "summary" ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400" : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
           }`}
         >
-          <BarChart3 size={18} />
-          <span>Analytics & Reports</span>
+          <BarChart3 size={18} /><span>Analytics & Reports</span>
         </button>
       </div>
 
       {/* Requests Tab */}
       {activeTab === "requests" && (
         <>
-          {/* Stats Cards */}
+          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              title="Total Leaves"
-              value={stats.total}
-              subtitle="All time"
-              icon={Calendar}
-              color={{
-                bg: "bg-blue-100 dark:bg-blue-800",
-                text: "text-blue-500 dark:text-blue-300",
-                value: "text-blue-500"
-              }}
-              darkMode={darkMode}
-            />
-            <StatCard
-              title="Pending"
-              value={stats.pending}
-              subtitle="Awaiting approval"
-              icon={Clock}
-              color={{
-                bg: "bg-yellow-100 dark:bg-yellow-800",
-                text: "text-yellow-500 dark:text-yellow-300",
-                value: "text-yellow-500"
-              }}
-              darkMode={darkMode}
-            />
-            <StatCard
-              title="Approved"
-              value={stats.approved}
-              subtitle="Leaves granted"
-              icon={User}
-              color={{
-                bg: "bg-green-100 dark:bg-green-800",
-                text: "text-green-500 dark:text-green-300",
-                value: "text-green-500"
-              }}
-              darkMode={darkMode}
-            />
-            <StatCard
-              title="Rejected"
-              value={stats.rejected}
-              subtitle="Leaves denied"
-              icon={AlertCircle}
-              color={{
-                bg: "bg-red-100 dark:bg-red-800",
-                text: "text-red-500 dark:text-red-300",
-                value: "text-red-500"
-              }}
-              darkMode={darkMode}
-            />
+            <StatCard title="Total Leaves" value={stats.total} subtitle="All time" icon={Calendar}
+              color={{ bg:"bg-blue-100 dark:bg-blue-800", text:"text-blue-500 dark:text-blue-300", value:"text-blue-500" }} darkMode={darkMode}/>
+            <StatCard title="Pending" value={stats.pending} subtitle="Awaiting approval" icon={Clock}
+              color={{ bg:"bg-yellow-100 dark:bg-yellow-800", text:"text-yellow-500 dark:text-yellow-300", value:"text-yellow-500" }} darkMode={darkMode}/>
+            <StatCard title="Approved" value={stats.approved} subtitle="Leaves granted" icon={User}
+              color={{ bg:"bg-green-100 dark:bg-green-800", text:"text-green-500 dark:text-green-300", value:"text-green-500" }} darkMode={darkMode}/>
+            <StatCard title="Rejected" value={stats.rejected} subtitle="Leaves denied" icon={AlertCircle}
+              color={{ bg:"bg-red-100 dark:bg-red-800", text:"text-red-500 dark:text-red-300", value:"text-red-500" }} darkMode={darkMode}/>
           </div>
 
           {/* Actions */}
@@ -451,67 +531,32 @@ export const ELeavePlanner = ({ darkMode }) => {
                   type="text"
                   placeholder="Search by name or ID..."
                   className="ml-2 bg-transparent outline-none text-sm w-full"
-                  onChange={(e) => {
-                    // Implement search functionality
-                    const searchTerm = e.target.value.toLowerCase();
-                    const filtered = leaves.filter(l => 
-                      l.name.toLowerCase().includes(searchTerm) || 
-                      l.empId.toLowerCase().includes(searchTerm)
-                    );
-                    setLeaves(filtered);
-                  }}
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
                 />
               </div>
-              <select
-                className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option>All Status</option>
-                <option>Pending</option>
-                <option>Approved</option>
-                <option>Rejected</option>
+              <select className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
+                      value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option>All Status</option><option>Pending</option><option>Approved</option><option>Rejected</option>
               </select>
-              <select
-                className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-              >
-                <option>All Types</option>
-                <option>Annual</option>
-                <option>Sick</option>
-                <option>Casual</option>
-                <option>Other</option>
+              <select className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
+                      value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option>All Types</option><option>Annual</option><option>Sick</option><option>Casual</option><option>Other</option>
               </select>
-              <select
-                className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
-                value={yearFilter}
-                onChange={(e) => setYearFilter(e.target.value)}
-              >
-                <option>2023</option>
-                <option>2024</option>
-                <option>2025</option>
+              <select className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
+                      value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option>2023</option><option>2024</option><option>2025</option>
               </select>
             </div>
             <button
               onClick={() => {
                 setEditing(null);
-                setForm({
-                  empId: "",
-                  name: "",
-                  type: "Annual",
-                  from: "",
-                  to: "",
-                  days: "",
-                  reason: "",
-                  status: "Pending",
-                });
+                setForm({ empId:"", name:"", type:"Annual", from:"", to:"", days:"", reason:"", status:"Pending" });
                 setShowForm(true);
               }}
               className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-md shadow hover:bg-orange-600 transition-colors"
             >
-              <Plus size={18} />
-              <span>New Request</span>
+              <Plus size={18} /><span>New Request</span>
             </button>
           </div>
 
@@ -519,11 +564,8 @@ export const ELeavePlanner = ({ darkMode }) => {
           <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 mb-6`}>
             <div className={`flex justify-between items-center p-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
               <h3 className="font-medium">Leave Requests</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {leaves.length} records found
-              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{filteredLeaves.length} records found</span>
             </div>
-            
             {loading ? (
               <div className="text-center py-8">Loading leave data...</div>
             ) : (
@@ -544,7 +586,7 @@ export const ELeavePlanner = ({ darkMode }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {leaves.map((r) => (
+                    {filteredLeaves.map((r) => (
                       <tr key={r._id} className={`border-t ${darkMode ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"}`}>
                         <td className="p-3">{r.number}</td>
                         <td className="p-3 font-medium">{r.empId}</td>
@@ -555,43 +597,25 @@ export const ELeavePlanner = ({ darkMode }) => {
                         <td className="p-3">{r.days}</td>
                         <td className="p-3 max-w-xs truncate">{r.reason}</td>
                         <td className="p-3">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              r.status === "Approved"
-                                ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200"
-                                : r.status === "Pending"
-                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200"
-                                : "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
-                            }`}
-                          >
-                            {r.status}
-                          </span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            r.status === "Approved"
+                              ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200"
+                              : r.status === "Pending"
+                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200"
+                              : "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                          }`}>{r.status}</span>
                         </td>
                         <td className="p-3">
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => onEdit(r)}
-                              className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
-                              title="Edit"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={() => onDelete(r)}
-                              className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <button onClick={() => onEdit(r)} className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600" title="Edit"><Edit size={14} /></button>
+                            <button onClick={() => onDelete(r)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600" title="Delete"><Trash2 size={14} /></button>
                           </div>
                         </td>
                       </tr>
                     ))}
-                    {!loading && leaves.length === 0 && (
+                    {!loading && filteredLeaves.length === 0 && (
                       <tr>
-                        <td className="p-3 text-sm text-gray-500 dark:text-gray-400" colSpan={10}>
-                          No leave records found.
-                        </td>
+                        <td className="p-3 text-sm text-gray-500 dark:text-gray-400" colSpan={10}>No leave records found.</td>
                       </tr>
                     )}
                   </tbody>
@@ -603,129 +627,59 @@ export const ELeavePlanner = ({ darkMode }) => {
           {/* Popup Form */}
           {showForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div
-                className="absolute inset-0 bg-black/40"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditing(null);
-                }}
-              />
+              <div className="absolute inset-0 bg-black/40" onClick={() => { setShowForm(false); setEditing(null); }} />
               <div className={`relative p-6 rounded-lg shadow w-full max-w-3xl max-h-screen overflow-y-auto ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditing(null);
-                  }}
-                  className="absolute right-3 top-3 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <X />
-                </button>
-                <h3 className="text-lg font-semibold mb-4">
-                  {editing ? "Update Leave Request" : "New Leave Request"}
-                </h3>
-
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className="absolute right-3 top-3 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"><X /></button>
+                <h3 className="text-lg font-semibold mb-4">{editing ? "Update Leave Request" : "New Leave Request"}</h3>
                 <form onSubmit={submitForm} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block mb-1 text-sm">Employee ID *</label>
-                    <input
-                      type="text"
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.empId}
-                      onChange={(e) => setForm({ ...form, empId: e.target.value })}
-                      required
-                    />
+                    <input type="text" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                           value={form.empId} onChange={(e) => setForm({ ...form, empId: e.target.value })} required />
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">Name *</label>
-                    <input
-                      type="text"
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      required
-                    />
+                    <input type="text" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                           value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">Leave Type *</label>
-                    <select
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.type}
-                      onChange={(e) => setForm({ ...form, type: e.target.value })}
-                    >
-                      <option>Annual</option>
-                      <option>Sick</option>
-                      <option>Casual</option>
-                      <option>Other</option>
+                    <select className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                            value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                      <option>Annual</option><option>Sick</option><option>Casual</option><option>Other</option>
                     </select>
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">From Date *</label>
-                    <input
-                      type="date"
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.from}
-                      onChange={(e) => setForm({ ...form, from: e.target.value })}
-                      required
-                    />
+                    <input type="date" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                           value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} required />
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">To Date *</label>
-                    <input
-                      type="date"
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.to}
-                      onChange={(e) => setForm({ ...form, to: e.target.value })}
-                      required
-                    />
+                    <input type="date" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                           value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} required />
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">Days</label>
-                    <input
-                      type="number"
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.days}
-                      onChange={(e) => setForm({ ...form, days: e.target.value })}
-                      placeholder="Auto-calculate if empty"
-                      min={1}
-                    />
+                    <input type="number" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                           value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} placeholder="Auto-calc if empty" min={1} />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block mb-1 text-sm">Reason</label>
-                    <textarea
-                      rows={3}
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.reason}
-                      onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                    />
+                    <textarea rows={3} className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                              value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">Status *</label>
-                    <select
-                      className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                      value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    >
-                      <option>Pending</option>
-                      <option>Approved</option>
-                      <option>Rejected</option>
+                    <select className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                            value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                      <option>Pending</option><option>Approved</option><option>Rejected</option>
                     </select>
                   </div>
-
                   <div className="md:col-span-2 text-right mt-2 flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowForm(false);
-                        setEditing(null);
-                      }}
-                      className="bg-gray-400 text-white px-4 py-2 rounded shadow hover:bg-gray-500 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600 transition-colors"
-                    >
+                    <button type="button" onClick={() => { setShowForm(false); setEditing(null); }}
+                      className="bg-gray-400 text-white px-4 py-2 rounded shadow hover:bg-gray-500">Cancel</button>
+                    <button type="submit" className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600">
                       {editing ? "Update" : "Submit Request"}
                     </button>
                   </div>
@@ -743,31 +697,12 @@ export const ELeavePlanner = ({ darkMode }) => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h3 className="text-lg font-semibold">Leave Analytics & Reports</h3>
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-              <div className={`flex items-center px-3 py-2 rounded-md ${darkMode ? "bg-gray-700" : "bg-white shadow-sm border"}`}>
-                <Search size={18} className="text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by Emp ID"
-                  className="ml-2 bg-transparent outline-none text-sm w-full"
-                  value={empSearch}
-                  onChange={(e) => setEmpSearch(e.target.value)}
-                />
-              </div>
-              <select
-                className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
-                value={yearFilter}
-                onChange={(e) => setYearFilter(e.target.value)}
-              >
-                <option>2023</option>
-                <option>2024</option>
-                <option>2025</option>
+              <select className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
+                      value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option>2023</option><option>2024</option><option>2025</option>
               </select>
-              <button
-                onClick={generatePDF}
-                className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-md shadow hover:bg-green-600 transition-colors"
-              >
-                <Download size={18} />
-                <span>Export PDF</span>
+              <button onClick={generatePDF} className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-md shadow hover:bg-green-600">
+                <Download size={18} /><span>Export PDF</span>
               </button>
             </div>
           </div>
@@ -777,113 +712,121 @@ export const ELeavePlanner = ({ darkMode }) => {
             <ChartContainer title="Leave Distribution by Type" darkMode={darkMode} ref={distRef}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={leaveData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100 || 0).toFixed(0)}%`
-                    }
-                  >
-                    {leaveData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                  <Pie data={leaveData} cx="50%" cy="50%" outerRadius={80} dataKey="value"
+                       label={({ name, percent }) => `${name}: ${(percent * 100 || 0).toFixed(0)}%`}>
+                    {leaveData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip darkMode={darkMode} />} />
-                  <Legend />
+                  <Tooltip /><Legend />
                 </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
 
-            <ChartContainer title="Leave Status Distribution" darkMode={darkMode}>
+            <ChartContainer title="Leave Status Distribution" darkMode={darkMode} ref={statusRef}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100 || 0).toFixed(0)}%`
-                    }
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                  <Pie data={statusData} cx="50%" cy="50%" outerRadius={80} dataKey="value"
+                       label={({ name, percent }) => `${name}: ${(percent * 100 || 0).toFixed(0)}%`}>
+                    {statusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip darkMode={darkMode} />} />
-                  <Legend />
+                  <Tooltip /><Legend />
                 </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
           </div>
 
-          {/* Additional Charts */}
           <div className="grid md:grid-cols-2 gap-6">
+            {/* ✅ Monthly Leave Trend */}
             <ChartContainer title="Monthly Leave Trend" darkMode={darkMode} ref={trendRef}>
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={monthlyTrendData}>
+                <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="colorLeaves" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorApproved" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#4B5563" : "#E5E7EB"} />
                   <XAxis dataKey="month" stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
-                  <YAxis stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
-                  <Tooltip content={<CustomTooltip darkMode={darkMode} />} />
-                  <Legend />
-                  <Bar dataKey="leaves" name="Total Leaves" fill="#3b82f6" />
-                  <Line type="monotone" dataKey="approved" name="Approved" stroke="#10b981" strokeWidth={2} />
-                </ComposedChart>
+                  <YAxis allowDecimals={false} stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                  <Tooltip /><Legend />
+                  <Area type="monotone" dataKey="leaves" name="Total Leaves" stroke="#3b82f6" fill="url(#colorLeaves)" />
+                  <Area type="monotone" dataKey="approved" name="Approved" stroke="#10b981" fill="url(#colorApproved)" />
+                </AreaChart>
               </ResponsiveContainer>
             </ChartContainer>
 
+            {/* Leave Balance (search + table) */}
             <ChartContainer title="Leave Balance" darkMode={darkMode} ref={balanceRef}>
-              {!balance ? (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                    Enter an Employee ID to view leave balance
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    list="empIdList"
+                    className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                    placeholder="Search Employee ID (e.g. EMPID001)"
+                    value={balanceEmp}
+                    onChange={(e) => setBalanceEmp(e.target.value)}
+                  />
+                  <datalist id="empIdList">
+                    {empIdOptions.map(id => <option key={id} value={id} />)}
+                  </datalist>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {[
-                    ["Annual", "bg-blue-500"],
-                    ["Sick", "bg-red-500"],
-                    ["Casual", "bg-orange-500"],
-                  ].map(([key, bar]) => {
-                    const total = balance[key].total;
-                    const used = balance[key].used;
-                    const pct = total ? Math.min((used / total) * 100, 100) : 0;
-                    return (
-                      <div key={key}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>{key} Leave</span>
-                          <span>
-                            {used}/{total} days
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded h-2">
-                          <div className={`${bar} h-2 rounded`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                {!balance ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Enter/select an Employee ID to view leave balance.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
+                        <tr>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Total</th>
+                          <th className="text-left p-2">Used</th>
+                          <th className="text-left p-2">Remaining</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {["Annual","Sick","Casual","Other"].map(k => (
+                          <tr key={k} className={darkMode ? "border-t border-gray-700" : "border-t border-gray-200"}>
+                            <td className="p-2">{k}</td>
+                            <td className="p-2">{balance[k]?.total ?? 0}</td>
+                            <td className="p-2">{balance[k]?.used ?? 0}</td>
+                            <td className="p-2">{balance[k]?.remaining ?? 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </ChartContainer>
           </div>
 
           {/* Upcoming Leaves */}
           <ChartContainer title="Upcoming Leaves" darkMode={darkMode}>
+            <div className="mb-3">
+              <input
+                list="empIdList2"
+                className={`w-full md:w-80 border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                placeholder="(Optional) Filter by Employee ID"
+                value={upcomingEmp}
+                onChange={(e) => setUpcomingEmp(e.target.value)}
+              />
+              <datalist id="empIdList2">
+                {empIdOptions.map(id => <option key={id} value={id} />)}
+              </datalist>
+            </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {upcoming.map((u) => (
                 <div
                   key={u._id}
                   className={`p-4 rounded-lg border-l-4 ${
                     u.type === "Annual" ? "border-blue-500" :
-                    u.type === "Sick" ? "border-red-500" :
-                    u.type === "Casual" ? "border-orange-500" :
-                    "border-purple-500"
+                    u.type === "Sick"   ? "border-red-500" :
+                    u.type === "Casual" ? "border-orange-500" : "border-purple-500"
                   } ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
                 >
                   <div className="flex justify-between mb-2">
@@ -908,7 +851,7 @@ export const ELeavePlanner = ({ darkMode }) => {
               ))}
               {upcoming.length === 0 && (
                 <p className="text-sm text-gray-500 dark:text-gray-400 col-span-3 text-center py-8">
-                  No upcoming leaves.
+                  No upcoming leaves{upcomingEmp ? ` for ${upcomingEmp}` : ""}.
                 </p>
               )}
             </div>

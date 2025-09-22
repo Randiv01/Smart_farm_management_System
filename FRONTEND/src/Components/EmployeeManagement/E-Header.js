@@ -1,7 +1,13 @@
 import React from "react";
 import { Sun, Moon, User } from "lucide-react";
+import { useUser } from "../contexts/UserContext";
+import { getProfileImageUrl } from "../utils/helpers"; // Move the function to a shared file
 
 export const Header = ({ darkMode, toggleTheme, language, changeLanguage }) => {
+  const { user } = useUser();
+  
+  const profileImageUrl = user.profileImage ? getProfileImageUrl(user.profileImage) : null;
+
   return (
     <header
       className={`flex justify-between items-center p-4 ${
@@ -44,12 +50,25 @@ export const Header = ({ darkMode, toggleTheme, language, changeLanguage }) => {
           {darkMode ? <Sun size={20} /> : <Moon size={20} />}
         </button>
 
-        {/* Profile Icon */}
-        <div
-          className={`w-10 h-10 flex items-center justify-center rounded-full 
-            ${darkMode ? "bg-green-600 text-white" : "bg-green-500 text-white"}`}
-        >
-          <User size={20} />
+        {/* Profile Info */}
+        <div className="flex items-center gap-2">
+          {profileImageUrl ? (
+            <img
+              src={profileImageUrl}
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className={`w-10 h-10 flex items-center justify-center rounded-full 
+                ${darkMode ? "bg-green-600 text-white" : "bg-green-500 text-white"}`}
+            >
+              <User size={20} />
+            </div>
+          )}
+          <span className="text-sm font-medium">
+            {user.firstName} {user.lastName}
+          </span>
         </div>
       </div>
     </header>
