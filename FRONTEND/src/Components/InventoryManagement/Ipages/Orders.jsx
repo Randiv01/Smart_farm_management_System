@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart } from "lucide-react";
+import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -25,6 +25,7 @@ const Orders = () => {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [chartData, setChartData] = useState({});
   const [activeChartTab, setActiveChartTab] = useState("profit");
+  const [showChart, setShowChart] = useState(true);
 
   const statusOptions = [
     { value: "all", label: "All Orders" },
@@ -46,20 +47,18 @@ const Orders = () => {
   };
 
   // Chart color schemes for dark/light mode
-  const chartColors = darkMode ? {
-    primary: '#10B981',
-    secondary: '#76f63bff',
-    accent: '#7bf7a0ff',
-    background: '#1F2937',
-    grid: '#374151',
-    text: '#F9FAFB'
-  } : {
-     primary: '#10B981',
-    secondary: '#76f63bff',
-    accent: '#7bf7a0ff',
-    background: '#FFFFFF',
-    grid: '#E5E7EB',
-    text: '#111827'
+  const COLORS = {
+    delivered: darkMode ? '#86efac' : '#22c55e', // Green shades
+    processing: darkMode ? '#fde047' : '#eab308', // Yellow shades
+    pending: darkMode ? '#fdba74' : '#f97316', // Orange shades
+    shipped: darkMode ? '#a5b4fc' : '#6366f1', // Indigo shades
+    cancelled: darkMode ? '#fca5a5' : '#ef4444', // Red shades
+    primary: darkMode ? '#86efac' : '#22c55e',
+    secondary: darkMode ? '#107703ff' : '#02751eff',
+    accent: darkMode ? '#1ef81eff' : '#4bf916ff',
+    background: darkMode ? '#1f2937' : '#ffffff',
+    text: darkMode ? '#e5e7eb' : '#374151',
+    grid: darkMode ? '#4b5563' : '#e5e7eb'
   };
 
   // Fetch orders from API
@@ -133,11 +132,11 @@ const Orders = () => {
       ];
 
       const statusDistribution = [
-        { name: 'Delivered', value: 65, color: chartColors.primary },
-        { name: 'Processing', value: 15, color: chartColors.secondary },
-        { name: 'Pending', value: 10, color: '#47ff50ff' },
-        { name: 'Shipped', value: 8, color: '#216b04ff' },
-        { name: 'Cancelled', value: 2, color: '#032b01ff' }
+        { name: 'Delivered', value: 65, color: COLORS.delivered },
+        { name: 'Processing', value: 15, color: COLORS.processing },
+        { name: 'Pending', value: 10, color: COLORS.pending },
+        { name: 'Shipped', value: 8, color: COLORS.shipped },
+        { name: 'Cancelled', value: 2, color: COLORS.cancelled }
       ];
 
       const weeklyTrend = [
@@ -276,30 +275,32 @@ const Orders = () => {
   const renderProfitChart = () => (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={chartData.monthly}>
-        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-        <XAxis dataKey="month" stroke={chartColors.text} />
-        <YAxis stroke={chartColors.text} />
+        <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+        <XAxis dataKey="month" stroke={COLORS.text} />
+        <YAxis stroke={COLORS.text} />
         <Tooltip 
           contentStyle={{ 
-            backgroundColor: darkMode ? '#374151' : '#FFFFFF',
-            borderColor: darkMode ? '#4B5563' : '#E5E7EB',
-            color: chartColors.text
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
           }}
         />
         <Legend />
         <Area 
           type="monotone" 
           dataKey="profit" 
-          stroke={chartColors.primary} 
-          fill={chartColors.primary}
+          stroke={COLORS.primary} 
+          fill={COLORS.primary}
           fillOpacity={0.3}
           name="Profit"
         />
         <Area 
           type="monotone" 
           dataKey="revenue" 
-          stroke={chartColors.secondary} 
-          fill={chartColors.secondary}
+          stroke={COLORS.secondary} 
+          fill={COLORS.secondary}
           fillOpacity={0.3}
           name="Revenue"
         />
@@ -310,31 +311,33 @@ const Orders = () => {
   const renderOrderTrendsChart = () => (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={chartData.monthly}>
-        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-        <XAxis dataKey="month" stroke={chartColors.text} />
-        <YAxis stroke={chartColors.text} />
+        <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+        <XAxis dataKey="month" stroke={COLORS.text} />
+        <YAxis stroke={COLORS.text} />
         <Tooltip 
           contentStyle={{ 
-            backgroundColor: darkMode ? '#374151' : '#FFFFFF',
-            borderColor: darkMode ? '#4B5563' : '#E5E7EB',
-            color: chartColors.text
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
           }}
         />
         <Legend />
         <Line 
           type="monotone" 
           dataKey="orders" 
-          stroke={chartColors.accent} 
+          stroke={COLORS.accent} 
           strokeWidth={3}
-          dot={{ fill: chartColors.accent, strokeWidth: 2, r: 4 }}
+          dot={{ fill: COLORS.accent, strokeWidth: 2, r: 4 }}
           name="Orders"
         />
         <Line 
           type="monotone" 
           dataKey="revenue" 
-          stroke={chartColors.secondary} 
+          stroke={COLORS.secondary} 
           strokeWidth={2}
-          dot={{ fill: chartColors.secondary, strokeWidth: 2, r: 4 }}
+          dot={{ fill: COLORS.secondary, strokeWidth: 2, r: 4 }}
           name="Revenue"
         />
       </LineChart>
@@ -344,19 +347,21 @@ const Orders = () => {
   const renderWeeklyPerformanceChart = () => (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={chartData.weeklyTrend}>
-        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-        <XAxis dataKey="day" stroke={chartColors.text} />
-        <YAxis stroke={chartColors.text} />
+        <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+        <XAxis dataKey="day" stroke={COLORS.text} />
+        <YAxis stroke={COLORS.text} />
         <Tooltip 
           contentStyle={{ 
-            backgroundColor: darkMode ? '#374151' : '#FFFFFF',
-            borderColor: darkMode ? '#4B5563' : '#E5E7EB',
-            color: chartColors.text
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
           }}
         />
         <Legend />
-        <Bar dataKey="profit" fill={chartColors.primary} name="Profit" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="revenue" fill={chartColors.secondary} name="Revenue" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="profit" fill={COLORS.primary} name="Profit" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="revenue" fill={COLORS.secondary} name="Revenue" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -368,11 +373,11 @@ const Orders = () => {
           data={chartData.statusDistribution}
           cx="50%"
           cy="50%"
-          labelLine={false}
-          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-          outerRadius={100}
-          fill="#8884d8"
+          innerRadius={60}
+          outerRadius={80}
+          paddingAngle={5}
           dataKey="value"
+          label={({ name, value }) => value > 0 ? `${name}: ${value}` : null}
         >
           {chartData.statusDistribution.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={entry.color} />
@@ -380,12 +385,14 @@ const Orders = () => {
         </Pie>
         <Tooltip 
           contentStyle={{ 
-            backgroundColor: darkMode ? '#374151' : '#FFFFFF',
-            borderColor: darkMode ? '#4B5563' : '#E5E7EB',
-            color: chartColors.text
+            backgroundColor: COLORS.background,
+            border: `1px solid ${COLORS.grid}`,
+            borderRadius: '4px',
+            padding: '8px',
+            color: COLORS.text
           }}
         />
-        <Legend />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
       </RechartsPieChart>
     </ResponsiveContainer>
   );
@@ -484,43 +491,45 @@ const Orders = () => {
         </div>
 
         {/* Charts Section */}
-        <div className={`mb-8 rounded-xl shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold flex items-center">
-                <BarChart3 className="mr-2" size={24} />
-                Analytics & Insights
-              </h2>
-              <div className="flex space-x-2">
-                {['profit', 'trends', 'weekly', 'status'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveChartTab(tab)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeChartTab === tab
-                        ? 'bg-green-600 text-white'
-                        : darkMode
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tab === 'profit' && 'Profit vs Revenue'}
-                    {tab === 'trends' && 'Order Trends'}
-                    {tab === 'weekly' && 'Weekly Performance'}
-                    {tab === 'status' && 'Status Distribution'}
-                  </button>
-                ))}
+        {showChart && (
+          <div className={`mb-8 rounded-xl shadow-lg ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold flex items-center">
+                  <BarChart3 className="mr-2" size={24} />
+                  Analytics & Insights
+                </h2>
+                <div className="flex space-x-2">
+                  {['profit', 'trends', 'weekly', 'status'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveChartTab(tab)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        activeChartTab === tab
+                          ? 'bg-green-600 text-white'
+                          : darkMode
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {tab === 'profit' && 'Profit vs Revenue'}
+                      {tab === 'trends' && 'Order Trends'}
+                      {tab === 'weekly' && 'Weekly Performance'}
+                      {tab === 'status' && 'Status Distribution'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+            
+            <div className="p-6">
+              {activeChartTab === 'profit' && renderProfitChart()}
+              {activeChartTab === 'trends' && renderOrderTrendsChart()}
+              {activeChartTab === 'weekly' && renderWeeklyPerformanceChart()}
+              {activeChartTab === 'status' && renderStatusDistributionChart()}
+            </div>
           </div>
-          
-          <div className="p-6">
-            {activeChartTab === 'profit' && renderProfitChart()}
-            {activeChartTab === 'trends' && renderOrderTrendsChart()}
-            {activeChartTab === 'weekly' && renderWeeklyPerformanceChart()}
-            {activeChartTab === 'status' && renderStatusDistributionChart()}
-          </div>
-        </div>
+        )}
 
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -555,6 +564,13 @@ const Orders = () => {
           </div>
          
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowChart(!showChart)}
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title={showChart ? "Hide Charts" : "Show Charts"}
+            >
+              <PieChartIcon size={20} />
+            </button>
             <Filter size={20} className={darkMode ? "text-gray-400" : "text-gray-500"} />
             <select
               value={selectedStatus}
@@ -681,9 +697,7 @@ const Orders = () => {
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className={`p-2 rounded-md ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''} ${
-                      darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'
-                    }`}
+                    className={`p-2 rounded-md ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''} ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'}`}
                   >
                     Previous
                   </button>
@@ -707,9 +721,7 @@ const Orders = () => {
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className={`p-2 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''} ${
-                      darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'
-                    }`}
+                    className={`p-2 rounded-md ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''} ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-700 border border-gray-300'}`}
                   >
                     Next
                   </button>

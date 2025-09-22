@@ -514,7 +514,7 @@ Market: ${product.market}`;
       </div>
       {/* Table View */}
       {viewMode === 'table' && (
-        <div className={`rounded-lg shadow-sm overflow-hidden ${darkMode ? "bg-dark-card" : "bg-white"}`}>
+        <div className={`rounded-xl shadow-sm overflow-hidden border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
           <table className="min-w-full">
             <thead className={darkMode ? "bg-dark-gray" : "bg-gray-50"}>
               <tr>
