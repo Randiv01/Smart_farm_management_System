@@ -3,6 +3,7 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 import Card from '../P-Card.jsx';
 import { Thermometer, Droplet, Sprout, Wind, Lightbulb, Waves, AlertTriangle, WifiOff, Bell } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import Loader from '../Loader/Loader';
 import '../styles/P-MonitorControl.css';
 import "../styles/theme.css";
 
@@ -47,6 +48,8 @@ const MonitorControl = () => {
     message: 'Soil moisture below threshold (30%)',
     timestamp: '2023-07-14 08:12'
   }]);
+  const [loading, setLoading] = useState(true);
+  
   // Sample greenhouse options
   const greenhouseOptions = [{
     id: 'GH-01',
@@ -64,9 +67,11 @@ const MonitorControl = () => {
     id: 'GH-05',
     name: 'Greenhouse 5 - Chili'
   }];
+  
   // Generate mock historical data
   useEffect(() => {
     const generateHistoricalData = () => {
+      setLoading(true);
       const data = [];
       const now = new Date();
       for (let i = 23; i >= 0; i--) {
@@ -81,8 +86,14 @@ const MonitorControl = () => {
       }
       return data;
     };
-    setHistoricalData(generateHistoricalData());
+    
+    // Simulate data loading delay
+    setTimeout(() => {
+      setHistoricalData(generateHistoricalData());
+      setLoading(false);
+    }, 1000);
   }, [selectedGreenhouse]);
+  
   // Simulate WebSocket connection for real-time updates
   useEffect(() => {
     if (selectedGreenhouse === 'GH-01') {
@@ -97,7 +108,9 @@ const MonitorControl = () => {
       return () => clearInterval(interval);
     }
   }, [selectedGreenhouse]);
+  
   const handleGreenhouseChange = e => {
+    setLoading(true);
     setSelectedGreenhouse(e.target.value);
     // Reset data for non-GH-01 greenhouses
     if (e.target.value !== 'GH-01') {
@@ -143,7 +156,13 @@ const MonitorControl = () => {
         }
       });
     }
+    
+    // Simulate loading delay when switching greenhouses
+    setTimeout(() => {
+      setLoading(false);
+    }, 800);
   };
+  
   const toggleControl = control => {
     if (selectedGreenhouse !== 'GH-01') {
       alert('Control not available. Equipment not connected.');
@@ -166,6 +185,7 @@ const MonitorControl = () => {
       }
     }));
   };
+  
   const getGaugeColor = (value, type) => {
     if (type === 'temperature') {
       if (value < 18) return '#29B6F6'; // cold
@@ -181,11 +201,13 @@ const MonitorControl = () => {
       return '#66BB6A'; // optimal
     }
   };
+  
   const getGaugeBorderColor = type => {
     if (type === 'temperature') return '#EF5350'; // red for temperature
     if (type === 'humidity') return '#29B6F6'; // blue for humidity
     return '#66BB6A'; // green for soil moisture
   };
+  
   const getAlertIcon = type => {
     switch (type) {
       case 'temperature':
@@ -200,17 +222,20 @@ const MonitorControl = () => {
         return <AlertTriangle size={16} />;
     }
   };
+  
   // Calculate the percentage for the gauge circle
   const calculateGaugePercentage = (value, min, max) => {
     if (value === null) return 0;
     const percentage = (value - min) / (max - min) * 100;
     return Math.min(Math.max(percentage, 0), 100);
   };
+  
   // Calculate the stroke dash offset for the gauge
   const calculateStrokeDashOffset = percentage => {
     const circumference = 2 * Math.PI * 45; // 45 is the radius of the circle
     return circumference - percentage / 100 * circumference;
   };
+  
   const renderEquipmentNotConnectedMessage = () => {
     if (selectedGreenhouse !== 'GH-01') {
       return <div className="not-connected-message">
@@ -220,6 +245,12 @@ const MonitorControl = () => {
     }
     return null;
   };
+
+  // Show loader while data is being loaded
+  if (loading) {
+    return <Loader darkMode={false} />;
+  }
+  
   return <div className="monitor-control">
       <div className="monitor-header">
         <h1>Monitor & Control</h1>
@@ -406,4 +437,5 @@ const MonitorControl = () => {
       </div>
     </div>;
 };
+
 export default MonitorControl;

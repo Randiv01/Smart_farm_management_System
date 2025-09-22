@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Clear all localStorage items
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("firstName");
@@ -77,9 +78,20 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("email");
     localStorage.removeItem("name");
     localStorage.removeItem("profileImage");
+    
+    // Clear any other user-related items
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith("user")) {
+        localStorage.removeItem(key);
+      }
+    });
 
     setUser(null);
     setIsAuthenticated(false);
+    
+    // Force a full page reload to ensure complete logout
+    window.location.href = '/';
   };
 
   // Update user info (used for profile changes)

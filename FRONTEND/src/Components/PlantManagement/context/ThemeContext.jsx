@@ -8,13 +8,17 @@ export const ThemeProvider = ({
     const savedTheme = localStorage.getItem('theme');
     return savedTheme || 'light';
   });
+  
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+  
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
+  
   return <ThemeContext.Provider value={{
     theme,
     toggleTheme
