@@ -12,7 +12,7 @@ const ELayout = () => {
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   return (
-    <div className={darkMode ? "bg-gray-900 text-white min-h-screen flex" : "bg-white text-black min-h-screen flex"}>
+    <div className={darkMode ? "bg-dark-bg text-dark-text min-h-screen flex" : "bg-light-beige text-gray-900 min-h-screen flex"}>
       <ESidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
       <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}>
         <ETopNavbar sidebarOpen={sidebarOpen} onMenuClick={toggleSidebar} />
