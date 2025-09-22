@@ -1,4 +1,3 @@
-// routes/productivity.js
 import express from 'express';
 import {
   createProductivityRecord,
@@ -8,33 +7,41 @@ import {
   updateProductivityRecord,
   deleteProductivityRecord,
   getProductivityTrends,
-  getProductivityAnalytics // NEW
+  getProductivityAnalytics,
+  getAllProductivityRecords,
+  getProductivityTotals // Added import
 } from '../controllers/productivityController.js';
 
 const router = express.Router();
 
-// Create productivity record
+// Create a new productivity record
 router.post('/', createProductivityRecord);
 
-// Get animal productivity records
+// Get productivity records for a specific animal
 router.get('/animal/:animalId', getAnimalProductivity);
 
-// Get batch productivity records
+// Get productivity records for a batch
 router.get('/batch/:batchId', getBatchProductivity);
 
-// Get productivity summary
+// Get productivity summary for dashboard
 router.get('/summary', getProductivitySummary);
 
-// Get productivity analytics (NEW)
+// Get productivity analytics for dashboard
 router.get('/analytics', getProductivityAnalytics);
 
-// Get productivity trends
+// Get productivity trends over time
 router.get('/trends', getProductivityTrends);
 
-// Update productivity record
+// Get productivity totals for different time periods
+router.get('/totals', getProductivityTotals);
+
+// Update a productivity record
 router.put('/:id', updateProductivityRecord);
 
-// Delete productivity record
+// Delete a productivity record
 router.delete('/:id', deleteProductivityRecord);
+
+// GET ALL PRODUCTIVITY RECORDS FOR THE MAIN DASHBOARD
+router.get('/', getAllProductivityRecords); 
 
 export default router;

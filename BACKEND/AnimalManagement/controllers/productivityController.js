@@ -20,14 +20,14 @@ export const createProductivityRecord = async (req, res) => {
     // Get animal type information for validation
     if (isGroup && batchId) {
       // For batch records, get the first animal to determine type
-      batchAnimals = await Animal.find({ batchId }).populate('type');
+      batchAnimals = await Animal.find({ batchId }).populate('type').lean();
       if (batchAnimals.length === 0) {
         return res.status(404).json({ message: 'Batch not found or empty' });
       }
       animalType = batchAnimals[0].type;
     } else if (animalId) {
       // For individual records
-      animal = await Animal.findById(animalId).populate('type');
+      animal = await Animal.findById(animalId).populate('type').lean();
       if (!animal) {
         return res.status(404).json({ message: 'Animal not found' });
       }
@@ -38,13 +38,12 @@ export const createProductivityRecord = async (req, res) => {
     if (animalType && animalType.productivityFields) {
       const validationErrors = [];
       
-      // Check required fields
+      // Check required fields and data types
       animalType.productivityFields.forEach(field => {
         if (field.required && !productivityData[field.name]) {
           validationErrors.push(`${field.label} is required`);
         }
         
-        // Validate data types
         if (productivityData[field.name] !== undefined) {
           if (field.type === 'number' && isNaN(Number(productivityData[field.name]))) {
             validationErrors.push(`${field.label} must be a number`);
@@ -52,19 +51,15 @@ export const createProductivityRecord = async (req, res) => {
         }
       });
       
-      // Check for extra fields that aren't defined
+      // Check for extra fields
       Object.keys(productivityData).forEach(key => {
-        const definedField = animalType.productivityFields.find(f => f.name === key);
-        if (!definedField) {
+        if (!animalType.productivityFields.find(f => f.name === key)) {
           validationErrors.push(`Field '${key}' is not defined for this animal type`);
         }
       });
       
       if (validationErrors.length > 0) {
-        return res.status(400).json({ 
-          message: 'Validation failed', 
-          errors: validationErrors 
-        });
+        return res.status(400).json({ message: 'Validation failed', errors: validationErrors });
       }
     }
 
@@ -91,7 +86,7 @@ export const createProductivityRecord = async (req, res) => {
           path: 'type',
           select: 'name productivityFields'
         }
-      });
+      }).lean();
 
     res.status(201).json({
       message: 'Productivity record created successfully',
@@ -99,42 +94,41 @@ export const createProductivityRecord = async (req, res) => {
     });
   } catch (error) {
     console.error('Create productivity record error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Get productivity records for an animal with animal type validation
+// Get productivity records for an animal
 export const getAnimalProductivity = async (req, res) => {
   try {
     const { animalId } = req.params;
     const { startDate, endDate, productType } = req.query;
 
-    const animal = await Animal.findById(animalId).populate('type');
+    const animal = await Animal.findById(animalId).populate('type').lean();
     if (!animal) return res.status(404).json({ message: 'Animal not found' });
 
     let query = { animalId, isGroup: false };
 
-    // Add date range filter if provided
+    // Add date range filter
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Add product type filter if provided
-    if (productType) {
-      query.productType = productType;
-    }
+    // Add product type filter
+    if (productType) query.productType = productType;
 
     const records = await Productivity.find(query)
       .populate('animalId', 'animalId data')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
 
-    // Calculate totals for each productivity field
+    // Calculate totals and averages
     const fieldTotals = {};
     const fieldAverages = {};
     
-    if (animal.type.productivityFields) {
+    if (animal.type?.productivityFields) {
       animal.type.productivityFields.forEach(field => {
         const fieldRecords = records.filter(record => record[field.name] !== undefined);
         const total = fieldRecords.reduce((sum, record) => sum + (Number(record[field.name]) || 0), 0);
@@ -145,8 +139,8 @@ export const getAnimalProductivity = async (req, res) => {
 
     res.json({
       animalId,
-      animalType: animal.type.name,
-      productivityFields: animal.type.productivityFields || [],
+      animalType: animal.type?.name || 'Unknown',
+      productivityFields: animal.type?.productivityFields || [],
       records,
       totalRecords: records.length,
       fieldTotals,
@@ -154,11 +148,11 @@ export const getAnimalProductivity = async (req, res) => {
     });
   } catch (error) {
     console.error('Get animal productivity error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Get productivity records for a batch/group
+// Get productivity records for a batch
 export const getBatchProductivity = async (req, res) => {
   try {
     const { batchId } = req.params;
@@ -166,31 +160,31 @@ export const getBatchProductivity = async (req, res) => {
 
     let query = { batchId, isGroup: true };
 
-    // Add date range filter if provided
+    // Add date range filter
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Add product type filter if provided
-    if (productType) {
-      query.productType = productType;
-    }
+    // Add product type filter
+    if (productType) query.productType = productType;
 
     const records = await Productivity.find(query)
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
 
-    // Get batch animals for additional info
+    // Get batch animals
     const batchAnimals = await Animal.find({ batchId })
       .populate('type', 'name productivityFields')
-      .select('animalId data type');
+      .select('animalId data type')
+      .lean();
 
-    // Calculate field totals and averages for the batch
+    // Calculate field totals and averages
     const fieldTotals = {};
     const fieldAverages = {};
     
-    if (batchAnimals.length > 0 && batchAnimals[0].type.productivityFields) {
+    if (batchAnimals.length > 0 && batchAnimals[0].type?.productivityFields) {
       batchAnimals[0].type.productivityFields.forEach(field => {
         const fieldRecords = records.filter(record => record[field.name] !== undefined);
         const total = fieldRecords.reduce((sum, record) => sum + (Number(record[field.name]) || 0), 0);
@@ -209,7 +203,7 @@ export const getBatchProductivity = async (req, res) => {
     });
   } catch (error) {
     console.error('Get batch productivity error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -222,7 +216,7 @@ export const getProductivityAnalytics = async (req, res) => {
     const now = new Date();
     let startDate;
     
-    switch(timeframe) {
+    switch (timeframe) {
       case 'day':
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
@@ -242,16 +236,13 @@ export const getProductivityAnalytics = async (req, res) => {
     // Build query
     let query = { date: { $gte: startDate, $lte: now } };
 
-    // Filter by animal type if provided
+    // Filter by animal type
     if (animalTypeId) {
-      const animals = await Animal.find({ type: animalTypeId }).select('_id');
+      const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
       const animalIds = animals.map(animal => animal._id);
       query.$or = [
         { animalId: { $in: animalIds }, isGroup: false },
-        { 
-          batchId: { $exists: true }, 
-          isGroup: true
-        }
+        { batchId: { $exists: true }, isGroup: true }
       ];
     }
 
@@ -263,34 +254,35 @@ export const getProductivityAnalytics = async (req, res) => {
           select: 'name productivityFields'
         }
       })
-      .sort({ date: 1 });
+      .sort({ date: 1 })
+      .lean();
 
-    // Get animal type info for field definitions
+    // Get animal type info
     let animalType;
     if (animalTypeId) {
-      animalType = await AnimalType.findById(animalTypeId);
+      animalType = await AnimalType.findById(animalTypeId).lean();
     }
 
-    // Group records by date and calculate analytics
+    // Group records by date
     const analytics = {};
     const dates = [];
     
     records.forEach(record => {
       let dateKey;
       
-      switch(groupBy) {
+      switch (groupBy) {
         case 'hour':
-          dateKey = record.date.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+          dateKey = record.date.toISOString().slice(0, 13);
           break;
         case 'day':
-          dateKey = record.date.toISOString().split('T')[0]; // YYYY-MM-DD
+          dateKey = record.date.toISOString().split('T')[0];
           break;
         case 'week':
           const weekNum = Math.ceil((record.date.getDate() + 6) / 7);
           dateKey = `${record.date.getFullYear()}-W${weekNum}`;
           break;
         case 'month':
-          dateKey = record.date.toISOString().slice(0, 7); // YYYY-MM
+          dateKey = record.date.toISOString().slice(0, 7);
           break;
         default:
           dateKey = record.date.toISOString().split('T')[0];
@@ -308,13 +300,11 @@ export const getProductivityAnalytics = async (req, res) => {
       
       analytics[dateKey].records++;
       
-      // Track unique animals
       if (record.animalId) {
         analytics[dateKey].animals.add(record.animalId._id.toString());
       }
       
-      // Sum values for each productivity field
-      if (animalType && animalType.productivityFields) {
+      if (animalType?.productivityFields) {
         animalType.productivityFields.forEach(field => {
           if (record[field.name] !== undefined) {
             if (!analytics[dateKey].values[field.name]) {
@@ -340,6 +330,7 @@ export const getProductivityAnalytics = async (req, res) => {
       });
       
       analytics[dateKey].animalCount = analytics[dateKey].animals.size;
+      delete analytics[dateKey].animals; // Remove Set for cleaner response
     });
 
     // Convert to array sorted by date
@@ -360,20 +351,20 @@ export const getProductivityAnalytics = async (req, res) => {
     });
   } catch (error) {
     console.error('Get productivity analytics error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Get productivity summary for dashboard (compatibility with old code)
+// Get productivity summary for dashboard
 export const getProductivitySummary = async (req, res) => {
   try {
     const { animalType, period = 'month' } = req.query;
     
-    // Calculate date range based on period
+    // Calculate date range
     const now = new Date();
     let startDate;
     
-    switch(period) {
+    switch (period) {
       case 'day':
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
@@ -393,16 +384,13 @@ export const getProductivitySummary = async (req, res) => {
     // Build query
     let query = { date: { $gte: startDate } };
 
-    // Filter by animal type if provided
+    // Filter by animal type
     if (animalType) {
-      const animals = await Animal.find({ type: animalType }).select('_id');
+      const animals = await Animal.find({ type: animalType }).select('_id').lean();
       const animalIds = animals.map(animal => animal._id);
       query.$or = [
         { animalId: { $in: animalIds }, isGroup: false },
-        { 
-          batchId: { $exists: true }, 
-          isGroup: true
-        }
+        { batchId: { $exists: true }, isGroup: true }
       ];
     }
 
@@ -411,12 +399,13 @@ export const getProductivitySummary = async (req, res) => {
         path: 'animalId',
         populate: {
           path: 'type',
-          select: 'name'
+          select: 'name productivityFields'
         }
       })
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
 
-    // Group by product type (for backward compatibility)
+    // Group by product type
     const summaryByProduct = records.reduce((acc, record) => {
       const productType = record.productType || 'default';
       if (!acc[productType]) {
@@ -427,12 +416,10 @@ export const getProductivitySummary = async (req, res) => {
         };
       }
       
-      // Use the first numeric field for quantity if productType exists
       let quantity = 0;
       if (record.productType) {
         quantity = record.quantity || 0;
-      } else if (record.animalId && record.animalId.type && record.animalId.type.productivityFields) {
-        // Use the first numeric field from productivityFields
+      } else if (record.animalId?.type?.productivityFields) {
         const numericField = record.animalId.type.productivityFields.find(f => f.type === 'number');
         if (numericField && record[numericField.name] !== undefined) {
           quantity = Number(record[numericField.name]) || 0;
@@ -462,7 +449,7 @@ export const getProductivitySummary = async (req, res) => {
     });
   } catch (error) {
     console.error('Get productivity summary error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -472,7 +459,7 @@ export const updateProductivityRecord = async (req, res) => {
     const { id } = req.params;
     const { date, notes, recordedBy, ...productivityData } = req.body;
 
-    // Get the existing record to validate against animal type
+    // Validate record exists
     const existingRecord = await Productivity.findById(id)
       .populate({
         path: 'animalId',
@@ -480,18 +467,17 @@ export const updateProductivityRecord = async (req, res) => {
           path: 'type',
           select: 'productivityFields'
         }
-      });
+      }).lean();
 
     if (!existingRecord) {
       return res.status(404).json({ message: 'Productivity record not found' });
     }
 
-    // Validate productivity data if animal type has defined fields
-    if (existingRecord.animalId && existingRecord.animalId.type && existingRecord.animalId.type.productivityFields) {
+    // Validate productivity data
+    if (existingRecord.animalId?.type?.productivityFields) {
       const validationErrors = [];
       const animalType = existingRecord.animalId.type;
       
-      // Check for extra fields that aren't defined
       Object.keys(productivityData).forEach(key => {
         const definedField = animalType.productivityFields.find(f => f.name === key);
         if (!definedField) {
@@ -500,10 +486,7 @@ export const updateProductivityRecord = async (req, res) => {
       });
       
       if (validationErrors.length > 0) {
-        return res.status(400).json({ 
-          message: 'Validation failed', 
-          errors: validationErrors 
-        });
+        return res.status(400).json({ message: 'Validation failed', errors: validationErrors });
       }
     }
 
@@ -525,7 +508,7 @@ export const updateProductivityRecord = async (req, res) => {
         path: 'type',
         select: 'name productivityFields'
       }
-    });
+    }).lean();
 
     res.json({
       message: 'Productivity record updated successfully',
@@ -533,7 +516,7 @@ export const updateProductivityRecord = async (req, res) => {
     });
   } catch (error) {
     console.error('Update productivity record error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -542,7 +525,7 @@ export const deleteProductivityRecord = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedRecord = await Productivity.findByIdAndDelete(id);
+    const deletedRecord = await Productivity.findByIdAndDelete(id).lean();
 
     if (!deletedRecord) {
       return res.status(404).json({ message: 'Productivity record not found' });
@@ -554,7 +537,7 @@ export const deleteProductivityRecord = async (req, res) => {
     });
   } catch (error) {
     console.error('Delete productivity record error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -567,7 +550,7 @@ export const getProductivityTrends = async (req, res) => {
     const now = new Date();
     let startDate;
     
-    switch(timeframe) {
+    switch (timeframe) {
       case '7days':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -585,23 +568,15 @@ export const getProductivityTrends = async (req, res) => {
     }
 
     // Build query
-    let query = { 
-      date: { 
-        $gte: startDate,
-        $lte: now
-      }
-    };
+    let query = { date: { $gte: startDate, $lte: now } };
 
-    // Filter by animal type if provided
+    // Filter by animal type
     if (animalTypeId) {
-      const animals = await Animal.find({ type: animalTypeId }).select('_id');
+      const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
       const animalIds = animals.map(animal => animal._id);
       query.$or = [
         { animalId: { $in: animalIds }, isGroup: false },
-        { 
-          batchId: { $exists: true }, 
-          isGroup: true
-        }
+        { batchId: { $exists: true }, isGroup: true }
       ];
     }
 
@@ -613,12 +588,13 @@ export const getProductivityTrends = async (req, res) => {
           select: 'name productivityFields'
         }
       })
-      .sort({ date: 1 });
+      .sort({ date: 1 })
+      .lean();
 
-    // Get animal type info for field definitions
+    // Get animal type info
     let animalType;
     if (animalTypeId) {
-      animalType = await AnimalType.findById(animalTypeId);
+      animalType = await AnimalType.findById(animalTypeId).lean();
     }
 
     // Group by date
@@ -633,12 +609,10 @@ export const getProductivityTrends = async (req, res) => {
         };
       }
       
-      // Calculate quantity based on available fields
       let quantity = 0;
       if (record.productType) {
         quantity = record.quantity || 0;
-      } else if (animalType && animalType.productivityFields) {
-        // Use the first numeric field from productivityFields
+      } else if (animalType?.productivityFields) {
         const numericField = animalType.productivityFields.find(f => f.type === 'number');
         if (numericField && record[numericField.name] !== undefined) {
           quantity = Number(record[numericField.name]) || 0;
@@ -648,7 +622,6 @@ export const getProductivityTrends = async (req, res) => {
       acc[dateStr].totalQuantity += quantity;
       acc[dateStr].records.push(record);
       
-      // Track unique animals for average calculation
       if (record.animalId) {
         acc[dateStr].animalCount.add(record.animalId._id.toString());
       }
@@ -677,6 +650,130 @@ export const getProductivityTrends = async (req, res) => {
     });
   } catch (error) {
     console.error('Get productivity trends error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getAllProductivityRecords = async (req, res) => {
+  try {
+    const records = await Productivity.find({})
+      .populate({
+        path: 'animalId',
+        populate: {
+          path: 'type',
+          select: 'name productivityFields'
+        }
+      })
+      .lean();
+
+    res.json({
+      allRecords: records
+    });
+  } catch (error) {
+    console.error('Get all productivity records error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get productivity totals for different time periods
+export const getProductivityTotals = async (req, res) => {
+  try {
+    const { animalTypeId, fieldName } = req.query;
+
+    if (!animalTypeId || !fieldName) {
+      return res.status(400).json({ message: 'Animal type ID and field name are required' });
+    }
+
+    // Get all animals of this type
+    const animals = await Animal.find({ type: animalTypeId }).select('_id').lean();
+    const animalIds = animals.map(animal => animal._id);
+
+    // Calculate date ranges
+    const now = new Date();
+    const todayStart = new Date(now.setHours(0, 0, 0, 0));
+    
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - 7);
+    
+    const monthStart = new Date(now);
+    monthStart.setDate(monthStart.getDate() - 30);
+    
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+
+    // Build queries for different time periods
+    const queries = {
+      daily: { 
+        date: { $gte: todayStart, $lte: now },
+        animalId: { $in: animalIds },
+        isGroup: false,
+        [fieldName]: { $exists: true }
+      },
+      weekly: { 
+        date: { $gte: weekStart, $lte: now },
+        animalId: { $in: animalIds },
+        isGroup: false,
+        [fieldName]: { $exists: true }
+      },
+      monthly: { 
+        date: { $gte: monthStart, $lte: now },
+        animalId: { $in: animalIds },
+        isGroup: false,
+        [fieldName]: { $exists: true }
+      },
+      yearly: { 
+        date: { $gte: yearStart, $lte: now },
+        animalId: { $in: animalIds },
+        isGroup: false,
+        [fieldName]: { $exists: true }
+      },
+      allTime: { 
+        animalId: { $in: animalIds },
+        isGroup: false,
+        [fieldName]: { $exists: true }
+      }
+    };
+
+    // Execute all queries in parallel
+    const results = await Promise.all([
+      Productivity.aggregate([
+        { $match: queries.daily },
+        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
+      ]),
+      Productivity.aggregate([
+        { $match: queries.weekly },
+        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
+      ]),
+      Productivity.aggregate([
+        { $match: queries.monthly },
+        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
+      ]),
+      Productivity.aggregate([
+        { $match: queries.yearly },
+        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
+      ]),
+      Productivity.aggregate([
+        { $match: queries.allTime },
+        { $group: { _id: null, total: { $sum: `$${fieldName}` } } }
+      ])
+    ]);
+
+    // Extract totals
+    const totals = {
+      daily: results[0][0]?.total || 0,
+      weekly: results[1][0]?.total || 0,
+      monthly: results[2][0]?.total || 0,
+      yearly: results[3][0]?.total || 0,
+      allTime: results[4][0]?.total || 0
+    };
+
+    res.json({
+      animalTypeId,
+      fieldName,
+      totals,
+      animalCount: animals.length
+    });
+  } catch (error) {
+    console.error('Get productivity totals error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

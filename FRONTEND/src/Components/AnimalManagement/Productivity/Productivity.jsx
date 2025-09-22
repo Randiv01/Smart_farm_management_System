@@ -89,8 +89,7 @@ export default function AnimalProductivityDashboard() {
   const [activeTab, setActiveTab] = useState("all");
   const [message, setMessage] = useState({ text: "", type: "" });
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
-const [showFilters, setShowFilters] = useState(false);
-  
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     document.title = "Animal Productivity - Animal Manager";
@@ -108,68 +107,83 @@ const [showFilters, setShowFilters] = useState(false);
       setGlobalLoading(true);
       setError(null);
 
+      // This Promise.all now uses the new '/productivity' endpoint we created
       const [typesRes, animalsRes, productivityRes, analyticsRes] = await Promise.all([
         axios.get("http://localhost:5000/animal-types"),
         axios.get("http://localhost:5000/animals"),
-        axios.get("http://localhost:5000/productivity/summary?period=month"),
+        axios.get("http://localhost:5000/productivity"), // This now works and gets ALL records
         axios.get("http://localhost:5000/productivity/analytics?timeframe=month&groupBy=day"),
       ]);
 
       const types = typesRes.data;
       const allAnimals = animalsRes.data;
-      const productivityData = productivityRes.data;
+      const allProductivityRecords = productivityRes.data.allRecords || []; // Correctly gets all records
       const analyticsData = analyticsRes.data;
 
       setAnimals(allAnimals);
-      setProductivityRecords(productivityData.allRecords || []);
+      setProductivityRecords(allProductivityRecords);
       setProductivityAnalytics(analyticsData);
 
-      // Extract productivity fields
-      const allProductivityFields = new Set();
-      const productivityFieldLabels = {};
-      const productivityFieldTypes = {};
-      const productivityUnits = {};
-
+      const allProductivityFields = [];
+      const fieldNames = new Set();
       types.forEach((type) => {
-        if (type.productivityFields && type.productivityFields.length > 0) {
+        if (type.productivityFields) {
           type.productivityFields.forEach((field) => {
-            allProductivityFields.add(field.name);
-            productivityFieldLabels[field.name] = field.label;
-            productivityFieldTypes[field.name] = field.type;
-            productivityUnits[field.name] = field.unit || "";
+            if (!fieldNames.has(field.name)) {
+              fieldNames.add(field.name);
+              allProductivityFields.push(field);
+            }
           });
         }
       });
+      setProductivityFields(allProductivityFields);
 
-      const fieldArray = Array.from(allProductivityFields).map((field) => ({
-        name: field,
-        label: productivityFieldLabels[field] || field,
-        type: productivityFieldTypes[field] || "number",
-        unit: productivityUnits[field] || "",
-      }));
-
-      setProductivityFields(fieldArray);
-
-      // Calculate productivity for each animal type
       const typesWithStats = types.map((type) => {
-        const animalsOfType = allAnimals.filter((a) => a.type && a.type._id === type._id);
+        // Robustly filter animals belonging to the current type
+        const animalsOfType = allAnimals.filter(a => {
+          if (!a.type) return false;
+          const typeId = typeof a.type === 'object' ? a.type._id : a.type;
+          return typeId === type._id;
+        });
+
+        const animalIdsOfType = new Set(animalsOfType.map(a => a._id.toString()));
+        const batchIdsOfType = new Set(animalsOfType.filter(a => a.batchId).map(a => a.batchId));
+        
+        const recordsForType = allProductivityRecords.filter(record => {
+  // First, check if it's a batch record
+  if (record.batchId && batchIdsOfType.has(record.batchId)) {
+    return true;
+  }
+  
+  // Next, handle individual animal records robustly
+  if (record.animalId) {
+    // This handles if record.animalId is a full object OR just a string ID
+    const recordAnimalIdStr = typeof record.animalId === 'object'
+      ? record.animalId._id?.toString()
+      : record.animalId.toString();
+      
+    return animalIdsOfType.has(recordAnimalIdStr);
+  }
+
+  return false;
+});
 
         const productivity = {};
-        if (type.productivityFields && type.productivityFields.length > 0) {
-          type.productivityFields.forEach((field) => {
-            const fieldRecords = productivityData.allRecords
-              .filter((record) =>
-                (record.animalId && animalsOfType.some((a) => a._id === record.animalId.toString())) ||
-                (record.batchId && animalsOfType.some((a) => a.batchId === record.batchId))
-              )
-              .filter((record) => record.productType === field.name);
-
-            productivity[field.name] = fieldRecords.reduce(
-              (sum, record) => sum + (parseFloat(record.quantity) || 0),
-              0
-            );
-          });
+        if (type.productivityFields) {
+            type.productivityFields.forEach(field => {
+                productivity[field.name] = 0;
+            });
         }
+        
+        recordsForType.forEach(record => {
+            if (type.productivityFields) {
+                type.productivityFields.forEach(field => {
+                    if (record[field.name] && typeof record[field.name] === 'number') {
+                        productivity[field.name] += record[field.name];
+                    }
+                });
+            }
+        });
 
         return {
           ...type,
@@ -181,19 +195,19 @@ const [showFilters, setShowFilters] = useState(false);
       });
 
       setAnimalTypes(typesWithStats);
-      setTotalAnimals(typesWithStats.reduce((sum, type) => sum + type.totalCount, 0));
+      setTotalAnimals(allAnimals.length);
 
-      // Overall productivity aggregation
       const overall = {};
-      fieldArray.forEach((field) => {
-        overall[field.name] = productivityData.allRecords
-          .filter((record) => record.productType === field.name)
-          .reduce((sum, record) => sum + (parseFloat(record.quantity) || 0), 0);
+      allProductivityFields.forEach((field) => {
+        overall[field.name] = allProductivityRecords.reduce((sum, record) => {
+          return sum + (Number(record[field.name]) || 0);
+        }, 0);
       });
-
       setProductivityStats(overall);
-      generateTrendData(typesWithStats, productivityData.allRecords);
+      
+      generateTrendData(allProductivityRecords, allProductivityFields);
       generateInsights(typesWithStats, overall, analyticsData);
+
     } catch (err) {
       console.error("Failed to fetch productivity data:", err);
       setError("Failed to load productivity data. Please try again.");
@@ -203,7 +217,10 @@ const [showFilters, setShowFilters] = useState(false);
     }
   };
 
-  const generateTrendData = (types, records) => {
+
+  // --- END: CORRECTED FETCH AND AGGREGATION LOGIC ---
+  
+  const generateTrendData = (records, fields) => {
     const months = [];
     const now = new Date();
 
@@ -217,20 +234,16 @@ const [showFilters, setShowFilters] = useState(false);
 
     const trendData = months.map((monthObj) => {
       const entry = { date: monthObj.label };
+      const monthStart = new Date(monthObj.date.getFullYear(), monthObj.date.getMonth(), 1);
+      const monthEnd = new Date(monthObj.date.getFullYear(), monthObj.date.getMonth() + 1, 0);
 
-      productivityFields.forEach((field) => {
-        const monthStart = new Date(monthObj.date.getFullYear(), monthObj.date.getMonth(), 1);
-        const monthEnd = new Date(monthObj.date.getFullYear(), monthObj.date.getMonth() + 1, 0);
-
-        const monthRecords = records.filter((record) => {
-          const recordDate = new Date(record.date);
-          return recordDate >= monthStart && recordDate <= monthEnd && record.productType === field.name;
-        });
-
-        entry[field.name] = monthRecords.reduce(
-          (sum, record) => sum + (parseFloat(record.quantity) || 0),
-          0
-        );
+      const monthRecords = records.filter((record) => {
+        const recordDate = new Date(record.date);
+        return recordDate >= monthStart && recordDate <= monthEnd;
+      });
+      
+      fields.forEach((field) => {
+        entry[field.name] = monthRecords.reduce((sum, record) => sum + (Number(record[field.name]) || 0), 0);
       });
 
       return entry;
@@ -445,20 +458,31 @@ const [showFilters, setShowFilters] = useState(false);
 
   const getMainProductivityMetrics = (animalType) => {
     if (!animalType.productivityFields || animalType.productivityFields.length === 0) {
-      return "No productivity data";
+      return "No productivity data recorded";
     }
-    return animalType.productivityFields
+    const metrics = animalType.productivityFields
       .map((field) => {
         const value = animalType.productivity[field.name] || 0;
         const unit = field.unit || "";
-        return `${field.label}: ${value.toLocaleString()} ${unit}`;
+        // Only show metrics with a non-zero value
+        if (value > 0) {
+            return `${field.label}: ${value.toLocaleString()} ${unit}`;
+        }
+        return null;
       })
-      .join(" | ");
+      .filter(Boolean); // Remove null entries
+      
+    if (metrics.length === 0) {
+        return "No productivity data recorded";
+    }
+
+    return metrics.join(" | ");
   };
 
   const getProductivityPerAnimal = (animalType) => {
     if (animalType.totalCount === 0) return "N/A";
     const totalProductivity = Object.values(animalType.productivity).reduce((sum, val) => sum + val, 0);
+    if (totalProductivity === 0) return "0.00";
     return (totalProductivity / animalType.totalCount).toFixed(2);
   };
 
@@ -644,7 +668,7 @@ const [showFilters, setShowFilters] = useState(false);
             <p className="text-2xl font-bold">{animalTypes.length}</p>
           </div>
         </div>
-        {productivityFields.map((field, idx) => (
+        {productivityFields.slice(0, 2).map((field) => (
           <div
             key={field.name}
             className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}

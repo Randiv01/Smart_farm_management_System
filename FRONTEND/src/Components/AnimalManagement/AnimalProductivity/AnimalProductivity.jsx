@@ -16,11 +16,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  TrendingUp, 
-  TrendingDown, 
-  Download, 
-  Filter, 
-  BarChart3, 
+  TrendingUp,
+  TrendingDown,
+  Download,
+  Filter,
+  BarChart3,
   Calendar,
   AlertTriangle,
   Info,
@@ -61,18 +61,10 @@ export default function AnimalProductivity() {
   const [editMode, setEditMode] = useState(false);
   const [editedRecord, setEditedRecord] = useState(null);
   const [popup, setPopup] = useState({ show: false, success: true, message: "" });
-
-  // State for new record with dynamic fields
-  const [newRecord, setNewRecord] = useState({
-    date: new Date().toISOString().split("T")[0],
-    notes: ""
-  });
-
+  const [showFilters, setShowFilters] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(null);
-  
-  // New state variables
   const [productivityStats, setProductivityStats] = useState({});
   const [productivityFields, setProductivityFields] = useState([]);
   const [trendStats, setTrendStats] = useState([]);
@@ -80,29 +72,52 @@ export default function AnimalProductivity() {
   const [timeframe, setTimeframe] = useState("month");
   const [groupBy, setGroupBy] = useState("day");
   const [productivityAnalytics, setProductivityAnalytics] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
-  const [showFilters, setShowFilters] = useState(true);
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [activeTab, setActiveTab] = useState("all");
+  // New state for milk totals
+  const [milkTotals, setMilkTotals] = useState({
+    daily: 0,
+    weekly: 0,
+    monthly: 0,
+    yearly: 0,
+    allTime: 0,
+  });
+  const primaryMetric = useMemo(() => productivityFields.find(f => f.type === 'number'), [productivityFields]);
+
+  // State for new record with dynamic fields
+  const [newRecord, setNewRecord] = useState({
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
+    milkQuantity: "", // Initialize milkQuantity
+  });
 
   useEffect(() => {
     document.title = "Animal Productivity Dashboard";
     fetchData();
   }, []);
 
+  // Fetch milk totals
+  useEffect(() => {
+    if (animalType?._id) {
+      fetchMilkTotals();
+    }
+  }, [animalType]);
+
   // Set up auto-refresh for live data
   useEffect(() => {
     if (showAnalytics) {
       const interval = setInterval(() => {
         fetchData();
+        fetchMilkTotals();
       }, 30000); // Refresh every 30 seconds
       setRefreshInterval(interval);
-      
+
       return () => clearInterval(interval);
     } else if (refreshInterval) {
       clearInterval(refreshInterval);
       setRefreshInterval(null);
     }
-  }, [showAnalytics]);
+  }, [showAnalytics, animalType]);
 
   // Fetch zones
   useEffect(() => {
@@ -120,47 +135,79 @@ export default function AnimalProductivity() {
     fetchZones();
   }, []);
 
+ // AnimalProductivity.jsx
+
+// Fetch productivity totals from backend
+const fetchMilkTotals = async () => {
+  // Find the first numeric productivity field to use for the main summary.
+  const primaryNumericField = productivityFields.find(field => field.type === 'number');
+
+  // If no numeric field is defined, we cannot fetch totals.
+  if (!animalType?._id || !primaryNumericField) {
+    // Reset totals to 0 as a fallback.
+    setMilkTotals({ daily: 0, weekly: 0, monthly: 0, yearly: 0, allTime: 0 });
+    return;
+  }
+
+  // Use the dynamic field name from the animal type's configuration.
+  const fieldNameForTotals = primaryNumericField.name;
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/productivity/totals?animalTypeId=${animalType._id}&fieldName=${fieldNameForTotals}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      setMilkTotals(data.totals);
+    } else {
+      console.error("Failed to fetch productivity totals");
+    }
+  } catch (err) {
+    console.error("Error fetching productivity totals:", err);
+  }
+};
+
   // Helper function to safely get zone information
   const getZoneInfo = (animal) => {
     if (!animal) return { name: "Not assigned", id: null };
-   
-    if (animal.assignedZone && typeof animal.assignedZone === 'object') {
+
+    if (animal.assignedZone && typeof animal.assignedZone === "object") {
       return {
         name: animal.assignedZone.name || "Unknown",
-        id: animal.assignedZone._id
+        id: animal.assignedZone._id,
       };
     }
-   
-    if (animal.assignedZone && typeof animal.assignedZone === 'string') {
-      const foundZone = zones.find(z => z._id === animal.assignedZone);
+
+    if (animal.assignedZone && typeof animal.assignedZone === "string") {
+      const foundZone = zones.find((z) => z._id === animal.assignedZone);
       return foundZone
         ? { name: foundZone.name, id: foundZone._id }
         : { name: "Unknown", id: animal.assignedZone };
     }
-   
+
     if (animal.zoneId) {
-      const foundZone = zones.find(z => z._id === animal.zoneId);
+      const foundZone = zones.find((z) => z._id === animal.zoneId);
       return foundZone
         ? { name: foundZone.name, id: foundZone._id }
         : { name: "Unknown", id: animal.zoneId };
     }
-   
+
     return { name: "Not assigned", id: null };
   };
 
   const handleRecordChange = (field, value) => {
-    setNewRecord(prev => ({
-     ...prev,
-     [field]: value
-   }));
- };
+    setNewRecord((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   // Get health status with color
   const getHealthStatus = (animal) => {
     const status = animal.data?.healthStatus || "Unknown";
     let colorClass = "";
-   
-    switch(status.toLowerCase()) {
+
+    switch (status.toLowerCase()) {
       case "healthy":
         colorClass = "text-green-600 dark:text-green-400";
         break;
@@ -176,31 +223,31 @@ export default function AnimalProductivity() {
       default:
         colorClass = "text-gray-600 dark:text-gray-400";
     }
-   
+
     return { status, colorClass };
   };
 
   // Calculate age from birth date
   const calculateAge = (animal) => {
     const birthDate = animal.data?.dob;
-   
+
     if (!birthDate) return "Unknown";
-   
+
     const birth = new Date(birthDate);
     const today = new Date();
     let years = today.getFullYear() - birth.getFullYear();
     let months = today.getMonth() - birth.getMonth();
-   
+
     if (months < 0) {
       years--;
       months += 12;
     }
-   
+
     if (years === 0) {
-      return `${months} month${months !== 1 ? 's' : ''}`;
+      return `${months} month${months !== 1 ? "s" : ""}`;
     }
-   
-    return `${years} year${years !== 1 ? 's' : ''}, ${months} month${months !== 1 ? 's' : ''}`;
+
+    return `${years} year${years !== 1 ? "s" : ""}, ${months} month${months !== 1 ? "s" : ""}`;
   };
 
   // Fetch productivity records for an animal/group
@@ -209,13 +256,13 @@ export default function AnimalProductivity() {
       const endpoint = isGroup
         ? `http://localhost:5000/productivity/batch/${id}`
         : `http://localhost:5000/productivity/animal/${id}`;
-     
+
       const res = await fetch(endpoint);
       if (res.ok) {
         const data = await res.json();
-        setProductivityRecords(prev => ({
+        setProductivityRecords((prev) => ({
           ...prev,
-          [id]: data.records || []
+          [id]: data.records || [],
         }));
       }
     } catch (err) {
@@ -226,91 +273,90 @@ export default function AnimalProductivity() {
   // Get latest productivity record
   const getLatestRecord = (records) => {
     if (!records || records.length === 0) return null;
-   
+
     return records.reduce((latest, record) => {
       return new Date(record.date) > new Date(latest.date) ? record : latest;
     }, records[0]);
   };
 
   // Calculate productivity totals for a specific period and field
-  const calculateProductivityTotals = (records, period = 'day', fieldName) => {
+  const calculateProductivityTotals = (records, period = "day", fieldName) => {
     if (!records || records.length === 0) return { total: 0, average: 0 };
-   
+
     const now = new Date();
     let startDate;
-   
-    switch(period) {
-      case 'week':
+
+    switch (period) {
+      case "week":
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
-      case 'month':
+      case "month":
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
       default: // day
         startDate = new Date(now);
         startDate.setHours(0, 0, 0, 0);
     }
-   
-    const recentRecords = records.filter(record => {
+
+    const recentRecords = records.filter((record) => {
       const recordDate = new Date(record.date);
       return recordDate >= startDate && recordDate <= now && record[fieldName] !== undefined;
     });
-   
+
     if (recentRecords.length === 0) return { total: 0, average: 0 };
-   
+
     const total = recentRecords.reduce((sum, record) => sum + (parseFloat(record[fieldName]) || 0), 0);
     const average = total / recentRecords.length;
-   
+
     return { total, average };
   };
 
   // Calculate total productivity for a period across all fields
-  const calculateTotalProductivity = (period = 'day', fieldName) => {
+  const calculateTotalProductivity = (period = "day", fieldName) => {
     let total = 0;
-    
-    animals.forEach(animal => {
+
+    animals.forEach((animal) => {
       const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
       const { total: animalTotal } = calculateProductivityTotals(records, period, fieldName);
       total += animalTotal;
     });
-    
+
     return total.toFixed(1);
   };
 
-  // Prepare analytics data (simplified)
+  // Prepare analytics data
   const prepareAnalyticsData = () => {
     if (!animals.length || !productivityFields.length) return null;
-    
-    // Calculate productivity by date for trend chart (per field)
+
     const productivityByDate = {};
     const allRecords = [];
-    
+
     // Collect all records
-    animals.forEach(animal => {
+    animals.forEach((animal) => {
       const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-      records.forEach(record => {
+      records.forEach((record) => {
         allRecords.push({
           ...record,
-          date: new Date(record.date).toISOString().split('T')[0],
-          animalName: animal.data?.name || animal.animalId || animal.batchId
+          date: new Date(record.date).toISOString().split("T")[0],
+          animalName: animal.data?.name || animal.animalId || animal.batchId,
         });
       });
     });
-    
+
     // Group by date
-    allRecords.forEach(record => {
+    allRecords.forEach((record) => {
       if (!productivityByDate[record.date]) {
         productivityByDate[record.date] = {
           date: record.date,
-          fields: {}
+          fields: {},
         };
       }
-      productivityFields.forEach(field => {
+      productivityFields.forEach((field) => {
         if (record[field.name] !== undefined) {
           if (!productivityByDate[record.date].fields[field.name]) {
             productivityByDate[record.date].fields[field.name] = {
               total: 0,
-              count: 0
+              count: 0,
             };
           }
           productivityByDate[record.date].fields[field.name].total += parseFloat(record[field.name]) || 0;
@@ -318,71 +364,96 @@ export default function AnimalProductivity() {
         }
       });
     });
-    
+
     // Convert to array and sort by date
     const trendData = Object.values(productivityByDate)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map(item => ({
+      .map((item) => ({
         ...item,
-        date: new Date(item.date).toLocaleDateString()
+        date: new Date(item.date).toLocaleDateString(),
       }));
-    
-    // Weekly/Monthly comparison (per field)
+
+    // Weekly/Monthly/Yearly comparison for milkQuantity
     const weeklyData = [];
     const monthlyData = [];
-    
+    const yearlyData = [];
+
     const now = new Date();
-    
+
     // Last 7 days
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      const dayRecords = allRecords.filter(r => r.date === dateStr);
+      const dateStr = date.toISOString().split("T")[0];
+
+      const dayRecords = allRecords.filter((r) => r.date === dateStr);
       const dayFields = {};
-      productivityFields.forEach(field => {
-        const fieldRecords = dayRecords.filter(r => r[field.name] !== undefined);
+      productivityFields.forEach((field) => {
+        const fieldRecords = dayRecords.filter((r) => r[field.name] !== undefined);
         dayFields[field.name] = fieldRecords.reduce((sum, r) => sum + (parseFloat(r[field.name]) || 0), 0);
       });
-      
+
       weeklyData.push({
-        name: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        name: date.toLocaleDateString("en-US", { weekday: "short" }),
         date: dateStr,
-        fields: dayFields
+        fields: dayFields,
       });
     }
-    
+
     // Last 30 days grouped by week
     for (let i = 3; i >= 0; i--) {
       const weekStart = new Date(now);
       weekStart.setDate(weekStart.getDate() - (i + 1) * 7);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
-      
-      const weekRecords = allRecords.filter(r => {
+
+      const weekRecords = allRecords.filter((r) => {
         const recordDate = new Date(r.date);
         return recordDate >= weekStart && recordDate <= weekEnd;
       });
-      
+
       const weekFields = {};
-      productivityFields.forEach(field => {
-        const fieldRecords = weekRecords.filter(r => r[field.name] !== undefined);
+      productivityFields.forEach((field) => {
+        const fieldRecords = weekRecords.filter((r) => r[field.name] !== undefined);
         weekFields[field.name] = fieldRecords.reduce((sum, r) => sum + (parseFloat(r[field.name]) || 0), 0);
       });
-      
+
       monthlyData.push({
-        name: `Week ${4-i}`,
+        name: `Week ${4 - i}`,
         range: `${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`,
-        fields: weekFields
+        fields: weekFields,
       });
     }
-    
+
+    // Last 12 months
+    for (let i = 11; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+
+      const monthRecords = allRecords.filter((r) => {
+        const recordDate = new Date(r.date);
+        return recordDate >= monthStart && recordDate <= monthEnd;
+      });
+
+      const monthFields = {};
+      productivityFields.forEach((field) => {
+        const fieldRecords = monthRecords.filter((r) => r[field.name] !== undefined);
+        monthFields[field.name] = fieldRecords.reduce((sum, r) => sum + (parseFloat(r[field.name]) || 0), 0);
+      });
+
+      yearlyData.push({
+        name: monthStart.toLocaleDateString("en-US", { month: "short" }),
+        range: `${monthStart.toLocaleDateString()} - ${monthEnd.toLocaleDateString()}`,
+        fields: monthFields,
+      });
+    }
+
     return {
       trendData,
       weeklyData,
       monthlyData,
-      lastUpdated: new Date().toLocaleTimeString()
+      yearlyData,
+      lastUpdated: new Date().toLocaleTimeString(),
     };
   };
 
@@ -399,16 +470,14 @@ export default function AnimalProductivity() {
       setProductivityFields(typeData.productivityFields || []);
 
       // Fetch animals
-      const animalsRes = await fetch(
-        `http://localhost:5000/animals?type=${typeData._id}`
-      );
+      const animalsRes = await fetch(`http://localhost:5000/animals?type=${typeData._id}`);
       if (!animalsRes.ok) throw new Error("Failed to fetch animals");
       const animalsData = await animalsRes.json();
-     
+
       // Group animals by batch for batch management types
       if (typeData.managementType === "batch") {
         const batchGroups = {};
-        animalsData.forEach(animal => {
+        animalsData.forEach((animal) => {
           const batchId = animal.batchId || "ungrouped";
           if (!batchGroups[batchId]) {
             batchGroups[batchId] = {
@@ -419,48 +488,49 @@ export default function AnimalProductivity() {
               animalId: `BATCH-${batchId}`,
               data: {
                 name: `${typeData.name} Batch - ${batchId}`,
-                batchCount: 0
-              }
+                batchCount: 0,
+              },
             };
           }
           batchGroups[batchId].animals.push(animal);
           batchGroups[batchId].data.batchCount = batchGroups[batchId].animals.length;
         });
-       
+
         const groupedAnimals = Object.values(batchGroups);
         setAnimals(groupedAnimals);
-       
+
         // Fetch productivity records for each batch
-        groupedAnimals.forEach(batch => {
+        groupedAnimals.forEach((batch) => {
           if (batch.batchId !== "ungrouped") {
             fetchProductivityRecords(batch.batchId, true);
           }
         });
       } else {
         // For individual animals
-        const individualAnimals = animalsData.map(animal => ({
+        const individualAnimals = animalsData.map((animal) => ({
           ...animal,
           isGroup: false,
-          animals: [animal]
+          animals: [animal],
         }));
         setAnimals(individualAnimals);
-       
+
         // Fetch productivity records for each animal
-        individualAnimals.forEach(animal => {
+        individualAnimals.forEach((animal) => {
           fetchProductivityRecords(animal._id, false);
         });
       }
 
       // Fetch batches
-      const batchIds = [...new Set(animalsData
-        .filter(animal => animal.batchId)
-        .map(animal => animal.batchId)
-      )];
-      setBatches(batchIds.map(id => ({ _id: id, name: id })));
+      const batchIds = [
+        ...new Set(animalsData.filter((animal) => animal.batchId).map((animal) => animal.batchId)),
+      ];
+      setBatches(batchIds.map((id) => ({ _id: id, name: id })));
 
       // Fetch productivity analytics
       try {
-        const analyticsRes = await fetch("http://localhost:5000/productivity/analytics?timeframe=month&groupBy=day");
+        const analyticsRes = await fetch(
+          `http://localhost:5000/productivity/analytics?animalTypeId=${typeData._id}&timeframe=${timeframe}&groupBy=${groupBy}`
+        );
         if (analyticsRes.ok) {
           const analyticsData = await analyticsRes.json();
           setProductivityAnalytics(analyticsData);
@@ -471,23 +541,22 @@ export default function AnimalProductivity() {
 
       // Calculate productivity stats
       const overall = {};
-      productivityFields.forEach(field => {
+      productivityFields.forEach((field) => {
         overall[field.name] = 0;
       });
-      
-      animalsData.forEach(animal => {
-        const records = productivityRecords[animal._id] || []; // Adjust for batch if needed
-        productivityFields.forEach(field => {
+
+      animalsData.forEach((animal) => {
+        const records = productivityRecords[animal._id] || [];
+        productivityFields.forEach((field) => {
           const total = records.reduce((sum, r) => sum + (parseFloat(r[field.name]) || 0), 0);
           overall[field.name] += total;
         });
       });
-      
+
       setProductivityStats(overall);
-      
+
       // Generate insights
       generateInsights(typeData, overall, productivityAnalytics);
-
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -500,66 +569,64 @@ export default function AnimalProductivity() {
   // Generate insights function
   const generateInsights = (animalType, overallStats, analyticsData) => {
     const newInsights = [];
-    
+
     // Top performing field
     if (productivityFields.length > 0) {
       const topField = productivityFields.reduce((prev, current) => {
         return (overallStats[prev.name] || 0) > (overallStats[current.name] || 0) ? prev : current;
       });
-      
+
       if (topField) {
         newInsights.push({
           type: "success",
-          message: `${topField.label} is the highest tracked metric with total of ${(overallStats[topField.name] || 0).toLocaleString()} ${topField.unit || 'units'}`
+          message: `${topField.label} is the highest tracked metric with total of ${(overallStats[topField.name] || 0).toLocaleString()} ${topField.unit || "units"}`,
         });
       }
     }
-    
+
     // Fields with no data
-    const inactiveFields = productivityFields.filter(field => 
-      (overallStats[field.name] || 0) === 0
-    );
-    
+    const inactiveFields = productivityFields.filter((field) => (overallStats[field.name] || 0) === 0);
+
     if (inactiveFields.length > 0) {
       newInsights.push({
         type: "warning",
-        message: `${inactiveFields.length} productivity field(s) have no recorded data: ${inactiveFields.map(f => f.label).join(', ')}`
+        message: `${inactiveFields.length} productivity field(s) have no recorded data: ${inactiveFields.map((f) => f.label).join(", ")}`,
       });
     }
-    
+
     // Compare with previous period using analytics data
     if (analyticsData?.analytics && analyticsData.analytics.length >= 2) {
       const current = analyticsData.analytics[analyticsData.analytics.length - 1];
       const previous = analyticsData.analytics[analyticsData.analytics.length - 2];
-      
+
       let totalCurrent = 0;
       let totalPrevious = 0;
-      
+
       // Sum all productivity values
       if (current.values) {
-        Object.values(current.values).forEach(fieldData => {
+        Object.values(current.values).forEach((fieldData) => {
           totalCurrent += fieldData.total || 0;
         });
       }
-      
+
       if (previous.values) {
-        Object.values(previous.values).forEach(fieldData => {
+        Object.values(previous.values).forEach((fieldData) => {
           totalPrevious += fieldData.total || 0;
         });
       }
-      
+
       if (totalPrevious > 0) {
         const change = ((totalCurrent - totalPrevious) / totalPrevious) * 100;
-        
+
         if (Math.abs(change) > 5) {
           newInsights.push({
             type: change > 0 ? "success" : "danger",
-            message: `Overall productivity has ${change > 0 ? 'increased' : 'decreased'} by ${Math.abs(change).toFixed(1)}% compared to last period`
+            message: `Overall productivity has ${change > 0 ? "increased" : "decreased"} by ${Math.abs(change).toFixed(1)}% compared to last period`,
           });
         }
       }
     }
-    
+
     setInsights(newInsights);
   };
 
@@ -572,9 +639,9 @@ export default function AnimalProductivity() {
 
   // Toggle row expansion
   const toggleRowExpansion = (id) => {
-    setExpandedRows(prev => ({
+    setExpandedRows((prev) => ({
       ...prev,
-      [id]: !prev[id]
+      [id]: !prev[id],
     }));
   };
 
@@ -582,62 +649,86 @@ export default function AnimalProductivity() {
     setSelectedAnimal(animal);
     // Initialize new record with dynamic fields
     const initialRecord = {
-      date: new Date().toISOString().split('T')[0],
-      notes: ""
+      date: new Date().toISOString().split("T")[0],
+      notes: "",
+      milkQuantity: "", // Ensure milkQuantity is included
     };
-    productivityFields.forEach(field => {
-      initialRecord[field.name] = field.type === 'number' ? '' : ''; // Default empty
+    productivityFields.forEach((field) => {
+      if (field.name !== "milkQuantity") {
+        initialRecord[field.name] = field.type === "number" ? "" : "";
+      }
     });
     setNewRecord(initialRecord);
     setShowAddRecordModal(true);
   };
 
-  const handleSaveProductivityRecord = async () => {
-    try {
-      // Prepare payload
-      const payload = {
-        animalId: selectedAnimal.isGroup ? null : selectedAnimal._id,
-        batchId: selectedAnimal.isGroup ? selectedAnimal.batchId : null,
-        isGroup: selectedAnimal.isGroup,
-        date: newRecord.date,
-        notes: newRecord.notes,
-        recordedBy: "User",
-      };
+  // AnimalProductivity.jsx
 
-      // Add dynamic fields
-      productivityFields.forEach(field => {
-        if (newRecord[field.name] !== undefined && newRecord[field.name] !== '') {
-          payload[field.name] = field.type === 'number' ? parseFloat(newRecord[field.name]) : newRecord[field.name];
-        }
-      });
+const handleSaveProductivityRecord = async () => {
+  try {
+    // --- START: CORRECTED VALIDATION ---
+    // Dynamic validation based on productivityFields
+    for (const field of productivityFields) {
+      const value = newRecord[field.name];
 
-      const res = await fetch(`http://localhost:5000/productivity`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      
-      if (res.ok) {
-        // Refresh records
-        if (selectedAnimal.isGroup) {
-          fetchProductivityRecords(selectedAnimal.batchId, true);
-        } else {
-          fetchProductivityRecords(selectedAnimal._id, false);
-        }
-        setShowAddRecordModal(false);
-        setSelectedAnimal(null);
-        fetchData();
-        
-        setPopup({ show: true, success: true, message: "Productivity record saved successfully!" });
-      } else {
-        const errorData = await res.json();
-        setPopup({ show: true, success: false, message: errorData.message || "Failed to save record" });
+      // Check if a required field is missing or empty
+      if (field.required && (value === undefined || value === '')) {
+        setPopup({ show: true, success: false, message: `${field.label} is required.` });
+        return;
       }
-    } catch (err) {
-      console.error("Error saving productivity record:", err);
-      setPopup({ show: true, success: false, message: `Error: ${err.message}` });
+
+      // Check if a number field has an invalid number (but allow it to be empty if not required)
+      if (field.type === 'number' && value && isNaN(Number(value))) {
+        setPopup({ show: true, success: false, message: `${field.label} must be a valid number.` });
+        return;
+      }
     }
-  };
+    // --- END: CORRECTED VALIDATION ---
+
+    // Prepare payload (The rest of the function remains the same)
+    const payload = {
+      animalId: selectedAnimal.isGroup ? null : selectedAnimal._id,
+      batchId: selectedAnimal.isGroup ? selectedAnimal.batchId : null,
+      isGroup: selectedAnimal.isGroup,
+      date: newRecord.date,
+      notes: newRecord.notes,
+      recordedBy: 'User',
+    };
+
+    // Add dynamic fields
+    productivityFields.forEach((field) => {
+      if (newRecord[field.name] !== undefined && newRecord[field.name] !== '') {
+        payload[field.name] = field.type === 'number' ? parseFloat(newRecord[field.name]) : newRecord[field.name];
+      }
+    });
+
+    const res = await fetch(`http://localhost:5000/productivity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      // Refresh records
+      if (selectedAnimal.isGroup) {
+        fetchProductivityRecords(selectedAnimal.batchId, true);
+      } else {
+        fetchProductivityRecords(selectedAnimal._id, false);
+      }
+      setShowAddRecordModal(false);
+      setSelectedAnimal(null);
+      fetchData();
+      fetchMilkTotals(); // Refresh totals
+      setPopup({ show: true, success: true, message: 'Productivity record saved successfully!' });
+    } else {
+      const errorData = await res.json();
+      setPopup({ show: true, success: false, message: errorData.message || 'Failed to save record' });
+    }
+  } catch (err) {
+    console.error('Error saving productivity record:', err);
+    setPopup({ show: true, success: false, message: `Error: ${err.message}` });
+  }
+};
 
   const handleViewHistory = (animal) => {
     setSelectedAnimal(animal);
@@ -654,13 +745,19 @@ export default function AnimalProductivity() {
 
   const handleSaveEditedRecord = async () => {
     try {
+      // Validate milkQuantity
+      if (editedRecord.milkQuantity !== undefined && (isNaN(parseFloat(editedRecord.milkQuantity)) || editedRecord.milkQuantity === "")) {
+        setPopup({ show: true, success: false, message: "Milk quantity must be a valid number" });
+        return;
+      }
+
       const updateData = {
         date: editedRecord.date,
-        notes: editedRecord.notes
+        notes: editedRecord.notes,
       };
-      productivityFields.forEach(field => {
+      productivityFields.forEach((field) => {
         if (editedRecord[field.name] !== undefined) {
-          updateData[field.name] = field.type === 'number' ? parseFloat(editedRecord[field.name]) : editedRecord[field.name];
+          updateData[field.name] = field.type === "number" ? parseFloat(editedRecord[field.name]) : editedRecord[field.name];
         }
       });
 
@@ -669,7 +766,7 @@ export default function AnimalProductivity() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData),
       });
-     
+
       if (res.ok) {
         if (selectedAnimal.isGroup) {
           fetchProductivityRecords(selectedAnimal.batchId, true);
@@ -679,6 +776,7 @@ export default function AnimalProductivity() {
         setEditMode(false);
         setSelectedRecord(null);
         fetchData();
+        fetchMilkTotals(); // Refresh totals
         setPopup({ show: true, success: true, message: "Record updated successfully!" });
       } else {
         throw new Error("Failed to update record");
@@ -695,7 +793,7 @@ export default function AnimalProductivity() {
         const res = await fetch(`http://localhost:5000/productivity/${recordId}`, {
           method: "DELETE",
         });
-       
+
         if (res.ok) {
           if (selectedAnimal.isGroup) {
             fetchProductivityRecords(selectedAnimal.batchId, true);
@@ -703,6 +801,7 @@ export default function AnimalProductivity() {
             fetchProductivityRecords(selectedAnimal._id, false);
           }
           fetchData();
+          fetchMilkTotals(); // Refresh totals
           setPopup({ show: true, success: true, message: "Record deleted successfully!" });
         } else {
           throw new Error("Failed to delete record");
@@ -732,84 +831,79 @@ export default function AnimalProductivity() {
 
   const filteredAnimals = useMemo(() => {
     return animals.filter((animal) => {
-      // Search query matching
-      const matchesSearch = searchQuery
-        ? (animal.data?.name && animal.data.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (animal.animalId && animal.animalId.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (animal.batchId && animal.batchId.toLowerCase().includes(searchQuery.toLowerCase()))
-        : true;
+      const matchesSearch =
+        searchQuery
+          ? (animal.data?.name && animal.data.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (animal.animalId && animal.animalId.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (animal.batchId && animal.batchId.toLowerCase().includes(searchQuery.toLowerCase()))
+          : true;
 
       // Filter matching
       const matchesFilters = Object.keys(filterValues).every((key) => {
         if (!filterValues[key]) return true;
-       
+
         if (key === "zone" && !animal.isGroup) {
           return getZoneInfo(animal).name.toLowerCase().includes(filterValues[key].toLowerCase());
         }
-       
+
         if (key === "healthStatus" && !animal.isGroup) {
           const healthStatus = animal.data?.healthStatus || "";
           return healthStatus.toLowerCase().includes(filterValues[key].toLowerCase());
         }
-       
+
         if (key === "gender" && !animal.isGroup) {
           const gender = animal.data?.gender || "";
           return gender.toLowerCase().includes(filterValues[key].toLowerCase());
         }
-       
+
         if (key === "ageRange" && !animal.isGroup) {
           const ageText = calculateAge(animal);
           if (ageText === "Unknown") return false;
-         
+
           let ageInMonths = 0;
-          if (ageText.includes('year')) {
-            const years = parseInt(ageText.split(' ')[0]);
-            const months = parseInt(ageText.split(' ')[2]);
+          if (ageText.includes("year")) {
+            const years = parseInt(ageText.split(" ")[0]);
+            const months = parseInt(ageText.split(" ")[2]);
             ageInMonths = years * 12 + months;
           } else {
-            ageInMonths = parseInt(ageText.split(' ')[0]);
+            ageInMonths = parseInt(ageText.split(" ")[0]);
           }
-         
-          const [min, max] = filterValues[key].split('-').map(Number);
+
+          const [min, max] = filterValues[key].split("-").map(Number);
           return ageInMonths >= min && ageInMonths <= max;
         }
-       
+
         if (key === "batchCount" && animal.isGroup) {
           const count = animal.data?.batchCount || 0;
-          const [min, max] = filterValues[key].split('-').map(Number);
+          const [min, max] = filterValues[key].split("-").map(Number);
           return count >= min && count <= max;
         }
-       
+
         return true;
       });
 
       // Date range filtering for productivity records
       const matchesDateRange = () => {
         if (!dateRange.start && !dateRange.end) return true;
-       
+
         const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
         if (records.length === 0) return false;
-       
+
         if (dateRange.start && dateRange.end) {
-          return records.some(record => {
+          return records.some((record) => {
             const recordDate = new Date(record.date);
-            return recordDate >= new Date(dateRange.start) &&
-                   recordDate <= new Date(dateRange.end);
+            return recordDate >= new Date(dateRange.start) && recordDate <= new Date(dateRange.end);
           });
         }
-       
+
         if (dateRange.start) {
-          return records.some(record =>
-            new Date(record.date) >= new Date(dateRange.start)
-          );
+          return records.some((record) => new Date(record.date) >= new Date(dateRange.start));
         }
-       
+
         if (dateRange.end) {
-          return records.some(record =>
-            new Date(record.date) <= new Date(dateRange.end)
-          );
+          return records.some((record) => new Date(record.date) <= new Date(dateRange.end));
         }
-       
+
         return true;
       };
 
@@ -825,36 +919,32 @@ export default function AnimalProductivity() {
         {productivityFields.map((field, idx) => (
           <div key={idx}>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              {field.label} ({field.unit || ''})
+              {field.label} ({field.unit || ""})
             </label>
             <input
               type={field.type}
-              value={editedRecord[field.name] || ''}
-              onChange={(e) => setEditedRecord({...editedRecord, [field.name]: e.target.value})}
+              value={editedRecord[field.name] || ""}
+              onChange={(e) => setEditedRecord({ ...editedRecord, [field.name]: e.target.value })}
               className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required={field.required}
             />
           </div>
         ))}
         <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-            Date
-          </label>
+          <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date</label>
           <input
             type="date"
-            value={new Date(editedRecord.date).toISOString().split('T')[0]}
-            onChange={(e) => setEditedRecord({...editedRecord, date: e.target.value})}
+            value={new Date(editedRecord.date).toISOString().split("T")[0]}
+            onChange={(e) => setEditedRecord({ ...editedRecord, date: e.target.value })}
             className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-          Notes
-        </label>
+        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Notes</label>
         <textarea
-          value={editedRecord.notes || ''}
-          onChange={(e) => setEditedRecord({...editedRecord, notes: e.target.value})}
+          value={editedRecord.notes || ""}
+          onChange={(e) => setEditedRecord({ ...editedRecord, notes: e.target.value })}
           className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           rows="3"
         />
@@ -879,7 +969,7 @@ export default function AnimalProductivity() {
   // Record Table Component
   const RecordTable = () => {
     const records = productivityRecords[selectedAnimal.isGroup ? selectedAnimal.batchId : selectedAnimal._id] || [];
-   
+
     return (
       <>
         {records.length > 0 ? (
@@ -890,7 +980,7 @@ export default function AnimalProductivity() {
                   <th className="p-2 text-center text-gray-700 dark:text-gray-300">Date</th>
                   {productivityFields.map((field, idx) => (
                     <th key={idx} className="p-2 text-center text-gray-700 dark:text-gray-300">
-                      {field.label} ({field.unit || ''})
+                      {field.label} ({field.unit || ""})
                     </th>
                   ))}
                   <th className="p-2 text-center text-gray-700 dark:text-gray-300">Notes</th>
@@ -954,7 +1044,7 @@ export default function AnimalProductivity() {
     return null;
   };
 
-  // Analytics View (simplified)
+  // Analytics View
   const AnalyticsView = () => {
     if (!analyticsData) {
       return (
@@ -970,27 +1060,32 @@ export default function AnimalProductivity() {
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Productivity Analytics</h3>
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Last updated: {analyticsData.lastUpdated}
-            <button 
-              onClick={fetchData}
+            <button
+              onClick={() => {
+                fetchData();
+                fetchMilkTotals();
+              }}
               className="ml-3 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
             >
               Refresh
             </button>
           </div>
         </div>
-        
+
         {/* Insights Section */}
         {insights.length > 0 && (
           <div className="mb-6">
             <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Insights</h4>
             <div className="grid grid-cols-1 gap-3">
               {insights.map((insight, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className={`p-3 rounded-lg ${
-                    insight.type === "success" ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200" :
-                    insight.type === "warning" ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200" :
-                    "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200"
+                    insight.type === "success"
+                      ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
+                      : insight.type === "warning"
+                      ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200"
+                      : "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200"
                   }`}
                 >
                   <div className="flex items-center">
@@ -1004,44 +1099,42 @@ export default function AnimalProductivity() {
             </div>
           </div>
         )}
-        
-        {/* Productivity Trend Charts (two per row) */}
+
+        {/* Milk Production Trend Chart */}
+        <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow mb-6">
+  <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+    {/* DYNAMIC TITLE */}
+    {primaryMetric ? `${primaryMetric.label} Production Over Time (${primaryMetric.unit})` : "Production Over Time"}
+  </h4>
+  <div className="h-80">
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={analyticsData.trendData}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+        <XAxis dataKey="date" stroke="#888" />
+        <YAxis stroke="#888" label={{ value: primaryMetric?.unit || 'Units', angle: -90, position: "insideLeft" }} />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend />
+        {primaryMetric && <Line
+          type="monotone"
+          // DYNAMIC DATA KEY
+          dataKey={`fields.${primaryMetric.name}.total`}
+          name={`Total ${primaryMetric.label}`}
+          stroke="#8884d8"
+          strokeWidth={2}
+          dot={{ r: 4 }}
+          activeDot={{ r: 6 }}
+        />}
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+
+        {/* Weekly Productivity Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {productivityFields.filter(f => f.type === 'number').map((field, idx) => (
+          {productivityFields.filter((f) => f.type === "number").map((field, idx) => (
             <div key={idx} className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
               <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
-                {field.label} Trend Over Time ({field.unit || ''})
-              </h4>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={analyticsData.trendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis dataKey="date" stroke="#888" />
-                    <YAxis stroke="#888" />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey={`fields.${field.name}.total`} 
-                      name="Total" 
-                      stroke={CHART_COLORS[idx % CHART_COLORS.length]} 
-                      strokeWidth={2} 
-                      dot={{ r: 4 }} 
-                      activeDot={{ r: 6 }} 
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Weekly Productivity Charts (two per row) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {productivityFields.filter(f => f.type === 'number').map((field, idx) => (
-            <div key={idx} className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
-              <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
-                Last 7 Days {field.label} ({field.unit || ''})
+                Last 7 Days {field.label} ({field.unit || ""})
               </h4>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1051,20 +1144,24 @@ export default function AnimalProductivity() {
                     <YAxis stroke="#888" />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Bar dataKey={`fields.${field.name}`} name="Daily" fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                    <Bar
+                      dataKey={`fields.${field.name}`}
+                      name="Daily"
+                      fill={CHART_COLORS[idx % CHART_COLORS.length]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
           ))}
         </div>
-        
-        {/* Monthly Productivity Charts (two per row) */}
+
+        {/* Monthly Productivity Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {productivityFields.filter(f => f.type === 'number').map((field, idx) => (
+          {productivityFields.filter((f) => f.type === "number").map((field, idx) => (
             <div key={idx} className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
               <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
-                Last 4 Weeks {field.label} ({field.unit || ''})
+                Last 4 Weeks {field.label} ({field.unit || ""})
               </h4>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1074,21 +1171,60 @@ export default function AnimalProductivity() {
                     <YAxis stroke="#888" />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Bar dataKey={`fields.${field.name}`} name="Weekly" fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                    <Bar
+                      dataKey={`fields.${field.name}`}
+                      name="Weekly"
+                      fill={CHART_COLORS[idx % CHART_COLORS.length]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
           ))}
         </div>
+
+        {/* Yearly Productivity Chart for Milk */}
+        <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+  <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white text-center">
+    {/* DYNAMIC TITLE */}
+    Yearly {primaryMetric ? `${primaryMetric.label} Production (${primaryMetric.unit})` : "Production"}
+  </h4>
+  <div className="h-80">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={analyticsData.yearlyData}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+        <XAxis dataKey="name" stroke="#888" />
+        <YAxis stroke="#888" label={{ value: primaryMetric?.unit || 'Units', angle: -90, position: "insideLeft" }} />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend />
+        {primaryMetric && <Bar
+          // DYNAMIC DATA KEY
+          dataKey={`fields.${primaryMetric.name}`}
+          name={`Monthly ${primaryMetric.label}`}
+          fill="#82ca9d"
+        />}
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</div>
       </div>
     );
   };
 
   // Colors for charts
   const CHART_COLORS = [
-    '#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', 
-    '#FFBB28', '#FF8042', '#A4DE6C', '#D0ED57', '#FFC0CB', '#8A2BE2'
+    "#8884d8",
+    "#82ca9d",
+    "#ffc658",
+    "#ff8042",
+    "#0088FE",
+    "#00C49F",
+    "#FFBB28",
+    "#FF8042",
+    "#A4DE6C",
+    "#D0ED57",
+    "#FFC0CB",
+    "#8A2BE2",
   ];
 
   // Loading / Error
@@ -1106,9 +1242,7 @@ export default function AnimalProductivity() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {error ? `Error Loading ${type}` : "Animal Type Not Found"}
         </h2>
-        <p className="text-red-500 dark:text-red-400 mb-4">
-          {error || `The animal type "${type}" could not be loaded.`}
-        </p>
+        <p className="text-red-500 dark:text-red-400 mb-4">{error || `The animal type "${type}" could not be loaded.`}</p>
         {error && (
           <button
             className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 mr-2"
@@ -1121,38 +1255,42 @@ export default function AnimalProductivity() {
     );
 
   const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
 
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return null;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={16} className="inline ml-1" /> : <ChevronDown size={16} className="inline ml-1" />;
+    return sortConfig.direction === "asc" ? (
+      <ChevronUp size={16} className="inline ml-1" />
+    ) : (
+      <ChevronDown size={16} className="inline ml-1" />
+    );
   };
 
   const filteredAnimalsList = filteredAnimals.sort((a, b) => {
-    let aValue = sortConfig.key === 'name' ? a.data?.name : a[sortConfig.key];
-    let bValue = sortConfig.key === 'name' ? b.data?.name : b[sortConfig.key];
-    
-    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    let aValue = sortConfig.key === "name" ? a.data?.name : a[sortConfig.key];
+    let bValue = sortConfig.key === "name" ? b.data?.name : b[sortConfig.key];
 
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    if (typeof aValue === "string") aValue = aValue.toLowerCase();
+    if (typeof bValue === "string") bValue = bValue.toLowerCase();
+
+    if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
     return 0;
-  }); // Add sorting
+  });
 
   // Calculate summary stats
   const getSummary = () => {
     const totalAnimals = animals.length;
-    // Add more as needed
     return { totalAnimals };
   };
 
   const summary = getSummary();
+  
 
   // Render
   return (
@@ -1160,7 +1298,7 @@ export default function AnimalProductivity() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <PawPrint  className="text-green-500" size={32} />
+          <PawPrint className="text-green-500" size={32} />
           {animalType.name.charAt(0).toUpperCase() + animalType.name.slice(1).toLowerCase()} Productivity
         </h1>
         <p className={`mt-2 text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -1180,7 +1318,6 @@ export default function AnimalProductivity() {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Icon */}
             <div className="mb-4">
               {popup.success ? (
                 <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mx-auto relative flex items-center justify-center">
@@ -1193,19 +1330,9 @@ export default function AnimalProductivity() {
                 </div>
               )}
             </div>
-
-            {/* Message */}
             <p className="text-sm font-medium dark:text-gray-200 mb-2">{popup.message}</p>
-
-            {/* Button */}
             <button
-              onClick={() => {
-                setPopup({ ...popup, show: false });
-
-                if (popup.success) {
-                  // Success → redirect to /AnimalManagement if needed, but per user, stay
-                }
-              }}
+              onClick={() => setPopup({ ...popup, show: false })}
               className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium ${
                 popup.success
                   ? "bg-green-600 hover:bg-green-700 text-white"
@@ -1218,56 +1345,80 @@ export default function AnimalProductivity() {
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-          <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
-            <Package className="text-blue-500" size={24} />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total Animals</h3>
-            <p className="text-2xl font-bold">{summary.totalAnimals}</p>
-          </div>
+{/* Summary Cards */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+  <div
+    className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}
+  >
+    <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+      <Package className="text-blue-500" size={24} />
+    </div>
+    <div>
+      <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total Animals</h3>
+      <p className="text-2xl font-bold">{summary.totalAnimals}</p>
+    </div>
+  </div>
+
+  {/* Conditionally render productivity cards only if a numeric field exists */}
+  {primaryMetric && (
+    <>
+      <div
+        className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}
+      >
+        <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+          <Package className="text-blue-500" size={24} />
         </div>
-        
-        {productivityFields.filter(f => f.type === 'number').map((field, idx) => (
-          <React.Fragment key={idx}>
-            <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-              <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
-                <Package className="text-blue-500" size={24} />
-              </div>
-              <div>
-                <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">{field.label} Daily</h3>
-                <p className="text-2xl font-bold">{calculateTotalProductivity('day', field.name)} {field.unit || ''}</p>
-              </div>
-            </div>
-            <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-              <div className={`p-3 rounded-full ${darkMode ? "bg-purple-900/30" : "bg-purple-100"}`}>
-                <Package className="text-purple-500" size={24} />
-              </div>
-              <div>
-                <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">{field.label} Weekly</h3>
-                <p className="text-2xl font-bold">{calculateTotalProductivity('week', field.name)} {field.unit || ''}</p>
-              </div>
-            </div>
-            <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
-              <div className={`p-3 rounded-full ${darkMode ? "bg-orange-900/30" : "bg-orange-100"}`}>
-                <Package className="text-orange-500" size={24} />
-              </div>
-              <div>
-                <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">{field.label} Monthly</h3>
-                <p className="text-2xl font-bold">{calculateTotalProductivity('month', field.name)} {field.unit || ''}</p>
-              </div>
-            </div>
-          </React.Fragment>
-        ))}
+        <div>
+          <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Daily {primaryMetric.label}</h3>
+          <p className="text-2xl font-bold">{milkTotals.daily.toFixed(1)} {primaryMetric.unit || ''}</p>
+        </div>
       </div>
+      
+      <div
+        className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}
+      >
+        <div className={`p-3 rounded-full ${darkMode ? "bg-orange-900/30" : "bg-orange-100"}`}>
+          <Package className="text-orange-500" size={24} />
+        </div>
+        <div>
+          <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Monthly {primaryMetric.label}</h3>
+          <p className="text-2xl font-bold">{milkTotals.monthly.toFixed(1)} {primaryMetric.unit || ''}</p>
+        </div>
+      </div>
+      <div
+        className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}
+      >
+        <div className={`p-3 rounded-full ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+          <Package className="text-green-500" size={24} />
+        </div>
+        <div>
+          <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Yearly {primaryMetric.label}</h3>
+          <p className="text-2xl font-bold">{milkTotals.yearly.toFixed(1)} {primaryMetric.unit || ''}</p>
+        </div>
+      </div>
+      <div
+        className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}
+      >
+        <div className={`p-3 rounded-full ${darkMode ? "bg-teal-900/30" : "bg-teal-100"}`}>
+          <Package className="text-teal-500" size={24} />
+        </div>
+        <div>
+          <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total {primaryMetric.label}</h3>
+          <p className="text-2xl font-bold">{milkTotals.allTime.toFixed(1)} {primaryMetric.unit || ''}</p>
+        </div>
+      </div>
+    </>
+  )}
+</div>
 
       {/* Controls Section */}
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <button 
-            onClick={fetchData}
+          <button
+            onClick={() => {
+              fetchData();
+              fetchMilkTotals();
+            }}
             className={`px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
               darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"
             } transition-all`}
@@ -1275,8 +1426,8 @@ export default function AnimalProductivity() {
             <RefreshCw size={18} />
             Refresh
           </button>
-          <button 
-            onClick={handleViewAnalytics} 
+          <button
+            onClick={handleViewAnalytics}
             className="bg-green-600 px-4 py-2 rounded-lg text-white hover:bg-green-700 transition flex items-center justify-center gap-2"
           >
             <BarChart3 size={18} />
@@ -1288,172 +1439,156 @@ export default function AnimalProductivity() {
       {/* Analytics Section */}
       {showAnalytics && <AnalyticsView />}
 
-      {/* Filter Section */}
-      <div className={`p-4 rounded-xl shadow-lg mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-        <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Filters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          {/* Search */}
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Search
-            </label>
+      {/* Filters */}
+      <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-6`}>
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="relative w-full sm:w-auto flex-1">
+            <Search
+              size={20}
+              className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+            />
             <input
               type="text"
-              placeholder="Search by ID, Name, Batch..."
+              placeholder="Search by name or ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className={`w-full pl-10 pr-4 py-2.5 rounded-lg border ${
+                darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+              } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
             />
           </div>
-         
-          {/* Zone Filter (only for individual animals) */}
-          {animalType.managementType !== "batch" && (
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg ${
+              darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            } transition-colors w-full sm:w-auto justify-center sm:justify-start`}
+          >
+            <Filter size={20} />
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+        </div>
+        {showFilters && (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Zone
-              </label>
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Zone</label>
               <select
                 value={filterValues.zone || ""}
                 onChange={(e) => handleFilterChange("zone", e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className={`w-full px-3 py-2.5 rounded-lg border ${
+                  darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
               >
                 <option value="">All Zones</option>
-                {zones.map(zone => (
+                {zones.map((zone) => (
                   <option key={zone._id} value={zone.name}>
                     {zone.name}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-         
-          {/* Gender Filter (only for individual animals) */}
-          {animalType.managementType !== "batch" && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Gender
-              </label>
-              <select
-                value={filterValues.gender || ""}
-                onChange={(e) => handleFilterChange("gender", e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">All Genders</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          )}
-         
-          {/* Health Status Filter (only for individual animals) */}
-          {animalType.managementType !== "batch" && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Health Status
-              </label>
-              <select
-                value={filterValues.healthStatus || ""}
-                onChange={(e) => handleFilterChange("healthStatus", e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">All Statuses</option>
-                <option value="healthy">Healthy</option>
-                <option value="sick">Sick</option>
-                <option value="recovering">Recovering</option>
-                <option value="quarantined">Quarantined</option>
-              </select>
-            </div>
-          )}
-         
-          {/* Age Range Filter (only for individual animals) */}
-          {animalType.managementType !== "batch" && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Age Range (months)
-              </label>
-              <select
-                value={filterValues.ageRange || ""}
-                onChange={(e) => handleFilterChange("ageRange", e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">All Ages</option>
-                <option value="0-6">0-6 months</option>
-                <option value="7-12">7-12 months</option>
-                <option value="13-24">13-24 months</option>
-                <option value="25-60">25-60 months</option>
-                <option value="61-120">61-120 months</option>
-                <option value="121-999">121+ months</option>
-              </select>
-            </div>
-          )}
-         
-          {/* Batch Count Filter (only for batch animals) */}
-          {animalType.managementType === "batch" && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Batch Size
-              </label>
-              <select
-                value={filterValues.batchCount || ""}
-                onChange={(e) => handleFilterChange("batchCount", e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">All Sizes</option>
-                <option value="1-10">1-10 animals</option>
-                <option value="11-50">11-50 animals</option>
-                <option value="51-100">51-100 animals</option>
-                <option value="101-500">101-500 animals</option>
-                <option value="501-9999">500+ animals</option>
-              </select>
-            </div>
-          )}
-         
-          {/* Date Range Filter */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Date Range
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => handleDateRangeChange("start", e.target.value)}
-                className="flex-1 p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="mm/dd/yyyy"
-              />
-              <span className="self-center text-gray-700 dark:text-gray-300">to</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => handleDateRangeChange("end", e.target.value)}
-                className="flex-1 p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="mm/dd/yyyy"
-              />
+            {animalType.managementType !== "batch" && (
+              <>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Health Status</label>
+                  <select
+                    value={filterValues.healthStatus || ""}
+                    onChange={(e) => handleFilterChange("healthStatus", e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${
+                      darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Healthy">Healthy</option>
+                    <option value="Sick">Sick</option>
+                    <option value="Recovering">Recovering</option>
+                    <option value="Quarantined">Quarantined</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Gender</label>
+                  <select
+                    value={filterValues.gender || ""}
+                    onChange={(e) => handleFilterChange("gender", e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${
+                      darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                  >
+                    <option value="">All Genders</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Age Range</label>
+                  <select
+                    value={filterValues.ageRange || ""}
+                    onChange={(e) => handleFilterChange("ageRange", e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${
+                      darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                  >
+                    <option value="">All Ages</option>
+                    <option value="0-6">0-6 months</option>
+                    <option value="7-12">7-12 months</option>
+                    <option value="13-24">13-24 months</option>
+                    <option value="25-60">25-60 months</option>
+                    <option value="61-120">61-120 months</option>
+                    <option value="121-999">121+ months</option>
+                  </select>
+                </div>
+              </>
+            )}
+            {animalType.managementType === "batch" && (
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Batch Size</label>
+                <select
+                  value={filterValues.batchCount || ""}
+                  onChange={(e) => handleFilterChange("batchCount", e.target.value)}
+                  className={`w-full px-3 py-2.5 rounded-lg border ${
+                    darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                >
+                  <option value="">All Sizes</option>
+                  <option value="1-10">1-10 animals</option>
+                  <option value="11-50">11-50 animals</option>
+                  <option value="51-100">51-100 animals</option>
+                  <option value="101-500">101-500 animals</option>
+                  <option value="501-9999">500+ animals</option>
+                </select>
+              </div>
+            )}
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Date Range</label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => handleDateRangeChange("start", e.target.value)}
+                  className={`flex-1 px-3 py-2.5 rounded-lg border ${
+                    darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                  placeholder="Start Date"
+                />
+                <span className="self-center text-gray-500 dark:text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => handleDateRangeChange("end", e.target.value)}
+                  className={`flex-1 px-3 py-2.5 rounded-lg border ${
+                    darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                  placeholder="End Date"
+                />
+              </div>
             </div>
           </div>
-        </div>
-       
-        {/* Clear Filters Button */}
-        <div className="flex justify-end">
-          <button
-            onClick={() => {
-              setFilterValues({});
-              setDateRange({ start: "", end: "" });
-              setSearchQuery("");
-            }}
-            className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-500"
-          >
-            Clear Filters
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Results Count */}
       <div className={`mb-4 flex justify-between items-center ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-        <p className="text-sm">
-          Showing {filteredAnimals.length} of {animals.length} items
-        </p>
+        <p className="text-sm">Showing {filteredAnimals.length} of {animals.length} items</p>
         {filteredAnimals.length === 0 && (
           <button
             onClick={() => {
@@ -1476,20 +1611,20 @@ export default function AnimalProductivity() {
             <thead className={darkMode ? "bg-gray-700" : "bg-gray-100"}>
               <tr>
                 <th className="p-3 text-center"></th>
-                <th 
+                <th
                   className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort('id')}
+                  onClick={() => requestSort("id")}
                 >
                   <div className="flex items-center">
-                    {animalType.managementType === "batch" ? "Batch ID" : "QR & ID"} {getSortIcon('id')}
+                    {animalType.managementType === "batch" ? "Batch ID" : "QR & ID"} {getSortIcon("id")}
                   </div>
                 </th>
-                <th 
+                <th
                   className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort('name')}
+                  onClick={() => requestSort("name")}
                 >
                   <div className="flex items-center">
-                    {animalType.managementType === "batch" ? "Batch Name" : "Name"} {getSortIcon('name')}
+                    {animalType.managementType === "batch" ? "Batch Name" : "Name"} {getSortIcon("name")}
                   </div>
                 </th>
                 {animalType.managementType !== "batch" && (
@@ -1506,18 +1641,13 @@ export default function AnimalProductivity() {
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Animal Count</th>
                 )}
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Weight</th>
-               
-                {/* Dynamic Productivity Field Columns */}
                 {productivityFields.map((field, idx) => (
                   <th key={idx} className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    {field.label} ({field.unit || ''})
+                    {field.label} ({field.unit || ""})
                   </th>
                 ))}
-               
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Last Record</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
@@ -1526,11 +1656,10 @@ export default function AnimalProductivity() {
                   const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
                   const latestRecord = getLatestRecord(records);
                   const healthStatus = getHealthStatus(animal);
-                 
+
                   return (
                     <React.Fragment key={animal.isGroup ? animal.batchId : animal._id}>
                       <tr className={darkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"}>
-                        {/* Expand/Collapse Button */}
                         <td className="p-2 text-center">
                           <button
                             onClick={(e) => {
@@ -1542,94 +1671,51 @@ export default function AnimalProductivity() {
                             {expandedRows[animal.isGroup ? animal.batchId : animal._id] ? "▼" : "►"}
                           </button>
                         </td>
-                       
-                        {/* QR Code + Animal ID / Batch ID */}
                         <td className="px-6 py-4">
                           <div className="flex flex-col items-start">
                             {!animal.isGroup && animal.qrCode ? (
                               <div>
-                                <QRCodeCanvas
-                                  value={animal.qrCode}
-                                  size={60}
-                                  level="H"
-                                  className="mx-auto"
-                                />
-                                <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                                  {animal.animalId}
-                                </div>
+                                <QRCodeCanvas value={animal.qrCode} size={60} level="H" className="mx-auto" />
+                                <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">{animal.animalId}</div>
                               </div>
                             ) : animal.isGroup ? (
-                              <div className="font-semibold">
-                                {animal.batchId}
-                              </div>
+                              <div className="font-semibold">{animal.batchId}</div>
                             ) : (
                               animal.animalId
                             )}
                           </div>
                         </td>
-
-                        {/* Name / Batch Name */}
                         <td className="px-6 py-4 font-medium">
                           {animal.data?.name || (animal.isGroup ? `Batch ${animal.batchId}` : "Unnamed")}
                         </td>
-
-                        {/* Gender (only for individual animals) */}
                         {animalType.managementType !== "batch" && (
-                          <td className="px-6 py-4">
-                            {animal.data?.gender || "Unknown"}
-                          </td>
+                          <>
+                            <td className="px-6 py-4">{animal.data?.gender || "Unknown"}</td>
+                            <td className="px-6 py-4">{calculateAge(animal)}</td>
+                          </>
                         )}
-
-                        {/* Age (only for individual animals) */}
-                        {animalType.managementType !== "batch" && (
-                          <td className="px-6 py-4">
-                            {calculateAge(animal)}
-                          </td>
-                        )}
-
-                        {/* Zone */}
-                        <td className="px-6 py-4">
-                          {animal.isGroup ? "Multiple Zones" : getZoneInfo(animal).name}
-                        </td>
-
-                        {/* Health Status (only for individual animals) / Animal Count (for batches) */}
+                        <td className="px-6 py-4">{animal.isGroup ? "Multiple Zones" : getZoneInfo(animal).name}</td>
                         {animalType.managementType !== "batch" ? (
                           <td className="px-6 py-4">
-                            <span className={`font-semibold ${healthStatus.colorClass}`}>
-                              {healthStatus.status}
-                            </span>
+                            <span className={`font-semibold ${healthStatus.colorClass}`}>{healthStatus.status}</span>
                           </td>
                         ) : (
-                          <td className="px-6 py-4 font-semibold">
-                            {animal.animals?.length || animal.data?.batchCount || 0}
-                          </td>
+                          <td className="px-6 py-4 font-semibold">{animal.animals?.length || animal.data?.batchCount || 0}</td>
                         )}
-
-                        {/* Weight */}
                         <td className="px-6 py-4">
-                          {animal.isGroup ?
-                            `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total` :
-                            `${animal.data?.weight || "Unknown"} kg`
-                          }
+                          {animal.isGroup
+                            ? `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total`
+                            : `${animal.data?.weight || "Unknown"} kg`}
                         </td>
-
-                        {/* Dynamic Productivity Field Columns */}
                         {productivityFields.map((field, idx) => {
-                          const { average } = calculateProductivityTotals(records, 'day', field.name);
-                         
+                          const { average } = calculateProductivityTotals(records, "day", field.name);
                           return (
                             <td key={idx} className="px-6 py-4 font-semibold">
-                              {average > 0 ? average.toFixed(1) : "-"} {field.unit || ''}
+                              {average > 0 ? average.toFixed(1) : "-"} {field.unit || ""}
                             </td>
                           );
                         })}
-
-                        {/* Last Record Date */}
-                        <td className="px-6 py-4">
-                          {latestRecord ? new Date(latestRecord.date).toLocaleDateString() : "No records"}
-                        </td>
-
-                        {/* Actions */}
+                        <td className="px-6 py-4">{latestRecord ? new Date(latestRecord.date).toLocaleDateString() : "No records"}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-2">
                             <button
@@ -1655,13 +1741,13 @@ export default function AnimalProductivity() {
                           </div>
                         </td>
                       </tr>
-                     
-                      {/* Expanded Row for Details */}
                       {expandedRows[animal.isGroup ? animal.batchId : animal._id] && (
                         <tr className="bg-gray-50 dark:bg-gray-700">
-                          <td colSpan={11 + productivityFields.length + (animalType.managementType === "batch" ? -2 : 0)} className="p-4">
+                          <td
+                            colSpan={11 + productivityFields.length + (animalType.managementType === "batch" ? -2 : 0)}
+                            className="p-4"
+                          >
                             <div className="flex flex-col md:flex-row gap-6">
-                              {/* Animal/Batch Details */}
                               <div className="flex-1">
                                 <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">
                                   {animal.isGroup ? "Batch Details" : "Animal Details"}
@@ -1671,7 +1757,8 @@ export default function AnimalProductivity() {
                                     <span className="font-medium">ID:</span> {animal.isGroup ? animal.batchId : animal.animalId}
                                   </div>
                                   <div className="text-center">
-                                    <span className="font-medium">Name:</span> {animal.data?.name || (animal.isGroup ? `Batch ${animal.batchId}` : "Unnamed")}
+                                    <span className="font-medium">Name:</span>{" "}
+                                    {animal.data?.name || (animal.isGroup ? `Batch ${animal.batchId}` : "Unnamed")}
                                   </div>
                                   {!animal.isGroup && (
                                     <>
@@ -1681,82 +1768,65 @@ export default function AnimalProductivity() {
                                       <div className="text-center">
                                         <span className="font-medium">Age:</span> {calculateAge(animal)}
                                       </div>
+                                      <div className="text-center">
+                                        <span className="font-medium">Health Status:</span>{" "}
+                                        <span className={healthStatus.colorClass}>{healthStatus.status}</span>
+                                      </div>
+                                      <div className="text-center">
+                                        <span className="font-medium">Weight:</span> {animal.data?.weight || "Unknown"} kg
+                                      </div>
                                     </>
                                   )}
-                                  <div className="text-center">
-                                    <span className="font-medium">Zone:</span> {animal.isGroup ? "Multiple Zones" : getZoneInfo(animal).name}
-                                  </div>
-                                  {!animal.isGroup ? (
+                                  {animal.isGroup && (
                                     <div className="text-center">
-                                      <span className="font-medium">Health:</span>
-                                      <span className={`ml-1 font-semibold ${healthStatus.colorClass}`}>
-                                        {healthStatus.status}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="text-center">
-                                      <span className="font-medium">Animal Count:</span> {animal.animals?.length || animal.data?.batchCount || 0}
+                                      <span className="font-medium">Animal Count:</span>{" "}
+                                      {animal.animals?.length || animal.data?.batchCount || 0}
                                     </div>
                                   )}
                                   <div className="text-center">
-                                    <span className="font-medium">Weight:</span> {animal.isGroup ?
-                                      `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total` :
-                                      `${animal.data?.weight || "Unknown"} kg`
-                                    }
+                                    <span className="font-medium">Zone:</span>{" "}
+                                    {animal.isGroup ? "Multiple Zones" : getZoneInfo(animal).name}
                                   </div>
                                 </div>
                               </div>
-                             
-                              {/* Productivity Summary (dynamic fields) */}
-                              <div className="flex-1">
-                                <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">Productivity Summary</h4>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                  {productivityFields.map((field, idx) => {
-                                    const daily = calculateProductivityTotals(records, 'day', field.name);
-                                    const weekly = calculateProductivityTotals(records, 'week', field.name);
-                                    const monthly = calculateProductivityTotals(records, 'month', field.name);
-                                   
-                                    return (
-                                      <React.Fragment key={idx}>
-                                        <div className="col-span-2 font-medium mt-2 first:mt-0 text-center">{field.label} ({field.unit || ''})</div>
-                                        <div className="text-center">
-                                          <span className="font-medium">Daily Avg:</span> {daily.average > 0 ? `${daily.average.toFixed(1)}` : "-"}
-                                        </div>
-                                        <div className="text-center">
-                                          <span className="font-medium">Weekly Total:</span> {weekly.total > 0 ? `${weekly.total.toFixed(1)}` : "-"}
-                                        </div>
-                                        <div className="text-center">
-                                          <span className="font-medium">Monthly Total:</span> {monthly.total > 0 ? `${monthly.total.toFixed(1)}` : "-"}
-                                        </div>
-                                        <div className="text-center">
-                                          <span className="font-medium">Last Record:</span> {records.length > 0 ? new Date(records[records.length - 1].date).toLocaleDateString() : "None"}
-                                        </div>
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                             
-                              {/* Recent Records */}
-                              <div className="flex-1">
-                                <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">Recent Records</h4>
-                                {records.length > 0 ? (
-                                  <div className="max-h-40 overflow-y-auto">
-                                    {records.slice(-5).reverse().map((record, idx) => (
-                                      <div key={idx} className="text-sm mb-2 p-2 bg-gray-100 dark:bg-gray-600 rounded">
-                                        <div className="font-medium text-center">
-                                          {productivityFields.map(field => record[field.name] !== undefined ? `${field.label}: ${record[field.name]} ${field.unit || ''}` : '').filter(Boolean).join(', ')}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                                          {new Date(record.date).toLocaleDateString()} - {record.notes || "No notes"}
-                                        </div>
-                                      </div>
-                                    ))}
+                              {animal.isGroup && (
+                                <div className="flex-1">
+                                  <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">
+                                    Animals in Batch
+                                  </h4>
+                                  <div className="max-h-60 overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                      <thead className="bg-gray-100 dark:bg-gray-600">
+                                        <tr>
+                                          <th className="p-2 text-left">ID</th>
+                                          <th className="p-2 text-left">Name</th>
+                                          <th className="p-2 text-left">Gender</th>
+                                          <th className="p-2 text-left">Age</th>
+                                          <th className="p-2 text-left">Health</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {animal.animals.map((subAnimal) => {
+                                          const subHealthStatus = getHealthStatus(subAnimal);
+                                          return (
+                                            <tr key={subAnimal._id} className="hover:bg-gray-100 dark:hover:bg-gray-600">
+                                              <td className="p-2">{subAnimal.animalId}</td>
+                                              <td className="p-2">{subAnimal.data?.name || "Unnamed"}</td>
+                                              <td className="p-2">{subAnimal.data?.gender || "Unknown"}</td>
+                                              <td className="p-2">{calculateAge(subAnimal)}</td>
+                                              <td className="p-2">
+                                                <span className={subHealthStatus.colorClass}>
+                                                  {subHealthStatus.status}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
                                   </div>
-                                ) : (
-                                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center">No productivity records yet.</p>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1766,14 +1836,11 @@ export default function AnimalProductivity() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={11 + productivityFields.length + (animalType.managementType === "batch" ? -2 : 0)} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center h-full">
-                      <Package size={48} className="text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No animals found</h3>
-                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                        Try adjusting your search or filter criteria.
-                      </p>
-                    </div>
+                  <td
+                    colSpan={11 + productivityFields.length + (animalType.managementType === "batch" ? -2 : 0)}
+                    className="p-6 text-center text-gray-500 dark:text-gray-400"
+                  >
+                    No animals or batches found matching the filters.
                   </td>
                 </tr>
               )}
@@ -1782,111 +1849,121 @@ export default function AnimalProductivity() {
         </div>
       </div>
 
-      {/* Add Record Modal */}
-      {showAddRecordModal && selectedAnimal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-xl shadow-2xl max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <Plus size={24} />
-                Add Productivity Record
-              </h2>
+      {/* Add Productivity Record Modal */}
+      {showAddRecordModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowAddRecordModal(false)}
+        >
+          <div
+            className={`p-6 rounded-2xl max-w-lg w-full ${darkMode ? "bg-gray-800" : "bg-white"} shadow-xl`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Add Productivity Record for {selectedAnimal.data?.name || selectedAnimal.batchId}
+              </h3>
               <button
                 onClick={() => setShowAddRecordModal(false)}
-                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
-            
             <div className="space-y-4">
-              {productivityFields.map((field, idx) => (
-                <div key={idx}>
-                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                    {field.label} ({field.unit || ''}) {field.required ? '*' : ''}
-                  </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {productivityFields.map((field, idx) => (
+                  <div key={idx}>
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                      {field.label} ({field.unit || ""})
+                    </label>
+                    <input
+                      type={field.type}
+                      value={newRecord[field.name] || ""}
+                      onChange={(e) => handleRecordChange(field.name, e.target.value)}
+                      className={`w-full p-2 rounded border ${
+                        darkMode
+                          ? "bg-gray-700 border-gray-600 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      required={field.required}
+                      placeholder={`Enter ${field.label}`}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date</label>
                   <input
-                    type={field.type}
-                    value={newRecord[field.name] || ''}
-                    onChange={(e) => handleRecordChange(field.name, e.target.value)}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${
-                      darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
-                    }`}
-                    required={field.required}
+                    type="date"
+                    value={newRecord.date}
+                    onChange={(e) => handleRecordChange("date", e.target.value)}
+                    className={`w-full p-2 rounded border ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
                 </div>
-              ))}
-              <div>
-                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={newRecord.date}
-                  onChange={(e) => handleRecordChange("date", e.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
-                  }`}
-                />
               </div>
               <div>
-                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  Notes
-                </label>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Notes</label>
                 <textarea
                   value={newRecord.notes}
                   onChange={(e) => handleRecordChange("notes", e.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
-                  }`}
+                  className={`w-full p-2 rounded border ${
+                    darkMode
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-gray-900"
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   rows="3"
+                  placeholder="Add any notes..."
                 />
               </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setShowAddRecordModal(false)}
-                className={`px-4 py-2.5 rounded-lg ${
-                  darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"
-                } transition-all`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProductivityRecord}
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2"
-              >
-                <Bell size={16} />
-                Save Record
-              </button>
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setShowAddRecordModal(false)}
+                  className={`px-4 py-2 rounded ${
+                    darkMode
+                      ? "bg-gray-600 text-gray-300 hover:bg-gray-500"
+                      : "bg-gray-300 text-gray-700 hover:bg-gray-400"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProductivityRecord}
+                  className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+                >
+                  Save Record
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* History Modal */}
-      {showHistoryModal && selectedAnimal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-xl shadow-2xl max-w-4xl w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <TrendingUp size={24} />
-                Productivity History
-              </h2>
+      {showHistoryModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowHistoryModal(false)}
+        >
+          <div
+            className={`p-6 rounded-2xl max-w-4xl w-full ${darkMode ? "bg-gray-800" : "bg-white"} shadow-xl max-h-[80vh] overflow-y-auto`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Productivity History for {selectedAnimal.data?.name || selectedAnimal.batchId}
+              </h3>
               <button
                 onClick={() => setShowHistoryModal(false)}
-                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
-            
-            {editMode ? (
-              <EditRecordForm />
-            ) : (
-              <RecordTable />
-            )}
+            {editMode && selectedRecord ? <EditRecordForm /> : <RecordTable />}
           </div>
         </div>
       )}
