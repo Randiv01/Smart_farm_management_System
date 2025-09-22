@@ -139,7 +139,7 @@ import {
   sendMedicalRequest,
   testEmail,
 } from "./AnimalManagement/controllers/medicalRequestController.js";
-import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
+import animalProductivityRouter from "./AnimalManagement/routes/animalProductivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
 import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
@@ -199,7 +199,7 @@ app.use("/emergency", emergencyRoutes);
 app.use("/api/users", userRoutes);
 // IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
 app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
-app.use("/productivity", productivityRouter);
+app.use("/animal-productivity", animalProductivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 app.use("/api/meats", meatRoutes);

@@ -210,8 +210,8 @@ export default function HealthInfoDetails() {
     
     // Company information
     const companyName = "Mount Olive Farm House";
-    const companyAddress = "123 Farm Road, Agricultural District, Country";
-    const companyContact = "Phone: +1 (555) 123-4567 | Email: info@mountolivefarm.com";
+    const companyAddress = "No. 45, Green Valley Road,Boragasketiya,Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
     const reportDate = new Date().toLocaleDateString();
     
     // Add logo
@@ -547,12 +547,32 @@ const handleMedicalRequest = async () => {
 
   // Loading / Error
   if (loading)
-    return (
-      <div className="flex justify-center items-center h-48 text-gray-700 dark:text-gray-200">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-teal-500"></div>
-        <p className="ml-4">Loading health data...</p>
-      </div>
-    );
+  return (
+    <div className="flex flex-col justify-center items-center h-48 text-gray-700 dark:text-gray-300">
+      {/* New SVG Arc Spinner */}
+      <svg
+        className="animate-spin h-12 w-12 text-green-600 dark:text-green-400"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        ></circle>
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        ></path>
+      </svg>
+      <p className="mt-4 font-medium">Loading data...</p>
+    </div>
+  );
 
   if (error || !animalType)
     return (
