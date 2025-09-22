@@ -681,6 +681,7 @@ export const StaffHub = ({ darkMode }) => {
         : (pathologist.specializations || "").toLowerCase()
       ).includes(searchQuery.toLowerCase())
   );
+  
 
   /* ---------- tables ---------- */
   const renderEmployeeTable = () => (
@@ -1228,6 +1229,7 @@ export const StaffHub = ({ darkMode }) => {
     </div>
   );
 
+ 
   /* ---------- render ---------- */
   return (
     <div className="p-4">
