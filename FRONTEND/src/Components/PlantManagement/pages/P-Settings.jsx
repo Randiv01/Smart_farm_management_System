@@ -37,13 +37,12 @@ export default function PSettings() {
   const [profileImage, setProfileImage] = useState("");
   const [profileImageFile, setProfileImageFile] = useState(null);
 
-  // Theme variables based on your requirements
+  // Theme variables
   const bgCard = theme === 'dark' ? 'bg-[#2d2d2d]' : 'bg-white';
   const textColor = theme === 'dark' ? 'text-gray-200' : 'text-gray-800';
   const borderColor = theme === 'dark' ? 'border-[#555]' : 'border-gray-300';
   const inputBg = theme === 'dark' ? '#3a3a3b' : '#fff';
   const inputText = theme === 'dark' ? '#f4f7fb' : '#1f2937';
-  const buttonHover = theme === 'dark' ? 'hover:bg-green-700/20' : 'hover:bg-green-100';
 
   useEffect(() => {
     fetchUserData();
@@ -129,13 +128,11 @@ export default function PSettings() {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Check if file is an image
       if (!file.type.startsWith('image/')) {
         setMessage({ type: "error", text: "Please select an image file" });
         return;
       }
 
-      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setMessage({ type: "error", text: "Image size must be less than 5MB" });
         return;
@@ -170,83 +167,127 @@ export default function PSettings() {
     e.preventDefault();
     setIsLoading(true);
     setMessage({ type: "", text: "" });
-  
+
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setMessage({ type: "error", text: "No authentication token found. Please login again." });
+        setIsLoading(false);
+        return;
+      }
+
       const formData = new FormData();
-  
+
       // Append profile image if selected
       if (profileImageFile) {
         formData.append("profileImage", profileImageFile);
       }
-  
-      // Append other profile data - FIX: Include all fields properly
-      const fieldsToUpdate = [
-        'firstName', 'lastName', 'phone', 'address', 
-        'city', 'country', 'dateOfBirth', 'bio'
-      ];
-      
-      fieldsToUpdate.forEach(key => {
-        formData.append(key, profileForm[key] || '');
-      });
-  
-      console.log('Sending profile update with data:', {
-        firstName: profileForm.firstName,
-        lastName: profileForm.lastName,
-        phone: profileForm.phone
-      });
-  
-      // FIX: Use absolute URL for API call
-      const response = await axios.put("http://localhost:5000/api/users/profile", formData, {
+
+      // Append other profile data
+      formData.append("firstName", profileForm.firstName || "");
+      formData.append("lastName", profileForm.lastName || "");
+      formData.append("phone", profileForm.phone || "");
+      formData.append("address", profileForm.address || "");
+      formData.append("city", profileForm.city || "");
+      formData.append("country", profileForm.country || "");
+      formData.append("dateOfBirth", profileForm.dateOfBirth || "");
+      formData.append("bio", profileForm.bio || "");
+
+      console.log('Sending profile update request...');
+
+      // API call with proxy support
+      const response = await axios.put("/api/users/profile", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data"
-        }
+        },
+        timeout: 15000 // 15 second timeout
       });
-  
-      console.log('Profile update response:', response.data);
-  
+
+      console.log('Profile update successful:', response.data);
+
       if (response.data) {
-        // Update localStorage with new data
-        const fullName = `${profileForm.firstName} ${profileForm.lastName}`;
+        const userData = response.data;
+        const fullName = `${userData.firstName} ${userData.lastName}`;
+        
+        // Update localStorage with complete user data
         localStorage.setItem("userFullName", fullName);
-        localStorage.setItem("userPhone", profileForm.phone);
-        localStorage.setItem("userAddress", profileForm.address);
-        localStorage.setItem("userCity", profileForm.city);
-        localStorage.setItem("userCountry", profileForm.country);
-        localStorage.setItem("userDateOfBirth", profileForm.dateOfBirth);
-        localStorage.setItem("userBio", profileForm.bio);
-  
-        // Update profile image if uploaded
-        if (response.data.profileImage) {
-          const imageUrl = `http://localhost:5000${response.data.profileImage}`;
+        localStorage.setItem("userEmail", userData.email || "");
+        localStorage.setItem("userPhone", userData.phone || "");
+        localStorage.setItem("userAddress", userData.address || "");
+        localStorage.setItem("userCity", userData.city || "");
+        localStorage.setItem("userCountry", userData.country || "");
+        localStorage.setItem("userDateOfBirth", userData.dateOfBirth ? new Date(userData.dateOfBirth).toISOString().split('T')[0] : "");
+        localStorage.setItem("userBio", userData.bio || "");
+        localStorage.setItem("userRole", userData.role || "plant");
+
+        // Update profile image
+        if (userData.profileImage) {
+          const imageUrl = `/api${userData.profileImage}`;
           setProfileImage(imageUrl);
           localStorage.setItem("profileImage", imageUrl);
         }
-  
-        // Dispatch event to update navbar with proper data
+
+        // Dispatch event to update navbar in real-time
         window.dispatchEvent(new CustomEvent('userProfileUpdated', {
           detail: {
             fullName,
-            profileImage: response.data.profileImage ? 
-              `http://localhost:5000${response.data.profileImage}` : profileImage,
-            role: profileForm.role
+            profileImage: userData.profileImage ? `/api${userData.profileImage}` : profileImage,
+            role: userData.role || profileForm.role
           }
         }));
-  
+
         setMessage({ type: "success", text: "Profile updated successfully!" });
-        
-        // Clear the file after successful upload
         setProfileImageFile(null);
+
+        // Refresh form data to ensure sync
+        setTimeout(() => {
+          setProfileForm(prev => ({
+            ...prev,
+            firstName: userData.firstName || prev.firstName,
+            lastName: userData.lastName || prev.lastName,
+            phone: userData.phone || prev.phone,
+            address: userData.address || prev.address,
+            city: userData.city || prev.city,
+            country: userData.country || prev.country,
+            dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth).toISOString().split('T')[0] : prev.dateOfBirth,
+            bio: userData.bio || prev.bio,
+            role: userData.role || prev.role
+          }));
+        }, 100);
       }
     } catch (error) {
-      console.error("Failed to update profile:", error);
-      console.error("Error details:", error.response?.data);
+      console.error("Profile update failed:", error);
       
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          "Failed to update profile";
+      let errorMessage = "Failed to update profile. Please try again.";
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = "Request timeout. Please check your internet connection.";
+      } else if (error.response) {
+        // Server responded with error status
+        console.error("Error response:", error.response.status, error.response.data);
+        
+        switch (error.response.status) {
+          case 401:
+            errorMessage = "Authentication failed. Please login again.";
+            break;
+          case 404:
+            errorMessage = "Profile update service not available. Please contact support.";
+            break;
+          case 500:
+            errorMessage = "Server error. Please try again later.";
+            break;
+          default:
+            errorMessage = error.response.data?.error || error.response.data?.message || errorMessage;
+        }
+      } else if (error.request) {
+        // No response received
+        errorMessage = "Cannot connect to server. Please ensure the backend server is running on port 5000.";
+      } else {
+        // Other errors
+        errorMessage = error.message || errorMessage;
+      }
+      
       setMessage({ type: "error", text: errorMessage });
     } finally {
       setIsLoading(false);
@@ -278,7 +319,8 @@ export default function PSettings() {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
       }, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
       });
 
       if (response.data) {
@@ -332,8 +374,8 @@ export default function PSettings() {
         {message.text && (
           <div className={`mb-6 p-4 rounded-md border ${
             message.type === 'success' 
-              ? 'bg-[var(--status-active)]/20 text-[var(--status-active)] border-[var(--status-active)]/30'
-              : 'bg-[var(--status-maintenance)]/20 text-[var(--status-maintenance)] border-[var(--status-maintenance)]/30'
+              ? 'bg-green-100 text-green-800 border-green-300'
+              : 'bg-red-100 text-red-800 border-red-300'
           }`}>
             {message.text}
           </div>
@@ -533,7 +575,7 @@ export default function PSettings() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`inline-flex items-center px-6 py-3 rounded-md font-medium bg-[var(--primary)] text-white hover:bg-[var(--secondary)] transition-colors ${
+                  className={`inline-flex items-center px-6 py-3 rounded-md font-medium bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 transition-colors ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
@@ -651,7 +693,7 @@ export default function PSettings() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`inline-flex items-center px-6 py-3 rounded-md font-medium bg-[var(--primary)] text-white hover:bg-[var(--secondary)] transition-colors ${
+                  className={`inline-flex items-center px-6 py-3 rounded-md font-medium bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 transition-colors ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
