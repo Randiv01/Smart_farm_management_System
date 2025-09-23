@@ -86,6 +86,26 @@ export default function AnimalProductivity() {
   });
   const primaryMetric = useMemo(() => productivityFields.find(f => f.type === 'number'), [productivityFields]);
 
+    const displayFields = useMemo(() => {
+    if (!animalType) return [];
+    if (animalType.managementType === "batch") {
+      return animalType.categories.find(cat => cat.name === "Batch Info")?.fields || [];
+    }
+    return animalType.categories.find(cat => cat.name === "Basic Info")?.fields || [];
+  }, [animalType]);
+
+   const primaryIdentifierField = useMemo(() => {
+    if (!displayFields || displayFields.length === 0) {
+      return { name: "name", label: "Identifier" }; // Fallback
+    }
+    // Prefer a field with 'name' in its name, otherwise take the first text field, or just the first field.
+    return (
+      displayFields.find(f => f.name.toLowerCase().includes('name')) ||
+      displayFields.find(f => f.type === 'text') ||
+      displayFields[0]
+    );
+  }, [displayFields]);
+
   // State for new record with dynamic fields
   const [newRecord, setNewRecord] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -137,7 +157,6 @@ export default function AnimalProductivity() {
     fetchZones();
   }, []);
 
- // AnimalProductivity.jsx
 
 // Fetch productivity totals from backend
 const fetchMilkTotals = async () => {
@@ -285,30 +304,35 @@ const fetchMilkTotals = async () => {
   const calculateProductivityTotals = (records, period = "day", fieldName) => {
     if (!records || records.length === 0) return { total: 0, average: 0 };
 
-    const now = new Date();
-    let startDate;
+    let recordsToProcess = records;
 
-    switch (period) {
-      case "week":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case "month":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      default: // day
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
+    // Filter records by date range only for 'week' and 'month' periods
+    if (period === "week" || period === "month") {
+      const now = new Date();
+      let startDate;
+
+      switch (period) {
+        case "week":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "month":
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+      }
+
+      recordsToProcess = records.filter((record) => {
+        const recordDate = new Date(record.date);
+        return recordDate >= startDate && recordDate <= now && record[fieldName] !== undefined;
+      });
+    } else {
+      // For 'day' (average), just ensure the field exists in the records
+      recordsToProcess = records.filter(record => record[fieldName] !== undefined);
     }
 
-    const recentRecords = records.filter((record) => {
-      const recordDate = new Date(record.date);
-      return recordDate >= startDate && recordDate <= now && record[fieldName] !== undefined;
-    });
+    if (recordsToProcess.length === 0) return { total: 0, average: 0 };
 
-    if (recentRecords.length === 0) return { total: 0, average: 0 };
-
-    const total = recentRecords.reduce((sum, record) => sum + (parseFloat(record[fieldName]) || 0), 0);
-    const average = total / recentRecords.length;
+    const total = recordsToProcess.reduce((sum, record) => sum + (parseFloat(record[fieldName]) || 0), 0);
+    const average = total / recordsToProcess.length;
 
     return { total, average };
   };
@@ -326,6 +350,7 @@ const fetchMilkTotals = async () => {
     return total.toFixed(1);
   };
 
+  
   // Prepare analytics data
   const prepareAnalyticsData = () => {
     if (!animals.length || !productivityFields.length) return null;
@@ -484,14 +509,17 @@ const fetchMilkTotals = async () => {
         animalsData.forEach((animal) => {
           const batchId = animal.batchId || "ungrouped";
           if (!batchGroups[batchId]) {
+            // CORRECTED: When creating a new batch group, copy all data from the first animal
+            // This ensures fields like 'species', 'batchName', etc., are included.
             batchGroups[batchId] = {
               _id: batchId,
               batchId: batchId,
               isGroup: true,
               animals: [],
-              animalId: `BATCH-${batchId}`,
+              animalId: animal.animalId, // Use the actual animalId from the first record for consistency if needed
               data: {
-                name: `${typeData.name} Batch - ${batchId}`,
+                ...animal.data, // Copy all data from the first animal of the batch
+                name: animal.data.name || `${typeData.name} Batch - ${batchId}`, // Use existing name or create a default
                 batchCount: 0,
               },
             };
@@ -1264,8 +1292,11 @@ if (loading)
   });
 
   const getSummary = () => {
-    const totalAnimals = animals.length;
-    return { totalAnimals };
+    const totalCount =
+      animalType?.managementType === 'batch'
+        ? animals.reduce((sum, group) => sum + (group.data?.batchCount || 0), 0)
+        : animals.length;
+    return { totalAnimals: totalCount };
   };
 
   const summary = getSummary();
@@ -1575,249 +1606,154 @@ if (loading)
         )}
       </div>
 
-      <div className={`rounded-xl shadow-lg overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+<div className={`rounded-xl shadow-lg overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
         <div className="overflow-x-auto">
-<table className="min-w-full">
-  <thead className={darkMode ? "bg-gray-700" : "bg-gray-100"}>
-    <tr>
-      <th className="p-2"></th>
-      <th
-        className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-        onClick={() => requestSort("id")}
-      >
-        <div className="flex items-center">
-          {animalType.managementType === "batch" ? "Batch ID" : "QR & ID"} {getSortIcon("id")}
-        </div>
-      </th>
-      <th
-        className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-        onClick={() => requestSort("name")}
-      >
-        <div className="flex items-center">
-          {animalType.managementType === "batch" ? "Batch Name" : "Name"} {getSortIcon("name")}
-        </div>
-      </th>
-      {animalType.managementType !== "batch" && (
-        <>
-          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Gender</th>
-          <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Age</th>
-        </>
-      )}
-      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Zone</th>
-      {animalType.managementType !== "batch" && (
-        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Health Status</th>
-      )}
-      {animalType.managementType === "batch" && (
-        <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Animal Count</th>
-      )}
-      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Weight</th>
-      {productivityFields.map((field, idx) => (
-        <th key={idx} className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
-          {field.label} ({field.unit || ""})
-        </th>
-      ))}
-      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">Last Record</th>
-      <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
-    </tr>
-  </thead>
-  <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
-    {filteredAnimalsList.length > 0 ? (
-      filteredAnimalsList.map((animal) => {
-        const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
-        const latestRecord = getLatestRecord(records);
-        const healthStatus = getHealthStatus(animal);
-
-        return (
-          <React.Fragment key={animal.isGroup ? animal.batchId : animal._id}>
-            <tr className={darkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"}>
-              <td className="p-2 text-center">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleRowExpansion(animal.isGroup ? animal.batchId : animal._id);
-                  }}
-                  className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+          <table className="min-w-full">
+            <thead className={darkMode ? "bg-gray-700" : "bg-gray-100"}>
+              <tr>
+                <th className="p-2 w-12"></th> {/* Expander */}
+                <th
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort(primaryIdentifierField.name)}
                 >
-                  {expandedRows[animal.isGroup ? animal.batchId : animal._id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-              </td>
-              <td className="px-4 py-2 text-sm">
-                <div className="flex flex-col items-start">
-                  {!animal.isGroup && animal.qrCode ? (
-                    <div>
-                      <QRCodeCanvas value={animal.qrCode} size={48} level="H" className="mx-auto" />
-                      <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">{animal.animalId}</div>
-                    </div>
-                  ) : animal.isGroup ? (
-                    <div className="font-semibold">{animal.batchId}</div>
-                  ) : (
-                    animal.animalId
-                  )}
-                </div>
-              </td>
-              <td className="px-4 py-2 text-sm font-medium">
-                {animal.data?.name || (animal.isGroup ? `Batch ${animal.batchId}` : "Unnamed")}
-              </td>
-              {animalType.managementType !== "batch" && (
-                <>
-                  <td className="px-4 py-2 text-sm">{animal.data?.gender || "Unknown"}</td>
-                  <td className="px-4 py-2 text-sm">{calculateAge(animal)}</td>
-                </>
-              )}
-              <td className="px-4 py-2 text-sm">{animal.isGroup ? "Multiple Zones" : getZoneInfo(animal).name}</td>
-              {animalType.managementType !== "batch" ? (
-                <td className="px-4 py-2 text-sm">
-                  <span className={`font-semibold ${healthStatus.colorClass}`}>{healthStatus.status}</span>
-                </td>
-              ) : (
-                <td className="px-4 py-2 text-sm font-semibold">{animal.animals?.length || animal.data?.batchCount || 0}</td>
-              )}
-              <td className="px-4 py-2 text-sm">
-                {animal.isGroup
-                  ? `${animal.animals?.reduce((sum, a) => sum + (parseFloat(a.data?.weight) || 0), 0).toFixed(1)} kg total`
-                  : `${animal.data?.weight || "Unknown"} kg`}
-              </td>
-              {productivityFields.map((field, idx) => {
-                const { average } = calculateProductivityTotals(records, "day", field.name);
-                return (
-                  <td key={idx} className="px-4 py-2 text-sm font-semibold">
-                    {average > 0 ? average.toFixed(1) : "-"} {field.unit || ""}
-                  </td>
-                );
-              })}
-              <td className="px-4 py-2 text-sm">{latestRecord ? new Date(latestRecord.date).toLocaleDateString() : "No records"}</td>
-              <td className="px-4 py-2 text-sm">
-                <div className="flex flex-col items-end gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddProductivityRecord(animal);
-                    }}
-                    className="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1 w-36 justify-center"
-                  >
-                    <Plus size={16} />
-                    Add Record
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewHistory(animal);
-                    }}
-                    className="bg-gray-500 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 transition flex items-center gap-1 w-36 justify-center"
-                    title="View History"
-                  >
-                    <History size={16} />
-                    View History
-                  </button>
-                </div>
-              </td>
-            </tr>
-            {expandedRows[animal.isGroup ? animal.batchId : animal._id] && (
-              <tr className="bg-gray-50 dark:bg-gray-700">
-                <td
-                  colSpan={11 + productivityFields.length + (animalType.managementType === "batch" ? -2 : 0)}
-                  className="p-4"
-                >
-                  {/* ... Expanded row content remains the same ... */}
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex-1">
-                      <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">
-                        {animal.isGroup ? "Batch Details" : "Animal Details"}
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-center">
-                          <span className="font-medium">ID:</span> {animal.isGroup ? animal.batchId : animal.animalId}
-                        </div>
-                        <div className="text-center">
-                          <span className="font-medium">Name:</span>{" "}
-                          {animal.data?.name || (animal.isGroup ? `Batch ${animal.batchId}` : "Unnamed")}
-                        </div>
-                        {!animal.isGroup && (
-                          <>
-                            <div className="text-center">
-                              <span className="font-medium">Gender:</span> {animal.data?.gender || "Unknown"}
-                            </div>
-                            <div className="text-center">
-                              <span className="font-medium">Age:</span> {calculateAge(animal)}
-                            </div>
-                            <div className="text-center">
-                              <span className="font-medium">Health Status:</span>{" "}
-                              <span className={healthStatus.colorClass}>{healthStatus.status}</span>
-                            </div>
-                            <div className="text-center">
-                              <span className="font-medium">Weight:</span> {animal.data?.weight || "Unknown"} kg
-                            </div>
-                          </>
-                        )}
-                        {animal.isGroup && (
-                          <div className="text-center">
-                            <span className="font-medium">Animal Count:</span>{" "}
-                            {animal.animals?.length || animal.data?.batchCount || 0}
-                          </div>
-                        )}
-                        <div className="text-center">
-                          <span className="font-medium">Zone:</span>{" "}
-                          {animal.isGroup ? "Multiple Zones" : getZoneInfo(animal).name}
-                        </div>
-                      </div>
-                    </div>
-                    {animal.isGroup && (
-                      <div className="flex-1">
-                        <h4 className="font-semibold mb-2 text-gray-900 dark:text-white text-center">
-                          Animals in Batch
-                        </h4>
-                        <div className="max-h-60 overflow-y-auto">
-                          <table className="w-full text-sm">
-                            <thead className="bg-gray-100 dark:bg-gray-600">
-                              <tr>
-                                <th className="p-2 text-left">ID</th>
-                                <th className="p-2 text-left">Name</th>
-                                <th className="p-2 text-left">Gender</th>
-                                <th className="p-2 text-left">Age</th>
-                                <th className="p-2 text-left">Health</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                              {animal.animals.map((subAnimal) => {
-                                const subHealthStatus = getHealthStatus(subAnimal);
-                                return (
-                                  <tr key={subAnimal._id} className="hover:bg-gray-100 dark:hover:bg-gray-600">
-                                    <td className="p-2">{subAnimal.animalId}</td>
-                                    <td className="p-2">{subAnimal.data?.name || "Unnamed"}</td>
-                                    <td className="p-2">{subAnimal.data?.gender || "Unknown"}</td>
-                                    <td className="p-2">{calculateAge(subAnimal)}</td>
-                                    <td className="p-2">
-                                      <span className={subHealthStatus.colorClass}>
-                                        {subHealthStatus.status}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
+                  <div className="flex items-center">
+                    {primaryIdentifierField.label}
+                    {getSortIcon(primaryIdentifierField.name)}
                   </div>
-                </td>
+                </th>
+                
+                {animalType.managementType === "batch" && (
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Count</th>
+                )}
+
+                {/* DYNAMIC PRODUCTIVITY FIELDS */}
+                {productivityFields.map((field, idx) => (
+                  <th key={idx} className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    {field.label} (Daily Avg)
+                  </th>
+                ))}
+
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Last Record</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
               </tr>
-            )}
-          </React.Fragment>
-        );
-      })
-    ) : (
-      <tr>
-        <td
-          colSpan={11 + productivityFields.length + (animalType.managementType === "batch" ? -2 : 0)}
-          className="p-6 text-center text-gray-500 dark:text-gray-400"
-        >
-          No animals or batches found matching the filters.
-        </td>
-      </tr>
-    )}
-  </tbody>
-</table>
+            </thead>
+            <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
+              {filteredAnimalsList.length > 0 ? (
+                filteredAnimalsList.map((animal) => {
+                  const records = productivityRecords[animal.isGroup ? animal.batchId : animal._id] || [];
+                  const latestRecord = getLatestRecord(records);
+
+                  return (
+                    <React.Fragment key={animal.isGroup ? animal.batchId : animal._id}>
+                      <tr className={darkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"}>
+                        <td className="p-2 text-center">
+                          <button
+                            onClick={() => toggleRowExpansion(animal.isGroup ? animal.batchId : animal._id)}
+                            className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                          >
+                            {expandedRows[animal.isGroup ? animal.batchId : animal._id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2 text-sm font-medium">
+                          {animal.data?.[primaryIdentifierField.name] || (animal.isGroup ? `Batch ${animal.batchId}` : "Unnamed")}
+                        </td>
+                        
+                        {animalType.managementType === "batch" && (
+                          <td className="px-4 py-2 text-sm font-semibold text-center">
+                            {animal.data?.batchCount || 0}
+                          </td>
+                        )}
+
+                        {productivityFields.map((field, idx) => {
+                          const { average } = calculateProductivityTotals(records, "day", field.name);
+                          return (
+                            <td key={idx} className="px-4 py-2 text-sm font-semibold text-center">
+                              {average > 0 ? `${average.toFixed(1)} ${field.unit || ""}`.trim() : "-"}
+                            </td>
+                          );
+                        })}
+
+                        <td className="px-4 py-2 text-sm text-center">
+                          {latestRecord ? new Date(latestRecord.date).toLocaleDateString() : "No records"}
+                        </td>
+                        
+                        <td className="px-4 py-2 text-sm">
+                          <div className="flex justify-center items-center gap-2">
+                            <button
+                              onClick={() => handleAddProductivityRecord(animal)}
+                              className="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5"
+                            >
+                              <Plus size={16} />
+                              Add
+                            </button>
+                            <button
+                              onClick={() => handleViewHistory(animal)}
+                              className="bg-gray-500 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 transition flex items-center gap-1.5"
+                            >
+                              <History size={16} />
+                              History
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expandedRows[animal.isGroup ? animal.batchId : animal._id] && (
+                        <tr className="bg-gray-50 dark:bg-gray-700/50">
+                          <td colSpan={4 + productivityFields.length + (animalType.managementType === "batch" ? 1 : 0)} className="p-4">
+                            <div className="flex flex-col md:flex-row gap-6">
+                              <div className="flex flex-col items-center p-2">
+                                <QRCodeCanvas value={animal.isGroup ? animal.batchId : (animal.qrCode || animal.animalId)} size={80} level="H" />
+                                <div className="text-xs mt-2 font-mono text-gray-500 dark:text-gray-400">
+                                  {animal.isGroup ? animal.batchId : animal.animalId}
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">
+                                  Details
+                                </h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+                                  {displayFields.map(field => (
+                                    <div key={field.name}>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">{field.label}:</span>
+                                      <span className="ml-2">{animal.data?.[field.name] || "-"}</span>
+                                    </div>
+                                  ))}
+                                  {!animal.isGroup && (
+                                    <>
+                                       <div>
+                                        <span className="font-medium text-gray-600 dark:text-gray-400">Age:</span>
+                                        <span className="ml-2">{calculateAge(animal)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-medium text-gray-600 dark:text-gray-400">Health:</span>
+                                        <span className={`ml-2 font-semibold ${getHealthStatus(animal).colorClass}`}>{getHealthStatus(animal).status}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                   <div>
+                                    <span className="font-medium text-gray-600 dark:text-gray-400">Zone:</span>
+                                    <span className="ml-2">{getZoneInfo(animal).name}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan={4 + productivityFields.length + (animalType.managementType === "batch" ? 1 : 0)}
+                    className="p-6 text-center text-gray-500 dark:text-gray-400"
+                  >
+                    No animals or batches found matching the filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

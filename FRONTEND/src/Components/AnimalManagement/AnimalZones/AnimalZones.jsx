@@ -124,7 +124,7 @@ export default function AnimalZones() {
     fetchAnimalTypes();
   }, []);
 
-  const zoneTypes = ["Shelter", "Cage", "Pond", "Open Field", "Barn"];
+  const zoneTypes = ["Shelter", "Cage", "Pond", "Open Field", "Barn", "Shelter + Pond"];
   const units = ["m", "km", "ft"];
 
   const showPopup = (type, message) => {

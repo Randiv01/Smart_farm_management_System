@@ -16,16 +16,24 @@ const animalSchema = new mongoose.Schema({
     unique: true, 
     sparse: true 
   },
-  // Track zone assignment
   assignedZone: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Zone',
     default: null
   },
-  // For batch animals, track if they're part of a batch
   batchId: {
     type: String,
     default: null
+  },
+  // NEW: Add count field for batch animals
+  count: {
+    type: Number,
+    default: 1
+  },
+  // NEW: Flag to identify if this is a batch record
+  isBatch: {
+    type: Boolean,
+    default: false
   },
   createdAt: { 
     type: Date, 

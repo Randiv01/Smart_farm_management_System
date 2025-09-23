@@ -31,6 +31,11 @@ const orderSchema = new mongoose.Schema({
       type: String,
       required: true,
       trim: true
+    },
+    zipCode: {
+      type: String,
+      required: true,
+      trim: true
     }
   },
   items: [{
@@ -53,6 +58,10 @@ const orderSchema = new mongoose.Schema({
       required: true,
       min: 1
     },
+    image: {
+      type: String,
+      required: false
+    },
     total: {
       type: Number,
       required: true,
@@ -70,6 +79,12 @@ const orderSchema = new mongoose.Schema({
     default: 5.00,
     min: 0
   },
+  tax: {
+    type: Number,
+    required: true,
+    default: 0,
+    min: 0
+  },
   totalAmount: {
     type: Number,
     required: true,
@@ -78,8 +93,13 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['card', 'cash', 'bank'],
+    enum: ['card', 'cash', 'bank_transfer'],
     default: 'card'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'completed', 'failed', 'refunded'],
+    default: 'pending'
   },
   status: {
     type: String,
@@ -94,6 +114,10 @@ const orderSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  transactionId: {
+    type: String,
+    required: false
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -106,6 +130,7 @@ const orderSchema = new mongoose.Schema({
 orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ 'customer.email': 1 });
 orderSchema.index({ status: 1 });
+orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ orderDate: -1 });
 
 // Static method to generate order number
@@ -121,6 +146,24 @@ orderSchema.pre('validate', function(next) {
     this.orderNumber = this.constructor.generateOrderNumber();
   }
   next();
+});
+
+// Virtual for formatted order date
+orderSchema.virtual('formattedOrderDate').get(function() {
+  return this.orderDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+});
+
+// Virtual for formatted delivery date
+orderSchema.virtual('formattedDeliveryDate').get(function() {
+  return this.estimatedDelivery.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 });
 
 const Order = mongoose.model('Order', orderSchema);

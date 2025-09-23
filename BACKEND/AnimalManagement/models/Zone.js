@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const zoneSchema = new mongoose.Schema({
   zoneID: { type: String, unique: true },
   name: { type: String, required: true },
-  type: { type: String, enum: ["Shelter", "Cage", "Pond", "Open Field", "Barn"], required: true },
+  type: { type: String, enum: ["Shelter", "Cage", "Pond", "Open Field", "Barn", "Shelter + Pond"], required: true },
   dimensions: {
     length: Number,
     width: Number,

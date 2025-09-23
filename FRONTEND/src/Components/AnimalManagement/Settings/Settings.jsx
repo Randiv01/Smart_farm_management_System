@@ -86,10 +86,11 @@ export default function Settings() {
 
   const getProfileImageUrl = useCallback((path) => {
     if (!path) return null;
-    const cleanPath = path.replace(/\\/g, "/");
-    const parts = cleanPath.split("/");
-    const filename = parts[parts.length - 1];
-    return `http://localhost:5000/api/users/profile-image/${filename}`;
+    // The path from the DB is like `/uploads/image.jpg`. We just need to add the server's address.
+    const baseUrl = "http://localhost:5000";
+    // Remove any previous cache-busting query params before adding a new one
+    const cleanPath = path.split("?")[0];
+    return `${baseUrl}${cleanPath}`;
   }, []);
 
   const showMessage = useCallback((type, text) => {
@@ -203,7 +204,7 @@ export default function Settings() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleImageUpload = async (e) => {
+const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -222,9 +223,14 @@ export default function Settings() {
       const response = await axios.post("http://localhost:5000/api/users/upload-profile-image", formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
-      setUserData((prev) => ({ ...prev, profileImage: response.data.imageUrl }));
-      updateUserData({ profileImage: response.data.imageUrl });
+
+      // ✅ FIX: Add a timestamp to the URL to bust the browser cache
+      const imageUrlWithCacheBuster = `${response.data.imageUrl}?t=${new Date().getTime()}`;
+
+      setUserData((prev) => ({ ...prev, profileImage: imageUrlWithCacheBuster }));
+      updateUserData({ profileImage: imageUrlWithCacheBuster });
       showMessage("success", "Profile image updated successfully");
+
     } catch (error) {
       console.error("Error uploading image:", error);
       showMessage("error", "Failed to upload image");
@@ -397,15 +403,15 @@ export default function Settings() {
                       <div className="w-40 h-40 rounded-full overflow-hidden border-4 border-gray-300 dark:border-gray-600 mx-auto shadow-md">
                         {userData.profileImage ? (
                           <img
-                            src={
-                              userData.profileImage.includes("http")
-                                ? userData.profileImage
-                                : getProfileImageUrl(userData.profileImage) ||
-                                  "https://via.placeholder.com/150?text=No+Image"
-                            }
-                            alt="Profile"
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          />
+    src={
+      // ✅ FIX: This logic is now simpler and more robust
+      userData.profileImage 
+        ? getProfileImageUrl(userData.profileImage) 
+        : "https://via.placeholder.com/150?text=No+Image"
+    }
+    alt="Profile"
+    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+  />
                         ) : (
                           <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                             <span className="text-5xl font-semibold text-gray-500 dark:text-gray-400">
