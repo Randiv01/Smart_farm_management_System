@@ -14,9 +14,12 @@ import {
   Truck,
   Calendar,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Loader,
+  Home
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Payment = () => {
   const { darkMode } = useTheme();
@@ -44,14 +47,26 @@ const Payment = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [orderDetails, setOrderDetails] = useState(null);
-  const [currentStep, setCurrentStep] = useState(1); // 1: Customer info, 2: Payment, 3: Review
+  const [currentStep, setCurrentStep] = useState(1);
   const [isCardValid, setIsCardValid] = useState(false);
 
   // Load cart from localStorage on component mount
   useEffect(() => {
     const savedCart = localStorage.getItem('farmCart');
     if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
+      try {
+        const cartData = JSON.parse(savedCart);
+        setCartItems(Array.isArray(cartData) ? cartData : []);
+        
+        // Pre-fill customer info if available
+        const savedCustomerInfo = localStorage.getItem('customerInfo');
+        if (savedCustomerInfo) {
+          setCustomerInfo(JSON.parse(savedCustomerInfo));
+        }
+      } catch (e) {
+        console.error('Error loading cart:', e);
+        setCartItems([]);
+      }
     } else {
       navigate('/catalog');
     }
@@ -61,10 +76,11 @@ const Payment = () => {
   useEffect(() => {
     const validateCard = () => {
       const { cardNumber, expiryDate, cvv, cardName } = cardDetails;
-      const isNumberValid = cardNumber.replace(/\s/g, '').length === 16;
+      const cleanedCardNumber = cardNumber.replace(/\s/g, '');
+      const isNumberValid = /^\d{16}$/.test(cleanedCardNumber);
       const isExpiryValid = /^(0[1-9]|1[0-2])\/([0-9]{2})$/.test(expiryDate);
       const isCvvValid = /^[0-9]{3,4}$/.test(cvv);
-      const isNameValid = cardName.trim().length > 0;
+      const isNameValid = cardName.trim().length > 2;
       
       setIsCardValid(isNumberValid && isExpiryValid && isCvvValid && isNameValid);
     };
@@ -73,12 +89,12 @@ const Payment = () => {
   }, [cardDetails]);
 
   const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
+    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
   const shippingCost = 5.00;
-  const taxRate = 0.08; // 8% tax
-  const subtotal = parseFloat(getTotalPrice());
+  const taxRate = 0.08;
+  const subtotal = getTotalPrice();
   const tax = subtotal * taxRate;
   const total = subtotal + shippingCost + tax;
 
@@ -93,19 +109,21 @@ const Payment = () => {
   const handleCardInputChange = (e) => {
     let { name, value } = e.target;
     
-    // Format card number with spaces
     if (name === "cardNumber") {
-      value = value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-      if (value.length > 19) value = value.slice(0, 19);
+      // Remove all non-digits, add spaces every 4 digits
+      value = value.replace(/\D/g, '');
+      if (value.length > 16) value = value.slice(0, 16);
+      value = value.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
     }
     
-    // Format expiry date
     if (name === "expiryDate") {
-      value = value.replace(/\D/g, '').replace(/(\d{2})(?=\d)/, '$1/').trim();
-      if (value.length > 5) value = value.slice(0, 5);
+      value = value.replace(/\D/g, '');
+      if (value.length > 4) value = value.slice(0, 4);
+      if (value.length > 2) {
+        value = value.slice(0, 2) + '/' + value.slice(2);
+      }
     }
     
-    // Limit CVV
     if (name === "cvv") {
       value = value.replace(/\D/g, '').slice(0, 4);
     }
@@ -119,14 +137,14 @@ const Payment = () => {
   const validateCustomerInfo = () => {
     const { name, email, phone, address, city, zipCode } = customerInfo;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/;
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
     
-    if (!name.trim()) return "Please enter your full name";
+    if (!name.trim() || name.trim().length < 2) return "Please enter your full name (min 2 characters)";
     if (!emailRegex.test(email)) return "Please enter a valid email address";
-    if (!phoneRegex.test(phone)) return "Please enter a valid phone number";
-    if (!address.trim()) return "Please enter your delivery address";
+    if (!phoneRegex.test(phone.replace(/\D/g, ''))) return "Please enter a valid phone number";
+    if (!address.trim() || address.trim().length < 5) return "Please enter your complete delivery address";
     if (!city.trim()) return "Please enter your city";
-    if (!zipCode.trim()) return "Please enter your ZIP code";
+    if (!zipCode.trim() || !/^\d{5,10}$/.test(zipCode)) return "Please enter a valid ZIP code";
     
     return null;
   };
@@ -154,37 +172,80 @@ const Payment = () => {
     setError("");
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate random payment failure (10% chance)
-      if (Math.random() < 0.1) {
-        throw new Error("Payment declined. Please check your card details or try a different payment method.");
+      // Validate final details
+      const customerError = validateCustomerInfo();
+      if (customerError) {
+        throw new Error(customerError);
       }
-      
-      // Generate order details
-      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      const deliveryDate = new Date();
-      deliveryDate.setDate(deliveryDate.getDate() + 3);
-      
-      setOrderDetails({
-        orderNumber,
-        deliveryDate: deliveryDate.toLocaleDateString(),
-        items: cartItems,
-        subtotal: subtotal,
-        shipping: shippingCost,
-        tax: tax,
-        total: total,
+
+      if (!isCardValid) {
+        throw new Error("Please check your card details");
+      }
+
+      // Prepare order data for backend
+      const orderData = {
         customer: customerInfo,
-        paymentMethod: customerInfo.paymentMethod
+        items: cartItems.map(item => ({
+          _id: item._id || `temp-${Math.random().toString(36).substr(2, 9)}`,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image || ''
+        })),
+        paymentMethod: customerInfo.paymentMethod,
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        shipping: shippingCost,
+        tax: parseFloat(tax.toFixed(2)),
+        totalAmount: parseFloat(total.toFixed(2))
+      };
+
+      const paymentDetails = {
+        cardLastFour: cardDetails.cardNumber.replace(/\s/g, '').slice(-4),
+        expiryDate: cardDetails.expiryDate
+      };
+
+      console.log('Sending payment request...', { orderData, paymentDetails });
+
+      // Send payment and order data to backend
+      const response = await axios.post('http://localhost:5000/api/orders/payment', {
+        orderData,
+        paymentDetails
+      }, {
+        withCredentials: true,
+        timeout: 10000 // 10 second timeout
       });
-      
-      setOrderSuccess(true);
-      localStorage.removeItem('farmCart');
+
+      console.log('Payment response:', response.data);
+
+      if (response.data.success) {
+        // Save customer info for future use
+        localStorage.setItem('customerInfo', JSON.stringify(customerInfo));
+        
+        // Set order details from backend response
+        setOrderDetails(response.data.order);
+        setOrderSuccess(true);
+        localStorage.removeItem('farmCart');
+      } else {
+        throw new Error(response.data.message || 'Payment failed');
+      }
       
     } catch (error) {
       console.error('Payment error:', error);
-      setError(error.message || 'Payment failed. Please try again.');
+      
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (error.response) {
+        // Server responded with error status
+        errorMessage = error.response.data?.message || error.response.statusText;
+      } else if (error.request) {
+        // Request made but no response received
+        errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      } else {
+        // Something else happened
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -194,8 +255,12 @@ const Payment = () => {
     navigate('/catalog');
   };
 
-  const formatCardNumber = (number) => {
-    return number.replace(/\d{4}(?=.)/g, '$& ');
+  const viewOrderHistory = () => {
+    navigate('/orders');
+  };
+
+  const goHome = () => {
+    navigate('/');
   };
 
   const renderProgressSteps = () => (
@@ -293,7 +358,7 @@ const Payment = () => {
               </div>
               <div className="flex justify-between font-bold text-lg pt-2 border-t">
                 <span>Total</span>
-                <span className="text-green-600">${orderDetails.total.toFixed(2)}</span>
+                <span className="text-green-600">${orderDetails.totalAmount.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -306,7 +371,13 @@ const Payment = () => {
             <p className="mb-2 flex items-center">
               <Calendar size={16} className="mr-2" />
               <span className="font-semibold">Estimated Delivery:</span> 
-              <span className="ml-2">{orderDetails.deliveryDate}</span>
+              <span className="ml-2">
+                {new Date(orderDetails.estimatedDelivery).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </span>
             </p>
             <p className="mb-2">
               <span className="font-semibold">Address:</span> {orderDetails.customer.address}, {orderDetails.customer.city}, {orderDetails.customer.zipCode}
@@ -316,17 +387,32 @@ const Payment = () => {
             </p>
           </div>
           
-          <div className="text-center">
+          <div className="text-center space-y-4">
             <p className={`mb-6 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
               A confirmation email has been sent to {orderDetails.customer.email}
             </p>
             
-            <button
-              onClick={continueShopping}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
-            >
-              Continue Shopping
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={goHome}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center"
+              >
+                <Home size={16} className="mr-2" />
+                Go Home
+              </button>
+              <button
+                onClick={continueShopping}
+                className="px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700"
+              >
+                Continue Shopping
+              </button>
+              <button
+                onClick={viewOrderHistory}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
+              >
+                View Order History
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -354,9 +440,11 @@ const Payment = () => {
         {renderProgressSteps()}
 
         {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded flex items-center">
-            <AlertCircle size={20} className="mr-2" />
-            {error}
+          <div className={`mb-6 p-4 rounded-lg flex items-center ${
+            darkMode ? "bg-red-900/30 text-red-200" : "bg-red-100 text-red-800"
+          }`}>
+            <AlertCircle size={20} className="mr-3 flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -366,12 +454,12 @@ const Payment = () => {
             <h2 className="text-xl font-bold mb-4">Order Summary</h2>
             
             <div className="space-y-4 mb-6">
-              {cartItems.map((item) => (
-                <div key={item._id} className="flex justify-between items-center">
+              {cartItems.map((item, index) => (
+                <div key={index} className="flex justify-between items-center">
                   <div>
                     <p className="font-medium">{item.name}</p>
                     <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      {item.quantity} × ${item.price}
+                      {item.quantity} × ${item.price.toFixed(2)}
                     </p>
                   </div>
                   <p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
@@ -424,7 +512,9 @@ const Payment = () => {
                       required
                       value={customerInfo.name}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                      } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                       placeholder="Enter your full name"
                     />
                   </div>
@@ -439,7 +529,9 @@ const Payment = () => {
                       required
                       value={customerInfo.email}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                      } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                       placeholder="Enter your email"
                     />
                   </div>
@@ -454,7 +546,9 @@ const Payment = () => {
                       required
                       value={customerInfo.phone}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                      } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                       placeholder="Enter your phone number"
                     />
                   </div>
@@ -469,8 +563,10 @@ const Payment = () => {
                       required
                       value={customerInfo.address}
                       onChange={handleInputChange}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
-                      placeholder="Enter your address"
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                      } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
+                      placeholder="Enter your complete address"
                     />
                   </div>
 
@@ -485,7 +581,9 @@ const Payment = () => {
                         required
                         value={customerInfo.city}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                        } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                         placeholder="City"
                       />
                     </div>
@@ -499,7 +597,9 @@ const Payment = () => {
                         required
                         value={customerInfo.zipCode}
                         onChange={handleInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                        } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                         placeholder="ZIP Code"
                       />
                     </div>
@@ -507,7 +607,7 @@ const Payment = () => {
 
                   <button
                     onClick={nextStep}
-                    className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 mt-4"
+                    className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 mt-4 transition-colors"
                   >
                     Continue to Payment
                   </button>
@@ -533,7 +633,9 @@ const Payment = () => {
                       required
                       value={cardDetails.cardNumber}
                       onChange={handleCardInputChange}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                      } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                       placeholder="1234 5678 9012 3456"
                       maxLength={19}
                     />
@@ -550,7 +652,9 @@ const Payment = () => {
                         required
                         value={cardDetails.expiryDate}
                         onChange={handleCardInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                        } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                         placeholder="MM/YY"
                         maxLength={5}
                       />
@@ -565,7 +669,9 @@ const Payment = () => {
                         required
                         value={cardDetails.cvv}
                         onChange={handleCardInputChange}
-                        className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                        } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                         placeholder="123"
                         maxLength={4}
                       />
@@ -582,7 +688,9 @@ const Payment = () => {
                       required
                       value={cardDetails.cardName}
                       onChange={handleCardInputChange}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
+                      } focus:ring-2 focus:ring-green-500 focus:border-transparent`}
                       placeholder="John Doe"
                     />
                   </div>
@@ -590,14 +698,14 @@ const Payment = () => {
                   <div className="flex space-x-4 mt-6">
                     <button
                       onClick={prevStep}
-                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
                     >
                       Back
                     </button>
                     <button
                       onClick={nextStep}
                       disabled={!isCardValid}
-                      className={`flex-1 py-3 text-white rounded-lg font-semibold ${
+                      className={`flex-1 py-3 text-white rounded-lg font-semibold transition-colors ${
                         isCardValid ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
                       }`}
                     >
@@ -623,10 +731,10 @@ const Payment = () => {
                 <div className="space-y-4">
                   <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
                     <h3 className="font-semibold mb-2">Delivery Information</h3>
-                    <p>{customerInfo.name}</p>
-                    <p>{customerInfo.email}</p>
-                    <p>{customerInfo.phone}</p>
-                    <p>{customerInfo.address}, {customerInfo.city}, {customerInfo.zipCode}</p>
+                    <p className="break-words">{customerInfo.name}</p>
+                    <p className="break-words">{customerInfo.email}</p>
+                    <p className="break-words">{customerInfo.phone}</p>
+                    <p className="break-words">{customerInfo.address}, {customerInfo.city}, {customerInfo.zipCode}</p>
                   </div>
 
                   <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
@@ -638,20 +746,20 @@ const Payment = () => {
                   <div className="flex space-x-4 mt-6">
                     <button
                       onClick={prevStep}
-                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
                     >
                       Back
                     </button>
                     <button
                       onClick={handleSubmit}
                       disabled={isSubmitting}
-                      className={`flex-1 py-3 text-white rounded-lg font-semibold flex items-center justify-center ${
+                      className={`flex-1 py-3 text-white rounded-lg font-semibold flex items-center justify-center transition-colors ${
                         isSubmitting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
                       {isSubmitting ? (
                         <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          <Loader size={20} className="animate-spin mr-2" />
                           Processing...
                         </>
                       ) : (
