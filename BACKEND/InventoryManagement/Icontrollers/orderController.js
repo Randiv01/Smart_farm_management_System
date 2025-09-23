@@ -22,6 +22,15 @@ export const createOrderFromPayment = async (req, res) => {
       });
     }
 
+    // Validate items and check stock availability
+    const stockValidation = await validateStockAvailability(items);
+    if (!stockValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: stockValidation.message
+      });
+    }
+
     // Calculate estimated delivery (3 days from now)
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
@@ -32,7 +41,7 @@ export const createOrderFromPayment = async (req, res) => {
       name: item.name,
       price: item.price,
       quantity: item.quantity,
-      image: item.image,
+      image: item.image || '',
       total: item.price * item.quantity
     }));
    
@@ -57,17 +66,8 @@ export const createOrderFromPayment = async (req, res) => {
    
     const savedOrder = await order.save();
    
-    // Update product stock quantities
-    await Promise.all(
-      items.map(async (item) => {
-        if (item._id || item.productId) {
-          await Product.findByIdAndUpdate(
-            item._id || item.productId,
-            { $inc: { 'stock.quantity': -item.quantity } }
-          );
-        }
-      })
-    );
+    // Update product stock quantities - DECREMENT STOCK
+    await updateProductStock(items, 'decrement');
    
     res.status(201).json({
       success: true,
@@ -88,6 +88,103 @@ export const createOrderFromPayment = async (req, res) => {
       success: false,
       message: error.message 
     });
+  }
+};
+
+// Validate stock availability before creating order
+const validateStockAvailability = async (items) => {
+  try {
+    for (const item of items) {
+      const productId = item._id || item.productId;
+      
+      if (!productId) {
+        return {
+          valid: false,
+          message: `Product ID missing for item: ${item.name}`
+        };
+      }
+
+      // Find the product in database
+      const product = await Product.findById(productId);
+      
+      if (!product) {
+        return {
+          valid: false,
+          message: `Product not found: ${item.name}`
+        };
+      }
+
+      if (!product.isActive) {
+        return {
+          valid: false,
+          message: `Product is no longer available: ${item.name}`
+        };
+      }
+
+      if (product.stock.quantity < item.quantity) {
+        return {
+          valid: false,
+          message: `Insufficient stock for ${item.name}. Available: ${product.stock.quantity}, Requested: ${item.quantity}`
+        };
+      }
+
+      // Check if product is expired
+      if (new Date(product.expiryDate) < new Date()) {
+        return {
+          valid: false,
+          message: `Product expired: ${item.name}`
+        };
+      }
+    }
+
+    return { valid: true };
+  } catch (error) {
+    console.error('Stock validation error:', error);
+    return {
+      valid: false,
+      message: 'Error validating stock availability'
+    };
+  }
+};
+
+// Update product stock (increment or decrement)
+const updateProductStock = async (items, operation) => {
+  try {
+    for (const item of items) {
+      const productId = item._id || item.productId;
+      
+      if (!productId) {
+        console.warn(`Skipping stock update for item without ID: ${item.name}`);
+        continue;
+      }
+
+      const product = await Product.findById(productId);
+      
+      if (!product) {
+        console.warn(`Product not found for stock update: ${productId}`);
+        continue;
+      }
+
+      const quantityChange = operation === 'decrement' ? -item.quantity : item.quantity;
+      
+      // Update stock quantity
+      product.stock.quantity += quantityChange;
+      
+      // Ensure stock doesn't go negative
+      if (product.stock.quantity < 0) {
+        product.stock.quantity = 0;
+      }
+
+      // Update product status based on new stock level
+      product.updateStatus();
+      
+      await product.save();
+      
+      console.log(`Stock updated for ${product.name}: ${operation === 'decrement' ? 'Decreased' : 'Increased'} by ${item.quantity}. New stock: ${product.stock.quantity}`);
+    }
+  } catch (error) {
+    console.error('Error updating product stock:', error);
+    throw new Error('Failed to update product stock');
   }
 };
 
@@ -279,17 +376,10 @@ export const updatePaymentStatus = async (req, res) => {
   }
 };
 
-// Cancel order
+// Cancel order - RESTORE STOCK
 export const cancelOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status: 'cancelled',
-        paymentStatus: 'refunded'
-      },
-      { new: true }
-    );
+    const order = await Order.findById(req.params.id);
    
     if (!order) {
       return res.status(404).json({ 
@@ -297,18 +387,14 @@ export const cancelOrder = async (req, res) => {
         message: 'Order not found' 
       });
     }
+
+    // Update order status
+    order.status = 'cancelled';
+    order.paymentStatus = 'refunded';
+    await order.save();
    
-    // Restore product stock quantities
-    await Promise.all(
-      order.items.map(async (item) => {
-        if (item.productId) {
-          await Product.findByIdAndUpdate(
-            item.productId,
-            { $inc: { 'stock.quantity': item.quantity } }
-          );
-        }
-      })
-    );
+    // Restore product stock quantities - INCREMENT STOCK
+    await updateProductStock(order.items, 'increment');
    
     res.status(200).json({
       success: true,
@@ -323,14 +409,10 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
-// Delete order (soft delete)
+// Delete order (soft delete) - RESTORE STOCK if not delivered/cancelled
 export const deleteOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
+    const order = await Order.findById(req.params.id);
     
     if (!order) {
       return res.status(404).json({ 
@@ -339,18 +421,13 @@ export const deleteOrder = async (req, res) => {
       });
     }
     
+    // Soft delete
+    order.isActive = false;
+    await order.save();
+    
     // Restore stock if the order is not delivered or cancelled
     if (order.status !== 'delivered' && order.status !== 'cancelled') {
-      await Promise.all(
-        order.items.map(async (item) => {
-          if (item.productId) {
-            await Product.findByIdAndUpdate(
-              item.productId,
-              { $inc: { 'stock.quantity': item.quantity } }
-            );
-          }
-        })
-      );
+      await updateProductStock(order.items, 'increment');
     }
     
     res.status(200).json({
@@ -478,7 +555,11 @@ export const processPayment = async (req, res) => {
   try {
     const { orderData, paymentDetails } = req.body;
     
-    console.log('Received payment request:', { orderData, paymentDetails });
+    console.log('Received payment request:', { 
+      customer: orderData.customer?.email,
+      itemsCount: orderData.items?.length,
+      totalAmount: orderData.totalAmount 
+    });
     
     // Validate required fields
     if (!orderData || !orderData.customer || !orderData.items || !orderData.totalAmount) {
@@ -488,11 +569,20 @@ export const processPayment = async (req, res) => {
       });
     }
 
+    // Validate stock availability before processing payment
+    const stockValidation = await validateStockAvailability(orderData.items);
+    if (!stockValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: stockValidation.message
+      });
+    }
+
     // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Simulate random payment failure (10% chance) - Reduced for testing
-    if (Math.random() < 0.05) { // 5% failure rate for testing
+    // Simulate random payment failure (5% chance for testing)
+    if (Math.random() < 0.05) {
       return res.status(400).json({
         success: false,
         message: "Payment declined. Please check your card details or try a different payment method."
@@ -508,7 +598,7 @@ export const processPayment = async (req, res) => {
     
     // Prepare order items with totals
     const orderItems = orderData.items.map(item => ({
-      productId: item._id || `prod-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      productId: item._id || `temp-${Math.random().toString(36).substr(2, 9)}`,
       name: item.name,
       price: item.price,
       quantity: item.quantity,
@@ -545,17 +635,8 @@ export const processPayment = async (req, res) => {
     const savedOrder = await order.save();
     console.log('Order saved successfully:', savedOrder.orderNumber);
     
-    // Update product stock quantities (simplified for demo)
-    try {
-      // In a real application, you would update the actual product stock here
-      console.log('Stock would be updated for items:', orderItems.map(item => ({
-        product: item.name,
-        quantity: item.quantity
-      })));
-    } catch (stockError) {
-      console.warn('Stock update failed:', stockError.message);
-      // Continue with order creation even if stock update fails for demo
-    }
+    // Update product stock quantities - DECREMENT STOCK
+    await updateProductStock(orderData.items, 'decrement');
     
     res.status(201).json({
       success: true,
