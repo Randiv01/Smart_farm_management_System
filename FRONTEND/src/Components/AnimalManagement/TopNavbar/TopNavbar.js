@@ -237,11 +237,9 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   // Helper function to get proper image URL
   const getProfileImageUrl = (path) => {
     if (!path) return null;
-    if (path.includes("http")) return path;
-    const cleanPath = path.replace(/\\/g, "/");
-    const parts = cleanPath.split("/");
-    const filename = parts[parts.length - 1];
-    return `http://localhost:5000/api/users/profile-image/${filename}`;
+    // The path from context will now include the cache-buster, which is fine.
+    const baseUrl = "http://localhost:5000";
+    return `${baseUrl}${path}`;
   };
 
   // Handle FAQ question click
@@ -778,12 +776,14 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                 }`}
               >
                 {userData.profileImage ? (
-                  <img
+                 <img
                     src={getProfileImageUrl(userData.profileImage)}
                     alt="Profile"
                     className="w-full h-full object-cover"
                     onError={(e) => {
+                      // This is a good fallback, keep it
                       e.target.style.display = "none";
+                      // You can also show an icon inside the parent div here
                     }}
                   />
                 ) : (

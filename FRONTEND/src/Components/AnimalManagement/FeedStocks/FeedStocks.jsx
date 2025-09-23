@@ -738,9 +738,10 @@ export default function FeedStocksAnimalManager() {
                     Expiry Date {getSortIcon('expiryDate')}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                   Actions
                 </th>
+
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
@@ -810,13 +811,6 @@ export default function FeedStocksAnimalManager() {
                           >
                             <Plus size={16} />
                             Request Refill
-                          </button>
-                          <button 
-                            onClick={() => handleShowStockChart(food)}
-                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-purple-400 hover:bg-gray-700" : "text-purple-600 hover:bg-gray-100"}`}
-                            title="View Stock History"
-                          >
-                            <TrendingUp size={18} />
                           </button>
                         </div>
                       </td>
