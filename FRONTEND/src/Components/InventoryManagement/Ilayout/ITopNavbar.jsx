@@ -356,7 +356,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                 {notifications.length > 0 && (
                   <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
                     <button
-                      onClick={() => navigate("/InventoryManagement")}
+                      onClick={() => navigate("/InventoryManagement/notification")}
                       className={`w-full text-center text-sm ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
                     >
                       View all notifications
@@ -410,7 +410,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/Inventory/isettings")}
+                  onClick={() => navigate("/InventoryManagement/isettings")}
                   className={`flex items-center w-full text-left px-4 py-2 text-sm ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`}
                 >
                   <User size={16} className="mr-2" /> Profile Settings

@@ -5,8 +5,6 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useTheme } from "./context/ThemeContext";
 
-
-
 export default function PTopNavbar({ sidebarOpen, onMenuClick }) {
   const { theme, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -68,7 +66,14 @@ export default function PTopNavbar({ sidebarOpen, onMenuClick }) {
           // Store in localStorage for persistence
           localStorage.setItem("userFullName", updatedName);
           localStorage.setItem("userRole", updatedRole);
-          localStorage.setItem("userEmail", user.email);
+          localStorage.setItem("userEmail", user.email || "");
+          localStorage.setItem("userPhone", user.phone || "");
+          localStorage.setItem("userAddress", user.address || "");
+          localStorage.setItem("userCity", user.city || "");
+          localStorage.setItem("userCountry", user.country || "");
+          localStorage.setItem("userDateOfBirth", user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : "");
+          localStorage.setItem("userBio", user.bio || "");
+          
           if (updatedImage) {
             localStorage.setItem("profileImage", updatedImage);
           }
@@ -79,33 +84,38 @@ export default function PTopNavbar({ sidebarOpen, onMenuClick }) {
       }
     };
 
-    fetchUserData();
-    
-  // Listen for profile updates - FIX: Handle all update scenarios
-  const handleProfileUpdate = (event) => {
-    console.log('Profile update event received:', event.detail);
-    
-    if (event.detail) {
-      setFullName(event.detail.fullName || fullName);
-      setProfileImage(event.detail.profileImage || profileImage);
-      // Also update role if provided
-      if (event.detail.role) {
-        setRole(event.detail.role);
-        localStorage.setItem("userRole", event.detail.role);
+    // Event listener for profile updates
+    const handleProfileUpdate = (event) => {
+      console.log('Profile update event received in navbar:', event.detail);
+      if (event.detail) {
+        if (event.detail.fullName) {
+          setFullName(event.detail.fullName);
+          localStorage.setItem("userFullName", event.detail.fullName);
+        }
+        if (event.detail.profileImage !== undefined) {
+          const imageUrl = event.detail.profileImage;
+          setProfileImage(imageUrl);
+          if (imageUrl) {
+            localStorage.setItem("profileImage", imageUrl);
+          } else {
+            localStorage.removeItem("profileImage");
+          }
+        }
+        if (event.detail.role) {
+          setRole(event.detail.role);
+          localStorage.setItem("userRole", event.detail.role);
+        }
       }
-    }
+    };
+
+    window.addEventListener('userProfileUpdated', handleProfileUpdate);
     
-    // Always refresh from localStorage as fallback
-    setTimeout(() => {
-      setFullName(localStorage.getItem("userFullName") || "Plant Manager");
-      setRole(localStorage.getItem("userRole") || "plant");
-      setProfileImage(localStorage.getItem("profileImage") || "");
-    }, 100);
-  };
-  
-  window.addEventListener('userProfileUpdated', handleProfileUpdate);
-  return () => window.removeEventListener('userProfileUpdated', handleProfileUpdate);
-}, []);
+    fetchUserData();
+
+    return () => {
+      window.removeEventListener('userProfileUpdated', handleProfileUpdate);
+    };
+  }, []); // Empty dependency array to run only once
 
   const handleLogout = () => {
     // Clear all localStorage items
@@ -182,14 +192,15 @@ export default function PTopNavbar({ sidebarOpen, onMenuClick }) {
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.nextElementSibling.style.display = 'flex';
+                    // Show fallback if image fails to load
+                    const fallback = document.querySelector('.profile-fallback');
+                    if (fallback) fallback.style.display = 'flex';
                   }}
                 />
-              ) : (
-                <div style={{backgroundColor: theme === 'dark' ? 'var(--border)' : 'var(--background)'}} className="rounded-full w-8 h-8 flex items-center justify-center">
-                  <User size={18} />
-                </div>
-              )}
+              ) : null}
+              <div className="profile-fallback" style={{display: profileImage ? 'none' : 'flex', backgroundColor: theme === 'dark' ? 'var(--border)' : 'var(--background)'}} className1="rounded-full w-8 h-8 flex items-center justify-center">
+                <User size={18} />
+              </div>
               <div className="hidden sm:block text-right">
                 <span className="block text-sm font-medium">{fullName}</span>
                 <span style={{color: theme === 'dark' ? 'var(--text-light)' : 'var(--text-light)'}} className="block text-xs">
