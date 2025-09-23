@@ -11,6 +11,7 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import autoTable from "jspdf-autotable";
+import Loader from "../Loader/Loader.js"; // Import the Loader component
 
 const API = "http://localhost:5000/api/leaves";
 
@@ -45,6 +46,7 @@ export const ELeavePlanner = ({ darkMode }) => {
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
+  const [showLoader, setShowLoader] = useState(true); // Loader state
 
   const [tableSearch, setTableSearch] = useState("");
 
@@ -70,6 +72,33 @@ export const ELeavePlanner = ({ darkMode }) => {
   const balanceRef = useRef(null);
   const trendRef = useRef(null);
 
+  // Move hooks before any conditional returns
+  // charts: distribution + status
+  const leaveData = useMemo(() => {
+    const sums = { Annual: 0, Sick: 0, Casual: 0, Other: 0 };
+    leaves.forEach((l) => { sums[l.type] = (sums[l.type] || 0) + (l.days || 0); });
+    return [
+      { name: "Annual Leave", value: sums.Annual, color: "#3b82f6" },
+      { name: "Sick Leave",   value: sums.Sick,   color: "#ef4444" },
+      { name: "Casual Leave", value: sums.Casual, color: "#f59e0b" },
+      { name: "Other",        value: sums.Other,  color: "#8b5cf6" },
+    ];
+  }, [leaves]);
+
+  const statusData = useMemo(() => ([
+    { name: "Pending",  value: stats.pending,  color: "#f59e0b" },
+    { name: "Approved", value: stats.approved, color: "#10b981" },
+    { name: "Rejected", value: stats.rejected, color: "#ef4444" },
+  ]), [stats]);
+
+  const filteredLeaves = useMemo(() => {
+    if (!tableSearch.trim()) return leaves;
+    const t = tableSearch.toLowerCase();
+    return leaves.filter(r =>
+      r.name?.toLowerCase().includes(t) || r.empId?.toLowerCase().includes(t)
+    );
+  }, [tableSearch, leaves]);
+
   const buildQuery = () => {
     const p = new URLSearchParams();
     if (statusFilter !== "All Status") p.append("status", statusFilter);
@@ -93,6 +122,7 @@ export const ELeavePlanner = ({ darkMode }) => {
       console.error("Error loading leaves:", e);
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when data is loaded
     }
   };
 
@@ -201,6 +231,11 @@ export const ELeavePlanner = ({ darkMode }) => {
   useEffect(() => { loadUpcoming(); }, [upcomingEmp, yearFilter]);
   useEffect(() => { loadBalance(); }, [balanceEmp, yearFilter]);
 
+  // Show loader while loading
+  if (showLoader) {
+    return <Loader darkMode={darkMode} />;
+  }
+
   // CRUD
   const submitForm = async (e) => {
     e.preventDefault();
@@ -246,32 +281,6 @@ export const ELeavePlanner = ({ darkMode }) => {
       alert("Error deleting leave request. Please try again.");
     }
   };
-
-  // charts: distribution + status
-  const leaveData = useMemo(() => {
-    const sums = { Annual: 0, Sick: 0, Casual: 0, Other: 0 };
-    leaves.forEach((l) => { sums[l.type] = (sums[l.type] || 0) + (l.days || 0); });
-    return [
-      { name: "Annual Leave", value: sums.Annual, color: "#3b82f6" },
-      { name: "Sick Leave",   value: sums.Sick,   color: "#ef4444" },
-      { name: "Casual Leave", value: sums.Casual, color: "#f59e0b" },
-      { name: "Other",        value: sums.Other,  color: "#8b5cf6" },
-    ];
-  }, [leaves]);
-
-  const statusData = useMemo(() => ([
-    { name: "Pending",  value: stats.pending,  color: "#f59e0b" },
-    { name: "Approved", value: stats.approved, color: "#10b981" },
-    { name: "Rejected", value: stats.rejected, color: "#ef4444" },
-  ]), [stats]);
-
-  const filteredLeaves = useMemo(() => {
-    if (!tableSearch.trim()) return leaves;
-    const t = tableSearch.toLowerCase();
-    return leaves.filter(r =>
-      r.name?.toLowerCase().includes(t) || r.empId?.toLowerCase().includes(t)
-    );
-  }, [tableSearch, leaves]);
 
   /* --------------------- PDF (polished design + dark-green theme) --------------------- */
 

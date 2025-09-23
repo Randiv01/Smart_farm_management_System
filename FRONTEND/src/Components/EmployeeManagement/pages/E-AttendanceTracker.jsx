@@ -33,6 +33,8 @@ import {
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import Loader from "../Loader/Loader.js";// Import the Loader component
+
 
 // Base URL for API calls
 const API_BASE_URL = "http://localhost:5000";
@@ -76,6 +78,16 @@ const ChartContainer = ({ title, children, darkMode, className = "" }) => (
 );
 
 export const AttendanceTracker = ({ darkMode }) => {
+  const getLocalDateString = (dateObj) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = new Date();
+  const todayStr = getLocalDateString(today);
+
   const [activeTab, setActiveTab] = useState("daily");
   const [showForm, setShowForm] = useState(false);
   const [attendanceData, setAttendanceData] = useState([]);
@@ -83,12 +95,12 @@ export const AttendanceTracker = ({ darkMode }) => {
   const [chartData, setChartData] = useState([]);
   const [reportStats, setReportStats] = useState({ attendanceRate: 0, lateArrivals: 0 });
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [reportPeriod, setReportPeriod] = useState("thisweek");
   const [formData, setFormData] = useState({
     employeeId: "",
     name: "",
-    date: new Date().toISOString().split("T")[0],
+    date: todayStr,
     checkIn: "",
     checkOut: "",
     status: "Present",
@@ -99,6 +111,7 @@ export const AttendanceTracker = ({ darkMode }) => {
   const [notification, setNotification] = useState({ show: false, message: "", type: "" });
   const [employeeStats, setEmployeeStats] = useState([]);
   const [attendanceTrend, setAttendanceTrend] = useState([]);
+  const [showLoader, setShowLoader] = useState(false); // New state for loader
 
   // keep the original record (for date-change detection)
   const originalRecordRef = useRef(null);
@@ -119,6 +132,7 @@ export const AttendanceTracker = ({ darkMode }) => {
 
   const fetchAttendanceData = async () => {
     setLoading(true);
+    setShowLoader(true); // Show loader when fetching data
     try {
       const params = {};
       if (selectedDate) params.date = selectedDate;
@@ -127,20 +141,27 @@ export const AttendanceTracker = ({ darkMode }) => {
       setAttendanceData(data);
     } catch (error) {
       showNotification("Error fetching attendance data. Make sure the server is running on port 5000.", "error");
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false);
+      setShowLoader(false); // Hide loader when done
+    }
   };
 
-  const fetchSummaryData = async () => {
+  const fetchSummaryData = async (dateStr = selectedDate) => {
+    setShowLoader(true); // Show loader for summary data
     try {
-      const { data } = await axios.get(`/api/attendance/summary/${selectedDate}`);
+      const { data } = await axios.get(`/api/attendance/summary/${dateStr}`);
       setSummaryData(data);
     } catch (error) {
       showNotification("Error fetching summary data", "error");
+    } finally {
+      setShowLoader(false); // Hide loader when done
     }
   };
 
   const fetchReportData = async () => {
     setLoading(true);
+    setShowLoader(true); // Show loader for report data
     try {
       const { data } = await axios.get("/api/attendance/reports", { params: { period: reportPeriod } });
       setChartData(data.chartData || []);
@@ -151,10 +172,13 @@ export const AttendanceTracker = ({ darkMode }) => {
         present: item.present,
         absent: item.absent,
       })));
-      await fetchSummaryData();
+      await fetchSummaryData(todayStr);
     } catch (error) {
       showNotification("Error fetching report data. Make sure the server is running on port 5000.", "error");
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false);
+      setShowLoader(false); // Hide loader when done
+    }
   };
 
   useEffect(() => {
@@ -212,7 +236,7 @@ export const AttendanceTracker = ({ darkMode }) => {
     setFormData({
       employeeId: "",
       name: "",
-      date: new Date().toISOString().split("T")[0],
+      date: todayStr,
       checkIn: "",
       checkOut: "",
       status: "Present",
@@ -225,10 +249,11 @@ export const AttendanceTracker = ({ darkMode }) => {
     if (!validateForm()) return;
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when submitting form
       const submitData = {
         employeeId: formData.employeeId.trim(),
         name: formData.name.trim(),
-        date: formData.date, // ISO yyyy-mm-dd string
+        date: formData.date, // local yyyy-mm-dd string
         checkIn: formData.checkIn ? convertToDisplayTime(formData.checkIn) : "-",
         checkOut: formData.checkOut ? convertToDisplayTime(formData.checkOut) : "-",
         status: formData.status,
@@ -254,12 +279,16 @@ export const AttendanceTracker = ({ darkMode }) => {
     } catch (error) {
       const errorMsg = error?.response?.data?.message || "Error saving attendance record. Make sure the server is running.";
       showNotification(errorMsg, "error");
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false);
+      setShowLoader(false); // Hide loader when done
+    }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this attendance record?")) return;
     try {
+      setShowLoader(true); // Show loader when deleting
       await axios.delete(`/api/attendance/${id}`);
       showNotification("Attendance record deleted successfully!");
       await fetchAttendanceData();
@@ -267,16 +296,20 @@ export const AttendanceTracker = ({ darkMode }) => {
       if (activeTab === "reports") await fetchReportData();
     } catch {
       showNotification("Error deleting attendance record", "error");
+    } finally {
+      setShowLoader(false); // Hide loader when done
     }
   };
 
   const handleEdit = (record) => {
     // keep a copy for date-change detection (ISO day string)
-    originalRecordRef.current = { id: record._id, dateISO: new Date(record.date).toISOString().split("T")[0] };
+    const localDate = new Date(record.date);
+    const dateStr = getLocalDateString(localDate);
+    originalRecordRef.current = { id: record._id, dateISO: dateStr };
     setFormData({
       employeeId: record.employeeId,
       name: record.name,
-      date: new Date(record.date).toISOString().split("T")[0],
+      date: dateStr,
       checkIn: record.checkIn !== "-" ? convertToTimeInput(record.checkIn) : "",
       checkOut: record.checkOut !== "-" ? convertToTimeInput(record.checkOut) : "",
       status: record.status,
@@ -329,6 +362,9 @@ export const AttendanceTracker = ({ darkMode }) => {
 
   return (
     <div className={`font-sans min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"}`}>
+      {/* Loader Component */}
+      {showLoader && <Loader darkMode={darkMode} />}
+      
       {notification.show && (
         <Notification message={notification.message} type={notification.type} onClose={closeNotification} />
       )}

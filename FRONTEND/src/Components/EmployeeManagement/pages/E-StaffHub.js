@@ -20,17 +20,17 @@ import {
   MapPin,
   BookOpen,
   Award,
-  Loader,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import axios from "axios";
+import Loader from "../Loader/Loader.js";
 
 /* ---------- helpers: validation ---------- */
 
 // Sri Lankan mobile: allow 9–10 digits (7XXXXXXXX or 07XXXXXXXX)
-// (Matches the requirement “more than 8 or less than 10 characters” ⇒ 9 or 10)
+// (Matches the requirement "more than 8 or less than 10 characters" ⇒ 9 or 10)
 const isValidSLMobile = (val) => {
   if (!val) return false;
   const clean = String(val).replace(/\D/g, "");
@@ -82,6 +82,8 @@ export const StaffHub = ({ darkMode }) => {
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showLoader, setShowLoader] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   const formDataTemplate = {
     // common
@@ -246,6 +248,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const form = new FormData();
       Object.entries(formData).forEach(([k, v]) => {
@@ -273,6 +276,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to add employee.");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
@@ -281,6 +285,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const form = new FormData();
       Object.entries(formData).forEach(([k, v]) => {
@@ -310,11 +315,13 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to update employee.");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
   const handleDeleteEmployee = async (id) => {
     setLoading((p) => ({ ...p, employees: true }));
+    setShowLoader(true);
     try {
       const response = await fetch(
         `http://localhost:5000/api/employees/${id}`,
@@ -332,6 +339,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to delete employee.");
     } finally {
       setLoading((p) => ({ ...p, employees: false }));
+      setShowLoader(false);
     }
   };
 
@@ -341,6 +349,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -369,6 +378,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to add doctor");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
@@ -377,6 +387,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -407,11 +418,13 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to update doctor");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
   const handleDeleteDoctor = async (id) => {
     setLoading((p) => ({ ...p, doctors: true }));
+    setShowLoader(true);
     try {
       await axios.delete(`http://localhost:5000/api/doctors/${id}`);
       fetchDoctors();
@@ -422,6 +435,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to delete doctor");
     } finally {
       setLoading((p) => ({ ...p, doctors: false }));
+      setShowLoader(false);
     }
   };
 
@@ -431,6 +445,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -459,6 +474,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to add plant pathologist");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
@@ -467,6 +483,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -497,11 +514,13 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to update plant pathologist");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
   const handleDeletePathologist = async (id) => {
     setLoading((p) => ({ ...p, pathologists: true }));
+    setShowLoader(true);
     try {
       await axios.delete(
         `http://localhost:5000/api/plant-pathologists/${id}`
@@ -514,6 +533,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to delete plant pathologist");
     } finally {
       setLoading((p) => ({ ...p, pathologists: false }));
+      setShowLoader(false);
     }
   };
 
@@ -713,8 +733,8 @@ export const StaffHub = ({ darkMode }) => {
               <tr>
                 <td colSpan="10" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" /> Loading
-                    employees...
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+                    Loading employees...
                   </div>
                 </td>
               </tr>
@@ -773,7 +793,8 @@ export const StaffHub = ({ darkMode }) => {
                       <img
                         src={`http://localhost:5000${employee.photo}`}
                         alt="Employee"
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-10 w-10 rounded-full object-cover cursor-pointer"
+                        onClick={() => setSelectedPhoto(`http://localhost:5000${employee.photo}`)}
                       />
                     ) : (
                       "—"
@@ -806,10 +827,10 @@ export const StaffHub = ({ darkMode }) => {
                         href={`http://localhost:5000/api/employees/${employee.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        className="inline-flex items-center text-green-500 hover:underline p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
                         title="Generate PDF Report"
                       >
-                        <FileText size={16} className="text-green-500" />
+                        <FileText size={14} className="mr-1" /> PDF
                       </a>
                       <button
                         onClick={() => handleEdit(employee, "employee")}
@@ -871,7 +892,7 @@ export const StaffHub = ({ darkMode }) => {
               <tr>
                 <td colSpan="7" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" />
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
                     Loading doctors...
                   </div>
                 </td>
@@ -1063,8 +1084,8 @@ export const StaffHub = ({ darkMode }) => {
               <tr>
                 <td colSpan="7" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" /> Loading
-                    pathologists...
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+                    Loading pathologists...
                   </div>
                 </td>
               </tr>
@@ -1229,10 +1250,12 @@ export const StaffHub = ({ darkMode }) => {
     </div>
   );
 
- 
   /* ---------- render ---------- */
   return (
     <div className="p-4">
+      {/* Loader Component */}
+      {showLoader && <Loader darkMode={darkMode} />}
+
       {successMessage && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in">
           <div
@@ -1262,7 +1285,7 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Users size={18} />
           <span>Employees</span>
-          {loading.employees && <Loader size={16} className="animate-spin" />}
+          {loading.employees && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
         </button>
         <button
           onClick={() => setActiveTab("doctors")}
@@ -1276,7 +1299,7 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Stethoscope size={18} />
           <span>Doctors</span>
-          {loading.doctors && <Loader size={16} className="animate-spin" />}
+          {loading.doctors && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
         </button>
         <button
           onClick={() => setActiveTab("pathologists")}
@@ -1290,7 +1313,7 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Leaf size={18} />
           <span>Plant Pathologists</span>
-          {loading.pathologists && <Loader size={16} className="animate-spin" />}
+          {loading.pathologists && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
         </button>
       </div>
 
@@ -1485,10 +1508,50 @@ export const StaffHub = ({ darkMode }) => {
                 disabled={loading.employees || loading.doctors || loading.pathologists}
               >
                 {loading.employees || loading.doctors || loading.pathologists ? (
-                  <Loader size={16} className="animate-spin mx-4" />
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-4"></div>
                 ) : (
                   "Delete"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Modal */}
+      {selectedPhoto && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
+          onClick={() => setSelectedPhoto(null)}
+        >
+          <div 
+            className={`rounded-lg p-6 max-w-3xl w-full ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Profile Photo</h2>
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <img 
+                src={selectedPhoto} 
+                alt="Enlarged profile" 
+                className="max-h-[70vh] max-w-full rounded-lg shadow-lg object-contain" 
+              />
+            </div>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className={`px-4 py-2 rounded-md ${
+                  darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                } transition`}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -2065,7 +2128,7 @@ export const StaffHub = ({ darkMode }) => {
                 >
                   {loading.form ? (
                     <>
-                      <Loader size={16} className="animate-spin" />
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>Processing...</span>
                     </>
                   ) : (

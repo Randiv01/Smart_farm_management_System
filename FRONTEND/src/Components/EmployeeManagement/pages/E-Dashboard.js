@@ -1,5 +1,5 @@
 // FRONTEND/src/Components/EmployeeManagement/pages/E-Dashboard.js
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -14,9 +14,11 @@ import {
 // ✅ Use default imports for charts
 import { EmployeeChart } from "../charts/E-EmployeeChart.js";
 import { AttendanceChart } from "../charts/E-AttendanceChart.js";
-
+import Loader from "../Loader/Loader.js"; // Import the Loader component
 
 export const Dashboard = ({ setActiveModule, darkMode }) => {
+  const [showLoader, setShowLoader] = useState(true); // Loader state
+
   const modules = [
     { id: "staff", name: "Staff Hub", icon: <Users size={24} />, count: 48, change: "+2" },
     { id: "attendance", name: "Attendance Tracker", icon: <ClipboardCheck size={24} />, count: 42, change: "-3" },
@@ -26,6 +28,20 @@ export const Dashboard = ({ setActiveModule, darkMode }) => {
     { id: "reports", name: "Employee Report Center", icon: <FileText size={24} /> },
     { id: "settings", name: "System Settings", icon: <Settings size={24} /> },
   ];
+
+  // Simulate loading data
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowLoader(false);
+    }, 1500); // Show loader for 1.5 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Show loader while loading
+  if (showLoader) {
+    return <Loader darkMode={darkMode} />;
+  }
 
   return (
     <div className="min-h-screen bg-light-beige p-6">

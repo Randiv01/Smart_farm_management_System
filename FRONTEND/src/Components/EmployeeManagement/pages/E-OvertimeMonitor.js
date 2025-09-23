@@ -12,9 +12,10 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { FileDown, Filter, Plus, ChevronDown, Loader, Edit, Trash2, X } from 'lucide-react';
+import { FileDown, Filter, Plus, ChevronDown, Edit, Trash2, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import Loader from '../Loader/Loader.js'; // Import the Loader component
 
 
 // ===== helpers to build a professional Overtime ID (frontend fallback) =====
@@ -55,6 +56,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
 
   const [overtimeRecords, setOvertimeRecords] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showLoader, setShowLoader] = useState(true); // Loader state
 
   // records filtering/pagination
   const [filters, setFilters] = useState({
@@ -83,6 +85,20 @@ export const OvertimeMonitor = ({ darkMode }) => {
   const [topRange, setTopRange] = useState('thisMonth'); // thisMonth | lastMonth
   const [topEmployees, setTopEmployees] = useState([]);  // for pie chart
 
+  // ===== compute stats directly from the table (for the selected month/year) =====
+  // Move useMemo hooks before any conditional returns
+  const { totalOvertimeHours, avgPerEmployeeHours } = useMemo(() => {
+    if (!Array.isArray(overtimeRecords) || overtimeRecords.length === 0) {
+      return { totalOvertimeHours: 0, avgPerEmployeeHours: 0 };
+    }
+    const total = overtimeRecords.reduce((sum, r) => sum + (Number(r.overtimeHours) || 0), 0);
+    const uniqueEmployees = new Set(overtimeRecords.map((r) => r.employee?._id || r.employee)).size;
+    return {
+      totalOvertimeHours: total,
+      avgPerEmployeeHours: uniqueEmployees ? total / uniqueEmployees : 0,
+    };
+  }, [overtimeRecords]);
+
   // fetch employees
   useEffect(() => {
     (async () => {
@@ -99,6 +115,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
   // fetch overtime records (list table)
   const fetchOvertimeRecords = async () => {
     setLoading(true);
+    setShowLoader(true); // Show loader when fetching data
     try {
       const params = new URLSearchParams({
         month: filters.month,
@@ -115,12 +132,14 @@ export const OvertimeMonitor = ({ darkMode }) => {
       console.error('Error fetching overtime records:', e);
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
   // analytics fetchers
   const fetchTrend = async () => {
     setLoading(true);
+    setShowLoader(true); // Show loader when fetching analytics
     try {
       const res = await fetch(
         `http://localhost:5000/api/overtime/analytics?mode=trend&window=${trendWindow}`
@@ -136,11 +155,13 @@ export const OvertimeMonitor = ({ darkMode }) => {
       console.error('Error fetching trend:', e);
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
   const fetchTopEmployees = async () => {
     setLoading(true);
+    setShowLoader(true); // Show loader when fetching analytics
     try {
       const res = await fetch(
         `http://localhost:5000/api/overtime/analytics?mode=top&range=${topRange}`
@@ -151,6 +172,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
       console.error('Error fetching top employees:', e);
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
@@ -182,6 +204,11 @@ export const OvertimeMonitor = ({ darkMode }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topRange]);
 
+  // Show loader while loading
+  if (showLoader) {
+    return <Loader darkMode={darkMode} />;
+  }
+
   // helpers
   const handleFilterChange = (key, val) => setFilters((f) => ({ ...f, [key]: val }));
   const applyFilters = () => {
@@ -209,6 +236,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setShowLoader(true); // Show loader when submitting form
       const url = editingRecord
         ? `http://localhost:5000/api/overtime/${editingRecord}`
         : 'http://localhost:5000/api/overtime';
@@ -225,32 +253,24 @@ export const OvertimeMonitor = ({ darkMode }) => {
       fetchOvertimeRecords();
     } catch (e) {
       console.error('Error saving record:', e);
+    } finally {
+      setShowLoader(false); // Hide loader when done
     }
   };
 
   const handleDelete = async (id) => {
     try {
+      setShowLoader(true); // Show loader when deleting
       const res = await fetch(`http://localhost:5000/api/overtime/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete');
       setDeleteConfirm(null);
       fetchOvertimeRecords();
     } catch (e) {
       console.error('Error deleting record:', e);
+    } finally {
+      setShowLoader(false); // Hide loader when done
     }
   };
-
-  // ===== compute stats directly from the table (for the selected month/year) =====
-  const { totalOvertimeHours, avgPerEmployeeHours } = useMemo(() => {
-    if (!Array.isArray(overtimeRecords) || overtimeRecords.length === 0) {
-      return { totalOvertimeHours: 0, avgPerEmployeeHours: 0 };
-    }
-    const total = overtimeRecords.reduce((sum, r) => sum + (Number(r.overtimeHours) || 0), 0);
-    const uniqueEmployees = new Set(overtimeRecords.map((r) => r.employee?._id || r.employee)).size;
-    return {
-      totalOvertimeHours: total,
-      avgPerEmployeeHours: uniqueEmployees ? total / uniqueEmployees : 0,
-    };
-  }, [overtimeRecords]);
 
   const formatHours = (hours) => {
     const whole = Math.floor(Number(hours) || 0);
@@ -334,14 +354,8 @@ export const OvertimeMonitor = ({ darkMode }) => {
         </button>
       </div>
 
-      {loading && (
-        <div className="flex justify-center items-center py-8">
-          <Loader className="animate-spin" size={32} />
-        </div>
-      )}
-
       {/* RECORDS TAB */}
-      {!loading && activeTab === 'records' && (
+      {activeTab === 'records' && (
         <>
           {/* Toolbar */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -512,7 +526,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
       )}
 
       {/* ANALYTICS TAB */}
-      {!loading && activeTab === 'analytics' && (
+      {activeTab === 'analytics' && (
         <div className="space-y-6">
           {/* Controls (Export removed) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

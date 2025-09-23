@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useETheme } from '../Econtexts/EThemeContext.jsx';
-import { FiCheck, FiX, FiCamera, FiTrash2, FiAlertCircle, FiUploadCloud, FiUser } from 'react-icons/fi';
+import { FiCheck, FiX, FiCamera, FiTrash2, FiAlertCircle, FiUser } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import io from 'socket.io-client';
+import Loader from '../Loader/Loader.js'; // Import the Loader component
 
 // Polished MessagePopup
 const MessagePopup = ({ type, message, show, onClose }) => {
@@ -87,6 +88,7 @@ const ESystemSettings = () => {
   const { theme, toggleTheme } = useETheme();
   const darkMode = theme === 'dark';
   const [loading, setLoading] = useState(false);
+  const [showLoader, setShowLoader] = useState(true); // Loader state
   const [socket, setSocket] = useState(null);
 
   const [activeTab, setActiveTab] = useState('profile');
@@ -163,6 +165,7 @@ const ESystemSettings = () => {
     const fetchUserProfile = async () => {
       try {
         setLoading(true);
+        setShowLoader(true); // Show loader when fetching data
         const token = localStorage.getItem('token');
         const response = await axios.get('/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` },
@@ -178,6 +181,7 @@ const ESystemSettings = () => {
         showMessage('error', error.response?.data?.error || 'Failed to fetch user profile');
       } finally {
         setLoading(false);
+        setShowLoader(false); // Hide loader when done
       }
     };
 
@@ -196,6 +200,11 @@ const ESystemSettings = () => {
     fetchUserProfile();
     fetchRoles();
   }, [showMessage, getProfileImageUrl]);
+
+  // Show loader while loading
+  if (showLoader) {
+    return <Loader darkMode={darkMode} />;
+  }
 
   // Input handlers
   const handleInputChange = (field, value) => {
@@ -271,6 +280,7 @@ const ESystemSettings = () => {
     if (!validateProfile()) return;
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when updating profile
       const token = localStorage.getItem('token');
       const updateData = {
         firstName: userData.firstName,
@@ -298,6 +308,7 @@ const ESystemSettings = () => {
       showMessage('error', error.response?.data?.error || 'Failed to update profile');
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
@@ -305,6 +316,7 @@ const ESystemSettings = () => {
     if (!validatePassword()) return;
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when updating password
       const token = localStorage.getItem('token');
       await axios.put(
         '/api/users/change-password',
@@ -323,6 +335,7 @@ const ESystemSettings = () => {
       showMessage('error', error.response?.data?.error || 'Failed to change password');
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
@@ -340,6 +353,7 @@ const ESystemSettings = () => {
     }
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when uploading image
       const formData = new FormData();
       formData.append('profileImage', file);
       const token = localStorage.getItem('token');
@@ -360,12 +374,14 @@ const ESystemSettings = () => {
       showMessage('error', error.response?.data?.error || 'Failed to upload image');
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
   const handleRemoveImage = async () => {
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when removing image
       const token = localStorage.getItem('token');
       await axios.delete('/api/users/profile-image', {
         headers: { Authorization: `Bearer ${token}` },
@@ -381,6 +397,7 @@ const ESystemSettings = () => {
       showMessage('error', error.response?.data?.error || 'Failed to remove image');
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
@@ -390,6 +407,7 @@ const ESystemSettings = () => {
     }
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when deactivating account
       const token = localStorage.getItem('token');
       await axios.put('/api/users/deactivate', {}, {
         headers: { Authorization: `Bearer ${token}` },
@@ -400,6 +418,7 @@ const ESystemSettings = () => {
       console.error('Error deactivating account:', error);
       showMessage('error', error.response?.data?.error || 'Failed to deactivate account');
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
@@ -409,6 +428,7 @@ const ESystemSettings = () => {
     }
     try {
       setLoading(true);
+      setShowLoader(true); // Show loader when deleting account
       const token = localStorage.getItem('token');
       await axios.delete('/api/users/account', {
         headers: { Authorization: `Bearer ${token}` },
@@ -419,6 +439,7 @@ const ESystemSettings = () => {
       console.error('Error deleting account:', error);
       showMessage('error', error.response?.data?.error || 'Failed to delete account');
       setLoading(false);
+      setShowLoader(false); // Hide loader when done
     }
   };
 
@@ -437,14 +458,14 @@ const ESystemSettings = () => {
   };
 
   return (
-    <div className={`h-full min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className={`h-full ${darkMode ? 'bg-gray-900 text-gray-200' : 'bg-gray-50 text-gray-800'}`}>
       <div className="max-w-5xl mx-auto p-6 md:p-10">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
               System Settings
             </h2>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Manage your profile, password and account settings.</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage your profile, password and account settings.</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-500 dark:text-gray-400">Preview</div>
@@ -452,7 +473,7 @@ const ESystemSettings = () => {
               {imagePreview ? (
                 <img src={imagePreview} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <FiUser className="w-6 h-6 text-gray-500 dark:text-gray-300" />
+                <FiUser className="w-6 h-6 text-gray-500 dark:text-gray-400" />
               )}
             </div>
           </div>
@@ -559,7 +580,7 @@ const ESystemSettings = () => {
                           validationErrors[item.field]
                             ? 'border-red-400 ring-red-100'
                             : darkMode
-                            ? 'bg-gray-700 text-white border-gray-600'
+                            ? 'bg-gray-700 text-gray-200 border-gray-600'
                             : 'bg-white text-gray-800 border-gray-200'
                         }`}
                       />
@@ -592,7 +613,7 @@ const ESystemSettings = () => {
                           onChange={(e) => handleInputChange('specialization', e.target.value)}
                           maxLength="100"
                           className={`w-full p-3 rounded-xl border ${
-                            darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-800 border-gray-200'
+                            darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white text-gray-800 border-gray-200'
                           }`}
                           disabled={loading}
                         />
@@ -606,7 +627,7 @@ const ESystemSettings = () => {
                           value={userData.experience}
                           onChange={(e) => handleInputChange('experience', e.target.value)}
                           className={`w-full p-3 rounded-xl border ${
-                            darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-800 border-gray-200'
+                            darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white text-gray-800 border-gray-200'
                           }`}
                           disabled={loading}
                         />
@@ -619,7 +640,7 @@ const ESystemSettings = () => {
                           onChange={(e) => handleInputChange('education', e.target.value)}
                           maxLength="200"
                           className={`w-full p-3 rounded-xl border ${
-                            darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-800 border-gray-200'
+                            darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white text-gray-800 border-gray-200'
                           }`}
                           disabled={loading}
                         />
@@ -628,7 +649,7 @@ const ESystemSettings = () => {
                   )}
 
                   <div className="md:col-span-2">
-                    <label className="blocktext-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
                     <textarea
                       value={userData.bio}
                       onChange={(e) => handleInputChange('bio', e.target.value)}
@@ -638,7 +659,7 @@ const ESystemSettings = () => {
                         validationErrors.bio
                           ? 'border-red-400 ring-red-100'
                           : darkMode
-                          ? 'bg-gray-700 text-white border-gray-600'
+                          ? 'bg-gray-700 text-gray-200 border-gray-600'
                           : 'bg-white text-gray-800 border-gray-200'
                       }`}
                       disabled={loading}
@@ -672,7 +693,7 @@ const ESystemSettings = () => {
           {/* Password Tab */}
           {activeTab === 'password' && (
             <div className="space-y-6 max-w-xl">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Change Password</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Change Password</h3>
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password *</label>
@@ -681,7 +702,7 @@ const ESystemSettings = () => {
                     value={passwordData.currentPassword}
                     onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
                     className={`w-full p-3 rounded-xl border ${
-                      validationErrors.currentPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'
+                      validationErrors.currentPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white border-gray-200'
                     }`}
                     disabled={loading}
                   />
@@ -694,7 +715,7 @@ const ESystemSettings = () => {
                     value={passwordData.newPassword}
                     onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                     className={`w-full p-3 rounded-xl border ${
-                      validationErrors.newPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'
+                      validationErrors.newPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white border-gray-200'
                     }`}
                     disabled={loading}
                   />
@@ -707,7 +728,7 @@ const ESystemSettings = () => {
                     value={passwordData.confirmPassword}
                     onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
                     className={`w-full p-3 rounded-xl border ${
-                      validationErrors.confirmPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-200'
+                      validationErrors.confirmPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white border-gray-200'
                     }`}
                     disabled={loading}
                   />
