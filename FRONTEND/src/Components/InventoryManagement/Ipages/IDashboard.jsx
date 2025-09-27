@@ -212,91 +212,240 @@ const IDashboard = () => {
   const generatePDFReport = async () => {
     setGeneratingReport(true);
     try {
-      const pdf = new jsPDF();
-      let yPosition = 20;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      // Company information
+      const companyName = "Mount Olive Farm House";
+      const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+      const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+      const reportDate = new Date().toLocaleDateString();
+      const reportTime = new Date().toLocaleTimeString();
+      
+      // Professional color scheme
+      const primaryColor = [34, 197, 94]; // Green
+      const secondaryColor = [16, 185, 129]; // Teal
+      const accentColor = [59, 130, 246]; // Blue
+      const textColor = [31, 41, 55]; // Dark gray
+      const lightGray = [243, 244, 246];
 
-      // Add title
-      pdf.setFontSize(20);
-      pdf.setTextColor(34, 197, 94); // Green color
-      pdf.text('Farm Manager Inventory Report', 20, yPosition);
-      yPosition += 15;
+      // Add real company logo
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          pdf.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+          generatePDFContent();
+        };
+        logoImg.onerror = () => {
+          // Fallback to placeholder if logo fails to load
+          pdf.setFillColor(...primaryColor);
+          pdf.rect(20, 15, 25, 25, 'F');
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(12);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('MOF', 30, 30, { align: 'center' });
+          generatePDFContent();
+        };
+        logoImg.src = '/logo512.png';
+      } catch (error) {
+        console.error('Error loading logo:', error);
+        // Fallback to placeholder
+        pdf.setFillColor(...primaryColor);
+        pdf.rect(20, 15, 25, 25, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('MOF', 30, 30, { align: 'center' });
+        generatePDFContent();
+      }
 
-      // Add date
+      const generatePDFContent = () => {
+
+      // Company header
+      pdf.setTextColor(...textColor);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(companyName, 50, 20);
+      
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(companyAddress, 50, 27);
+      pdf.text(companyContact, 50, 32);
+
+      // Report title with professional styling
+      pdf.setFillColor(...lightGray);
+      pdf.rect(20, 40, 170, 12, 'F');
+      pdf.setTextColor(...primaryColor);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('INVENTORY MANAGEMENT REPORT', 105, 49, { align: 'center' });
+
+      // Report metadata
+      pdf.setTextColor(...textColor);
       pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
-      yPosition += 20;
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 60);
+      pdf.text(`Report ID: MOF-IM-${Date.now().toString().slice(-6)}`, 20, 65);
 
-      // Summary section
+      let yPosition = 75;
+
+      // Summary section with professional styling
       if (reportOptions.sections.summary) {
-        pdf.setFontSize(16);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text('SUMMARY', 20, yPosition);
-        yPosition += 10;
+        pdf.setFillColor(...secondaryColor);
+        pdf.rect(20, yPosition, 170, 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('INVENTORY SUMMARY', 25, yPosition + 6);
+        yPosition += 15;
 
         const summaryData = [
-          ['Metric', 'Value', 'Trend'],
-          ['Total Stock', dashboardData.totalStock.toString(), `${dashboardData.trends.totalStock}%`],
-          ['Export Stock', dashboardData.exportStock.toString(), `${dashboardData.trends.exportStock}%`],
-          ['Local Sales', dashboardData.localSales.toString(), `${dashboardData.trends.localSales}%`],
-          ['Total Value', `$${dashboardData.totalValue}`, `${dashboardData.trends.totalValue}%`]
+          ['Metric', 'Current Value', 'Trend', 'Status'],
+          ['Total Stock', dashboardData.totalStock.toString(), `${dashboardData.trends.totalStock}%`, 'Active'],
+          ['Export Stock', dashboardData.exportStock.toString(), `${dashboardData.trends.exportStock}%`, 'Active'],
+          ['Local Sales', dashboardData.localSales.toString(), `${dashboardData.trends.localSales}%`, 'Active'],
+          ['Total Value', `$${dashboardData.totalValue}`, `${dashboardData.trends.totalValue}%`, 'Active']
         ];
 
-        pdf.setFontSize(10);
-        summaryData.forEach((row, index) => {
-          pdf.text(row[0], 20, yPosition + (index * 8));
-          pdf.text(row[1], 80, yPosition + (index * 8));
-          pdf.text(row[2], 120, yPosition + (index * 8));
+        // Create professional table for summary
+        pdf.autoTable({
+          head: [summaryData[0]],
+          body: summaryData.slice(1),
+          startY: yPosition,
+          theme: 'grid',
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 10
+          },
+          bodyStyles: {
+            fontSize: 9,
+            textColor: textColor,
+            cellPadding: 3
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 20, right: 20 }
         });
-        yPosition += (summaryData.length * 8) + 15;
+
+        yPosition = pdf.lastAutoTable.finalY + 15;
       }
 
-      // Low stock alerts
+      // Low stock alerts with professional styling
       if (reportOptions.sections.alerts && lowStockItems.length > 0) {
-        pdf.setFontSize(16);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text('LOW STOCK ALERTS', 20, yPosition);
-        yPosition += 10;
+        pdf.setFillColor(...accentColor);
+        pdf.rect(20, yPosition, 170, 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('LOW STOCK ALERTS', 25, yPosition + 6);
+        yPosition += 15;
 
-        pdf.setFontSize(10);
-        lowStockItems.forEach((item, index) => {
-          if (yPosition > 250) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(`${item.name} (${item.category}): ${item.current}/${item.threshold} units`, 25, yPosition + (index * 8));
+        const alertData = lowStockItems.map(item => [
+          item.name,
+          item.category,
+          `${item.current}/${item.threshold}`,
+          'Critical'
+        ]);
+
+        pdf.autoTable({
+          head: [['Item Name', 'Category', 'Current/Threshold', 'Status']],
+          body: alertData,
+          startY: yPosition,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [239, 68, 68], // Red for alerts
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 10
+          },
+          bodyStyles: {
+            fontSize: 9,
+            textColor: textColor,
+            cellPadding: 3
+          },
+          alternateRowStyles: {
+            fillColor: [254, 242, 242] // Light red
+          },
+          margin: { left: 20, right: 20 }
         });
-        yPosition += (lowStockItems.length * 8) + 15;
+
+        yPosition = pdf.lastAutoTable.finalY + 15;
       }
 
-      // Add charts if requested
+      // Stock distribution section
       if (reportOptions.includeCharts && reportOptions.sections.charts) {
-        if (yPosition > 200) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        pdf.setFillColor(...secondaryColor);
+        pdf.rect(20, yPosition, 170, 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('STOCK DISTRIBUTION', 25, yPosition + 6);
+        yPosition += 15;
 
-        pdf.setFontSize(16);
-        pdf.text('STOCK DISTRIBUTION', 20, yPosition);
-        yPosition += 10;
+        const distributionData = chartData.stockDistribution.map(item => [
+          item.name,
+          item.value.toString(),
+          'Active'
+        ]);
 
-        // Capture chart as image (simplified version)
-        pdf.setFontSize(10);
-        pdf.text('Chart: Stock distribution across categories', 20, yPosition);
-        yPosition += 20;
-
-        // Add a simple table representation of the chart data
-        chartData.stockDistribution.forEach((item, index) => {
-          if (yPosition > 250) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(`${item.name}: ${item.value} units`, 25, yPosition + (index * 8));
+        pdf.autoTable({
+          head: [['Category', 'Stock Units', 'Status']],
+          body: distributionData,
+          startY: yPosition,
+          theme: 'grid',
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 10
+          },
+          bodyStyles: {
+            fontSize: 9,
+            textColor: textColor,
+            cellPadding: 3
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 20, right: 20 }
         });
       }
 
-      pdf.save(`farm-inventory-report-${new Date().toISOString().split('T')[0]}.pdf`);
-      setSuccess("PDF report generated successfully!");
+      // Professional footer
+      const pageCount = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        
+        // Footer background
+        pdf.setFillColor(...lightGray);
+        pdf.rect(0, 280, 210, 20, 'F');
+        
+        // Footer content
+        pdf.setTextColor(...textColor);
+        pdf.setFontSize(8);
+        pdf.text(`Page ${i} of ${pageCount}`, 20, 288);
+        pdf.text(`Generated on ${new Date().toLocaleString()}`, 105, 288, { align: 'center' });
+        pdf.text(companyName, 190, 288, { align: 'right' });
+        
+        // Footer line
+        pdf.setDrawColor(...primaryColor);
+        pdf.setLineWidth(0.5);
+        pdf.line(20, 290, 190, 290);
+        
+        // Disclaimer
+        pdf.setTextColor(100, 100, 100);
+        pdf.setFontSize(7);
+        pdf.text("This report is generated by Mount Olive Farm House Management System", 105, 295, { align: 'center' });
+      }
+
+        // Save PDF with professional naming
+        const fileName = `MOF_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        pdf.save(fileName);
+        setSuccess("PDF report generated successfully!");
+      };
     } catch (error) {
       setError("Failed to generate PDF report");
     } finally {

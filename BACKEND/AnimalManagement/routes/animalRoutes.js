@@ -10,6 +10,8 @@ import {
   updateAnimalHealth,
   createBatchAnimals,
   deleteBatchAnimals,
+  deleteAnimalsByType,
+  deleteAnimalTypeCompletely,
   moveAnimalToZone,
   getAnimalsByBatch,
   updateBatchAnimals
@@ -33,6 +35,10 @@ router.post('/group', createBatchAnimals);
 router.get('/batch/:batchId', getAnimalsByBatch);
 router.put('/batch/:batchId', updateBatchAnimals);
 router.delete('/batch/:batchId', deleteBatchAnimals);
+
+// Type-based deletion routes
+router.delete('/type/:animalTypeId', deleteAnimalsByType);
+router.delete('/type/:animalTypeId/complete', deleteAnimalTypeCompletely);
 
 // Health info routes
 router.get('/:id/health', getAnimalHealth);

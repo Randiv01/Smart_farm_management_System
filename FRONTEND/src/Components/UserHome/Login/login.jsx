@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { EyeIcon, EyeOffIcon, ArrowLeftIcon } from 'lucide-react';
-import { FaGoogle, FaFacebook } from 'react-icons/fa'; // <-- Import icons
+import { FaFacebook } from 'react-icons/fa'; // <-- Import icons
 import { useAuth } from '../UHContext/UHAuthContext';
 
 const LoginPage = () => {
@@ -101,7 +101,7 @@ const LoginPage = () => {
 
           <div className="text-left font-bold text-dark-green text-2xl mb-2 flex items-center">
             <img 
-              src="/logo.png" 
+              src="/logo192.png" 
               alt="Mount Olive Farm Marketplace Logo" 
               className="h-8 w-8 mr-2" 
               onError={(e) => { e.target.onerror = null; e.target.src = "/favicon.ico"; }}

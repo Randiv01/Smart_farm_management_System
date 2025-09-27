@@ -32,7 +32,7 @@ export const EEmployeeReportCenter = () => {
     joined: "2022-05-15",
     contact: "+94 77 123 4567",
     email: "john.smith@smartfarm.com",
-    address: "123 Farm Road, Agricultural Zone",
+    address: "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka",
     attendance: { present: 21, absent: 1, leave: 1 },
     leave: { annual: { used: 6, total: 21 }, sick: { used: 2, total: 14 } },
     overtime: { currentMonth: 12.5, lastMonth: 10 },

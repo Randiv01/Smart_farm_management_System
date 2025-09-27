@@ -681,7 +681,7 @@ This is an automated emergency alert from Mount Olive Farm House Management Syst
 
         <div class="footer">
             <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">🚑 Mount Olive Farm House Medical Alert System</p>
-            <p style="margin: 0 0 15px 0; font-size: 14px; opacity: 0.9;">123 Farm Road, Agricultural District | Phone: +1 (555) 123-4567 | Email: emergency@mountolivefarm.com</p>
+            <p style="margin: 0 0 15px 0; font-size: 14px; opacity: 0.9;">No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka | Phone: +94 81 249 2134 | Email: info@mountolivefarm.com</p>
             <p style="margin: 0 0 15px 0; font-size: 13px; opacity: 0.8;">This is an automated emergency message. Please do not reply to this email.</p>
             <p style="margin: 0; font-size: 12px; opacity: 0.7;">
                 © ${new Date().getFullYear()} Mount Olive Farm House. All rights reserved.<br>
@@ -800,8 +800,13 @@ export const testEmail = async (req, res) => {
         </div>
 
         <div class="footer">
-            <p>Mount Olive Farm House Monitoring System</p>
-            <p>This is a test message. No action required.</p>
+            <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">🚑 Mount Olive Farm House Medical Alert System</p>
+            <p style="margin: 0 0 15px 0; font-size: 14px; opacity: 0.9;">No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka | Phone: +94 81 249 2134 | Email: info@mountolivefarm.com</p>
+            <p style="margin: 0 0 15px 0; font-size: 13px; opacity: 0.8;">This is a test message. No action required.</p>
+            <p style="margin: 0; font-size: 12px; opacity: 0.7;">
+                © ${new Date().getFullYear()} Mount Olive Farm House. All rights reserved.<br>
+                Sent from our automated animal health monitoring system
+            </p>
         </div>
     </div>
 </body>

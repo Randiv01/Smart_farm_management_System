@@ -1026,7 +1026,7 @@ const ISupplier = () => {
                           onChange={handleInputChange}
                           className={`w-full px-4 py-3 rounded-lg border transition-all focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
                           required
-                          placeholder="+1 (555) 123-4567"
+                          placeholder="+94 81 249 2134"
                         />
                       </div>
                       

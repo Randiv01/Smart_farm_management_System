@@ -4,6 +4,56 @@ import AnimalType from '../models/AnimalType.js';
 import mongoose from 'mongoose';
 import { canZoneAccommodate, updateZoneOccupancy } from '../utils/zoneOccupancy.js';
 
+// Helper function to delete all productivity records for a batch
+const deleteAllProductivityRecords = async (batchId, batchAnimal, individualAnimals, session) => {
+  const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+  
+  // Get all possible IDs that might be linked to productivity records
+  const allAnimalIds = [
+    batchAnimal._id,
+    ...individualAnimals.map(a => a._id)
+  ];
+  
+  // Try multiple deletion strategies
+  const deletionQueries = [
+    { batchId: batchId },
+    { batchId: batchAnimal.batchId },
+    { animalId: { $in: allAnimalIds } },
+    { isGroup: true, batchId: batchId },
+    { isGroup: false, animalId: { $in: allAnimalIds } }
+  ];
+  
+  let totalDeleted = 0;
+  
+  for (const query of deletionQueries) {
+    const result = await AnimalProductivity.deleteMany(query, { session });
+    if (result.deletedCount > 0) {
+      console.log(`Deleted ${result.deletedCount} productivity records with query:`, query);
+      totalDeleted += result.deletedCount;
+    }
+  }
+  
+  // Also try to find any remaining records by searching for the batch name or animal IDs
+  const remainingRecords = await AnimalProductivity.find({
+    $or: [
+      { animalId: { $in: allAnimalIds } },
+      { batchId: batchId },
+      { batchId: batchAnimal.batchId }
+    ]
+  });
+  
+  if (remainingRecords.length > 0) {
+    console.log(`Found ${remainingRecords.length} remaining productivity records, deleting by ID...`);
+    const finalResult = await AnimalProductivity.deleteMany({
+      _id: { $in: remainingRecords.map(r => r._id) }
+    }, { session });
+    totalDeleted += finalResult.deletedCount;
+  }
+  
+  console.log(`Total productivity records deleted: ${totalDeleted}`);
+  return totalDeleted;
+};
+
 
 // Create new animal with auto-generated AnimalID
 export const createAnimal = async (req, res) => {
@@ -131,7 +181,8 @@ export const createAnimal = async (req, res) => {
           await updateZoneOccupancy(zoneId, 1);
         }
         
-        return res.status(201).json(animal);
+        
+        return res.status(201).json(animal.toObject());
       } catch (fallbackError) {
         return res.status(500).json({ 
           message: 'Critical error in animal ID generation',
@@ -348,17 +399,85 @@ export const deleteAnimal = async (req, res) => {
     const animal = await Animal.findById(req.params.id);
     if (!animal) return res.status(404).json({ message: 'Animal not found' });
 
-    // Store zone ID before deletion
+    // Store zone ID and batch ID before deletion
     const zoneId = animal.assignedZone;
+    const batchId = animal.batchId;
+    const animalId = animal._id;
 
-    await Animal.findByIdAndDelete(req.params.id);
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Update zone occupancy if animal was assigned to a zone
-    if (zoneId) {
-      await updateZoneOccupancy(zoneId.toString(), -1);
+    try {
+      // 1. Delete the animal record
+      await Animal.findByIdAndDelete(req.params.id, { session });
+
+      // 2. Delete productivity records for this specific animal
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const productivityResult = await AnimalProductivity.deleteMany({ animalId }, { session });
+      console.log(`Deleted ${productivityResult.deletedCount} productivity records for animal ${animalId}`);
+
+      // 3. Delete feeding history records for this animal
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ animalId }, { session });
+      console.log(`Deleted ${feedingResult.deletedCount} feeding history records for animal ${animalId}`);
+
+      // 4. Delete harvest history records if this animal has any
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ 
+        $or: [
+          { animalId: animalId },
+          { batchId: batchId }
+        ]
+      }, { session });
+      console.log(`Deleted ${harvestResult.deletedCount} harvest records for animal ${animalId}`);
+
+      // 5. Delete meat productivity records if this animal has any
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ 
+        $or: [
+          { animalId: animalId },
+          { batchId: batchId }
+        ]
+      }, { session });
+      console.log(`Deleted ${meatResult.deletedCount} meat productivity records for animal ${animalId}`);
+
+      // 6. Delete notifications related to this animal
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        'relatedEntity.id': animalId
+      }, { session });
+      console.log(`Deleted ${notificationResult.deletedCount} notifications for animal ${animalId}`);
+
+      // 3. Update zone occupancy if animal was assigned to a zone
+      if (zoneId) {
+        await updateZoneOccupancy(zoneId.toString(), -1);
+        console.log(`Updated zone ${zoneId} occupancy by -1`);
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: 'Animal deleted successfully',
+        details: {
+          productivityRecords: productivityResult.deletedCount,
+          feedingRecords: feedingResult.deletedCount,
+          harvestRecords: harvestResult.deletedCount,
+          meatRecords: meatResult.deletedCount,
+          notifications: notificationResult.deletedCount,
+          zoneOccupancyReduced: 1
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
     }
 
-    res.json({ message: 'Animal deleted successfully' });
   } catch (error) {
     console.error('Delete animal error:', error);
     res.status(500).json({ message: error.message });
@@ -379,22 +498,369 @@ export const deleteBatchAnimals = async (req, res) => {
 
     // Store zone ID and count before deletion
     const zoneId = batchAnimal.assignedZone;
-    const count = batchAnimal.count;
+    const count = batchAnimal.count || 1; // Ensure count is at least 1
+    const animalType = batchAnimal.type;
+    
+    console.log(`Deleting batch ${batchId}: count=${count}, zoneId=${zoneId}`);
 
-    // Delete the batch record
-    await Animal.findByIdAndDelete(batchAnimal._id);
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Update zone occupancy if batch was assigned to a zone
-    if (zoneId) {
-      await updateZoneOccupancy(zoneId.toString(), -count);
+    try {
+      // 1. Delete all individual animals in this batch (if any exist)
+      const individualAnimals = await Animal.find({ batchId, isBatch: false });
+      const individualCount = individualAnimals.length;
+      
+      if (individualCount > 0) {
+        await Animal.deleteMany({ batchId, isBatch: false }, { session });
+        console.log(`Deleted ${individualCount} individual animals from batch ${batchId}`);
+      }
+
+      // 2. Delete the batch record
+      await Animal.findByIdAndDelete(batchAnimal._id, { session });
+
+      // 3. Delete all productivity records for this batch (total/day/week/month/year)
+      const productivityDeletedCount = await deleteAllProductivityRecords(batchId, batchAnimal, individualAnimals, session);
+      
+      // Verify all productivity records are deleted
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const remainingProductivity = await AnimalProductivity.find({
+        $or: [
+          { batchId: batchId },
+          { animalId: batchAnimal._id },
+          { animalId: { $in: individualAnimals.map(a => a._id) } }
+        ]
+      });
+      
+      if (remainingProductivity.length > 0) {
+        console.log(`WARNING: ${remainingProductivity.length} productivity records still exist after deletion!`);
+        console.log('Remaining records:', remainingProductivity.map(r => ({ id: r._id, batchId: r.batchId, animalId: r.animalId })));
+      } else {
+        console.log(`✅ All productivity records successfully deleted for batch ${batchId}`);
+      }
+
+      // 4. Delete all harvest history records for this batch
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ batchId }, { session });
+      console.log(`Deleted ${harvestResult.deletedCount} harvest records for batch ${batchId}`);
+
+      // 5. Delete all meat productivity records for this batch
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ batchId }, { session });
+      console.log(`Deleted ${meatResult.deletedCount} meat productivity records for batch ${batchId}`);
+
+      // 6. Delete all feeding history records for individual animals in this batch
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ 
+        animalId: { $in: individualAnimals.map(a => a._id) } 
+      }, { session });
+      console.log(`Deleted ${feedingResult.deletedCount} feeding history records for batch ${batchId}`);
+
+      // 7. Delete all notifications related to this batch
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        $or: [
+          { 'relatedEntity.id': { $in: individualAnimals.map(a => a._id) } },
+          { 'relatedEntity.id': batchAnimal._id }
+        ]
+      }, { session });
+      console.log(`Deleted ${notificationResult.deletedCount} notifications for batch ${batchId}`);
+
+      // 6. Update zone occupancy if batch was assigned to a zone
+      if (zoneId) {
+        console.log(`Updating zone ${zoneId} occupancy by -${count} (current count: ${count})`);
+        const updatedZone = await updateZoneOccupancy(zoneId.toString(), -count);
+        console.log(`Zone ${zoneId} occupancy updated: ${updatedZone.currentOccupancy}/${updatedZone.capacity}`);
+      } else {
+        console.log(`No zone assigned to batch ${batchId}, skipping zone update`);
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: `Successfully deleted batch ${batchId}`,
+        details: {
+          batchAnimals: count,
+          individualAnimals: individualCount,
+          productivityRecords: productivityDeletedCount,
+          harvestRecords: harvestResult.deletedCount,
+          meatRecords: meatResult.deletedCount,
+          feedingRecords: feedingResult.deletedCount,
+          notifications: notificationResult.deletedCount,
+          zoneOccupancyReduced: count
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
     }
 
-    res.json({ 
-      message: `Deleted batch ${batchId} containing ${count} animals`,
-      deletedCount: count
-    });
   } catch (error) {
     console.error('Delete batch animals error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete all animals of a specific type (cascading delete for animal type deletion)
+export const deleteAnimalsByType = async (req, res) => {
+  try {
+    const { animalTypeId } = req.params;
+    
+    // Find all animals of this type
+    const animals = await Animal.find({ type: animalTypeId });
+    if (animals.length === 0) {
+      return res.json({ 
+        message: 'No animals found for this type',
+        details: { deletedCount: 0 }
+      });
+    }
+
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      let totalZoneOccupancyReduced = 0;
+      let totalProductivityRecords = 0;
+      let totalHarvestRecords = 0;
+      let totalMeatRecords = 0;
+      const batchIds = new Set();
+
+      // Collect batch IDs and count zone occupancy
+      animals.forEach(animal => {
+        if (animal.batchId) {
+          batchIds.add(animal.batchId);
+        }
+        if (animal.assignedZone) {
+          totalZoneOccupancyReduced += animal.count || 1;
+        }
+      });
+
+      // 1. Delete all animals of this type
+      await Animal.deleteMany({ type: animalTypeId }, { session });
+      console.log(`Deleted ${animals.length} animals of type ${animalTypeId}`);
+
+      // 2. Delete productivity records for all animals of this type
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const productivityResult = await AnimalProductivity.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      totalProductivityRecords = productivityResult.deletedCount;
+      console.log(`Deleted ${totalProductivityRecords} productivity records`);
+
+      // 3. Delete feeding history records for all animals of this type
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      const totalFeedingRecords = feedingResult.deletedCount;
+      console.log(`Deleted ${totalFeedingRecords} feeding history records`);
+
+      // 4. Delete harvest history records for all batches of this type
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalHarvestRecords = harvestResult.deletedCount;
+      console.log(`Deleted ${totalHarvestRecords} harvest records`);
+
+      // 5. Delete meat productivity records for all batches of this type
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalMeatRecords = meatResult.deletedCount;
+      console.log(`Deleted ${totalMeatRecords} meat productivity records`);
+
+      // 6. Delete all notifications related to this animal type
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        $or: [
+          { 'relatedEntity.id': { $in: animals.map(a => a._id) } },
+          { 'relatedEntity.type': 'animal' }
+        ]
+      }, { session });
+      const totalNotifications = notificationResult.deletedCount;
+      console.log(`Deleted ${totalNotifications} notifications for animal type ${animalTypeId}`);
+
+      // 5. Update zone occupancy for all affected zones
+      const zoneUpdates = {};
+      animals.forEach(animal => {
+        if (animal.assignedZone) {
+          const zoneId = animal.assignedZone.toString();
+          zoneUpdates[zoneId] = (zoneUpdates[zoneId] || 0) + (animal.count || 1);
+        }
+      });
+
+      for (const [zoneId, count] of Object.entries(zoneUpdates)) {
+        await updateZoneOccupancy(zoneId, -count);
+        console.log(`Updated zone ${zoneId} occupancy by -${count}`);
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: `Successfully deleted all animals of type ${animalTypeId}`,
+        details: {
+          animalsDeleted: animals.length,
+          productivityRecords: totalProductivityRecords,
+          feedingRecords: totalFeedingRecords,
+          harvestRecords: totalHarvestRecords,
+          meatRecords: totalMeatRecords,
+          notifications: totalNotifications,
+          zoneOccupancyReduced: totalZoneOccupancyReduced,
+          affectedZones: Object.keys(zoneUpdates).length
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+
+  } catch (error) {
+    console.error('Delete animals by type error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete entire animal type and ALL related data (PERMANENT DELETION)
+export const deleteAnimalTypeCompletely = async (req, res) => {
+  try {
+    const { animalTypeId } = req.params;
+    
+    // First, get the animal type to get its name
+    const animalType = await AnimalType.findById(animalTypeId);
+    if (!animalType) {
+      return res.status(404).json({ message: 'Animal type not found' });
+    }
+    
+    // Find all animals of this type
+    const animals = await Animal.find({ type: animalTypeId });
+    const batchIds = new Set();
+    animals.forEach(animal => {
+      if (animal.batchId) {
+        batchIds.add(animal.batchId);
+      }
+    });
+
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      let totalZoneOccupancyReduced = 0;
+      let totalProductivityRecords = 0;
+      let totalFeedingRecords = 0;
+      let totalHarvestRecords = 0;
+      let totalMeatRecords = 0;
+      let totalNotifications = 0;
+
+      // 1. Delete all animals of this type
+      await Animal.deleteMany({ type: animalTypeId }, { session });
+      console.log(`Deleted ${animals.length} animals of type ${animalTypeId}`);
+
+      // 2. Delete productivity records for all animals of this type
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const productivityResult = await AnimalProductivity.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      totalProductivityRecords = productivityResult.deletedCount;
+      console.log(`Deleted ${totalProductivityRecords} productivity records`);
+
+      // 3. Delete feeding history records for all animals of this type
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      totalFeedingRecords = feedingResult.deletedCount;
+      console.log(`Deleted ${totalFeedingRecords} feeding history records`);
+
+      // 4. Delete harvest history records for all batches of this type
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalHarvestRecords = harvestResult.deletedCount;
+      console.log(`Deleted ${totalHarvestRecords} harvest records`);
+
+      // 5. Delete meat productivity records for all batches of this type
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalMeatRecords = meatResult.deletedCount;
+      console.log(`Deleted ${totalMeatRecords} meat productivity records`);
+
+      // 6. Delete all notifications related to this animal type
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        $or: [
+          { 'relatedEntity.id': { $in: animals.map(a => a._id) } },
+          { 'relatedEntity.type': 'animal' }
+        ]
+      }, { session });
+      totalNotifications = notificationResult.deletedCount;
+      console.log(`Deleted ${totalNotifications} notifications for animal type ${animalTypeId}`);
+
+      // 7. Update zone occupancy for all affected zones
+      const zoneUpdates = {};
+      animals.forEach(animal => {
+        if (animal.assignedZone) {
+          const zoneId = animal.assignedZone.toString();
+          zoneUpdates[zoneId] = (zoneUpdates[zoneId] || 0) + (animal.count || 1);
+          totalZoneOccupancyReduced += (animal.count || 1);
+        }
+      });
+
+      for (const [zoneId, count] of Object.entries(zoneUpdates)) {
+        await updateZoneOccupancy(zoneId, -count);
+        console.log(`Updated zone ${zoneId} occupancy by -${count}`);
+      }
+
+      // 8. Finally, delete the animal type itself
+      await AnimalType.findByIdAndDelete(animalTypeId, { session });
+      console.log(`Deleted animal type: ${animalType.name}`);
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: `PERMANENTLY deleted animal type "${animalType.name}" and ALL related data`,
+        details: {
+          animalTypeDeleted: animalType.name,
+          animalsDeleted: animals.length,
+          productivityRecords: totalProductivityRecords,
+          feedingRecords: totalFeedingRecords,
+          harvestRecords: totalHarvestRecords,
+          meatRecords: totalMeatRecords,
+          notifications: totalNotifications,
+          zoneOccupancyReduced: totalZoneOccupancyReduced,
+          affectedZones: Object.keys(zoneUpdates).length,
+          warning: "This action is PERMANENT and cannot be undone!"
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+
+  } catch (error) {
+    console.error('Delete animal type completely error:', error);
     res.status(500).json({ message: error.message });
   }
 };

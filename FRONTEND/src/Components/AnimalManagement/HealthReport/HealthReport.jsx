@@ -206,107 +206,205 @@ export default function HealthInfoDetails() {
 };
 
   const downloadHealthReport = async (animal) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('p', 'mm', 'a4');
     
     // Company information
     const companyName = "Mount Olive Farm House";
-    const companyAddress = "No. 45, Green Valley Road,Boragasketiya,Nuwaraeliya, Sri Lanka";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
     const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const companyWebsite = "www.mountolivefarm.com";
     const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
     
-    // Add logo
-    const img = new Image();
-    img.src = "/logo512.png";
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
     
-    img.onload = async () => {
-      // Header with logo and company info
-      doc.addImage(img, "PNG", 14, 10, 30, 30);
-      doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
-      doc.text(companyName, 50, 15);
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.text(companyAddress, 50, 22);
-      doc.text(companyContact, 50, 29);
-      
-      // Report title
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text("ANIMAL HEALTH REPORT", 105, 45, { align: 'center' });
-      doc.setLineWidth(0.5);
-      doc.line(14, 50, 196, 50);
-      
-      // Animal information section
+    // Add real company logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        doc.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        doc.setFillColor(...primaryColor);
+        doc.rect(20, 15, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('MOF', 30, 30, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      doc.setFillColor(...primaryColor);
+      doc.rect(20, 15, 25, 25, 'F');
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
-      doc.text("Animal Information:", 14, 60);
-      doc.setFont(undefined, 'normal');
-      
-      const animalInfo = [
+      doc.text('MOF', 30, 30, { align: 'center' });
+      generatePDFContent();
+    }
+
+    const generatePDFContent = () => {
+    
+    // Company header
+    doc.setTextColor(...textColor);
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text(companyName, 50, 20);
+    
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(companyAddress, 50, 27);
+    doc.text(companyContact, 50, 32);
+    doc.text(companyWebsite, 50, 37);
+    
+    // Report title with professional styling
+    doc.setFillColor(...lightGray);
+    doc.rect(20, 45, 170, 12, 'F');
+    doc.setTextColor(...primaryColor);
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text("ANIMAL HEALTH REPORT", 105, 54, { align: 'center' });
+    
+    // Report metadata
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 65);
+    doc.text(`Report ID: MOF-HR-${Date.now().toString().slice(-6)}`, 20, 70);
+    
+    // Animal information section with professional styling
+    doc.setFillColor(...secondaryColor);
+    doc.rect(20, 80, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("ANIMAL INFORMATION", 25, 86);
+    
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    const animalInfo = [
         ["Animal ID", animal.animalId || "N/A"],
-        ["Name", animal.data?.name || "N/A"],
-        ["Type", animalType.name],
-        ["Report Date", reportDate]
-      ];
-      
-      let yPos = 70;
-      animalInfo.forEach(([label, value]) => {
+        ["Animal Name", animal.data?.name || "N/A"],
+        ["Animal Type", animalType.name],
+        ["Report Date", reportDate],
+        ["Reported By", "Farm Management System"]
+    ];
+    
+    let yPos = 95;
+    animalInfo.forEach(([label, value]) => {
         doc.setFont(undefined, 'bold');
-        doc.text(`${label}:`, 20, yPos);
+        doc.text(`${label}:`, 25, yPos);
         doc.setFont(undefined, 'normal');
-        doc.text(value, 60, yPos);
-        yPos += 7;
-      });
-      
-      // Health data section
-      yPos += 5;
-      doc.setFont(undefined, 'bold');
-      doc.text("Health Assessment:", 14, yPos);
-      yPos += 10;
-      
-      // Health data table
-      const tableData = healthFields.map(field => [
+        doc.text(value, 80, yPos);
+        yPos += 6;
+    });
+    
+    // Health assessment section
+    yPos += 10;
+    doc.setFillColor(...accentColor);
+    doc.rect(20, yPos, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("HEALTH ASSESSMENT", 25, yPos + 6);
+    
+    yPos += 15;
+    
+    // Health data table with professional styling
+    const tableData = healthFields.map(field => [
         field.label, 
         animal.data?.[field.name] || "Not recorded"
-      ]);
-      
-      autoTable(doc, {
+    ]);
+    
+    autoTable(doc, {
         startY: yPos,
-        head: [["Health Parameter", "Value"]],
-        body: tableData,
+        head: [["Health Parameter", "Current Value", "Status"]],
+        body: tableData.map(row => [
+            row[0], 
+            row[1],
+            row[1] === "Not recorded" ? "Pending" : "Recorded"
+        ]),
         theme: "grid",
         headStyles: { 
-          fillColor: [60, 141, 188], 
-          textColor: 255,
-          fontStyle: 'bold'
+            fillColor: primaryColor, 
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 10
         },
+        bodyStyles: {
+            fontSize: 9,
+            cellPadding: 4,
+            textColor: textColor
+        },
+        alternateRowStyles: {
+            fillColor: [249, 250, 251]
+        },
+        margin: { left: 20, right: 20 },
         styles: {
-          fontSize: 10,
-          cellPadding: 3
-        },
-        margin: { left: 14, right: 14 }
-      });
-      
-      // Veterinarian section
-      const finalY = doc.lastAutoTable.finalY + 15;
-      doc.setFont(undefined, 'bold');
-      doc.text("Veterinarian Notes:", 14, finalY);
-      doc.setFont(undefined, 'normal');
-      doc.text("________________________________________________________________", 14, finalY + 5);
-      doc.text("________________________________________________________________", 14, finalY + 10);
-      doc.text("________________________________________________________________", 14, finalY + 15);
-      
-      // Footer with page number
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5
+        }
+    });
+    
+    // Veterinarian section
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFillColor(...secondaryColor);
+    doc.rect(20, finalY, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("VETERINARIAN NOTES", 25, finalY + 6);
+    
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text("________________________________________________________________", 20, finalY + 15);
+    doc.text("________________________________________________________________", 20, finalY + 20);
+    doc.text("________________________________________________________________", 20, finalY + 25);
+    doc.text("________________________________________________________________", 20, finalY + 30);
+    
+    // Professional footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 280, 210, 20, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
         doc.setFontSize(8);
-        doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
-        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 290, { align: 'center' });
-      }
-      
-      // Save the PDF
-      const fileName = `Health_Report_${animal.data?.name || animal.animalId || animal._id}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.text(`Page ${i} of ${pageCount}`, 20, 288);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 288, { align: 'center' });
+        doc.text(companyName, 190, 288, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(20, 290, 190, 290);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 295, { align: 'center' });
+    }
+    
+      // Save the PDF with professional naming
+      const fileName = `MOF_Health_Report_${animal.data?.name || animal.animalId || animal._id}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
     };
   };

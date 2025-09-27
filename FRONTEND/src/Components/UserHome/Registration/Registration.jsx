@@ -6,11 +6,8 @@ import {
   EyeIcon, 
   EyeOffIcon, 
   FacebookIcon, 
-  TwitterIcon, 
-  GithubIcon,
   ArrowLeftIcon,
-  CheckIcon,
-  CalendarIcon
+  CheckIcon
 } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 
@@ -251,7 +248,7 @@ const RegisterPage = () => {
             <div className="flex justify-between items-center mb-6">
               <div className="font-bold text-dark-green text-2xl flex items-center">
                 <img 
-                  src="/logo.png" 
+                  src="/logo192.png" 
                   alt="Mount Olive Farm Marketplace Logo" 
                   className="h-8 w-8 mr-2" 
                   onError={(e) => {

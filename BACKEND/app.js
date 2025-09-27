@@ -145,8 +145,10 @@ import {
 import animalProductivityRouter from "./AnimalManagement/routes/animalProductivityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
+import notificationRoutes from "./AnimalManagement/routes/notificationRoutes.js";
 import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
 import HarvestHistory from "./AnimalManagement/models/HarvestHistory.js";
+import NotificationService from "./AnimalManagement/services/notificationService.js";
 
 // Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
@@ -206,6 +208,7 @@ app.use("/animal-productivity", animalProductivityRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 app.use("/api/meats", meatRoutes);
+app.use("/api/animal-management/notifications", notificationRoutes);
 
 // Health Management
 app.use("/api/doctors", doctorRoutes); // ✅ Only HealthManagement doctors here
@@ -332,9 +335,27 @@ const connectDB = async () => {
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () =>
-    console.log(`🚀 Server running on port ${PORT}`)
-  );
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    
+    // Start notification service
+    console.log('🔔 Starting notification service...');
+    
+    // Run initial notification check
+    NotificationService.runAllChecks();
+    
+    // Schedule notification checks every 5 minutes
+    setInterval(() => {
+      NotificationService.runAllChecks();
+    }, 5 * 60 * 1000);
+    
+    // Clean up expired notifications every hour
+    setInterval(() => {
+      NotificationService.cleanupExpiredNotifications();
+    }, 60 * 60 * 1000);
+    
+    console.log('✅ Notification service started');
+  });
 });
 
 export default app;

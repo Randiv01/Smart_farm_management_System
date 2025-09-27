@@ -27,7 +27,7 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
     { path: "/AnimalManagement/MeatManagement", icon: Beef, label: "MeatManagement" },
     { path: "/AnimalManagement/zones", icon: MapPin, label: "Zones / Shelters" },
     { path: `/AnimalManagement/design-plan/${type}`, icon: Plus, label: "Design your Plan" },
-    //{ path: "/AnimalManagement/alerts", icon: Bell, label: "Alerts" },
+    { path: "/AnimalManagement/alerts", icon: Bell, label: "Alerts" },
     { path: "/AnimalManagement/settings", icon: Settings, label: "Settings" }, 
   ];
 

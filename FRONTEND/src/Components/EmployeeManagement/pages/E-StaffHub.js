@@ -587,14 +587,79 @@ export const StaffHub = ({ darkMode }) => {
 
   /* ---------- export ---------- */
   const handleDownloadPDF = (type) => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
+    const doc = new jsPDF('p', 'mm', 'a4');
+    
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
+    
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
 
+    // Add real company logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        doc.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        doc.setFillColor(...primaryColor);
+        doc.rect(20, 15, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 30, 30, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      doc.setFillColor(...primaryColor);
+      doc.rect(20, 15, 25, 25, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MOF', 30, 30, { align: 'center' });
+      generatePDFContent();
+    }
+
+    const generatePDFContent = () => {
+
+    // Company header
+    doc.setTextColor(...textColor);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 50, 20);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(companyAddress, 50, 27);
+    doc.text(companyContact, 50, 32);
+
+    // Report title with professional styling
+    doc.setFillColor(...lightGray);
+    doc.rect(20, 40, 170, 12, 'F');
+    doc.setTextColor(...primaryColor);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    
+    let reportTitle = "";
     let headers = [];
     let body = [];
 
     if (type === "doctors") {
-      doc.text("Doctor Details", 14, 20);
+      reportTitle = "MEDICAL STAFF REPORT";
       headers = [
         "Full Name",
         "Email",
@@ -620,7 +685,7 @@ export const StaffHub = ({ darkMode }) => {
         d.gender,
       ]);
     } else if (type === "pathologists") {
-      doc.text("Plant Pathologist Details", 14, 20);
+      reportTitle = "PLANT PATHOLOGIST REPORT";
       headers = [
         "Full Name",
         "Email",
@@ -646,7 +711,7 @@ export const StaffHub = ({ darkMode }) => {
         p.gender,
       ]);
     } else {
-      doc.text("Employee Details", 14, 20);
+      reportTitle = "EMPLOYEE STAFF REPORT";
       headers = ["Emp ID", "Name", "Contact No", "Job Title", "Type", "Joined"];
       body = employees.map((e) => [
         e.id,
@@ -658,8 +723,78 @@ export const StaffHub = ({ darkMode }) => {
       ]);
     }
 
-    autoTable(doc, { head: [headers], body, startY: 30 });
-    doc.save(`${type.charAt(0).toUpperCase() + type.slice(1)}.pdf`);
+    doc.text(reportTitle, 105, 49, { align: 'center' });
+
+    // Report metadata
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 60);
+    doc.text(`Total Records: ${body.length}`, 20, 65);
+    doc.text(`Report ID: MOF-ES-${Date.now().toString().slice(-6)}`, 20, 70);
+
+    // Create professional table
+    autoTable(doc, {
+      head: [headers],
+      body: body,
+      startY: 80,
+      theme: 'grid',
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10,
+        cellPadding: 4
+      },
+      bodyStyles: {
+        fontSize: 9,
+        textColor: textColor,
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [249, 250, 251]
+      },
+      margin: { left: 20, right: 20 },
+      styles: {
+        lineColor: [209, 213, 219],
+        lineWidth: 0.5,
+        halign: 'left',
+        valign: 'middle',
+        overflow: 'linebreak'
+      }
+    });
+
+    // Professional footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      
+      // Footer background
+      doc.setFillColor(...lightGray);
+      doc.rect(0, 280, 210, 20, 'F');
+      
+      // Footer content
+      doc.setTextColor(...textColor);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} of ${pageCount}`, 20, 288);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 288, { align: 'center' });
+      doc.text(companyName, 190, 288, { align: 'right' });
+      
+      // Footer line
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(0.5);
+      doc.line(20, 290, 190, 290);
+      
+      // Disclaimer
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.text("This report is generated by Mount Olive Farm House Management System", 105, 295, { align: 'center' });
+    }
+
+      // Save PDF with professional naming
+      const fileName = `MOF_${type.charAt(0).toUpperCase() + type.slice(1)}_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+    };
   };
 
   /* ---------- filtering ---------- */

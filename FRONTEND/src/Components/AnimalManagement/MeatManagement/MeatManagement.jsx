@@ -42,6 +42,8 @@ import {
   History,
   BarChart3,
 } from "lucide-react";
+import { useNotifications, NotificationContainer } from "../UI/Notification";
+import { useTheme } from "../contexts/ThemeContext";
 
 ChartJS.register(
   CategoryScale,
@@ -83,6 +85,9 @@ const healthBadgeStyles = {
 };
 
 export default function MeatProductivityDashboard() {
+  const { notifications, addNotification, removeNotification } = useNotifications();
+  const { theme } = useTheme();
+  const darkMode = theme === "dark";
   const [meatBatches, setMeatBatches] = useState([]);
   const [harvestHistory, setHarvestHistory] = useState([]);
   const [stats, setStats] = useState({
@@ -111,7 +116,6 @@ export default function MeatProductivityDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "productionDate", direction: "desc" });
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState({ text: "", type: "" });
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showHarvestHistory, setShowHarvestHistory] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
@@ -119,9 +123,9 @@ export default function MeatProductivityDashboard() {
   const [showHarvestForm, setShowHarvestForm] = useState(false);
   const [editingBatchId, setEditingBatchId] = useState(null);
   const [harvestingBatchId, setHarvestingBatchId] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [analyticsPeriod, setAnalyticsPeriod] = useState("month");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Form state without batchId
   const [formData, setFormData] = useState({
@@ -189,7 +193,7 @@ export default function MeatProductivityDashboard() {
     } catch (err) {
       console.error("Failed to fetch meat productivity data:", err);
       setError("Failed to load meat productivity data. Please try again.");
-      setMessage({ text: "Failed to load data", type: "error" });
+      addNotification("Failed to load meat productivity data", "error");
     } finally {
       setIsLoading(false);
     }
@@ -203,7 +207,7 @@ export default function MeatProductivityDashboard() {
       setHarvestHistory(response.data.data);
     } catch (err) {
       console.error("Failed to fetch harvest history:", err);
-      setMessage({ text: "Failed to load harvest history", type: "error" });
+      addNotification("Failed to load harvest history", "error");
     }
   };
 
@@ -227,7 +231,7 @@ export default function MeatProductivityDashboard() {
       });
     } catch (err) {
       console.error("Failed to fetch batch data:", err);
-      setMessage({ text: "Failed to load batch data", type: "error" });
+      addNotification("Failed to load batch data", "error");
     } finally {
       setIsLoading(false);
     }
@@ -269,13 +273,37 @@ export default function MeatProductivityDashboard() {
 
   const fetchProductionAnalytics = async () => {
     try {
+      setIsLoading(true);
       const response = await axios.get("http://localhost:5000/api/meats/analytics/production", {
         params: { period: analyticsPeriod }
       });
-      setAnalyticsData(response.data.data);
+      if (response.data.success) {
+        setAnalyticsData(response.data.data);
+      } else {
+        addNotification("Failed to load production analytics", "error");
+      }
     } catch (err) {
       console.error("Failed to fetch production analytics:", err);
-      setMessage({ text: "Failed to load production analytics", type: "error" });
+      addNotification("Failed to load production analytics", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchMeatCounts = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/meats/analytics/counts", {
+        params: { period: analyticsPeriod }
+      });
+      if (response.data.success) {
+        setAnalyticsData(prev => ({
+          ...prev,
+          countsData: response.data.data
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch meat counts:", err);
+      addNotification("Failed to load meat counts", "error");
     }
   };
 
@@ -291,10 +319,7 @@ export default function MeatProductivityDashboard() {
     if (nearExpiryBatches.length > 0) {
       nearExpiryBatches.forEach(batch => {
         if (batch.daysUntilExpiry === 1) {
-          setMessage({
-            text: `Batch ${batch.batchId} expires tomorrow!`,
-            type: "warning",
-          });
+          addNotification(`Batch ${batch.batchId} expires tomorrow!`, "warning");
         }
       });
     }
@@ -304,12 +329,17 @@ export default function MeatProductivityDashboard() {
     if (!window.confirm("Are you sure you want to delete this batch?")) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/meats/${id}`);
-      setMessage({ text: "Batch deleted successfully", type: "success" });
+      const response = await axios.delete(`http://localhost:5000/api/meats/${id}`);
+      if (response.data.success) {
+        addNotification(response.data.message || "Batch deleted successfully", "success");
+      } else {
+        addNotification(response.data.message || "Failed to delete batch", "error");
+      }
       fetchData();
     } catch (err) {
       console.error("Failed to delete batch:", err);
-      setMessage({ text: "Failed to delete batch", type: "error" });
+      const errorMsg = err.response?.data?.message || "Failed to delete batch";
+      addNotification(errorMsg, "error");
     }
   };
 
@@ -448,7 +478,22 @@ export default function MeatProductivityDashboard() {
   };
 
   const getAnimalTypeChartData = () => {
-    if (!analyticsData) return null;
+    if (!analyticsData || !analyticsData.animalTypeData) {
+      return {
+        labels: [],
+        datasets: [
+          {
+            label: 'Quantity by Animal Type',
+            data: [],
+            backgroundColor: [
+              '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6',
+              '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#64748b',
+            ],
+            borderWidth: 1,
+          },
+        ],
+      };
+    }
 
     return {
       labels: Object.keys(analyticsData.animalTypeData),
@@ -467,7 +512,25 @@ export default function MeatProductivityDashboard() {
   };
 
   const getStatusChartData = () => {
-    if (!analyticsData) return null;
+    if (!analyticsData || !analyticsData.statusData) {
+      return {
+        labels: [],
+        datasets: [
+          {
+            label: 'Batches by Status',
+            data: [],
+            backgroundColor: [
+              '#10b981', // Fresh - green
+              '#3b82f6', // Stored - blue
+              '#8b5cf6', // Processed - purple
+              '#f59e0b', // Sold - yellow
+              '#ef4444', // Expired - red
+            ],
+            borderWidth: 1,
+          },
+        ],
+      };
+    }
 
     return {
       labels: Object.keys(analyticsData.statusData),
@@ -489,7 +552,21 @@ export default function MeatProductivityDashboard() {
   };
 
   const getMonthlyTrendData = () => {
-    if (!analyticsData || !analyticsData.productionTrend) return null;
+    if (!analyticsData || !analyticsData.productionTrend) {
+      return {
+        labels: [],
+        datasets: [
+          {
+            label: 'Monthly Production (kg)',
+            data: [],
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.3,
+            fill: true,
+          },
+        ],
+      };
+    }
 
     const labels = analyticsData.productionTrend.map(item => item._id.date);
     const data = analyticsData.productionTrend.map(item => item.totalMeat);
@@ -510,7 +587,22 @@ export default function MeatProductivityDashboard() {
   };
 
   const getBatchStatsData = () => {
-    if (!analyticsData || !analyticsData.batchStats) return null;
+    if (!analyticsData || !analyticsData.batchStats) {
+      return {
+        labels: ['Active', 'Harvested'],
+        datasets: [
+          {
+            label: 'Batch Status',
+            data: [0, 0],
+            backgroundColor: [
+              '#10b981', // Active - green
+              '#f59e0b', // Harvested - yellow
+            ],
+            borderWidth: 1,
+          },
+        ],
+      };
+    }
 
     return {
       labels: ['Active', 'Harvested'],
@@ -529,7 +621,22 @@ export default function MeatProductivityDashboard() {
   };
 
   const getAnimalDistributionData = () => {
-    if (!analyticsData || !analyticsData.animalDistribution) return null;
+    if (!analyticsData || !analyticsData.animalDistribution) {
+      return {
+        labels: [],
+        datasets: [
+          {
+            label: 'Meat Production by Animal Type (kg)',
+            data: [],
+            backgroundColor: [
+              '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6',
+              '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#64748b',
+            ],
+            borderWidth: 1,
+          },
+        ],
+      };
+    }
 
     return {
       labels: analyticsData.animalDistribution.map(item => item._id),
@@ -628,12 +735,17 @@ export default function MeatProductivityDashboard() {
     try {
       setIsLoading(true);
 
+      let response;
       if (editingBatchId) {
-        await axios.put(`http://localhost:5000/api/meats/${editingBatchId}`, formData);
-        setMessage({ text: "Batch updated successfully", type: "success" });
+        response = await axios.put(`http://localhost:5000/api/meats/${editingBatchId}`, formData);
       } else {
-        await axios.post("http://localhost:5000/api/meats", formData);
-        setMessage({ text: "Batch created successfully", type: "success" });
+        response = await axios.post("http://localhost:5000/api/meats", formData);
+      }
+
+      if (response.data.success) {
+        addNotification(response.data.message || (editingBatchId ? "Batch updated successfully" : "Batch created successfully"), "success");
+      } else {
+        addNotification(response.data.message || "Failed to save batch", "error");
       }
 
       setShowForm(false);
@@ -654,7 +766,7 @@ export default function MeatProductivityDashboard() {
     } catch (err) {
       console.error("Failed to save batch:", err);
       const errorMsg = err.response?.data?.message || "Failed to save batch";
-      setMessage({ text: errorMsg, type: "error" });
+      addNotification(errorMsg, "error");
     } finally {
       setIsLoading(false);
     }
@@ -667,9 +779,14 @@ export default function MeatProductivityDashboard() {
 
     try {
       setIsLoading(true);
-      await axios.post(`http://localhost:5000/api/meats/${harvestingBatchId}/harvest`, harvestFormData);
+      const response = await axios.post(`http://localhost:5000/api/meats/${harvestingBatchId}/harvest`, harvestFormData);
       
-      setMessage({ text: "Batch harvested successfully", type: "success" });
+      if (response.data.success) {
+        addNotification(response.data.message || "Batch harvested successfully", "success");
+      } else {
+        addNotification(response.data.message || "Failed to harvest batch", "error");
+      }
+      
       setShowHarvestForm(false);
       setHarvestingBatchId(null);
       setHarvestFormData({
@@ -684,7 +801,7 @@ export default function MeatProductivityDashboard() {
     } catch (err) {
       console.error("Failed to harvest batch:", err);
       const errorMsg = err.response?.data?.message || "Failed to harvest batch";
-      setMessage({ text: errorMsg, type: "error" });
+      addNotification(errorMsg, "error");
     } finally {
       setIsLoading(false);
     }
@@ -726,6 +843,9 @@ export default function MeatProductivityDashboard() {
 
   return (
     <div className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "light-beige"} font-sans`}>
+      {/* Notification Container */}
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -748,43 +868,16 @@ export default function MeatProductivityDashboard() {
         </div>
       </div>
 
-      {/* Message Alert */}
-      {message.text && (
-        <div
-          className={`mb-6 p-4 rounded-lg flex items-center justify-between ${
-            message.type === "success"
-              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-              : message.type === "warning"
-              ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
-              : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
-          }`}
-        >
-          <div className="flex items-center">
-            {message.type === "success" ? (
-              <CheckCircle size={20} className="mr-2" />
-            ) : message.type === "warning" ? (
-              <AlertTriangle size={20} className="mr-2" />
-            ) : (
-              <XCircle size={20} className="mr-2" />
-            )}
-            {message.text}
-          </div>
-          <button onClick={() => setMessage({ text: "", type: "" })}>
-            <X size={20} />
-          </button>
-        </div>
-      )}
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div
           className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}
         >
           <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
-            <Package className="text-blue-600 dark:text-blue-400" size={28} />
+            <Package className={darkMode ? "text-blue-400" : "text-blue-600"} size={28} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Total Batches</h3>
+            <h3 className={`text-sm font-semibold ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Total Batches</h3>
             <p className="text-2xl font-bold">{stats.totalBatches}</p>
           </div>
         </div>
@@ -793,10 +886,10 @@ export default function MeatProductivityDashboard() {
           className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}
         >
           <div className={`p-3 rounded-full ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
-            <CheckCircle className="text-green-600 dark:text-green-400" size={28} />
+            <CheckCircle className={darkMode ? "text-green-400" : "text-green-600"} size={28} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Active Batches</h3>
+            <h3 className={`text-sm font-semibold ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Active Batches</h3>
             <p className="text-2xl font-bold">{stats.activeBatches}</p>
           </div>
         </div>
@@ -805,10 +898,10 @@ export default function MeatProductivityDashboard() {
           className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}
         >
           <div className={`p-3 rounded-full ${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}>
-            <History className="text-yellow-600 dark:text-yellow-400" size={28} />
+            <History className={darkMode ? "text-yellow-400" : "text-yellow-600"} size={28} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Harvested</h3>
+            <h3 className={`text-sm font-semibold ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Harvested</h3>
             <p className="text-2xl font-bold">{stats.harvestedBatches}</p>
           </div>
         </div>
@@ -817,21 +910,73 @@ export default function MeatProductivityDashboard() {
           className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg hover:shadow-xl transition-all flex items-center gap-4`}
         >
           <div className={`p-3 rounded-full ${darkMode ? "bg-purple-900/30" : "bg-purple-100"}`}>
-            <BarChart3 className="text-purple-600 dark:text-purple-400" size={28} />
+            <BarChart3 className={darkMode ? "text-purple-400" : "text-purple-600"} size={28} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Total Meat</h3>
+            <h3 className={`text-sm font-semibold ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Total Meat</h3>
             <p className="text-2xl font-bold">{stats.totalMeatProduced} kg</p>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search Bar - Always Visible */}
       <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-6`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Search size={20} />
+            Search Batches
+          </h3>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setSearchTerm("")}
+              className={`px-3 py-1.5 text-sm rounded-lg ${
+                darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+              } transition-all`}
+            >
+              Clear Search
+            </button>
+            <button
+              onClick={() => {
+                fetchData();
+                fetchHarvestHistory();
+              }}
+              className={`px-3 py-1.5 text-sm rounded-lg flex items-center gap-1 ${
+                darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+              } transition-all`}
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Search</label>
+          <div className="relative">
+            <Search
+              size={18}
+              className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+            />
+            <input
+              type="text"
+              placeholder="Search batches..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`w-full pl-10 pr-3 py-2 rounded-lg border ${
+                darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+              } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Filters - Toggle-able */}
+      {showFilters && (
+        <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-6 transition-all duration-300 ease-in-out`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
             <Filter size={20} />
-            Filters & Search
+            Advanced Filters
           </h3>
           <div className="flex gap-3">
             <button
@@ -930,7 +1075,7 @@ export default function MeatProductivityDashboard() {
                   darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
                 } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
               />
-              <span className="self-center text-gray-500 dark:text-gray-400">to</span>
+              <span className={`self-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>to</span>
               <input
                 type="date"
                 value={filters.toDate}
@@ -942,32 +1087,31 @@ export default function MeatProductivityDashboard() {
             </div>
           </div>
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Search</label>
-            <div className="relative">
-              <Search
-                size={18}
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
-              />
-              <input
-                type="text"
-                placeholder="Search batches..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-3 py-2 rounded-lg border ${
-                  darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
-                } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-              />
-            </div>
-          </div>
         </div>
       </div>
+      )}
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => setShowAnalytics(!showAnalytics)}
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-5 py-2.5 rounded-full flex items-center gap-2 ${
+              showFilters ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            } transition-all`}
+          >
+            <Filter size={18} />
+            {showFilters ? "Hide Advanced Filters" : "Show Advanced Filters"}
+          </button>
+          <button
+            onClick={() => {
+              const newShowAnalytics = !showAnalytics;
+              setShowAnalytics(newShowAnalytics);
+              if (newShowAnalytics) {
+                fetchProductionAnalytics();
+                fetchMeatCounts();
+              }
+            }}
             className={`px-5 py-2.5 rounded-full flex items-center gap-2 ${
               showAnalytics ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-800 hover:bg-gray-300"
             } transition-all`}
@@ -995,7 +1139,7 @@ export default function MeatProductivityDashboard() {
           </button>
         </div>
 
-        <div className="text-sm text-gray-500 dark:text-gray-400">
+        <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
           Showing {filteredBatches.length} of {meatBatches.length} batches
         </div>
       </div>
@@ -1019,7 +1163,10 @@ export default function MeatProductivityDashboard() {
                 <option value="year">Yearly</option>
               </select>
               <button
-                onClick={fetchProductionAnalytics}
+                onClick={() => {
+                  fetchProductionAnalytics();
+                  fetchMeatCounts();
+                }}
                 className={`px-3 py-2 rounded-lg flex items-center gap-1 ${
                   darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-200 hover:bg-gray-300 text-gray-800"
                 }`}
@@ -1034,95 +1181,113 @@ export default function MeatProductivityDashboard() {
             <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Production Trend</h3>
-                <TrendingUp className="text-gray-500 dark:text-gray-400" size={20} />
+                <TrendingUp className={darkMode ? "text-gray-400" : "text-gray-500"} size={20} />
               </div>
               <div className="h-80">
-                <Line
-                  data={getMonthlyTrendData()}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: "bottom",
-                        labels: { color: darkMode ? "#f3f4f6" : "#111827" },
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className={darkMode ? "text-gray-400" : "text-gray-500"}>Loading chart data...</div>
+                  </div>
+                ) : (
+                  <Line
+                    data={getMonthlyTrendData()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: "bottom",
+                          labels: { color: darkMode ? "#f3f4f6" : "#111827" },
+                        },
                       },
-                    },
-                    scales: {
-                      x: {
-                        ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
-                        grid: { color: darkMode ? "#374151" : "#e5e7eb" },
+                      scales: {
+                        x: {
+                          ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
+                          grid: { color: darkMode ? "#374151" : "#e5e7eb" },
+                        },
+                        y: {
+                          ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
+                          grid: { color: darkMode ? "#374151" : "#e5e7eb" },
+                          beginAtZero: true,
+                        },
                       },
-                      y: {
-                        ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
-                        grid: { color: darkMode ? "#374151" : "#e5e7eb" },
-                        beginAtZero: true,
-                      },
-                    },
-                  }}
-                />
+                    }}
+                  />
+                )}
               </div>
             </div>
 
             <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Batch Status</h3>
-                <PieChart className="text-gray-500 dark:text-gray-400" size={20} />
+                <PieChart className={darkMode ? "text-gray-400" : "text-gray-500"} size={20} />
               </div>
               <div className="h-80">
-                <Doughnut
-                  data={getBatchStatsData()}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: "bottom",
-                        labels: { color: darkMode ? "#f3f4f6" : "#111827" },
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className={darkMode ? "text-gray-400" : "text-gray-500"}>Loading chart data...</div>
+                  </div>
+                ) : (
+                  <Doughnut
+                    data={getBatchStatsData()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: "bottom",
+                          labels: { color: darkMode ? "#f3f4f6" : "#111827" },
+                        },
                       },
-                    },
-                  }}
-                />
+                    }}
+                  />
+                )}
               </div>
             </div>
 
             <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Meat Production by Animal Type</h3>
-                <PieChart className="text-gray-500 dark:text-gray-400" size={20} />
+                <PieChart className={darkMode ? "text-gray-400" : "text-gray-500"} size={20} />
               </div>
               <div className="h-80">
-                <Bar
-                  data={getAnimalDistributionData()}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: "bottom",
-                        labels: { color: darkMode ? "#f3f4f6" : "#111827" },
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className={darkMode ? "text-gray-400" : "text-gray-500"}>Loading chart data...</div>
+                  </div>
+                ) : (
+                  <Bar
+                    data={getAnimalDistributionData()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: "bottom",
+                          labels: { color: darkMode ? "#f3f4f6" : "#111827" },
+                        },
                       },
-                    },
-                    scales: {
-                      x: {
-                        ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
-                        grid: { color: darkMode ? "#374151" : "#e5e7eb" },
+                      scales: {
+                        x: {
+                          ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
+                          grid: { color: darkMode ? "#374151" : "#e5e7eb" },
+                        },
+                        y: {
+                          ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
+                          grid: { color: darkMode ? "#374151" : "#e5e7eb" },
+                          beginAtZero: true,
+                        },
                       },
-                      y: {
-                        ticks: { color: darkMode ? "#9ca3af" : "#6b7280" },
-                        grid: { color: darkMode ? "#374151" : "#e5e7eb" },
-                        beginAtZero: true,
-                      },
-                    },
-                  }}
-                />
+                    }}
+                  />
+                )}
               </div>
             </div>
 
             <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Storage Distribution</h3>
-                <Package className="text-gray-500 dark:text-gray-400" size={20} />
+                <Package className={darkMode ? "text-gray-400" : "text-gray-500"} size={20} />
               </div>
               <div className="h-80">
                 {analyticsData && analyticsData.storageDistribution && analyticsData.storageDistribution.length > 0 ? (
@@ -1153,7 +1318,7 @@ export default function MeatProductivityDashboard() {
                     }}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className={`flex items-center justify-center h-full ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                     No storage data available
                   </div>
                 )}
@@ -1164,7 +1329,7 @@ export default function MeatProductivityDashboard() {
       )}
 
       {/* Harvest History Section */}
-      {showHarvestHistory && (
+      {showHarvestHistory && showFilters && (
         <div className="mb-8">
           <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-6`}>
             <div className="flex items-center justify-between mb-4">
@@ -1231,7 +1396,7 @@ export default function MeatProductivityDashboard() {
                       darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
                     } focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                   />
-                  <span className="self-center text-gray-500 dark:text-gray-400">to</span>
+                  <span className={`self-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>to</span>
                   <input
                     type="date"
                     value={harvestFilters.toDate}
@@ -1396,7 +1561,7 @@ export default function MeatProductivityDashboard() {
                         <div className="flex flex-col">
                           <span>{new Date(batch.expiryDate).toLocaleDateString()}</span>
                           {batch.daysUntilExpiry !== undefined && (
-                            <span className={`text-xs ${batch.daysUntilExpiry <= 3 ? "text-red-500" : "text-gray-500"}`}>
+                            <span className={`text-xs ${batch.daysUntilExpiry <= 3 ? "text-red-500" : darkMode ? "text-gray-400" : "text-gray-500"}`}>
                               {batch.daysUntilExpiry > 0 ? `${batch.daysUntilExpiry} days left` : "Expired"}
                             </span>
                           )}
