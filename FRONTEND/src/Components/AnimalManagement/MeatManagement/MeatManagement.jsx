@@ -354,50 +354,220 @@ export default function MeatProductivityDashboard() {
     }));
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    const date = new Date().toLocaleDateString();
+  const exportPDF = async () => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-    doc.setFontSize(18);
-    doc.text("Meat Productivity Report", 14, 16);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Generated on ${date}`, 14, 23);
+      // Company information
+      const companyName = "Mount Olive Farm House";
+      const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+      const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+      const companyWebsite = "www.mountolivefarm.com";
+      const reportDate = new Date().toLocaleDateString();
+      const reportTime = new Date().toLocaleTimeString();
+      
+      // Professional color scheme
+      const primaryColor = [34, 197, 94]; // Green
+      const secondaryColor = [16, 185, 129]; // Teal
+      const accentColor = [59, 130, 246]; // Blue
+      const textColor = [31, 41, 55]; // Dark gray
+      const lightGray = [243, 244, 246];
 
+      // Add company logo
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 15, 10, 25, 25);
+          generatePDFContent();
+        };
+        logoImg.onerror = () => {
+          // Fallback to placeholder if logo fails to load
+          doc.setFillColor(...primaryColor);
+          doc.rect(15, 10, 25, 25, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('MOF', 27, 25, { align: 'center' });
+          generatePDFContent();
+        };
+        logoImg.src = '/logo512.png';
+      } catch (error) {
+        console.error('Error loading logo:', error);
+        // Fallback to placeholder
+        doc.setFillColor(...primaryColor);
+        doc.rect(15, 10, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 27, 25, { align: 'center' });
+        generatePDFContent();
+      }
+
+      const generatePDFContent = () => {
+        // Company header
+        doc.setTextColor(...textColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(companyName, 45, 18);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(companyAddress, 45, 25);
+        doc.text(companyContact, 45, 30);
+        doc.text(companyWebsite, 45, 35);
+
+        // Report title with professional styling
+        doc.setFillColor(...lightGray);
+        doc.rect(15, 40, 180, 10, 'F');
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MEAT PRODUCTIVITY REPORT', 105, 47, { align: 'center' });
+
+        // Report metadata
+        doc.setTextColor(...textColor);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 15, 58);
+        doc.text(`Total Batches: ${meatBatches.length}`, 15, 63);
+        doc.text(`Report ID: MOF-MP-${Date.now().toString().slice(-6)}`, 15, 68);
+
+        // Summary statistics
+        doc.setFillColor(...secondaryColor);
+        doc.rect(15, 75, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PRODUCTION SUMMARY', 20, 81);
+
+        doc.setTextColor(...textColor);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Batches: ${stats.totalBatches}`, 20, 90);
+        doc.text(`Active Batches: ${stats.activeBatches}`, 20, 95);
+        doc.text(`Harvested Batches: ${stats.harvestedBatches}`, 20, 100);
+        doc.text(`Fresh Batches: ${stats.freshBatches}`, 20, 105);
+        doc.text(`Near Expiry: ${stats.nearExpiryBatches}`, 20, 110);
+        doc.text(`Critical Condition: ${stats.criticalBatches}`, 20, 115);
+        doc.text(`Total Meat Produced: ${stats.totalMeatProduced} kg`, 20, 120);
+        
+        // Calculate additional statistics
+        const totalValue = meatBatches.reduce((sum, batch) => sum + ((batch.quantity || 0) * (batch.unitPrice || 0)), 0);
+        const averageBatchSize = stats.totalBatches > 0 ? (stats.totalMeatProduced / stats.totalBatches).toFixed(2) : 0;
+        const goodConditionBatches = meatBatches.filter(batch => batch.healthCondition === 'Good').length;
+        const fairConditionBatches = meatBatches.filter(batch => batch.healthCondition === 'Fair').length;
+        const poorConditionBatches = meatBatches.filter(batch => batch.healthCondition === 'Poor').length;
+        
+        doc.text(`Total Value: LKR ${totalValue.toLocaleString()}`, 20, 125);
+        doc.text(`Average Batch Size: ${averageBatchSize} kg`, 20, 130);
+        doc.text(`Good Condition: ${goodConditionBatches}`, 20, 135);
+        doc.text(`Fair Condition: ${fairConditionBatches}`, 20, 140);
+        doc.text(`Poor Condition: ${poorConditionBatches}`, 20, 145);
+
+        // Prepare table data
+        const headers = [["Batch ID", "Animal Type", "Meat Type", "Quantity", "Status", "Health", "Production Date", "Expiry Date", "Days Left"]];
+
+        const data = meatBatches.map(batch => {
+          const daysLeft = batch.daysUntilExpiry !== undefined ? 
+            (batch.daysUntilExpiry > 0 ? `${batch.daysUntilExpiry} days` : 'Expired') : 
+            'N/A';
+          
+          return [
+            batch.batchId || 'N/A',
+            batch.animalType || 'N/A',
+            batch.meatType || 'N/A',
+            `${batch.quantity || 0} ${batch.unit || 'kg'}`,
+            batch.status || 'N/A',
+            batch.healthCondition || 'N/A',
+            batch.productionDate ? new Date(batch.productionDate).toLocaleDateString() : 'N/A',
+            batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString() : 'N/A',
+            daysLeft
+          ];
+        });
+
+        // Create professional table
     autoTable(doc, {
-      startY: 30,
-      head: [["Metric", "Value"]],
-      body: [
-        ["Total Batches", stats.totalBatches],
-        ["Active Batches", stats.activeBatches],
-        ["Harvested Batches", stats.harvestedBatches],
-        ["Fresh Batches", stats.freshBatches],
-        ["Near Expiry", stats.nearExpiryBatches],
-        ["Critical Condition", stats.criticalBatches],
-        ["Total Meat Produced", `${stats.totalMeatProduced} kg`],
-      ],
-      theme: "grid",
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+          head: headers,
+          body: data,
+          startY: 155,
+          theme: 'grid',
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 9,
+            cellPadding: 3
+          },
+          bodyStyles: {
+            fontSize: 8,
+            textColor: textColor,
+            cellPadding: 2
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 15, right: 15 },
+          styles: {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak'
+          },
+          didDrawPage: (data) => {
+            // Add header and footer to each page
+            addHeaderFooter();
+          }
+        });
 
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 10,
-      head: [["Batch ID", "Animal Type", "Meat Type", "Quantity", "Status", "Health", "Production Date", "Expiry Date"]],
-      body: meatBatches.map(batch => [
-        batch.batchId,
-        batch.animalType,
-        batch.meatType,
-        `${batch.quantity} ${batch.unit}`,
-        batch.status,
-        batch.healthCondition,
-        new Date(batch.productionDate).toLocaleDateString(),
-        new Date(batch.expiryDate).toLocaleDateString(),
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+        // Professional footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          addHeaderFooter();
+        }
 
-    doc.save(`meat-report-${date.replace(/\//g, "-")}.pdf`);
+        // Save PDF with professional naming
+        const fileName = `MOF_Meat_Productivity_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        addNotification("PDF downloaded successfully!", "success");
+      };
+
+      const addHeaderFooter = () => {
+        const pageCount = doc.internal.getNumberOfPages();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 275, 210, 20, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
+        doc.setFontSize(8);
+        doc.text(`Page ${currentPage} of ${pageCount}`, 15, 283);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 283, { align: 'center' });
+        doc.text(companyName, 195, 283, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(15, 285, 195, 285);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 290, { align: 'center' });
+      };
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      addNotification("Error creating the PDF. Please try again.", "error");
+    }
   };
 
   const handleFilterChange = (key, value) => {

@@ -440,118 +440,236 @@ const getImageBase64 = async (url) => {
 
 const exportPDF = async () => {
     try {
-      const logoBase64 = await getImageBase64('/logo512.png');
-      const doc = new jsPDF();
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Company information
+      const companyName = "Mount Olive Farm House";
+      const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+      const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+      const companyWebsite = "www.mountolivefarm.com";
       const reportDate = new Date().toLocaleDateString();
-      const reportDateTime = new Date().toLocaleString();
-
-      // --- Reusable Header ---
-      const header = () => {
-        doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
-        doc.setFontSize(18);
-        doc.setFont("helvetica", 'bold');
-        doc.text('Mount Olive Farm House', 45, 18);
-        doc.setFontSize(9);
-        doc.setFont("helvetica", 'normal');
-        doc.text('No. 45, Green Valley Road, Nuwaraeliya, Sri Lanka', 45, 25);
-        doc.text('Phone: +94 81 249 2134 | Email: info@mountolivefarm.com', 45, 30);
-      };
-
-      // --- Reusable Footer ---
-      const footer = () => {
-        const pageCount = doc.internal.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        // Position footer at the bottom
-        const pageHeight = doc.internal.pageSize.height;
-        doc.text(`Page ${doc.internal.getCurrentPageInfo().pageNumber} of ${pageCount}`, doc.internal.pageSize.width / 2, pageHeight - 15, { align: 'center' });
-        doc.text(`Report generated on ${reportDateTime}`, doc.internal.pageSize.width / 2, pageHeight - 10, { align: 'center' });
-      };
-
-      // --- Document Title and Intro ---
-      doc.setFontSize(16);
-      doc.setFont("helvetica", 'bold');
-      doc.text('ANIMAL PRODUCTIVITY REPORT', 105, 50, { align: 'center' });
-      doc.setLineWidth(0.5);
-      doc.line(14, 55, 196, 55);
+      const reportTime = new Date().toLocaleTimeString();
       
-      doc.setFontSize(10);
-      doc.setFont("helvetica", 'normal');
-      doc.text(`Report Date: ${reportDate}`, 14, 65);
+      // Professional color scheme
+      const primaryColor = [34, 197, 94]; // Green
+      const secondaryColor = [16, 185, 129]; // Teal
+      const accentColor = [59, 130, 246]; // Blue
+      const textColor = [31, 41, 55]; // Dark gray
+      const lightGray = [243, 244, 246];
 
-      // --- 1. Overall Summary Table ---
-      doc.setFontSize(12);
-      doc.setFont("helvetica", 'bold');
-      doc.text("Overall Farm Productivity Summary", 14, 75);
-      
-      autoTable(doc, {
-        startY: 80,
-        head: [["Metric", "Total Value", "Unit"]],
-        body: productivityFields.map((field) => [
-          field.label,
-          (productivityStats[field.name] || 0).toLocaleString(),
-          field.unit,
-        ]),
-        theme: "grid",
-        headStyles: { 
-          fillColor: [60, 141, 188], // This is the blue color from your example
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        styles: {
-          fontSize: 10,
-          cellPadding: 3
-        },
-        margin: { left: 14, right: 14 },
-        didDrawPage: (data) => {
-          // Add header and footer to each page
-          header();
-          footer();
-        }
-      });
-
-      // --- 2. Detailed Breakdown Table ---
-      doc.setFontSize(12);
-      doc.setFont("helvetica", 'bold');
-      doc.text("Productivity Breakdown by Animal Type", 14, doc.lastAutoTable.finalY + 15);
-
-      const tableBody = sortedAnimalTypes.map((type) => [
-        capitalize(type.name),
-        type.totalCount,
-        ...productivityFields.map((field) => (type.productivity[field.name] || 0).toLocaleString()),
-      ]);
-
-      autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 20,
-        head: [["Animal Type", "Count", ...productivityFields.map((f) => f.label)]],
-        body: tableBody,
-        theme: "striped",
-        headStyles: { 
-          fillColor: [60, 141, 188], // This is the blue color from your example
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        styles: {
-          fontSize: 10,
-          cellPadding: 3
-        },
-        margin: { left: 14, right: 14 },
-        didDrawPage: (data) => {
-          // Add header and footer to each page
-          header();
-          footer();
-        }
-      });
-      
-      // Call footer on the last page manually if autoTable didn't create a new page
-      const finalPageNum = doc.internal.getNumberOfPages();
-      const lastAutoTablePageNum = doc.lastAutoTable.pageCount;
-      if (finalPageNum === lastAutoTablePageNum) {
-        footer();
+      // Add company logo
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 15, 10, 25, 25);
+          generatePDFContent();
+        };
+        logoImg.onerror = () => {
+          // Fallback to placeholder if logo fails to load
+          doc.setFillColor(...primaryColor);
+          doc.rect(15, 10, 25, 25, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('MOF', 27, 25, { align: 'center' });
+          generatePDFContent();
+        };
+        logoImg.src = '/logo512.png';
+      } catch (error) {
+        console.error('Error loading logo:', error);
+        // Fallback to placeholder
+        doc.setFillColor(...primaryColor);
+        doc.rect(15, 10, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 27, 25, { align: 'center' });
+        generatePDFContent();
       }
 
-      // --- SAVE THE DOCUMENT ---
-      doc.save(`Productivity-Report-${reportDate.replace(/\//g, "-")}.pdf`);
+      const generatePDFContent = () => {
+        // Company header
+        doc.setTextColor(...textColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(companyName, 45, 18);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(companyAddress, 45, 25);
+        doc.text(companyContact, 45, 30);
+        doc.text(companyWebsite, 45, 35);
+
+        // Report title with professional styling
+        doc.setFillColor(...lightGray);
+        doc.rect(15, 40, 180, 10, 'F');
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ANIMAL PRODUCTIVITY REPORT', 105, 47, { align: 'center' });
+
+        // Report metadata
+        doc.setTextColor(...textColor);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 15, 58);
+        doc.text(`Total Animals: ${totalAnimals}`, 15, 63);
+        doc.text(`Animal Types: ${animalTypes.length}`, 15, 68);
+        doc.text(`Report ID: MOF-AP-${Date.now().toString().slice(-6)}`, 15, 73);
+        
+        // Key productivity metrics
+        const totalMilk = productivityStats.milk || 0;
+        const totalEggs = productivityStats.eggs || 0;
+        const totalMeat = productivityStats.meat || 0;
+        const totalWool = productivityStats.wool || 0;
+        const averageProductivity = totalAnimals > 0 ? ((totalMilk + totalEggs + totalMeat + totalWool) / totalAnimals).toFixed(2) : 0;
+        
+        doc.text(`Total Milk Production: ${totalMilk.toLocaleString()} liters`, 15, 78);
+        doc.text(`Total Egg Production: ${totalEggs.toLocaleString()} units`, 15, 83);
+        doc.text(`Total Meat Production: ${totalMeat.toLocaleString()} kg`, 15, 88);
+        doc.text(`Average Productivity per Animal: ${averageProductivity} units`, 15, 93);
+
+        // Overall Summary Section
+        doc.setFillColor(...secondaryColor);
+        doc.rect(15, 100, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('OVERALL FARM PRODUCTIVITY SUMMARY', 20, 106);
+
+        // Overall productivity table with enhanced data
+        const enhancedProductivityData = productivityFields.map((field) => {
+          const value = productivityStats[field.name] || 0;
+          const percentage = totalAnimals > 0 ? ((value / totalAnimals) * 100).toFixed(1) : 0;
+          return [
+            field.label,
+            value.toLocaleString(),
+            field.unit || 'units',
+            `${percentage}%`
+          ];
+        });
+
+        autoTable(doc, {
+          startY: 115,
+          head: [["Productivity Metric", "Total Value", "Unit", "Per Animal"]],
+          body: enhancedProductivityData,
+          theme: "grid",
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 10
+          },
+          bodyStyles: {
+            fontSize: 9,
+            textColor: textColor,
+            cellPadding: 3
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 15, right: 15 },
+          styles: {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5,
+            halign: 'left',
+            valign: 'middle'
+          },
+          didDrawPage: (data) => {
+            addHeaderFooter();
+          }
+        });
+
+        // Detailed Breakdown Section
+        doc.setFillColor(...accentColor);
+        doc.rect(15, doc.lastAutoTable.finalY + 15, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PRODUCTIVITY BREAKDOWN BY ANIMAL TYPE', 20, doc.lastAutoTable.finalY + 21);
+
+        // Prepare detailed breakdown data
+        const tableBody = sortedAnimalTypes.map((type) => [
+          capitalize(type.name),
+          type.totalCount.toString(),
+          ...productivityFields.map((field) => (type.productivity[field.name] || 0).toLocaleString()),
+        ]);
+
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 30,
+          head: [["Animal Type", "Count", ...productivityFields.map((f) => f.label)]],
+          body: tableBody,
+          theme: "grid",
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 9
+          },
+          bodyStyles: {
+            fontSize: 8,
+            textColor: textColor,
+            cellPadding: 2
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 15, right: 15 },
+          styles: {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak'
+          },
+          didDrawPage: (data) => {
+            addHeaderFooter();
+          }
+        });
+
+        // Professional footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          addHeaderFooter();
+        }
+
+        // Save PDF with professional naming
+        const fileName = `MOF_Animal_Productivity_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        setMessage({ text: "PDF downloaded successfully!", type: "success" });
+      };
+
+      const addHeaderFooter = () => {
+        const pageCount = doc.internal.getNumberOfPages();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 275, 210, 20, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
+        doc.setFontSize(8);
+        doc.text(`Page ${currentPage} of ${pageCount}`, 15, 283);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 283, { align: 'center' });
+        doc.text(companyName, 195, 283, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(15, 285, 195, 285);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 290, { align: 'center' });
+      };
 
     } catch (error) {
       console.error("Error generating PDF:", error);
