@@ -1,5 +1,5 @@
 import FeedingHistory from "../models/feedingHistoryModel.js";
-import FeedStock from "../models/feedStockModel.js";
+import AnimalFood from "../../InventoryManagement/Imodels/AnimalFood.js";
 import Animal from "../models/Animal.js";
 import Zone from "../models/Zone.js";
 
@@ -16,7 +16,7 @@ export const getAnimals = async (req, res) => {
 // Get all feeds
 export const getFeeds = async (req, res) => {
   try {
-    const feeds = await FeedStock.find();
+    const feeds = await AnimalFood.find({ isActive: true });
     res.json(feeds);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -33,7 +33,7 @@ export const scheduleFeeding = async (req, res) => {
     if (!zone) return res.status(404).json({ message: "Zone not found" });
 
     // Validate feed exists and has enough quantity
-    const feed = await FeedStock.findById(foodId);
+    const feed = await AnimalFood.findById(foodId);
     if (!feed) return res.status(404).json({ message: "Feed not found" });
     if (feed.remaining < quantity) return res.status(400).json({ message: "Not enough feed remaining" });
 
@@ -81,10 +81,32 @@ export const getFeedingHistory = async (req, res) => {
     const history = await FeedingHistory.find()
       .populate("animalId", "name breed")
       .populate("zoneId", "name type")
-      .populate("foodId", "foodName")
+      .populate("foodId", "name unit")
       .sort({ feedingTime: -1 });
     res.json(history);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// Create feeding history entry
+export const createFeedingHistory = async (req, res) => {
+  try {
+    const { zoneId, foodId, quantity, feedingTime, notes, immediate } = req.body;
+
+    const feedingHistory = new FeedingHistory({
+      zoneId,
+      foodId,
+      quantity,
+      feedingTime,
+      notes,
+      immediate: immediate || false,
+      animalCount: 1 // Default to 1 for immediate feeding
+    });
+
+    const savedHistory = await feedingHistory.save();
+    res.status(201).json(savedHistory);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
   }
 };

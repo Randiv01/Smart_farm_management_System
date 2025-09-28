@@ -137,6 +137,8 @@ import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import chatbotRoutes from "./AnimalManagement/routes/chatbotRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
+import feedingRoutes from "./AnimalManagement/routes/feedingRoutes.js";
+import automatedFeedingRoutes from "./AnimalManagement/routes/automatedFeedingRoutes.js";
 import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js"; // ⚠️ Renamed to avoid conflict
 import {
   sendMedicalRequest,
@@ -149,6 +151,7 @@ import notificationRoutes from "./AnimalManagement/routes/notificationRoutes.js"
 import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
 import HarvestHistory from "./AnimalManagement/models/HarvestHistory.js";
 import NotificationService from "./AnimalManagement/services/notificationService.js";
+import automatedFeedingService from "./AnimalManagement/services/automatedFeedingService.js";
 
 // Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
@@ -201,6 +204,8 @@ app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
+app.use("/api/feeding", feedingRoutes);
+app.use("/api/automated-feeding", automatedFeedingRoutes);
 app.use("/api/users", userRoutes);
 // IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
 app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
@@ -355,6 +360,10 @@ connectDB().then(() => {
     }, 60 * 60 * 1000);
     
     console.log('✅ Notification service started');
+    
+    // Start automated feeding service
+    automatedFeedingService.start();
+    console.log('🤖 Automated feeding service started');
   });
 });
 
