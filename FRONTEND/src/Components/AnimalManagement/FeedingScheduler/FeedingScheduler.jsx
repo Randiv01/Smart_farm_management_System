@@ -29,11 +29,11 @@ export default function FeedingScheduler() {
   const darkMode = theme === "dark";
 
   // State management
-  const [animals, setAnimals] = useState([]);
+  const [zones, setZones] = useState([]);
   const [feeds, setFeeds] = useState([]);
   const [feedingHistory, setFeedingHistory] = useState([]);
   const [formData, setFormData] = useState({
-    animalId: "",
+    zoneId: "",
     foodId: "",
     quantity: 0,
     feedingTimes: [""],
@@ -58,27 +58,27 @@ export default function FeedingScheduler() {
           document.title = "FeedingScheduler - Animal Manager";
       }, []);
 
-  // Fetch animals, feeds, and history
+  // Fetch zones, feeds, and history
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setApiError(false);
         
-        // Fetch animals and feeds
-        const [animalsRes, feedsRes] = await Promise.all([
-          fetch("http://localhost:5000/animal-types"),
+        // Fetch zones and feeds
+        const [zonesRes, feedsRes] = await Promise.all([
+          fetch("http://localhost:5000/zones"),
           fetch("http://localhost:5000/api/animalfood")
         ]);
 
-        if (!animalsRes.ok || !feedsRes.ok) {
+        if (!zonesRes.ok || !feedsRes.ok) {
           throw new Error("Failed to fetch data from server");
         }
 
-        const animalsData = await animalsRes.json();
+        const zonesData = await zonesRes.json();
         const feedsData = await feedsRes.json();
 
-        setAnimals(animalsData || []);
+        setZones(zonesData.zones || []);
         setFeeds(feedsData || []);
         
       } catch (err) {
@@ -115,10 +115,9 @@ export default function FeedingScheduler() {
   }, [formData.foodId, feeds]);
 
   // Derived state
-  const selectedAnimal = animals.find((a) => a._id === formData.animalId);
-  const recommendedFeedSize = selectedAnimal?.feedSize;
+  const selectedZone = zones.find((z) => z._id === formData.zoneId);
   const selectedFeed = feeds.find((f) => f._id === formData.foodId);
-  const feedUnit = selectedFeed?.unit || selectedAnimal?.feedUnit || "kg";
+  const feedUnit = selectedFeed?.unit || "kg";
 
   // Test ESP32 connection
   const testEsp32Connection = async () => {
@@ -198,7 +197,7 @@ export default function FeedingScheduler() {
     setLoading(true);
 
     // Validate form
-    if (!formData.animalId || !formData.foodId || !formData.quantity || 
+    if (!formData.zoneId || !formData.foodId || !formData.quantity || 
         formData.feedingTimes.some(time => !time)) {
       toast.error("Please fill all required fields");
       setLoading(false);
@@ -208,7 +207,7 @@ export default function FeedingScheduler() {
     try {
       // Prepare data for submission
       const submissionData = {
-        animalId: formData.animalId,
+        zoneId: formData.zoneId,
         foodId: formData.foodId,
         quantity: formData.quantity,
         feedingTimes: formData.feedingTimes,
@@ -255,7 +254,7 @@ export default function FeedingScheduler() {
       
       // Reset form
       setFormData({
-        animalId: "",
+        zoneId: "",
         foodId: "",
         quantity: 0,
         feedingTimes: [""],
@@ -393,17 +392,17 @@ export default function FeedingScheduler() {
 
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {/* Animals Card */}
+        {/* Zones Card */}
         <div className={`p-5 rounded-xl shadow-sm transition-all hover:shadow-md ${
           darkMode ? "bg-gray-800" : "bg-white"
         }`}>
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-full ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
-              <span className="text-2xl">🐄</span>
+              <span className="text-2xl">🏠</span>
             </div>
             <div>
-              <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Animals</h3>
-              <p className="text-2xl font-bold">{animals.length}</p>
+              <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Zones</h3>
+              <p className="text-2xl font-bold">{zones.length}</p>
             </div>
           </div>
         </div>
@@ -468,14 +467,14 @@ export default function FeedingScheduler() {
         </h3>
 
         <form onSubmit={handleSubmit} className="grid gap-6 grid-cols-1 md:grid-cols-2">
-          {/* Animal Selection */}
+          {/* Zone Selection */}
           <div className="flex flex-col gap-2">
             <label className="font-semibold flex gap-1 items-center">
-              Animal <span className="text-red-500">*</span>
+              Zone <span className="text-red-500">*</span>
             </label>
             <select
-              name="animalId"
-              value={formData.animalId}
+              name="zoneId"
+              value={formData.zoneId}
               onChange={handleChange}
               className={`p-3 rounded-lg border focus:ring-2 focus:ring-blue-500 transition ${
                 darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"
@@ -483,23 +482,27 @@ export default function FeedingScheduler() {
               required
               disabled={loading}
             >
-              <option value="">-- Select Animal --</option>
+              <option value="">-- Select Zone --</option>
               {loading ? (
-                <option value="" disabled>Loading animals...</option>
-              ) : animals.length === 0 ? (
-                <option value="" disabled>No animals found</option>
+                <option value="" disabled>Loading zones...</option>
+              ) : zones.length === 0 ? (
+                <option value="" disabled>No zones found</option>
               ) : (
-                animals.map((a) => (
-                  <option key={a._id} value={a._id}>
-                    {a.name} {a.breed && `(${a.breed})`}
+                zones.map((zone) => (
+                  <option key={zone._id} value={zone._id}>
+                    {zone.name} ({zone.type}) - {zone.currentOccupancy}/{zone.capacity} animals
                   </option>
                 ))
               )}
             </select>
-            {recommendedFeedSize && (
-              <p className={`text-sm ${darkMode ? "text-blue-300" : "text-blue-600"}`}>
-                Recommended Feed Size: {recommendedFeedSize} {feedUnit}
-              </p>
+            {selectedZone && (
+              <div className={`text-sm ${darkMode ? "text-blue-300" : "text-blue-600"}`}>
+                <p>Zone Type: {selectedZone.type}</p>
+                <p>Capacity: {selectedZone.currentOccupancy}/{selectedZone.capacity} animals</p>
+                {selectedZone.assignedAnimalTypes && selectedZone.assignedAnimalTypes.length > 0 && (
+                  <p>Animal Types: {selectedZone.assignedAnimalTypes.join(", ")}</p>
+                )}
+              </div>
             )}
           </div>
 
