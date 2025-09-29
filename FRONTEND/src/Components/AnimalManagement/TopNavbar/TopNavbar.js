@@ -12,18 +12,21 @@ import {
   BotIcon,
   GripVerticalIcon,
   SearchIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  QrCode
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext.js";
 import { useUser } from "../contexts/UserContext.js";
 import { useNotifications } from "../contexts/NotificationContext.js";
 import { useNavigate } from "react-router-dom";
+import QRScanner from "../QRScanner/QRScanner.jsx";
 
 const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   const { theme, toggleTheme } = useTheme();
   const darkMode = theme === "dark";
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const { userData, isLoading } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
@@ -434,6 +437,19 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
             ) : (
               <MoonIcon size={20} className="text-gray-600" />
             )}
+          </button>
+
+          {/* QR Scanner Button */}
+          <button
+            onClick={() => setQrScannerOpen(true)}
+            className={`p-2 rounded-md outline-none transition-colors ${
+              darkMode 
+                ? "hover:bg-gray-700 text-gray-200 hover:text-green-400" 
+                : "hover:bg-gray-100 text-gray-600 hover:text-green-600"
+            }`}
+            title="Scan QR Code"
+          >
+            <QrCode size={20} />
           </button>
 
           <div className="relative">
@@ -953,6 +969,12 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
           </div>
         </div>
       </div>
+      
+      {/* QR Scanner Modal */}
+      <QRScanner 
+        isOpen={qrScannerOpen} 
+        onClose={() => setQrScannerOpen(false)} 
+      />
     </header>
   );
 };

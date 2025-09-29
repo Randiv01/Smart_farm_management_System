@@ -1078,3 +1078,68 @@ export const updateBatchAnimals = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+// Get animal/batch data by QR code
+export const getAnimalByQRCode = async (req, res) => {
+  try {
+    const { qrCode } = req.params;
+    
+    console.log('QR Code search request:', qrCode);
+    
+    if (!qrCode) {
+      return res.status(400).json({ message: 'QR code is required' });
+    }
+
+    // Search for animal by QR code (could be animalId, batchId, qrCode field, or MongoDB ObjectId)
+    const searchConditions = [
+      { animalId: qrCode },
+      { batchId: qrCode },
+      { qrCode: qrCode }
+    ];
+    
+    // If the QR code looks like a MongoDB ObjectId, also search by _id
+    if (mongoose.Types.ObjectId.isValid(qrCode)) {
+      searchConditions.push({ _id: qrCode });
+      console.log('QR code is valid ObjectId, searching by _id as well');
+    }
+    
+    console.log('Search conditions:', searchConditions);
+    
+    const animal = await Animal.findOne({
+      $or: searchConditions
+    }).populate('type', 'name typeId managementType')
+      .populate('assignedZone', 'name type capacity currentOccupancy');
+      
+    console.log('Found animal:', animal ? 'Yes' : 'No');
+
+    if (!animal) {
+      return res.status(404).json({ 
+        message: 'Animal or batch not found with this QR code',
+        qrCode: qrCode
+      });
+    }
+
+    // Format the response data
+    const responseData = {
+      _id: animal._id,
+      animalId: animal.animalId,
+      batchId: animal.batchId,
+      qrCode: animal.qrCode || animal.animalId || animal.batchId,
+      type: animal.type,
+      data: animal.data,
+      assignedZone: animal.assignedZone,
+      count: animal.count || 1,
+      isBatch: animal.isBatch || false,
+      createdAt: animal.createdAt,
+      updatedAt: animal.updatedAt
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('Get animal by QR code error:', error);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message 
+    });
+  }
+};

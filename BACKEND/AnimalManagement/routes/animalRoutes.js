@@ -14,7 +14,8 @@ import {
   deleteAnimalTypeCompletely,
   moveAnimalToZone,
   getAnimalsByBatch,
-  updateBatchAnimals
+  updateBatchAnimals,
+  getAnimalByQRCode
 } from '../controllers/animalController.js';
 import { sendMedicalRequest, testEmail } from '../controllers/medicalRequestController.js';
 
@@ -47,5 +48,8 @@ router.patch('/:id/health', updateAnimalHealth);
 // Medical request routes
 router.post('/:id/medical-request', sendMedicalRequest);
 router.get('/test/email', testEmail); // Add test endpoint
+
+// QR Code routes
+router.get('/qr/:qrCode', getAnimalByQRCode);
 
 export const animalRouter = router;
