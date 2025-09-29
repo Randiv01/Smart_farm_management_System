@@ -40,7 +40,7 @@ const LoginPage = () => {
         password: formData.password
       });
 
-      const { token, role, firstName, lastName, email } = res.data;
+      const { token, role, firstName, lastName, email, profileImage } = res.data;
 
       await login({
         token,
@@ -48,6 +48,7 @@ const LoginPage = () => {
         firstName,
         lastName,
         email,
+        profileImage: profileImage || '',
         name: `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || (email ? email.split('@')[0] : '')
       });
 

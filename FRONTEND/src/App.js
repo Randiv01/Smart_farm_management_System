@@ -162,8 +162,8 @@ function App() {
                             <Route path="/contact" element={<ContactUs />} />
 
                             {/* ----------------- Customer Protected ----------------- */}
-                            <Route path="/profile" element={<UserProtectedRoute><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
-                            <Route path="/orders" element={<UserProtectedRoute><><Navbar /><MyOrders /></></UserProtectedRoute>} />
+                            <Route path="/profile" element={<UserProtectedRoute customerOnly={true}><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
+                            <Route path="/orders" element={<UserProtectedRoute customerOnly={true}><><Navbar /><MyOrders /></></UserProtectedRoute>} />
 
                             {/* ----------------- Animal Management ----------------- */}
                             <Route path="/AnimalManagement/*" element={

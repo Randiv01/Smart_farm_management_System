@@ -1,29 +1,97 @@
 // src/Components/UserHome/UHContext/UHAuthContext.jsx
-import React, { useEffect, useState, createContext, useContext } from "react";
+import React, { useEffect, useState, createContext, useContext, useCallback } from "react";
+import axios from "axios";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load user from localStorage on mount
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      const userData = {
+  // Define refreshUserData function
+  const refreshUserData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return false;
+
+      setIsLoading(true);
+      const response = await axios.get('http://localhost:5000/api/users/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const freshUserData = response.data;
+      
+      // Update localStorage with fresh data
+      if (freshUserData.firstName) localStorage.setItem('firstName', freshUserData.firstName);
+      if (freshUserData.lastName) localStorage.setItem('lastName', freshUserData.lastName);
+      if (freshUserData.role) localStorage.setItem('role', freshUserData.role);
+      if (freshUserData.profileImage) localStorage.setItem('profileImage', freshUserData.profileImage);
+      if (freshUserData.email) localStorage.setItem('email', freshUserData.email);
+      
+      // Update state with fresh data
+      const updatedUser = {
         token,
-        role: localStorage.getItem("role"),
-        firstName: localStorage.getItem("firstName"),
-        lastName: localStorage.getItem("lastName"),
-        email: localStorage.getItem("email"),
-        name: localStorage.getItem("name"),
-        profileImage: localStorage.getItem("profileImage") || "",
+        role: freshUserData.role || localStorage.getItem('role'),
+        firstName: freshUserData.firstName || localStorage.getItem('firstName'),
+        lastName: freshUserData.lastName || localStorage.getItem('lastName'),
+        email: freshUserData.email || localStorage.getItem('email'),
+        name: localStorage.getItem('name') || `${freshUserData.firstName || ''} ${freshUserData.lastName || ''}`.trim(),
+        profileImage: freshUserData.profileImage || localStorage.getItem('profileImage') || '',
       };
-      setUser(userData);
-      setIsAuthenticated(true);
+      
+      setUser(updatedUser);
+      return true;
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
+
+  // Load user from localStorage on mount and fetch fresh data
+  useEffect(() => {
+    const initializeUserData = async () => {
+      const token = localStorage.getItem("token");
+      if (token) {
+        // First, set data from localStorage for immediate display
+        const userData = {
+          token,
+          role: localStorage.getItem("role"),
+          firstName: localStorage.getItem("firstName"),
+          lastName: localStorage.getItem("lastName"),
+          email: localStorage.getItem("email"),
+          name: localStorage.getItem("name"),
+          profileImage: localStorage.getItem("profileImage") || "",
+        };
+        setUser(userData);
+        setIsAuthenticated(true);
+
+        // Then fetch fresh data from API
+        try {
+          await refreshUserData();
+        } catch (error) {
+          console.error('Error fetching fresh user data on mount:', error);
+        }
+      }
+    };
+
+    initializeUserData();
+  }, [refreshUserData]);
+
+  // Refresh user data when the window regains focus (user returns to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      const token = localStorage.getItem('token');
+      if (token && isAuthenticated) {
+        refreshUserData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthenticated, refreshUserData]);
 
   const login = async (userData) => {
     try {
@@ -107,7 +175,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, login, register, logout, updateUser }}
+      value={{ user, isAuthenticated, login, register, logout, updateUser, refreshUserData, isLoading }}
     >
       {children}
     </AuthContext.Provider>

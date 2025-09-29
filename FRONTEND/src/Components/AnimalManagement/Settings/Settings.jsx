@@ -49,7 +49,7 @@ export default function Settings() {
   const { theme, toggleTheme } = useTheme();
   const darkMode = theme === "dark";
   const { setLoading: setGlobalLoading } = useLoader();
-  const { userData: contextUserData, updateUserData } = useUser();
+  const { userData: contextUserData, updateUserData, refreshUserData } = useUser();
 
   const [userData, setUserData] = useState({
     firstName: contextUserData.firstName || "",
@@ -224,11 +224,8 @@ const handleImageUpload = async (e) => {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
 
-      // ✅ FIX: Add a timestamp to the URL to bust the browser cache
-      const imageUrlWithCacheBuster = `${response.data.imageUrl}?t=${new Date().getTime()}`;
-
-      setUserData((prev) => ({ ...prev, profileImage: imageUrlWithCacheBuster }));
-      updateUserData({ profileImage: imageUrlWithCacheBuster });
+      // Refresh user data from API to get the latest profile image
+      await refreshUserData();
       showMessage("success", "Profile image updated successfully");
 
     } catch (error) {
@@ -247,8 +244,9 @@ const handleImageUpload = async (e) => {
       await axios.delete("http://localhost:5000/api/users/profile-image", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUserData((prev) => ({ ...prev, profileImage: "" }));
-      updateUserData({ profileImage: "" });
+      
+      // Refresh user data from API to get the latest profile image
+      await refreshUserData();
       showMessage("success", "Profile image removed successfully");
     } catch (error) {
       console.error("Error deleting image:", error);
@@ -267,15 +265,10 @@ const handleImageUpload = async (e) => {
       const response = await axios.put("http://localhost:5000/api/users/profile", userData, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const hasChanged =
-        contextUserData.firstName !== response.data.firstName ||
-        contextUserData.lastName !== response.data.lastName;
-      if (hasChanged) {
-        updateUserData({
-          firstName: response.data.firstName,
-          lastName: response.data.lastName,
-        });
-      }
+      
+      // Refresh user data from API to get the latest information
+      await refreshUserData();
+      
       showMessage("success", "Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
