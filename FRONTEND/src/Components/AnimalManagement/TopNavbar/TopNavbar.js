@@ -13,13 +13,15 @@ import {
   GripVerticalIcon,
   SearchIcon,
   ChevronRightIcon,
-  QrCode
+  QrCode,
+  Package
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext.js";
 import { useUser } from "../contexts/UserContext.js";
 import { useNotifications } from "../contexts/NotificationContext.js";
 import { useNavigate } from "react-router-dom";
 import QRScanner from "../QRScanner/QRScanner.jsx";
+import ProductivityNotification from "../ProductivityNotification/ProductivityNotification.jsx";
 
 const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   const { theme, toggleTheme } = useTheme();
@@ -27,6 +29,7 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [productivityNotificationOpen, setProductivityNotificationOpen] = useState(false);
   const { userData, isLoading } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
@@ -450,6 +453,19 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
             title="Scan QR Code"
           >
             <QrCode size={20} />
+          </button>
+
+          {/* Productivity Notification Button */}
+          <button
+            onClick={() => setProductivityNotificationOpen(true)}
+            className={`p-2 rounded-md outline-none transition-colors ${
+              darkMode 
+                ? "hover:bg-gray-700 text-gray-200 hover:text-blue-400" 
+                : "hover:bg-gray-100 text-gray-600 hover:text-blue-600"
+            }`}
+            title="Send Productivity Notification"
+          >
+            <Package size={20} />
           </button>
 
           <div className="relative">
@@ -974,6 +990,12 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
       <QRScanner 
         isOpen={qrScannerOpen} 
         onClose={() => setQrScannerOpen(false)} 
+      />
+      
+      {/* Productivity Notification Modal */}
+      <ProductivityNotification 
+        isOpen={productivityNotificationOpen} 
+        onClose={() => setProductivityNotificationOpen(false)} 
       />
     </header>
   );

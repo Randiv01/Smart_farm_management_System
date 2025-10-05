@@ -33,7 +33,7 @@ const adminUsers = [
     firstName: "David",
     lastName: "Inventory",
     email: "david.inv@mountolive.com",
-    password: "Inv123!",
+    password: "Inv123!",   //Inv12345!
     role: "inv",
     isAdmin: false
   },
@@ -41,7 +41,7 @@ const adminUsers = [
     firstName: "Sarah",
     lastName: "Employee",
     email: "sarah.emp@mountolive.com",
-    password: "Emp123!",
+    password: "Emp123!",  //Emp12345!
     role: "emp",
     isAdmin: false
   },
@@ -57,7 +57,7 @@ const adminUsers = [
     firstName: "Admin",
     lastName: "User",
     email: "admin@mountolive.com",
-    password: "Admin123!",
+    password: "Admin123!",  // Admin123!
     role: "admin",
     isAdmin: true
   }

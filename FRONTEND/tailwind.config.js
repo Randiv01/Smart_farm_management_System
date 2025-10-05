@@ -4,7 +4,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "light-beige": "0 0 8px rgba(102, 187, 106, 0.6);", // 60%
+        "light-beige": "0 0 8px rgba(187, 129, 102, 0.6);", // 60%
         "dark-green": "#2e7d32",  // 30%
         "soft-white": "#ffffff",   // 10%
         "dark-bg": "#111827",
