@@ -13,14 +13,34 @@ export default function ETopNavbar({ onMenuClick, sidebarOpen }) {
 
   useEffect(() => {
     // Load user data from localStorage
-    const user = {
-      name: localStorage.getItem("name") || "Admin",
-      firstName: localStorage.getItem("firstName"),
-      lastName: localStorage.getItem("lastName"),
-      role: localStorage.getItem("role") || "admin",
-      profileImage: localStorage.getItem("profileImage") || null
+    const loadUserData = () => {
+      const user = {
+        name: localStorage.getItem("name") || "Admin",
+        firstName: localStorage.getItem("firstName"),
+        lastName: localStorage.getItem("lastName"),
+        role: localStorage.getItem("role") || "admin",
+        profileImage: localStorage.getItem("profileImage") || null
+      };
+      setUserData(user);
     };
-    setUserData(user);
+
+    // Load initial data
+    loadUserData();
+
+    // Listen for storage changes (when profile is updated)
+    const handleStorageChange = () => {
+      loadUserData();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events from the same tab
+    window.addEventListener('profileUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profileUpdated', handleStorageChange);
+    };
   }, []);
 
   const handleLogout = () => {

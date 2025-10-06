@@ -30,6 +30,8 @@
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "serialport": "^13.0.0",
+    "smart-farm-management-system": "file:..",
+    "smart-farm-system": "file:..",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "twilio": "^5.8.0",

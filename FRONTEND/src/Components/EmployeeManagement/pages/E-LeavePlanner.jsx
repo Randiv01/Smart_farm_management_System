@@ -487,7 +487,7 @@ export const ELeavePlanner = ({ darkMode }) => {
   };
 
   return (
-    <div className={`p-6 font-sans min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`p-6 font-sans min-h-screen ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Leave Management System</h2>

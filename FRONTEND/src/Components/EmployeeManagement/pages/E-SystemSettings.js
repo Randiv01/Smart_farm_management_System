@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import io from 'socket.io-client';
 import Loader from '../Loader/Loader.js'; // Import the Loader component
 
-// Polished MessagePopup
-const MessagePopup = ({ type, message, show, onClose }) => {
+// Polished MessagePopup with dark mode support
+const MessagePopup = ({ type, message, show, onClose, darkMode }) => {
   return (
     <AnimatePresence>
       {show && (
@@ -23,7 +23,11 @@ const MessagePopup = ({ type, message, show, onClose }) => {
             aria-live="polite"
             className={`pointer-events-auto max-w-md w-full rounded-2xl shadow-2xl p-4 md:p-6 flex items-start gap-4 transition-transform transform ${
               type === 'success'
-                ? 'bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 text-green-800'
+                ? darkMode 
+                  ? 'bg-gradient-to-r from-green-900/80 to-green-800/80 border-l-4 border-green-400 text-green-200'
+                  : 'bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500 text-green-800'
+                : darkMode
+                ? 'bg-gradient-to-r from-red-900/80 to-red-800/80 border-l-4 border-red-400 text-red-200'
                 : 'bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 text-red-800'
             }`}
           >
@@ -40,7 +44,11 @@ const MessagePopup = ({ type, message, show, onClose }) => {
             <button
               onClick={onClose}
               aria-label="Close message"
-              className="ml-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className={`ml-2 p-2 rounded-lg transition-colors ${
+                darkMode 
+                  ? 'hover:bg-gray-700/50 text-gray-300' 
+                  : 'hover:bg-gray-100 text-gray-600'
+              }`}
             >
               <FiX className="w-5 h-5" />
             </button>
@@ -51,8 +59,8 @@ const MessagePopup = ({ type, message, show, onClose }) => {
   );
 };
 
-// Image modal for preview
-const ImageModal = ({ src, onClose }) => (
+// Image modal for preview with dark mode support
+const ImageModal = ({ src, onClose, darkMode }) => (
   <AnimatePresence>
     {src && (
       <motion.div
@@ -66,14 +74,18 @@ const ImageModal = ({ src, onClose }) => (
           animate={{ scale: 1 }}
           exit={{ scale: 0.95 }}
           transition={{ duration: 0.15 }}
-          className="bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl max-w-3xl w-full"
+          className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-2xl overflow-hidden shadow-2xl max-w-3xl w-full`}
         >
           <div className="relative">
             <img src={src} alt="Profile preview" className="w-full h-auto object-contain max-h-[70vh]" />
             <button
               onClick={onClose}
               aria-label="Close image preview"
-              className="absolute top-3 right-3 bg-white/80 dark:bg-gray-800/70 backdrop-blur rounded-full p-2 shadow"
+              className={`absolute top-3 right-3 backdrop-blur rounded-full p-2 shadow transition-colors ${
+                darkMode 
+                  ? 'bg-gray-800/80 hover:bg-gray-700/80 text-gray-200' 
+                  : 'bg-white/80 hover:bg-gray-100/80 text-gray-600'
+              }`}
             >
               <FiX />
             </button>
@@ -134,7 +146,7 @@ const ESystemSettings = () => {
     const cleanPath = path.replace(/\\/g, '/');
     const parts = cleanPath.split('/');
     const filename = parts[parts.length - 1];
-    return `/api/users/profile-image/${filename}`;
+    return `http://localhost:5000/api/users/profile-image/${filename}`;
   }, []);
 
   const showMessage = useCallback((type, text, timeout = 3000) => {
@@ -159,41 +171,63 @@ const ESystemSettings = () => {
 
     emitProfileUpdate(newData);
     window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('profileUpdated'));
   };
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         setLoading(true);
-        setShowLoader(true); // Show loader when fetching data
+        setShowLoader(true);
         const token = localStorage.getItem('token');
-        const response = await axios.get('/api/users/profile', {
+        
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const response = await axios.get('http://localhost:5000/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` },
         });
+        
         const userDataFromApi = response.data;
+        console.log('Fetched user data:', userDataFromApi);
+        
         setUserData(userDataFromApi);
+        
         if (userDataFromApi.profileImage) {
-          setImagePreview(getProfileImageUrl(userDataFromApi.profileImage));
+          const imageUrl = getProfileImageUrl(userDataFromApi.profileImage);
+          console.log('Setting image preview:', imageUrl);
+          setImagePreview(imageUrl);
         }
+        
         updateUserDataStorage(userDataFromApi);
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        showMessage('error', error.response?.data?.error || 'Failed to fetch user profile');
+        if (error.response?.status === 401) {
+          showMessage('error', 'Session expired. Please login again.');
+          localStorage.clear();
+          window.location.href = '/login';
+        } else {
+          showMessage('error', error.response?.data?.error || 'Failed to fetch user profile');
+        }
       } finally {
         setLoading(false);
-        setShowLoader(false); // Hide loader when done
+        setShowLoader(false);
       }
     };
 
     const fetchRoles = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('/api/users/roles', {
+        if (!token) return;
+        
+        const response = await axios.get('http://localhost:5000/api/users/roles', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setAvailableRoles(response.data);
       } catch (error) {
         console.error('Error fetching roles:', error);
+        // Don't show error for roles as it's not critical
       }
     };
 
@@ -280,8 +314,13 @@ const ESystemSettings = () => {
     if (!validateProfile()) return;
     try {
       setLoading(true);
-      setShowLoader(true); // Show loader when updating profile
+      setShowLoader(true);
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const updateData = {
         firstName: userData.firstName,
         lastName: userData.lastName,
@@ -292,23 +331,36 @@ const ESystemSettings = () => {
         dateOfBirth: userData.dateOfBirth,
         bio: userData.bio,
       };
+      
       if (['animal', 'plant', 'health'].includes(userData.role)) {
         updateData.specialization = userData.specialization;
         updateData.experience = userData.experience;
         updateData.education = userData.education;
       }
-      const response = await axios.put('/api/users/profile', updateData, {
+      
+      console.log('Updating profile with data:', updateData);
+      
+      const response = await axios.put('http://localhost:5000/api/users/profile', updateData, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      console.log('Profile update response:', response.data);
+      
       setUserData({ ...userData, ...response.data });
       updateUserDataStorage(response.data);
       showMessage('success', 'Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
-      showMessage('error', error.response?.data?.error || 'Failed to update profile');
+      if (error.response?.status === 401) {
+        showMessage('error', 'Session expired. Please login again.');
+        localStorage.clear();
+        window.location.href = '/login';
+      } else {
+        showMessage('error', error.response?.data?.error || 'Failed to update profile');
+      }
     } finally {
       setLoading(false);
-      setShowLoader(false); // Hide loader when done
+      setShowLoader(false);
     }
   };
 
@@ -316,10 +368,15 @@ const ESystemSettings = () => {
     if (!validatePassword()) return;
     try {
       setLoading(true);
-      setShowLoader(true); // Show loader when updating password
+      setShowLoader(true);
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       await axios.put(
-        '/api/users/change-password',
+        'http://localhost:5000/api/users/change-password',
         {
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword,
@@ -332,10 +389,16 @@ const ESystemSettings = () => {
       showMessage('success', 'Password changed successfully!');
     } catch (error) {
       console.error('Error changing password:', error);
-      showMessage('error', error.response?.data?.error || 'Failed to change password');
+      if (error.response?.status === 401) {
+        showMessage('error', 'Session expired. Please login again.');
+        localStorage.clear();
+        window.location.href = '/login';
+      } else {
+        showMessage('error', error.response?.data?.error || 'Failed to change password');
+      }
     } finally {
       setLoading(false);
-      setShowLoader(false); // Hide loader when done
+      setShowLoader(false);
     }
   };
 
@@ -353,37 +416,61 @@ const ESystemSettings = () => {
     }
     try {
       setLoading(true);
-      setShowLoader(true); // Show loader when uploading image
+      setShowLoader(true);
       const formData = new FormData();
       formData.append('profileImage', file);
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/users/upload-profile-image', formData, {
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      console.log('Uploading image:', file.name);
+      
+      const response = await axios.post('http://localhost:5000/api/users/upload-profile-image', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       });
 
+      console.log('Image upload response:', response.data);
+
       const updatedUserData = { ...userData, profileImage: response.data.imageUrl };
       setUserData(updatedUserData);
-      setImagePreview(URL.createObjectURL(file));
+      
+      // Set preview using the server URL instead of local object URL
+      const imageUrl = getProfileImageUrl(response.data.imageUrl);
+      setImagePreview(imageUrl);
+      
       updateUserDataStorage(updatedUserData);
       showMessage('success', 'Profile image updated successfully');
     } catch (error) {
       console.error('Error uploading image:', error);
-      showMessage('error', error.response?.data?.error || 'Failed to upload image');
+      if (error.response?.status === 401) {
+        showMessage('error', 'Session expired. Please login again.');
+        localStorage.clear();
+        window.location.href = '/login';
+      } else {
+        showMessage('error', error.response?.data?.error || 'Failed to upload image');
+      }
     } finally {
       setLoading(false);
-      setShowLoader(false); // Hide loader when done
+      setShowLoader(false);
     }
   };
 
   const handleRemoveImage = async () => {
     try {
       setLoading(true);
-      setShowLoader(true); // Show loader when removing image
+      setShowLoader(true);
       const token = localStorage.getItem('token');
-      await axios.delete('/api/users/profile-image', {
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      await axios.delete('http://localhost:5000/api/users/profile-image', {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -394,10 +481,16 @@ const ESystemSettings = () => {
       showMessage('success', 'Profile image removed successfully');
     } catch (error) {
       console.error('Error removing image:', error);
-      showMessage('error', error.response?.data?.error || 'Failed to remove image');
+      if (error.response?.status === 401) {
+        showMessage('error', 'Session expired. Please login again.');
+        localStorage.clear();
+        window.location.href = '/login';
+      } else {
+        showMessage('error', error.response?.data?.error || 'Failed to remove image');
+      }
     } finally {
       setLoading(false);
-      setShowLoader(false); // Hide loader when done
+      setShowLoader(false);
     }
   };
 
@@ -458,11 +551,11 @@ const ESystemSettings = () => {
   };
 
   return (
-    <div className={`h-full ${darkMode ? 'bg-gray-900 text-gray-200' : 'bg-gray-50 text-gray-800'}`}>
+    <div className={`h-full ${darkMode ? 'bg-gray-900 text-gray-200' : 'light-beige'}`}>
       <div className="max-w-5xl mx-auto p-6 md:p-10">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
+            <h2 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
               System Settings
             </h2>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage your profile, password and account settings.</p>
@@ -483,6 +576,7 @@ const ESystemSettings = () => {
           type={message.type}
           message={message.text}
           show={message.show}
+          darkMode={darkMode}
           onClose={() => setMessage({ type: '', text: '', show: false })}
         />
 
@@ -528,7 +622,7 @@ const ESystemSettings = () => {
                     </div>
 
                     <div className="flex justify-center mt-4 gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 hover:scale-[1.01] transition transform shadow-sm">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:scale-[1.01] transition transform shadow-sm">
                         <FiCamera />
                         <span className="text-sm">Change</span>
                         <input
@@ -578,10 +672,10 @@ const ESystemSettings = () => {
                         disabled={item.disabled || loading}
                         className={`w-full p-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-offset-1 ${
                           validationErrors[item.field]
-                            ? 'border-red-400 ring-red-100'
+                            ? 'border-red-400 ring-red-100 dark:ring-red-900'
                             : darkMode
-                            ? 'bg-gray-700 text-gray-200 border-gray-600'
-                            : 'bg-white text-gray-800 border-gray-200'
+                            ? 'bg-gray-700 text-gray-200 border-gray-600 focus:ring-blue-500 focus:ring-offset-gray-800'
+                            : 'bg-white text-gray-800 border-gray-200 focus:ring-blue-500 focus:ring-offset-white'
                         }`}
                       />
                       {validationErrors[item.field] && (
@@ -657,10 +751,10 @@ const ESystemSettings = () => {
                       maxLength="500"
                       className={`w-full p-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-offset-1 ${
                         validationErrors.bio
-                          ? 'border-red-400 ring-red-100'
+                          ? 'border-red-400 ring-red-100 dark:ring-red-900'
                           : darkMode
-                          ? 'bg-gray-700 text-gray-200 border-gray-600'
-                          : 'bg-white text-gray-800 border-gray-200'
+                          ? 'bg-gray-700 text-gray-200 border-gray-600 focus:ring-blue-500 focus:ring-offset-gray-800'
+                          : 'bg-white text-gray-800 border-gray-200 focus:ring-blue-500 focus:ring-offset-white'
                       }`}
                       disabled={loading}
                     />
@@ -702,7 +796,7 @@ const ESystemSettings = () => {
                     value={passwordData.currentPassword}
                     onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
                     className={`w-full p-3 rounded-xl border ${
-                      validationErrors.currentPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white border-gray-200'
+                      validationErrors.currentPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white text-gray-800 border-gray-200'
                     }`}
                     disabled={loading}
                   />
@@ -715,7 +809,7 @@ const ESystemSettings = () => {
                     value={passwordData.newPassword}
                     onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                     className={`w-full p-3 rounded-xl border ${
-                      validationErrors.newPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white border-gray-200'
+                      validationErrors.newPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white text-gray-800 border-gray-200'
                     }`}
                     disabled={loading}
                   />
@@ -728,7 +822,7 @@ const ESystemSettings = () => {
                     value={passwordData.confirmPassword}
                     onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
                     className={`w-full p-3 rounded-xl border ${
-                      validationErrors.confirmPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white border-gray-200'
+                      validationErrors.confirmPassword ? 'border-red-400' : darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-white text-gray-800 border-gray-200'
                     }`}
                     disabled={loading}
                   />
@@ -751,7 +845,7 @@ const ESystemSettings = () => {
           {/* Account Tab */}
           {activeTab === 'account' && (
             <div className="space-y-6">
-              <div className="p-4 border border-yellow-200 rounded-xl bg-yellow-50 dark:bg-yellow-900/20">
+              <div className="p-4 border border-yellow-200 dark:border-yellow-800 rounded-xl bg-yellow-50 dark:bg-yellow-900/20">
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-800/30">
                     <FiAlertCircle className="w-6 h-6 text-yellow-600 dark:text-yellow-300" />
@@ -772,7 +866,7 @@ const ESystemSettings = () => {
                 </div>
               </div>
 
-              <div className="p-4 border border-red-200 rounded-xl bg-red-50 dark:bg-red-900/20">
+              <div className="p-4 border border-red-200 dark:border-red-800 rounded-xl bg-red-50 dark:bg-red-900/20">
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-lg bg-red-100 dark:bg-red-800/30">
                     <FiTrash2 className="w-6 h-6 text-red-600 dark:text-red-300" />
@@ -818,7 +912,7 @@ const ESystemSettings = () => {
         </div>
       </div>
 
-      <ImageModal src={showImageModal ? imagePreview : null} onClose={() => setShowImageModal(false)} />
+      <ImageModal src={showImageModal ? imagePreview : null} darkMode={darkMode} onClose={() => setShowImageModal(false)} />
     </div>
   );
 };

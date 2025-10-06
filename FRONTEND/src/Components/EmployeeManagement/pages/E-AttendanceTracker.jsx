@@ -361,7 +361,7 @@ export const AttendanceTracker = ({ darkMode }) => {
   };
 
   return (
-    <div className={`font-sans min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"}`}>
+    <div className={`font-sans min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "light-beige"}`}>
       {/* Loader Component */}
       {showLoader && <Loader darkMode={darkMode} />}
       

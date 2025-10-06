@@ -327,7 +327,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
   const PIE_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f97316', '#f43f5e', '#a78bfa', '#22d3ee'];
 
   return (
-    <div className={`p-4 space-y-6 min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+    <div className={`p-4 space-y-6 min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'light-beige'}`}>
       {/* PAGE HEADER — title + one-line tagline */}
       <div className="mb-2">
         <h1 className={`text-2xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>

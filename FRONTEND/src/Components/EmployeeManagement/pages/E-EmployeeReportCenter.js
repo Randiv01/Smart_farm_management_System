@@ -52,7 +52,7 @@ export const EEmployeeReportCenter = () => {
   }
 
   return (
-    <div className={`h-full ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"}`}>
+    <div className={`h-full ${darkMode ? "bg-gray-900 text-gray-200" : "light-beige"}`}>
       <div className="max-w-5xl mx-auto p-6 md:p-10">
         <div className="flex flex-col md:flex-row gap-6">
           <aside className={`w-full md:w-80 rounded-2xl border shadow-xl p-4 ${

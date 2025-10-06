@@ -1387,7 +1387,7 @@ export const StaffHub = ({ darkMode }) => {
 
   /* ---------- render ---------- */
   return (
-    <div className="p-4">
+    <div className={`p-4 min-h-screen ${darkMode ? 'bg-gray-900 text-gray-200' : 'light-beige'}`}>
       {/* Loader Component */}
       {showLoader && <Loader darkMode={darkMode} />}
 

@@ -105,7 +105,7 @@ export const SalaryDesk = () => {
   }
 
   return (
-    <div className={`h-full ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"}`}>
+    <div className={`h-full ${darkMode ? "bg-gray-900 text-gray-200" : "light-beige"}`}>
       <div className="max-w-5xl mx-auto p-6 md:p-10">
         {/* Tabs */}
         <div className="flex mb-6 border-b border-gray-200 dark:border-gray-700">
