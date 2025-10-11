@@ -33,6 +33,8 @@ import {
 } from "recharts";
 import Loader from "../Loader/Loader.js";
 import { useETheme } from '../Econtexts/EThemeContext.jsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -265,37 +267,194 @@ export const SalaryDesk = () => {
     }
   };
 
-  // Export to PDF
-  const handleExportPDF = async () => {
+  // Export to PDF (Professional Frontend Generation)
+  const handleExportPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for better table visibility
+    
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const companyWebsite = "www.mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
+    
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
+
+    // Add real company logo
     try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        year: year.toString(),
-        month: month.toString()
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        doc.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        doc.setFillColor(...primaryColor);
+        doc.rect(20, 15, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 32, 30, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      doc.setFillColor(...primaryColor);
+      doc.rect(20, 15, 25, 25, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MOF', 32, 30, { align: 'center' });
+      generatePDFContent();
+    }
+
+    const generatePDFContent = () => {
+      // Company header
+      doc.setTextColor(...textColor);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(companyName, 50, 20);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(companyAddress, 50, 27);
+      doc.text(companyContact, 50, 32);
+      doc.text(companyWebsite, 50, 37);
+
+      // Report title with professional styling
+      doc.setFillColor(...lightGray);
+      doc.rect(20, 45, 257, 12, 'F');
+      doc.setTextColor(...primaryColor);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SALARY MANAGEMENT REPORT', 148, 54, { align: 'center' });
+
+      // Report metadata
+      doc.setTextColor(...textColor);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const monthName = new Date(0, month - 1).toLocaleString('default', { month: 'long' });
+      doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 65);
+      doc.text(`Period: ${monthName} ${year}`, 20, 70);
+      doc.text(`Report ID: MOF-SAL-${Date.now().toString().slice(-6)}`, 20, 75);
+
+      // Summary statistics
+      doc.setFillColor(...secondaryColor);
+      doc.rect(20, 82, 257, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAYROLL SUMMARY', 25, 88);
+
+      doc.setTextColor(...textColor);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Records: ${salaryRecords.length}`, 25, 97);
+      doc.text(`Total Payroll: LKR ${salarySummary.totalPayroll?.toLocaleString() || 0}`, 25, 102);
+      doc.text(`Total Overtime: LKR ${salarySummary.totalOvertime?.toLocaleString() || 0}`, 25, 107);
+      doc.text(`Pending Payments: ${salarySummary.pendingCount || 0}`, 25, 112);
+      doc.text(`Paid Records: ${salarySummary.paidCount || 0}`, 25, 117);
+
+      // Prepare table data
+      const headers = [["Emp ID", "Name", "Position", "Basic Salary", "Overtime", "Allowances", "Deductions", "Net Salary", "Status"]];
+      
+      const data = salaryRecords.map(record => [
+        record.employeeId || 'N/A',
+        record.employeeName || 'N/A',
+        record.position || 'N/A',
+        `LKR ${(record.basicSalary || 0).toLocaleString()}`,
+        `LKR ${(record.overtimePay || 0).toLocaleString()}`,
+        `LKR ${(record.allowances || 0).toLocaleString()}`,
+        `LKR ${(record.deductions || 0).toLocaleString()}`,
+        `LKR ${(record.netSalary || 0).toLocaleString()}`,
+        record.status || 'Pending'
+      ]);
+
+      // Create professional table
+      autoTable(doc, {
+        head: headers,
+        body: data,
+        startY: 125,
+        theme: 'grid',
+        headStyles: {
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3,
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: textColor,
+          cellPadding: 2
+        },
+        alternateRowStyles: {
+          fillColor: [249, 250, 251]
+        },
+        margin: { left: 20, right: 20 },
+        styles: {
+          lineColor: [209, 213, 219],
+          lineWidth: 0.5,
+          halign: 'left',
+          valign: 'middle',
+          overflow: 'linebreak'
+        },
+        didDrawPage: (data) => {
+          // Add header and footer to each page
+          addHeaderFooter();
+        }
       });
-      
-      const response = await fetch(`${API_BASE_URL}/salary/export/pdf?${params}`);
-      if (!response.ok) throw new Error('Failed to export PDF');
-      
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Salary_Report_${year}_${month}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+
+      // Professional footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        addHeaderFooter();
+      }
+
+      // Save PDF with professional naming
+      const fileName = `MOF_Salary_Report_${monthName}_${year}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
       
       setSuccess('PDF file exported successfully!');
       setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      setError('Failed to export PDF file');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    const addHeaderFooter = () => {
+      const pageCount = doc.internal.getNumberOfPages();
+      const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+      
+      // Footer background
+      doc.setFillColor(...lightGray);
+      doc.rect(0, 195, 297, 15, 'F'); // Landscape dimensions
+      
+      // Footer content
+      doc.setTextColor(...textColor);
+      doc.setFontSize(8);
+      doc.text(`Page ${currentPage} of ${pageCount}`, 20, 203);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, 148, 203, { align: 'center' });
+      doc.text(companyName, 277, 203, { align: 'right' });
+      
+      // Footer line
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(0.5);
+      doc.line(20, 197, 277, 197);
+      
+      // Disclaimer
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.text("This report is generated by Mount Olive Farm House Management System", 148, 208, { align: 'center' });
+    };
   };
 
   // Update salary status

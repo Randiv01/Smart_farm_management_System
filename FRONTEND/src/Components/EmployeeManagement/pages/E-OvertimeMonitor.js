@@ -339,24 +339,186 @@ export const OvertimeMonitor = () => {
     return `${whole}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  // ===== Export CURRENT TABLE VIEW as PDF (calls backend API) =====
+  // ===== Export CURRENT TABLE VIEW as PDF (Professional Frontend Generation) =====
   const handleExportPDF = () => {
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (filters.month) params.append('month', filters.month);
-    if (filters.year) params.append('year', filters.year);
-    if (filters.employee) params.append('employeeId', filters.employee);
-
-    // Create download URL
-    const downloadUrl = `http://localhost:5000/api/overtime/export/pdf?${params.toString()}`;
+    const doc = new jsPDF('p', 'mm', 'a4');
     
-    // Create a temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = `overtime-records-${filters.month || 'all'}-${filters.year || 'all'}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const companyWebsite = "www.mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
+    
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
+
+    // Add real company logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        doc.addImage(logoImg, 'PNG', 15, 10, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        doc.setFillColor(...primaryColor);
+        doc.rect(15, 10, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 27, 25, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      doc.setFillColor(...primaryColor);
+      doc.rect(15, 10, 25, 25, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MOF', 27, 25, { align: 'center' });
+      generatePDFContent();
+    }
+
+    const generatePDFContent = () => {
+      // Company header
+      doc.setTextColor(...textColor);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(companyName, 45, 18);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(companyAddress, 45, 25);
+      doc.text(companyContact, 45, 30);
+      doc.text(companyWebsite, 45, 35);
+
+      // Report title with professional styling
+      doc.setFillColor(...lightGray);
+      doc.rect(15, 40, 180, 10, 'F');
+      doc.setTextColor(...primaryColor);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('OVERTIME MANAGEMENT REPORT', 105, 47, { align: 'center' });
+
+      // Report metadata
+      doc.setTextColor(...textColor);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 15, 58);
+      doc.text(`Period: ${new Date(0, filters.month - 1).toLocaleString('default', { month: 'long' })} ${filters.year}`, 15, 63);
+      doc.text(`Report ID: MOF-OT-${Date.now().toString().slice(-6)}`, 15, 68);
+
+      // Summary statistics
+      doc.setFillColor(...secondaryColor);
+      doc.rect(15, 75, 180, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('OVERTIME SUMMARY', 20, 81);
+
+      doc.setTextColor(...textColor);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Records: ${overtimeRecords.length}`, 20, 90);
+      doc.text(`Total Overtime Hours: ${formatHours(totalOvertimeHours)}`, 20, 95);
+      doc.text(`Average Per Employee: ${formatHours(avgPerEmployeeHours)}`, 20, 100);
+
+      // Prepare table data
+      const headers = [["No", "Overtime ID", "Employee", "Date", "Regular Hours", "Overtime Hours", "Total Hours"]];
+      
+      const data = overtimeRecords.map((record, index) => [
+        (index + 1).toString(),
+        record.overtimeId || makeOvertimeIdFallback(record),
+        record.employee?.name || 'N/A',
+        new Date(record.date).toLocaleDateString(),
+        formatHours(record.regularHours),
+        formatHours(record.overtimeHours),
+        formatHours(record.totalHours)
+      ]);
+
+      // Create professional table
+      autoTable(doc, {
+        head: headers,
+        body: data,
+        startY: 110,
+        theme: 'grid',
+        headStyles: {
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: textColor,
+          cellPadding: 2
+        },
+        alternateRowStyles: {
+          fillColor: [249, 250, 251]
+        },
+        margin: { left: 15, right: 15 },
+        styles: {
+          lineColor: [209, 213, 219],
+          lineWidth: 0.5,
+          halign: 'left',
+          valign: 'middle',
+          overflow: 'linebreak'
+        },
+        didDrawPage: (data) => {
+          // Add header and footer to each page
+          addHeaderFooter();
+        }
+      });
+
+      // Professional footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        addHeaderFooter();
+      }
+
+      // Save PDF with professional naming
+      const monthName = new Date(0, filters.month - 1).toLocaleString('default', { month: 'long' });
+      const fileName = `MOF_Overtime_Report_${monthName}_${filters.year}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+    };
+
+    const addHeaderFooter = () => {
+      const pageCount = doc.internal.getNumberOfPages();
+      const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+      
+      // Footer background
+      doc.setFillColor(...lightGray);
+      doc.rect(0, 275, 210, 20, 'F');
+      
+      // Footer content
+      doc.setTextColor(...textColor);
+      doc.setFontSize(8);
+      doc.text(`Page ${currentPage} of ${pageCount}`, 15, 283);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 283, { align: 'center' });
+      doc.text(companyName, 195, 283, { align: 'right' });
+      
+      // Footer line
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(0.5);
+      doc.line(15, 285, 195, 285);
+      
+      // Disclaimer
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.text("This report is generated by Mount Olive Farm House Management System", 105, 290, { align: 'center' });
+    };
   };
 
   const handlePageChange = (newPage) => setPagination((p) => ({ ...p, page: newPage }));
