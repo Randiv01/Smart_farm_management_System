@@ -345,79 +345,222 @@ export default function FeedStocksAnimalManager() {
     ]
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (filteredAnimalFoods.length === 0) {
       showMessage("No data available to export", "error");
       return;
     }
 
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Animal Feed Stock Report', 14, 20);
+      // Company information
+      const companyName = "Mount Olive Farm House";
+      const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+      const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+      const companyWebsite = "www.mountolivefarm.com";
+      const reportDate = new Date().toLocaleDateString();
+      const reportTime = new Date().toLocaleTimeString();
+      
+      // Professional color scheme
+      const primaryColor = [34, 197, 94]; // Green
+      const secondaryColor = [16, 185, 129]; // Teal
+      const accentColor = [59, 130, 246]; // Blue
+      const textColor = [31, 41, 55]; // Dark gray
+      const lightGray = [243, 244, 246];
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
-    doc.text(`Total Items: ${filteredAnimalFoods.length}`, 14, 34);
-
-    const headers = [['Food Name', 'Remaining', 'Unit', 'Target Animal', 'Expiry Date', 'Status']];
-
-    const data = filteredAnimalFoods.map(food => {
-      const days = calculateDaysUntilExpiry(food.expiryDate);
-      return [
-        String(food.name || 'N/A'),
-        String(food.remaining || 0),
-        String(food.unit || 'N/A'),
-        String(food.targetAnimal || 'N/A'),
-        food.expiryDate ? new Date(food.expiryDate).toLocaleDateString() : 'N/A',
-        String(getDaysLeftText(days))
-      ];
-    });
-
-    autoTable(doc, {
-      head: headers,
-      body: data,
-      startY: 40,
-      theme: 'striped',
-      headStyles: {
-        fillColor: darkMode ? [55, 65, 81] : [79, 70, 229],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
-        fillColor: darkMode ? [31, 41, 55] : [255, 255, 255]
-      },
-      alternateRowStyles: {
-        fillColor: darkMode ? [40, 50, 65] : [240, 240, 240]
-      },
-      margin: { top: 40, left: 14, right: 14 },
-      styles: {
-        cellPadding: 2,
-        halign: 'left',
-        valign: 'middle',
-        overflow: 'linebreak'
+      // Add real company logo
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+          generatePDFContent();
+        };
+        logoImg.onerror = () => {
+          // Fallback to placeholder if logo fails to load
+          doc.setFillColor(...primaryColor);
+          doc.rect(20, 15, 25, 25, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('MOF', 30, 30, { align: 'center' });
+          generatePDFContent();
+        };
+        logoImg.src = '/logo512.png';
+      } catch (error) {
+        console.error('Error loading logo:', error);
+        // Fallback to placeholder
+        doc.setFillColor(...primaryColor);
+        doc.rect(20, 15, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 30, 30, { align: 'center' });
+        generatePDFContent();
       }
-    });
 
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(100);
-      doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+      const generatePDFContent = () => {
+        // Company header
+        doc.setTextColor(...textColor);
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text(companyName, 50, 20);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(companyAddress, 50, 27);
+        doc.text(companyContact, 50, 32);
+        doc.text(companyWebsite, 50, 37);
+
+        // Report title with professional styling
+        doc.setFillColor(...lightGray);
+        doc.rect(20, 45, 170, 12, 'F');
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text("FEED STOCK INVENTORY REPORT", 105, 54, { align: 'center' });
+
+        // Report metadata
+        doc.setTextColor(...textColor);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 65);
+        doc.text(`Total Feed Items: ${filteredAnimalFoods.length}`, 20, 70);
+        doc.text(`Report ID: MOF-FS-${Date.now().toString().slice(-6)}`, 20, 75);
+
+        // Calculate summary statistics
+        const totalStock = filteredAnimalFoods.reduce((sum, food) => sum + (food.remaining || 0), 0);
+        const lowStockItems = filteredAnimalFoods.filter(food => (food.remaining || 0) < 50).length;
+        const expiredItems = filteredAnimalFoods.filter(food => {
+          const days = calculateDaysUntilExpiry(food.expiryDate);
+          return days < 0;
+        }).length;
+        const nearExpiryItems = filteredAnimalFoods.filter(food => {
+          const days = calculateDaysUntilExpiry(food.expiryDate);
+          return days >= 0 && days <= 7;
+        }).length;
+
+        // Summary statistics section
+        doc.setFillColor(...secondaryColor);
+        doc.rect(20, 85, 170, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text("INVENTORY SUMMARY", 25, 91);
+
+        doc.setTextColor(...textColor);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Stock Quantity: ${totalStock} units`, 25, 100);
+        doc.text(`Low Stock Items (< 50 units): ${lowStockItems}`, 25, 105);
+        doc.text(`Expired Items: ${expiredItems}`, 25, 110);
+        doc.text(`Near Expiry (≤ 7 days): ${nearExpiryItems}`, 25, 115);
+        doc.text(`Healthy Stock Items: ${filteredAnimalFoods.length - lowStockItems - expiredItems}`, 25, 120);
+
+        // Prepare table data with enhanced information
+        const headers = [["Feed Name", "Remaining Stock", "Unit", "Target Animal", "Expiry Date", "Days Left", "Status"]];
+
+        const data = filteredAnimalFoods.map(food => {
+          const days = calculateDaysUntilExpiry(food.expiryDate);
+          const status = days < 0 ? 'Expired' : 
+                        days === 0 ? 'Expires Today' :
+                        days <= 7 ? 'Near Expiry' :
+                        (food.remaining || 0) < 50 ? 'Low Stock' : 'Good';
+          
+          return [
+            String(food.name || 'N/A'),
+            String(food.remaining || 0),
+            String(food.unit || 'N/A'),
+            String(food.targetAnimal || 'N/A'),
+            food.expiryDate ? new Date(food.expiryDate).toLocaleDateString() : 'N/A',
+            String(getDaysLeftText(days)),
+            status
+          ];
+        });
+
+        // Create professional table
+        autoTable(doc, {
+          head: headers,
+          body: data,
+          startY: 130,
+          theme: 'grid',
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 9,
+            cellPadding: 3
+          },
+          bodyStyles: {
+            fontSize: 8,
+            textColor: textColor,
+            cellPadding: 2
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 20, right: 20 },
+          styles: {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak'
+          },
+          didDrawPage: (data) => {
+            // Add header and footer to each page
+            addHeaderFooter();
+          }
+        });
+
+        // Professional footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          addHeaderFooter();
+        }
+
+        // Save PDF with professional naming
+        const fileName = `MOF_Feed_Stock_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        showMessage("PDF downloaded successfully!", "success");
+      };
+
+      const addHeaderFooter = () => {
+        const pageCount = doc.internal.getNumberOfPages();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 275, 210, 20, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
+        doc.setFontSize(8);
+        doc.text(`Page ${currentPage} of ${pageCount}`, 20, 283);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 283, { align: 'center' });
+        doc.text(companyName, 190, 283, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(20, 285, 190, 285);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 290, { align: 'center' });
+      };
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      showMessage("Error creating the PDF. Please try again.", "error");
     }
-
-    doc.save(`animal_feed_stock_report_${new Date().toISOString().split('T')[0]}.pdf`);
-    showMessage("PDF downloaded successfully!", "success");
   };
 
   const handleShowStockChart = async (food) => {

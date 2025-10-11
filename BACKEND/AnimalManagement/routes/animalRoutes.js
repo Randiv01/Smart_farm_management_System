@@ -10,9 +10,12 @@ import {
   updateAnimalHealth,
   createBatchAnimals,
   deleteBatchAnimals,
+  deleteAnimalsByType,
+  deleteAnimalTypeCompletely,
   moveAnimalToZone,
   getAnimalsByBatch,
-  updateBatchAnimals
+  updateBatchAnimals,
+  getAnimalByQRCode
 } from '../controllers/animalController.js';
 import { sendMedicalRequest, testEmail } from '../controllers/medicalRequestController.js';
 
@@ -34,6 +37,10 @@ router.get('/batch/:batchId', getAnimalsByBatch);
 router.put('/batch/:batchId', updateBatchAnimals);
 router.delete('/batch/:batchId', deleteBatchAnimals);
 
+// Type-based deletion routes
+router.delete('/type/:animalTypeId', deleteAnimalsByType);
+router.delete('/type/:animalTypeId/complete', deleteAnimalTypeCompletely);
+
 // Health info routes
 router.get('/:id/health', getAnimalHealth);
 router.patch('/:id/health', updateAnimalHealth);
@@ -41,5 +48,8 @@ router.patch('/:id/health', updateAnimalHealth);
 // Medical request routes
 router.post('/:id/medical-request', sendMedicalRequest);
 router.get('/test/email', testEmail); // Add test endpoint
+
+// QR Code routes
+router.get('/qr/:qrCode', getAnimalByQRCode);
 
 export const animalRouter = router;

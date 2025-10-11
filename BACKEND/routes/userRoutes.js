@@ -337,6 +337,48 @@ router.delete("/profile-image", verifyToken, async (req, res) => {
   }
 });
 
+// Serve profile images
+router.get("/profile-image/:filename", async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const imagePath = path.join(process.cwd(), 'uploads', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(imagePath)) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    
+    // Send the file
+    res.sendFile(imagePath);
+  } catch (err) {
+    console.error("Error serving profile image:", err);
+    res.status(500).json({ error: "Error serving image" });
+  }
+});
+
+// Get available roles
+router.get("/roles", verifyToken, async (req, res) => {
+  try {
+    const roles = [
+      { value: 'normal', label: 'Normal User' },
+      { value: 'animal', label: 'Animal Specialist' },
+      { value: 'plant', label: 'Plant Specialist' },
+      { value: 'inv', label: 'Inventory Manager' },
+      { value: 'emp', label: 'Employee Manager' },
+      { value: 'health', label: 'Health Specialist' },
+      { value: 'owner', label: 'Owner' },
+      { value: 'admin', label: 'Administrator' }
+    ];
+    res.json(roles);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ------------------- Admin Routes -------------------
 
 // Get user by ID

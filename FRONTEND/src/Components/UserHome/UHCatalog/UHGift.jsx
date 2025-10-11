@@ -262,7 +262,7 @@ const UHGift = ({ isOpen, onClose, giftItems = [], onUpdateGiftItems }) => {
                       value={deliveryInfo.address}
                       onChange={handleDeliveryInfoChange}
                       className="w-full p-3 rounded-lg border bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500"
-                      placeholder="123 Farm Road"
+                      placeholder="No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka"
                       required
                     />
                   </div>

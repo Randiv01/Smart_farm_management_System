@@ -20,6 +20,7 @@ import { LanguageProvider as HLanguageProvider } from "./Components/HealthManage
 import { ThemeProvider as HThemeProvider } from "./Components/HealthManagement/H_contexts/H_ThemeContext.js";
 import { ThemeProvider as HealthThemeProvider } from "./Components/HealthManagement/ThemeProvider/ThemeProvider.js";
 
+
 // ----------------- User Components -----------------
 import CartSidebar from "./Components/UserHome/UHCartSidebar/CartSidebar.jsx";
 import Navbar from "./Components/UserHome/UHNavbar/UHNavbar.jsx";
@@ -161,8 +162,8 @@ function App() {
                             <Route path="/contact" element={<ContactUs />} />
 
                             {/* ----------------- Customer Protected ----------------- */}
-                            <Route path="/profile" element={<UserProtectedRoute><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
-                            <Route path="/orders" element={<UserProtectedRoute><><Navbar /><MyOrders /></></UserProtectedRoute>} />
+                            <Route path="/profile" element={<UserProtectedRoute customerOnly={true}><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
+                            <Route path="/orders" element={<UserProtectedRoute customerOnly={true}><><Navbar /><MyOrders /></></UserProtectedRoute>} />
 
                             {/* ----------------- Animal Management ----------------- */}
                             <Route path="/AnimalManagement/*" element={

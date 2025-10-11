@@ -5,7 +5,6 @@ const MeatProductivitySchema = new mongoose.Schema({
   batchId: {
     type: String,
     unique: true,
-    required: [true, "Batch ID is required"],
   },
   batchName: {
     type: String,
@@ -42,7 +41,17 @@ const MeatProductivitySchema = new mongoose.Schema({
     required: [true, "Expiry date is required"],
     validate: {
       validator: function (value) {
-        return this.productionDate < value;
+        if (!this.productionDate || !value) return true;
+        
+        // Compare only dates, not times, to avoid timezone issues
+        const prodDate = new Date(this.productionDate);
+        const expDate = new Date(value);
+        
+        // Reset to start of day in UTC
+        const prodUTC = Date.UTC(prodDate.getFullYear(), prodDate.getMonth(), prodDate.getDate());
+        const expUTC = Date.UTC(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+        
+        return expUTC > prodUTC;
       },
       message: "Expiry date must be after production date",
     },

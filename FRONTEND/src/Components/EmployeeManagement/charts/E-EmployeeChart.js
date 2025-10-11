@@ -7,8 +7,11 @@ import {
   Legend,
   Tooltip,
 } from "recharts";
+import { useETheme } from '../Econtexts/EThemeContext.jsx';
 
-export const EmployeeChart = ({ darkMode }) => {
+export const EmployeeChart = () => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
   const data = [
     { name: "Full-time", value: 35, color: "#22c55e" },
     { name: "Part-time", value: 8, color: "#3b82f6" },

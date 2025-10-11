@@ -1,5 +1,6 @@
 // src/pages/StaffHub.jsx
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom/client";
 import {
   Search,
   Plus,
@@ -20,17 +21,18 @@ import {
   MapPin,
   BookOpen,
   Award,
-  Loader,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import axios from "axios";
+import Loader from "../Loader/Loader.js";
+import { useETheme } from '../Econtexts/EThemeContext.jsx';
 
 /* ---------- helpers: validation ---------- */
 
 // Sri Lankan mobile: allow 9–10 digits (7XXXXXXXX or 07XXXXXXXX)
-// (Matches the requirement “more than 8 or less than 10 characters” ⇒ 9 or 10)
+// (Matches the requirement "more than 8 or less than 10 characters" ⇒ 9 or 10)
 const isValidSLMobile = (val) => {
   if (!val) return false;
   const clean = String(val).replace(/\D/g, "");
@@ -64,7 +66,15 @@ const ageFromISO = (iso) => {
   return age;
 };
 
-export const StaffHub = ({ darkMode }) => {
+export const StaffHub = () => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Staff Hub - Employee Manager";
+  }, []);
+
   const [activeTab, setActiveTab] = useState("employees");
   const [showForm, setShowForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -82,10 +92,18 @@ export const StaffHub = ({ darkMode }) => {
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showLoader, setShowLoader] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [emailModal, setEmailModal] = useState(null);
+  const [emailData, setEmailData] = useState({
+    subject: "",
+    message: "",
+    fromEmail: "sarah.emp@mountolive.com" // Employee manager's email
+  });
 
   const formDataTemplate = {
     // common
-    id: "",
+    id: "", // Will be auto-generated
     name: "",
     contact: "",
     title: "",
@@ -93,15 +111,17 @@ export const StaffHub = ({ darkMode }) => {
     joined: "",
     photoFile: null,
     cvFile: null,
-    // med
     email: "",
+    department: "",
+    address: "",
+    status: "Active",
+    // med
     licenseNumber: "",
     specializations: "",
     qualifications: "",
     yearsOfExperience: "",
     dateOfBirth: "",
     gender: "Male",
-    address: "",
     password: "",
   };
 
@@ -113,6 +133,45 @@ export const StaffHub = ({ darkMode }) => {
     fetchDoctors();
     fetchPathologists();
   }, []);
+
+  // Fetch next employee ID
+  const fetchNextEmployeeId = async () => {
+    try {
+      // First try to get from backend
+      const response = await axios.get("/api/employees/get-next-id");
+      return response.data.nextId;
+    } catch (error) {
+      console.error("Error fetching next employee ID from backend:", error);
+      
+      // Fallback: generate ID based on existing employees
+      try {
+        const response = await axios.get("/api/employees");
+        const data = response.data;
+        // Handle both old format (array) and new format ({ docs: [...] })
+        const employees = Array.isArray(data) ? data : (data.docs || []);
+        
+        if (employees.length === 0) {
+          return "EMP001";
+        }
+        
+        // Find the highest employee ID
+        const highestId = employees.reduce((max, emp) => {
+          const match = emp.id.match(/EMP(\d+)/);
+          if (match) {
+            const num = parseInt(match[1]);
+            return Math.max(max, num);
+          }
+          return max;
+        }, 0);
+        
+        const nextNumber = highestId + 1;
+        return `EMP${nextNumber.toString().padStart(3, '0')}`;
+      } catch (fallbackError) {
+        console.error("Error in fallback ID generation:", fallbackError);
+        return "EMP001"; // Final fallback
+      }
+    }
+  };
 
   const showSuccess = (message) => {
     setSuccessMessage(message);
@@ -127,7 +186,9 @@ export const StaffHub = ({ darkMode }) => {
       const ct = res.headers.get("content-type") || "";
       if (!ct.includes("application/json")) throw new Error("Non-JSON response");
       const data = await res.json();
-      setEmployees(data);
+      // Handle both old format (array) and new format ({ docs: [...] })
+      const employeesArray = Array.isArray(data) ? data : (data.docs || []);
+      setEmployees(employeesArray);
     } catch (err) {
       console.error("Error fetching employees:", err);
     } finally {
@@ -168,10 +229,26 @@ export const StaffHub = ({ darkMode }) => {
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const resetForm = () => {
-    setFormData(formDataTemplate);
-    setEditingItem(null);
-    setErrors({});
+  const resetForm = async () => {
+    try {
+      const nextId = await fetchNextEmployeeId();
+      console.log("Fetched next ID:", nextId);
+      setFormData({
+        ...formDataTemplate,
+        id: nextId
+      });
+      setEditingItem(null);
+      setErrors({});
+    } catch (error) {
+      console.error("Error in resetForm:", error);
+      // Fallback to EMP001 if fetch fails
+      setFormData({
+        ...formDataTemplate,
+        id: "EMP001"
+      });
+      setEditingItem(null);
+      setErrors({});
+    }
   };
 
   /* ---------- validation ---------- */
@@ -196,9 +273,7 @@ export const StaffHub = ({ darkMode }) => {
 
     // Employees
     if (isEmp) {
-      if (!isEmpId(fd.id)) {
-        e.id = "Employee ID should be 3–20 characters (letters, numbers, _ or -).";
-      }
+      // ID is auto-generated, so no validation needed
       if (!minLen(fd.title, 2) || !maxLen(fd.title, 40)) {
         e.title = "Job title must be 2–40 characters.";
       }
@@ -245,14 +320,33 @@ export const StaffHub = ({ darkMode }) => {
     e.preventDefault();
     if (!validateForm()) return;
 
+    // Check if form has required data
+    console.log("Current form data:", formData);
+    if (!formData.name || !formData.contact || !formData.title || !formData.joined || !formData.email || !formData.department || !formData.address) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const form = new FormData();
-      Object.entries(formData).forEach(([k, v]) => {
-        if (k !== "photoFile" && k !== "cvFile") form.append(k, v);
+      // Only send the required fields, explicitly excluding ID
+      const fieldsToSend = ['name', 'contact', 'title', 'type', 'joined'];
+      fieldsToSend.forEach(field => {
+        if (formData[field]) {
+          console.log(`Adding to form: ${field} = ${formData[field]}`);
+          form.append(field, formData[field]);
+        }
       });
       if (formData.photoFile) form.append("photo", formData.photoFile);
       if (formData.cvFile) form.append("cv", formData.cvFile);
+
+      console.log("Form data being sent:", formData);
+      console.log("Form entries:");
+      for (let [key, value] of form.entries()) {
+        console.log(`${key}: ${value}`);
+      }
 
       const response = await fetch("http://localhost:5000/api/employees", {
         method: "POST",
@@ -266,13 +360,15 @@ export const StaffHub = ({ darkMode }) => {
         resetForm();
         showSuccess("Employee added successfully!");
       } else {
+        console.error("Backend error:", data);
         alert(`Error: ${data.error || "Failed to add employee"}`);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Frontend error:", err);
       alert("Failed to add employee.");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
@@ -281,6 +377,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const form = new FormData();
       Object.entries(formData).forEach(([k, v]) => {
@@ -310,11 +407,13 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to update employee.");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
   const handleDeleteEmployee = async (id) => {
     setLoading((p) => ({ ...p, employees: true }));
+    setShowLoader(true);
     try {
       const response = await fetch(
         `http://localhost:5000/api/employees/${id}`,
@@ -332,6 +431,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to delete employee.");
     } finally {
       setLoading((p) => ({ ...p, employees: false }));
+      setShowLoader(false);
     }
   };
 
@@ -341,6 +441,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -369,6 +470,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to add doctor");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
@@ -377,6 +479,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -407,11 +510,13 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to update doctor");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
   const handleDeleteDoctor = async (id) => {
     setLoading((p) => ({ ...p, doctors: true }));
+    setShowLoader(true);
     try {
       await axios.delete(`http://localhost:5000/api/doctors/${id}`);
       fetchDoctors();
@@ -422,6 +527,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to delete doctor");
     } finally {
       setLoading((p) => ({ ...p, doctors: false }));
+      setShowLoader(false);
     }
   };
 
@@ -431,6 +537,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -459,6 +566,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to add plant pathologist");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
@@ -467,6 +575,7 @@ export const StaffHub = ({ darkMode }) => {
     if (!validateForm()) return;
 
     setLoading((p) => ({ ...p, form: true }));
+    setShowLoader(true);
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -497,11 +606,13 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to update plant pathologist");
     } finally {
       setLoading((p) => ({ ...p, form: false }));
+      setShowLoader(false);
     }
   };
 
   const handleDeletePathologist = async (id) => {
     setLoading((p) => ({ ...p, pathologists: true }));
+    setShowLoader(true);
     try {
       await axios.delete(
         `http://localhost:5000/api/plant-pathologists/${id}`
@@ -514,6 +625,7 @@ export const StaffHub = ({ darkMode }) => {
       alert("Failed to delete plant pathologist");
     } finally {
       setLoading((p) => ({ ...p, pathologists: false }));
+      setShowLoader(false);
     }
   };
 
@@ -528,6 +640,10 @@ export const StaffHub = ({ darkMode }) => {
         title: item.title,
         type: item.type,
         joined: item.joined,
+        email: item.email || "",
+        department: item.department || "",
+        address: item.address || "",
+        status: item.status || "Active",
       });
     } else if (type === "doctor") {
       setFormData({
@@ -565,16 +681,128 @@ export const StaffHub = ({ darkMode }) => {
     setShowForm(true);
   };
 
+  /* ---------- email ---------- */
+  const handleEmailChange = (e) => {
+    const { name, value } = e.target;
+    setEmailData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailData.subject.trim() || !emailData.message.trim()) {
+      alert("Please fill in both subject and message");
+      return;
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, form: true }));
+      
+      // For now, we'll use mailto: to open the default email client
+      // In a real implementation, you would send this to your backend
+      
+      // Format employee email as employeename@mountolive.com
+      const employeeName = emailModal.employee.name.toLowerCase().replace(/\s+/g, '');
+      const employeeEmail = `${employeeName}@mountolive.com`;
+      
+      const mailtoLink = `mailto:${employeeEmail}?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.message)}`;
+      window.open(mailtoLink);
+      
+      setSuccessMessage(`Email opened for ${emailModal.employee.name}`);
+      setEmailModal(null);
+      setEmailData({
+        subject: "",
+        message: "",
+        fromEmail: "sarah.emp@mountolive.com"
+      });
+      
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error) {
+      console.error("Error sending email:", error);
+      alert("Error sending email. Please try again.");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
+    }
+  };
+
   /* ---------- export ---------- */
   const handleDownloadPDF = (type) => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for better table visibility
+    
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const companyWebsite = "www.mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
+    
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
 
+    // Add real company logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        doc.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        doc.setFillColor(...primaryColor);
+        doc.rect(20, 15, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 30, 30, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      doc.setFillColor(...primaryColor);
+      doc.rect(20, 15, 25, 25, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MOF', 30, 30, { align: 'center' });
+      generatePDFContent();
+    }
+
+    const generatePDFContent = () => {
+
+    // Company header
+    doc.setTextColor(...textColor);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName, 50, 20);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(companyAddress, 50, 27);
+    doc.text(companyContact, 50, 32);
+    doc.text(companyWebsite, 50, 37);
+
+    // Report title with professional styling
+    doc.setFillColor(...lightGray);
+    doc.rect(20, 45, 257, 12, 'F');
+    doc.setTextColor(...primaryColor);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    
+    let reportTitle = "";
     let headers = [];
     let body = [];
 
     if (type === "doctors") {
-      doc.text("Doctor Details", 14, 20);
+      reportTitle = "MEDICAL STAFF REPORT";
       headers = [
         "Full Name",
         "Email",
@@ -600,7 +828,7 @@ export const StaffHub = ({ darkMode }) => {
         d.gender,
       ]);
     } else if (type === "pathologists") {
-      doc.text("Plant Pathologist Details", 14, 20);
+      reportTitle = "PLANT PATHOLOGIST REPORT";
       headers = [
         "Full Name",
         "Email",
@@ -626,21 +854,118 @@ export const StaffHub = ({ darkMode }) => {
         p.gender,
       ]);
     } else {
-      doc.text("Employee Details", 14, 20);
-      headers = ["Emp ID", "Name", "Contact No", "Job Title", "Type", "Joined"];
+      reportTitle = "EMPLOYEE STAFF REPORT";
+      headers = ["Emp ID", "Name", "Contact No", "Email", "Job Title", "Department", "Type", "Status", "Joined", "Address"];
       body = employees.map((e) => [
         e.id,
         e.name,
         e.contact,
+        e.email || "—",
         e.title,
+        e.department || "—",
         e.type,
+        e.status || "Active",
         e.joined,
+        e.address || "—",
       ]);
     }
 
-    autoTable(doc, { head: [headers], body, startY: 30 });
-    doc.save(`${type.charAt(0).toUpperCase() + type.slice(1)}.pdf`);
+    doc.text(reportTitle, 148, 54, { align: 'center' }); // Centered for landscape
+
+    // Report metadata
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 65);
+    doc.text(`Total Records: ${body.length}`, 20, 70);
+    doc.text(`Report ID: MOF-ES-${Date.now().toString().slice(-6)}`, 20, 75);
+
+    // Create professional table
+    autoTable(doc, {
+      head: [headers],
+      body: body,
+      startY: 85,
+      theme: 'grid',
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: 3,
+        halign: 'center'
+      },
+      bodyStyles: {
+        fontSize: 8,
+        textColor: textColor,
+        cellPadding: 2
+      },
+      alternateRowStyles: {
+        fillColor: [249, 250, 251]
+      },
+      margin: { left: 20, right: 20 },
+      styles: {
+        lineColor: [209, 213, 219],
+        lineWidth: 0.5,
+        halign: 'left',
+        valign: 'middle',
+        overflow: 'linebreak'
+      },
+      columnStyles: {
+        0: { cellWidth: 'auto' }, // Emp ID
+        1: { cellWidth: 'auto' }, // Name
+        2: { cellWidth: 'auto' }, // Contact
+        3: { cellWidth: 'auto' }, // Email
+        4: { cellWidth: 'auto' }, // Job Title
+        5: { cellWidth: 'auto' }, // Department
+        6: { cellWidth: 'auto' }, // Type
+        7: { cellWidth: 'auto' }, // Status
+        8: { cellWidth: 'auto' }, // Joined
+        9: { cellWidth: 'auto' }  // Address
+      },
+      didDrawPage: (data) => {
+        // Add header and footer to each page
+        addHeaderFooter();
+      }
+    });
+
+    // Professional footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      addHeaderFooter();
+    }
+
+    // Save PDF with professional naming
+    const fileName = `MOF_${type.charAt(0).toUpperCase() + type.slice(1)}_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
   };
+
+  const addHeaderFooter = () => {
+    const pageCount = doc.internal.getNumberOfPages();
+    const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+    
+    // Footer background
+    doc.setFillColor(...lightGray);
+    doc.rect(0, 195, 297, 15, 'F'); // Landscape dimensions
+    
+    // Footer content
+    doc.setTextColor(...textColor);
+    doc.setFontSize(8);
+    doc.text(`Page ${currentPage} of ${pageCount}`, 20, 203);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, 148, 203, { align: 'center' });
+    doc.text(companyName, 277, 203, { align: 'right' });
+    
+    // Footer line
+    doc.setDrawColor(...primaryColor);
+    doc.setLineWidth(0.5);
+    doc.line(20, 197, 277, 197);
+    
+    // Disclaimer
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(7);
+    doc.text("This report is generated by Mount Olive Farm House Management System", 148, 208, { align: 'center' });
+  };
+};
 
   /* ---------- filtering ---------- */
   const filteredEmployees = employees.filter(
@@ -685,43 +1010,47 @@ export const StaffHub = ({ darkMode }) => {
 
   /* ---------- tables ---------- */
   const renderEmployeeTable = () => (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto shadow-lg rounded-lg">
       <div
-        className={`rounded-lg overflow-hidden shadow ${
-          darkMode ? "bg-gray-700" : "bg-gray-50"
+        className={`${
+          darkMode ? "bg-gray-800" : "bg-white"
         }`}
       >
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-full">
           <thead
-            className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}
+            className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-50"}`}
           >
             <tr>
-              <th className="px-4 py-3 text-left">Emp ID</th>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-left">Contact No</th>
-              <th className="px-4 py-3 text-left">Job Title</th>
-              <th className="px-4 py-3 text-left">Type</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Joined</th>
-              <th className="px-4 py-3 text-left">Photo</th>
-              <th className="px-4 py-3 text-left">CV</th>
-              <th className="px-4 py-3 text-left">Actions</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">No</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Emp ID</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Name</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Contact</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Email</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Job Title</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Department</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Joined</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Address</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Photo</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">CV</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading.employees ? (
               <tr>
-                <td colSpan="10" className="px-6 py-8 text-center">
+                <td colSpan="14" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" /> Loading
-                    employees...
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+                    Loading employees...
                   </div>
                 </td>
               </tr>
             ) : filteredEmployees.length === 0 ? (
               <tr>
                 <td
-                  colSpan="10"
+                  colSpan="14"
                   className={`px-6 py-8 text-center ${
                     darkMode ? "text-gray-400" : "text-gray-500"
                   }`}
@@ -732,20 +1061,39 @@ export const StaffHub = ({ darkMode }) => {
                 </td>
               </tr>
             ) : (
-              filteredEmployees.map((employee) => (
+              filteredEmployees.map((employee, index) => (
                 <tr
                   key={employee.id}
-                  className={`transition ${
-                    darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"
+                  className={`border-b transition duration-200 ${
+                    darkMode 
+                      ? "border-gray-700 hover:bg-gray-700 text-white" 
+                      : "border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <td className="px-4 py-3 font-medium">{employee.id}</td>
-                  <td className="px-4 py-3">{employee.name}</td>
-                  <td className="px-4 py-3">{employee.contact}</td>
-                  <td className="px-4 py-3">{employee.title}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {index + 1}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
+                    {employee.id}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {employee.name}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.contact}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.email || "—"}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    {employee.title}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.department || "—"}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs ${
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         employee.type === "Full-time"
                           ? "bg-green-100 text-green-800"
                           : employee.type === "Part-time"
@@ -756,67 +1104,87 @@ export const StaffHub = ({ darkMode }) => {
                       {employee.type}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs ${
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         employee.status === "Active"
                           ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          : employee.status === "Inactive"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-orange-100 text-orange-800"
                       }`}
                     >
-                      {employee.status}
+                      {employee.status || "Active"}
                     </span>
                   </td>
-                  <td className="px-4 py-3">{employee.joined}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.joined}
+                  </td>
+                  <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                    <div className="truncate" title={employee.address}>
+                      {employee.address || "—"}
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap">
                     {employee.photo ? (
                       <img
                         src={`http://localhost:5000${employee.photo}`}
                         alt="Employee"
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-12 w-12 rounded-full object-cover cursor-pointer border-2 border-gray-200 hover:border-blue-500 transition-colors"
+                        onClick={() => setSelectedPhoto(`http://localhost:5000${employee.photo}`)}
                       />
                     ) : (
-                      "—"
+                      <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                        <User size={20} className="text-gray-400" />
+                      </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap">
                     {employee.cv ? (
                       <a
                         href={`http://localhost:5000${employee.cv}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center text-blue-500 hover:underline"
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
                       >
-                        <FileText size={14} className="mr-1" /> View
+                        <FileText size={12} className="mr-1" />
+                        View
                       </a>
                     ) : (
-                      "—"
+                      <span className="text-gray-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                  <td className="px-3 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => setQrItem({ ...employee, type: "employee" })}
-                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
                         title="Generate QR Code"
                       >
-                        <QrCode size={16} className="text-purple-500" />
+                        <QrCode size={16} />
                       </button>
                       <a
                         href={`http://localhost:5000/api/employees/${employee.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
                         title="Generate PDF Report"
                       >
-                        <FileText size={16} className="text-green-500" />
+                        <FileText size={16} />
                       </a>
                       <button
+                        onClick={() => setEmailModal({ employee: employee })}
+                        className="p-2 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Send Email"
+                      >
+                        <Mail size={16} />
+                      </button>
+                      <button
                         onClick={() => handleEdit(employee, "employee")}
-                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit Employee"
                       >
-                        <Edit size={16} className="text-blue-500" />
+                        <Edit size={16} />
                       </button>
                       <button
                         onClick={() =>
@@ -826,10 +1194,10 @@ export const StaffHub = ({ darkMode }) => {
                             name: employee.name,
                           })
                         }
-                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-500 transition"
+                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete Employee"
                       >
-                        <Trash2 size={16} className="text-red-500" />
+                        <Trash2 size={16} />
                       </button>
                       {/* Removed Activate/Deactivate toggle button as requested */}
                     </div>
@@ -871,7 +1239,7 @@ export const StaffHub = ({ darkMode }) => {
               <tr>
                 <td colSpan="7" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" />
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
                     Loading doctors...
                   </div>
                 </td>
@@ -895,7 +1263,7 @@ export const StaffHub = ({ darkMode }) => {
                   key={doctor._id}
                   className={`transition ${
                     darkMode
-                      ? "hover:bg-gray-700 text-gray-200"
+                      ? "hover:bg-gray-800 text-gray-200"
                       : "hover:bg-gray-100 text-gray-800"
                   }`}
                 >
@@ -1063,8 +1431,8 @@ export const StaffHub = ({ darkMode }) => {
               <tr>
                 <td colSpan="7" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
-                    <Loader size={20} className="animate-spin mr-2" /> Loading
-                    pathologists...
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+                    Loading pathologists...
                   </div>
                 </td>
               </tr>
@@ -1087,7 +1455,7 @@ export const StaffHub = ({ darkMode }) => {
                   key={pathologist._id}
                   className={`transition ${
                     darkMode
-                      ? "hover:bg-gray-700 text-gray-200"
+                      ? "hover:bg-gray-800 text-gray-200"
                       : "hover:bg-gray-100 text-gray-800"
                   }`}
                 >
@@ -1229,10 +1597,12 @@ export const StaffHub = ({ darkMode }) => {
     </div>
   );
 
- 
   /* ---------- render ---------- */
   return (
-    <div className="p-4">
+    <div className={`p-4 min-h-screen ${darkMode ? 'bg-gray-900 text-gray-200' : 'light-beige'}`}>
+      {/* Loader Component */}
+      {showLoader && <Loader darkMode={darkMode} />}
+
       {successMessage && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in">
           <div
@@ -1262,7 +1632,7 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Users size={18} />
           <span>Employees</span>
-          {loading.employees && <Loader size={16} className="animate-spin" />}
+          {loading.employees && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
         </button>
         <button
           onClick={() => setActiveTab("doctors")}
@@ -1276,7 +1646,7 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Stethoscope size={18} />
           <span>Doctors</span>
-          {loading.doctors && <Loader size={16} className="animate-spin" />}
+          {loading.doctors && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
         </button>
         <button
           onClick={() => setActiveTab("pathologists")}
@@ -1290,7 +1660,7 @@ export const StaffHub = ({ darkMode }) => {
         >
           <Leaf size={18} />
           <span>Plant Pathologists</span>
-          {loading.pathologists && <Loader size={16} className="animate-spin" />}
+          {loading.pathologists && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
         </button>
       </div>
 
@@ -1298,7 +1668,7 @@ export const StaffHub = ({ darkMode }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div
           className={`flex items-center px-3 py-2 rounded-md w-full md:w-auto ${
-            darkMode ? "bg-gray-700" : "bg-gray-100"
+            darkMode ? "bg-gray-800" : "bg-gray-100"
           }`}
         >
           <Search size={18} className="text-gray-400" />
@@ -1336,8 +1706,8 @@ export const StaffHub = ({ darkMode }) => {
           </button>
 
           <button
-            onClick={() => {
-              resetForm();
+            onClick={async () => {
+              await resetForm();
               setShowForm(true);
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-white text-sm font-medium transition flex-1 md:flex-none justify-center ${
@@ -1359,7 +1729,7 @@ export const StaffHub = ({ darkMode }) => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
+        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
           <div className="flex items-center">
             <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-orange-100"}`}>
               <Users className={darkMode ? "text-orange-400" : "text-orange-500"} size={20} />
@@ -1371,7 +1741,7 @@ export const StaffHub = ({ darkMode }) => {
           </div>
         </div>
 
-        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
+        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
           <div className="flex items-center">
             <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-blue-100"}`}>
               <Stethoscope className={darkMode ? "text-blue-400" : "text-blue-500"} size={20} />
@@ -1383,7 +1753,7 @@ export const StaffHub = ({ darkMode }) => {
           </div>
         </div>
 
-        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-700" : "bg-white"}`}>
+        <div className={`rounded-lg p-4 shadow ${darkMode ? "bg-gray-800" : "bg-white"}`}>
           <div className="flex items-center">
             <div className={`rounded-full p-3 mr-4 ${darkMode ? "bg-gray-600" : "bg-green-100"}`}>
               <Leaf className={darkMode ? "text-green-400" : "text-green-500"} size={20} />
@@ -1413,14 +1783,28 @@ export const StaffHub = ({ darkMode }) => {
               <h2 className="text-lg font-semibold">QR Code</h2>
               <button
                 onClick={() => setQrItem(null)}
-                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                className={`rounded-full p-1 ${
+                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'
+                }`}
               >
                 <X size={20} />
               </button>
             </div>
             <div className="flex flex-col items-center gap-4">
               <div className="p-4 bg-white rounded-lg">
-                <QRCodeCanvas value={qrItem.id || qrItem._id} size={180} />
+                <QRCodeCanvas 
+                  value={(() => {
+                    const qrData = JSON.stringify({
+                      id: qrItem.id || qrItem._id,
+                      name: qrItem.name || qrItem.fullName,
+                      type: qrItem.type,
+                      timestamp: new Date().toISOString()
+                    });
+                    console.log("QR Code data:", qrData);
+                    return qrData;
+                  })()} 
+                  size={180} 
+                />
               </div>
               <p className="text-sm text-center">
                 <strong>{qrItem.name || qrItem.fullName}</strong>
@@ -1429,13 +1813,359 @@ export const StaffHub = ({ darkMode }) => {
                 <br />
                 <span className="text-gray-500">Type: {qrItem.type}</span>
               </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    // Generate professional employee ID card PDF
+                    const doc = new jsPDF('p', 'mm', 'a4');
+                    
+                    // Company branding
+                    const companyName = "Mount Olive Farm House";
+                    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+                    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+                    const primaryColor = [34, 197, 94]; // Green
+                    const textColor = [31, 41, 55]; // Dark gray
+                    const lightGray = [243, 244, 246];
+                    
+                    // Company logo - Try to load actual logo image
+                    try {
+                      // Try to load the company logo image
+                      const logoImg = new Image();
+                      logoImg.crossOrigin = 'anonymous';
+                      logoImg.onload = () => {
+                        // Add logo image to PDF
+                        doc.addImage(logoImg, 'PNG', 20, 10, 30, 30);
+                        generatePDFContent();
+                      };
+                      logoImg.onerror = () => {
+                        // Fallback to text logo if image fails to load
+                        doc.setFillColor(...primaryColor);
+                        doc.circle(35, 25, 15, 'F');
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(8);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('MOUNT', 35, 22, { align: 'center' });
+                        doc.text('OLIVE', 35, 26, { align: 'center' });
+                        doc.text('FARM', 35, 30, { align: 'center' });
+                        generatePDFContent();
+                      };
+                      logoImg.src = '/logo512.png';
+                    } catch (error) {
+                      console.error('Error loading logo:', error);
+                      // Fallback to text logo
+                      doc.setFillColor(...primaryColor);
+                      doc.circle(35, 25, 15, 'F');
+                      doc.setTextColor(255, 255, 255);
+                      doc.setFontSize(8);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('MOUNT', 35, 22, { align: 'center' });
+                      doc.text('OLIVE', 35, 26, { align: 'center' });
+                      doc.text('FARM', 35, 30, { align: 'center' });
+                      generatePDFContent();
+                    }
+                    
+                    const generatePDFContent = () => {
+                    
+                    // Company information
+                    doc.setTextColor(...textColor);
+                    doc.setFontSize(18);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(companyName, 60, 20);
+                    
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(companyAddress, 60, 28);
+                    doc.text(companyContact, 60, 32);
+                    
+                    // Report title banner
+                    doc.setFillColor(...lightGray);
+                    doc.rect(20, 40, 170, 12, 'F');
+                    doc.setTextColor(...primaryColor);
+                    doc.setFontSize(16);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("EMPLOYEE ID CARD", 105, 49, { align: 'center' });
+                    
+                    // Report metadata
+                    doc.setTextColor(...textColor);
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, 60);
+                    doc.text(`Report ID: MOF-ID-${Date.now().toString().slice(-6)}`, 20, 65);
+                    
+                    // Employee Information Section
+                    doc.setFillColor(255, 255, 255);
+                    doc.rect(20, 75, 170, 40, 'S');
+                    
+                    doc.setTextColor(...primaryColor);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("EMPLOYEE INFORMATION", 25, 85);
+                    
+                    doc.setTextColor(...textColor);
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Employee ID: ${qrItem.id || qrItem._id}`, 25, 95);
+                    doc.text(`Name: ${qrItem.name || qrItem.fullName}`, 25, 102);
+                    doc.text(`Type: ${qrItem.type}`, 25, 109);
+                    
+                    // QR Code Section
+                    doc.setTextColor(...primaryColor);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text("QR CODE FOR ATTENDANCE", 25, 125);
+                    
+                    // Generate QR code data URL
+                    const qrData = JSON.stringify({
+                      id: qrItem.id || qrItem._id,
+                      name: qrItem.name || qrItem.fullName,
+                      type: qrItem.type,
+                      timestamp: new Date().toISOString()
+                    });
+                    
+                    // Log QR code data to console for easy access
+                    console.log("QR Code data:", qrData);
+                    
+                    // Create a temporary QR code element to get the data URL
+                    const tempDiv = document.createElement('div');
+                    tempDiv.style.position = 'absolute';
+                    tempDiv.style.left = '-9999px';
+                    tempDiv.style.top = '-9999px';
+                    tempDiv.style.width = '200px';
+                    tempDiv.style.height = '200px';
+                    document.body.appendChild(tempDiv);
+                    
+                    // Create QR code using qrcode.react
+                    const QRCodeComponent = React.createElement(QRCodeCanvas, {
+                      value: qrData,
+                      size: 200,
+                      level: 'M',
+                      includeMargin: true
+                    });
+                    
+                    // Render the QR code to get the canvas
+                    const root = ReactDOM.createRoot(tempDiv);
+                    root.render(QRCodeComponent);
+                    
+                    // Wait for the QR code to render, then get the canvas
+                    setTimeout(() => {
+                      const canvas = tempDiv.querySelector('canvas');
+                      if (canvas) {
+                        const qrDataURL = canvas.toDataURL('image/png');
+                        
+                        // Add QR code image to PDF - centered
+                        doc.addImage(qrDataURL, 'PNG', 75, 135, 60, 60);
+                        
+                        // Add QR code instruction
+                        doc.setTextColor(...textColor);
+                        doc.setFontSize(10);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text("Scan this QR code for attendance", 105, 205, { align: 'center' });
+                        
+                        // Professional footer
+                        doc.setDrawColor(...primaryColor);
+                        doc.setLineWidth(0.5);
+                        doc.line(20, 220, 190, 220);
+                        
+                        doc.setTextColor(100, 100, 100);
+                        doc.setFontSize(8);
+                        doc.text("Page 1 of 1", 20, 230);
+                        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 230, { align: 'center' });
+                        doc.text("Mount Olive Farm House", 190, 230, { align: 'right' });
+                        
+                        doc.setTextColor(100, 100, 100);
+                        doc.setFontSize(7);
+                        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 235, { align: 'center' });
+                        
+                        // Save PDF
+                        const fileName = `Employee_${qrItem.id || qrItem._id}_${new Date().toISOString().split('T')[0]}.pdf`;
+                        doc.save(fileName);
+                        
+                        // Clean up
+                        document.body.removeChild(tempDiv);
+                      } else {
+                        // Fallback if QR code generation fails
+                        doc.setFillColor(0, 0, 0);
+                        doc.rect(75, 135, 60, 60, 'F');
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(8);
+                        doc.text("QR CODE", 105, 170, { align: 'center' });
+                        
+                        // Add QR code instruction
+                        doc.setTextColor(...textColor);
+                        doc.setFontSize(10);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text("Scan this QR code for attendance", 105, 205, { align: 'center' });
+                        
+                        // Professional footer
+                        doc.setDrawColor(...primaryColor);
+                        doc.setLineWidth(0.5);
+                        doc.line(20, 220, 190, 220);
+                        
+                        doc.setTextColor(100, 100, 100);
+                        doc.setFontSize(8);
+                        doc.text("Page 1 of 1", 20, 230);
+                        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 230, { align: 'center' });
+                        doc.text("Mount Olive Farm House", 190, 230, { align: 'right' });
+                        
+                        doc.setTextColor(100, 100, 100);
+                        doc.setFontSize(7);
+                        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 235, { align: 'center' });
+                        
+                        // Save PDF
+                        const fileName = `Employee_${qrItem.id || qrItem._id}_${new Date().toISOString().split('T')[0]}.pdf`;
+                        doc.save(fileName);
+                        
+                        // Clean up
+                        document.body.removeChild(tempDiv);
+                      }
+                    }, 200);
+                    };
+                  }}
+                  className={`px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition`}
+                >
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => setQrItem(null)}
+                  className={`px-4 py-2 rounded-md ${
+                    darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"
+                  } transition`}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {emailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-2xl rounded-lg shadow-xl ${
+            darkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`px-6 py-4 border-b ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h3 className={`text-lg font-semibold ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Send Email to {emailModal.employee.name}
+                </h3>
+                <button
+                  onClick={() => setEmailModal(null)}
+                  className={`p-2 rounded-full transition ${
+                    darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  From (Employee Manager)
+                </label>
+                <input
+                  type="email"
+                  value={emailData.fromEmail}
+                  disabled
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 border-gray-600'
+                      : 'bg-gray-100 text-gray-500 border-gray-300'
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  To
+                </label>
+                <input
+                  type="email"
+                  value={`${emailModal.employee.name.toLowerCase().replace(/\s+/g, '')}@mountolive.com`}
+                  disabled
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 border-gray-600'
+                      : 'bg-gray-100 text-gray-500 border-gray-300'
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="subject"
+                  value={emailData.subject}
+                  onChange={handleEmailChange}
+                  placeholder="Enter email subject"
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-800 text-white border-gray-600 placeholder-gray-400'
+                      : 'border-gray-300 placeholder-gray-500'
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Message <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  name="message"
+                  value={emailData.message}
+                  onChange={handleEmailChange}
+                  rows={6}
+                  placeholder="Enter your message here..."
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-800 text-white border-gray-600 placeholder-gray-400'
+                      : 'border-gray-300 placeholder-gray-500'
+                  }`}
+                />
+              </div>
+            </div>
+            
+            <div className={`px-6 py-4 border-t flex justify-end space-x-3 ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
               <button
-                onClick={() => setQrItem(null)}
-                className={`mt-4 px-4 py-2 rounded-md ${
-                  darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
-                } transition`}
+                onClick={() => setEmailModal(null)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  darkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                onClick={handleSendEmail}
+                disabled={loading.form}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  loading.form
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {loading.form ? 'Sending...' : 'Send Email'}
               </button>
             </div>
           </div>
@@ -1454,7 +2184,9 @@ export const StaffHub = ({ darkMode }) => {
               <h2 className="text-lg font-semibold">Confirm Delete</h2>
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                className={`rounded-full p-1 ${
+                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'
+                }`}
               >
                 <X size={20} />
               </button>
@@ -1467,7 +2199,7 @@ export const StaffHub = ({ darkMode }) => {
               <button
                 onClick={() => setDeleteConfirm(null)}
                 className={`px-4 py-2 rounded-md ${
-                  darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                  darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"
                 } transition`}
               >
                 Cancel
@@ -1485,10 +2217,52 @@ export const StaffHub = ({ darkMode }) => {
                 disabled={loading.employees || loading.doctors || loading.pathologists}
               >
                 {loading.employees || loading.doctors || loading.pathologists ? (
-                  <Loader size={16} className="animate-spin mx-4" />
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-4"></div>
                 ) : (
                   "Delete"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Modal */}
+      {selectedPhoto && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
+          onClick={() => setSelectedPhoto(null)}
+        >
+          <div 
+            className={`rounded-lg p-6 max-w-3xl w-full ${darkMode ? "bg-gray-800 text-white" : "bg-white"} animate-scale-in`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Profile Photo</h2>
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className={`rounded-full p-1 ${
+                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'
+                }`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <img 
+                src={selectedPhoto} 
+                alt="Enlarged profile" 
+                className="max-h-[70vh] max-w-full rounded-lg shadow-lg object-contain" 
+              />
+            </div>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className={`px-4 py-2 rounded-md ${
+                  darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"
+                } transition`}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -1526,7 +2300,9 @@ export const StaffHub = ({ darkMode }) => {
                   setShowForm(false);
                   resetForm();
                 }}
-                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                className={`rounded-full p-1 ${
+                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'
+                }`}
               >
                 <X size={20} />
               </button>
@@ -1573,7 +2349,7 @@ export const StaffHub = ({ darkMode }) => {
                         placeholder="e.g., John Doe"
                         className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                           darkMode
-                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                            ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                             : "border-gray-300 placeholder-gray-500"
                         } ${errors.name ? "border-red-500" : ""}`}
                       />
@@ -1598,7 +2374,7 @@ export const StaffHub = ({ darkMode }) => {
                         placeholder="07XXXXXXXX or 7XXXXXXXX"
                         className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                           darkMode
-                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                            ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                             : "border-gray-300 placeholder-gray-500"
                         } ${errors.contact ? "border-red-500" : ""}`}
                       />
@@ -1629,7 +2405,7 @@ export const StaffHub = ({ darkMode }) => {
                           placeholder="e.g., john@example.com"
                           className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                               : "border-gray-300 placeholder-gray-500"
                           } ${errors.email ? "border-red-500" : ""}`}
                         />
@@ -1655,7 +2431,7 @@ export const StaffHub = ({ darkMode }) => {
                           required
                           className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600"
+                              ? "bg-gray-800 text-white border-gray-600"
                               : "border-gray-300"
                           } ${errors.dateOfBirth ? "border-red-500" : ""}`}
                         />
@@ -1673,7 +2449,7 @@ export const StaffHub = ({ darkMode }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">
-                        Employee ID <span className="text-red-500">*</span>
+                        Employee ID <span className="text-green-600 text-xs">(Auto-generated)</span>
                       </label>
                       <input
                         type="text"
@@ -1681,13 +2457,13 @@ export const StaffHub = ({ darkMode }) => {
                         value={formData.id}
                         onChange={handleChange}
                         required
-                        disabled={!!editingItem}
-                        placeholder="e.g., EMP001"
+                        disabled={true}
+                        placeholder="Auto-generated (e.g., EMP001)"
                         className={`w-full px-3 py-2 rounded-md text-sm border ${
                           darkMode
-                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
-                            : "border-gray-300 placeholder-gray-500"
-                        } ${editingItem ? "opacity-70 cursor-not-allowed" : ""} ${
+                            ? "bg-gray-600 text-gray-300 border-gray-600 placeholder-gray-400"
+                            : "bg-gray-100 text-gray-600 border-gray-300 placeholder-gray-500"
+                        } opacity-70 cursor-not-allowed ${
                           errors.id ? "border-red-500" : ""
                         }`}
                       />
@@ -1712,7 +2488,7 @@ export const StaffHub = ({ darkMode }) => {
                           required
                           className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600"
+                              ? "bg-gray-800 text-white border-gray-600"
                               : "border-gray-300"
                           } ${errors.joined ? "border-red-500" : ""}`}
                         />
@@ -1741,19 +2517,30 @@ export const StaffHub = ({ darkMode }) => {
                       <label className="block text-sm font-medium mb-1">
                         Job Title <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="title"
                         value={formData.title}
                         onChange={handleChange}
                         required
-                        placeholder="e.g., Farm Manager"
                         className={`w-full px-3 py-2 rounded-md text-sm border ${
                           darkMode
-                            ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
-                            : "border-gray-300 placeholder-gray-500"
+                            ? "bg-gray-800 text-white border-gray-600"
+                            : "border-gray-300"
                         } ${errors.title ? "border-red-500" : ""}`}
-                      />
+                      >
+                        <option value="">Select Job Title</option>
+                        <option value="Employee Manager">Employee Manager</option>
+                        <option value="Animal Manager">Animal Manager</option>
+                        <option value="Plant Manager">Plant Manager</option>
+                        <option value="Inventory Manager">Inventory Manager</option>
+                        <option value="Animal Health Manager">Animal Health Manager</option>
+                        <option value="Plant Health Manager">Plant Health Manager</option>
+                        <option value="Worker">Worker</option>
+                        <option value="Care Taker">Care Taker</option>
+                        <option value="Cleaner">Cleaner</option>
+                        <option value="Driver">Driver</option>
+                        <option value="Other">Other</option>
+                      </select>
                       {errors.title && (
                         <p className="text-red-500 text-xs mt-1">{errors.title}</p>
                       )}
@@ -1768,7 +2555,7 @@ export const StaffHub = ({ darkMode }) => {
                         onChange={handleChange}
                         className={`w-full px-3 py-2 rounded-md text-sm border ${
                           darkMode
-                            ? "bg-gray-700 text-white border-gray-600"
+                            ? "bg-gray-800 text-white border-gray-600"
                             : "border-gray-300"
                         } ${errors.type ? "border-red-500" : ""}`}
                       >
@@ -1778,6 +2565,102 @@ export const StaffHub = ({ darkMode }) => {
                       </select>
                       {errors.type && (
                         <p className="text-red-500 text-xs mt-1">{errors.type}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="employeename@mountolive.com"
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.email ? "border-red-500" : ""}`}
+                      />
+                      {errors.email && (
+                        <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Department <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="department"
+                        value={formData.department}
+                        onChange={handleChange}
+                        required
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600"
+                            : "border-gray-300"
+                        } ${errors.department ? "border-red-500" : ""}`}
+                      >
+                        <option value="">Select Department</option>
+                        <option value="Farm Operations">Farm Operations</option>
+                        <option value="Inventory Management">Inventory Management</option>
+                        <option value="Health Management">Health Management</option>
+                        <option value="Administration">Administration</option>
+                        <option value="Employee Management">Employee Management</option>
+                        <option value="Plant Management">Plant Management</option>
+                        <option value="Animal Management">Animal Management</option>
+                      </select>
+                      {errors.department && (
+                        <p className="text-red-500 text-xs mt-1">{errors.department}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Status
+                      </label>
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600"
+                            : "border-gray-300"
+                        } ${errors.status ? "border-red-500" : ""}`}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                      </select>
+                      {errors.status && (
+                        <p className="text-red-500 text-xs mt-1">{errors.status}</p>
+                      )}
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">
+                        Address <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        required
+                        rows={3}
+                        placeholder="Enter complete address"
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.address ? "border-red-500" : ""}`}
+                      />
+                      {errors.address && (
+                        <p className="text-red-500 text-xs mt-1">{errors.address}</p>
                       )}
                     </div>
                   </div>
@@ -1802,7 +2685,7 @@ export const StaffHub = ({ darkMode }) => {
                           placeholder="e.g., MED12345"
                           className={`w-full px-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                               : "border-gray-300 placeholder-gray-500"
                           } ${errors.licenseNumber ? "border-red-500" : ""}`}
                         />
@@ -1825,7 +2708,7 @@ export const StaffHub = ({ darkMode }) => {
                           min="0"
                           className={`w-full px-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                               : "border-gray-300 placeholder-gray-500"
                           } ${errors.yearsOfExperience ? "border-red-500" : ""}`}
                         />
@@ -1856,7 +2739,7 @@ export const StaffHub = ({ darkMode }) => {
                             placeholder="e.g., Cardiology, Neurology (comma separated)"
                             className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                               darkMode
-                                ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                                ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                                 : "border-gray-300 placeholder-gray-500"
                             } ${errors.specializations ? "border-red-500" : ""}`}
                           />
@@ -1885,7 +2768,7 @@ export const StaffHub = ({ darkMode }) => {
                             placeholder="e.g., MBBS, MD"
                             className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                               darkMode
-                                ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                                ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                                 : "border-gray-300 placeholder-gray-500"
                             } ${errors.qualifications ? "border-red-500" : ""}`}
                           />
@@ -1909,7 +2792,7 @@ export const StaffHub = ({ darkMode }) => {
                           onChange={handleChange}
                           className={`w-full px-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600"
+                              ? "bg-gray-800 text-white border-gray-600"
                               : "border-gray-300"
                           }`}
                         >
@@ -1936,7 +2819,7 @@ export const StaffHub = ({ darkMode }) => {
                               placeholder="e.g., 123 Main St, City"
                               className={`w-full pl-10 pr-3 py-2 rounded-md text-sm border ${
                                 darkMode
-                                  ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                                  ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                                   : "border-gray-300 placeholder-gray-500"
                               }`}
                             />
@@ -1958,7 +2841,7 @@ export const StaffHub = ({ darkMode }) => {
                           required
                           className={`w-full px-3 py-2 rounded-md text-sm border ${
                             darkMode
-                              ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                              ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
                               : "border-gray-300 placeholder-gray-500"
                           } ${errors.password ? "border-red-500" : ""}`}
                         />
@@ -2047,7 +2930,9 @@ export const StaffHub = ({ darkMode }) => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
+              <div className={`flex justify-end gap-3 pt-4 border-t ${
+                darkMode ? 'border-gray-700' : 'border-gray-200'
+              }`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -2065,7 +2950,7 @@ export const StaffHub = ({ darkMode }) => {
                 >
                   {loading.form ? (
                     <>
-                      <Loader size={16} className="animate-spin" />
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>Processing...</span>
                     </>
                   ) : (

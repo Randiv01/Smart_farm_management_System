@@ -115,7 +115,7 @@ const PrivacyPolicy = () => {
       MountOlive Farm
       Email: privacy@mountolivefarm.com
       Phone: (123) 456-7890
-      Address: 123 Farm Road, Countryside, CS 12345
+      Address: No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka
     `;
     
     // Create a Blob with the content
@@ -531,7 +531,7 @@ const PrivacyPolicy = () => {
                       </div>
                       <div className="flex items-center md:col-span-2">
                         <MapPinIcon className="h-5 w-5 mr-3" />
-                        <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>123 Farm Road, Countryside, CS 12345</span>
+                        <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka</span>
                       </div>
                     </div>
                     <div className={`mt-4 p-4 rounded-lg ${darkMode ? 'bg-dark-green' : 'bg-green-50'} border ${darkMode ? 'border-green-700' : 'border-green-200'}`}>

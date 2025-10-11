@@ -11,11 +11,13 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import autoTable from "jspdf-autotable";
+import Loader from "../Loader/Loader.js";
+import { useETheme } from '../Econtexts/EThemeContext.jsx'; // Import the Loader component
 
 const API = "http://localhost:5000/api/leaves";
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
-  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 flex flex-col`}>
+  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border flex flex-col`}>
     <div className="flex items-center justify-between mb-2">
       <h4 className="font-medium text-sm">{title}</h4>
       <div className={`p-2 rounded-full ${color.bg} ${color.text}`}>
@@ -24,19 +26,28 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
     </div>
     <div className="mt-2">
       <p className={`text-2xl font-bold ${color.value}`}>{value}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+      <p className={`text-xs mt-1 ${
+        darkMode ? 'text-gray-400' : 'text-gray-500'
+      }`}>{subtitle}</p>
     </div>
   </div>
 );
 
 const ChartContainer = React.forwardRef(({ title, children, darkMode, className = "" }, ref) => (
-  <div ref={ref} className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 ${className}`}>
+  <div ref={ref} className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border ${className}`}>
     <h4 className="font-medium mb-4">{title}</h4>
     <div className="h-64">{children}</div>
   </div>
 ));
 
-export const ELeavePlanner = ({ darkMode }) => {
+export const ELeavePlanner = () => {
+  const { theme } = useETheme();
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Leave Management - Employee Manager";
+  }, []);
+  const darkMode = theme === 'dark';
   const [activeTab, setActiveTab] = useState("requests");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [typeFilter, setTypeFilter] = useState("All Types");
@@ -45,6 +56,8 @@ export const ELeavePlanner = ({ darkMode }) => {
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
+  const [showLoader, setShowLoader] = useState(true); // Loader state
+  const [allEmployees, setAllEmployees] = useState([]);
 
   const [tableSearch, setTableSearch] = useState("");
 
@@ -70,12 +83,50 @@ export const ELeavePlanner = ({ darkMode }) => {
   const balanceRef = useRef(null);
   const trendRef = useRef(null);
 
+  // Move hooks before any conditional returns
+  // charts: distribution + status
+  const leaveData = useMemo(() => {
+    const sums = { Annual: 0, Sick: 0, Casual: 0, Other: 0 };
+    leaves.forEach((l) => { sums[l.type] = (sums[l.type] || 0) + (l.days || 0); });
+    return [
+      { name: "Annual Leave", value: sums.Annual, color: "#3b82f6" },
+      { name: "Sick Leave",   value: sums.Sick,   color: "#ef4444" },
+      { name: "Casual Leave", value: sums.Casual, color: "#f59e0b" },
+      { name: "Other",        value: sums.Other,  color: "#8b5cf6" },
+    ];
+  }, [leaves]);
+
+  const statusData = useMemo(() => ([
+    { name: "Pending",  value: stats.pending,  color: "#f59e0b" },
+    { name: "Approved", value: stats.approved, color: "#10b981" },
+    { name: "Rejected", value: stats.rejected, color: "#ef4444" },
+  ]), [stats]);
+
+  const filteredLeaves = useMemo(() => {
+    if (!tableSearch.trim()) return leaves;
+    const t = tableSearch.toLowerCase();
+    return leaves.filter(r =>
+      r.name?.toLowerCase().includes(t) || r.empId?.toLowerCase().includes(t)
+    );
+  }, [tableSearch, leaves]);
+
   const buildQuery = () => {
     const p = new URLSearchParams();
     if (statusFilter !== "All Status") p.append("status", statusFilter);
     if (typeFilter !== "All Types") p.append("type", typeFilter);
     if (yearFilter) p.append("year", yearFilter);
     return p.toString();
+  };
+
+  const fetchAllEmployees = async () => {
+    try {
+      const response = await fetch("/api/employees");
+      const data = await response.json();
+      const employees = Array.isArray(data) ? data : (data.docs || []);
+      setAllEmployees(employees);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+    }
   };
 
   const loadLeaves = async () => {
@@ -93,6 +144,7 @@ export const ELeavePlanner = ({ darkMode }) => {
       console.error("Error loading leaves:", e);
     } finally {
       setLoading(false);
+      setShowLoader(false); // Hide loader when data is loaded
     }
   };
 
@@ -179,6 +231,7 @@ export const ELeavePlanner = ({ darkMode }) => {
   useEffect(() => {
     loadLeaves();
     loadTrend();
+    fetchAllEmployees(); // Fetch all employees for dropdown
     const es = new EventSource(`${API}/stream`);
     es.addEventListener("change", () => {
       loadLeaves();
@@ -200,6 +253,11 @@ export const ELeavePlanner = ({ darkMode }) => {
 
   useEffect(() => { loadUpcoming(); }, [upcomingEmp, yearFilter]);
   useEffect(() => { loadBalance(); }, [balanceEmp, yearFilter]);
+
+  // Show loader while loading
+  if (showLoader) {
+    return <Loader darkMode={darkMode} />;
+  }
 
   // CRUD
   const submitForm = async (e) => {
@@ -247,220 +305,198 @@ export const ELeavePlanner = ({ darkMode }) => {
     }
   };
 
-  // charts: distribution + status
-  const leaveData = useMemo(() => {
-    const sums = { Annual: 0, Sick: 0, Casual: 0, Other: 0 };
-    leaves.forEach((l) => { sums[l.type] = (sums[l.type] || 0) + (l.days || 0); });
-    return [
-      { name: "Annual Leave", value: sums.Annual, color: "#3b82f6" },
-      { name: "Sick Leave",   value: sums.Sick,   color: "#ef4444" },
-      { name: "Casual Leave", value: sums.Casual, color: "#f59e0b" },
-      { name: "Other",        value: sums.Other,  color: "#8b5cf6" },
-    ];
-  }, [leaves]);
-
-  const statusData = useMemo(() => ([
-    { name: "Pending",  value: stats.pending,  color: "#f59e0b" },
-    { name: "Approved", value: stats.approved, color: "#10b981" },
-    { name: "Rejected", value: stats.rejected, color: "#ef4444" },
-  ]), [stats]);
-
-  const filteredLeaves = useMemo(() => {
-    if (!tableSearch.trim()) return leaves;
-    const t = tableSearch.toLowerCase();
-    return leaves.filter(r =>
-      r.name?.toLowerCase().includes(t) || r.empId?.toLowerCase().includes(t)
-    );
-  }, [tableSearch, leaves]);
-
-  /* --------------------- PDF (polished design + dark-green theme) --------------------- */
+  /* --------------------- PDF (Professional design matching Animal Management style) --------------------- */
 
   const generatePDF = async () => {
-    const DARK_GREEN = "#2e7d32";        // requested brand color
-    const BRAND_RGB = [46, 125, 50];     // rgb for #2e7d32
+    const pdf = new jsPDF("p", "mm", "a4");
+    
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const companyWebsite = "www.mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
+    
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const M = 36; // margin
-    const brand = { primary: BRAND_RGB, green: [16, 185, 129], gray: [107, 114, 128] };
-
-    // Helpers
-    const fmtDate = (d = new Date()) =>
-      d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-
-    const header = (title = "Leave Analytics Report") => {
-      pdf.setFillColor(...brand.primary);
-      pdf.rect(0, 0, pageW, 64, "F");
+    // Add real company logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        pdf.addImage(logoImg, 'PNG', 15, 10, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        pdf.setFillColor(...primaryColor);
+        pdf.rect(15, 10, 25, 25, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('MOF', 27, 25, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      pdf.setFillColor(...primaryColor);
+      pdf.rect(15, 10, 25, 25, 'F');
       pdf.setTextColor(255, 255, 255);
-      pdf.setFont("helvetica", "bold"); pdf.setFontSize(16);
-      pdf.text("Mount Olive Farm House", M, 32);
-      pdf.setFontSize(22);
-      pdf.text(title, M, 54);
-      pdf.setFont("helvetica", "normal"); pdf.setFontSize(12);
-      pdf.text(`Year: ${yearFilter}`, pageW - M, 32, { align: "right" });
-      pdf.text(`Generated: ${fmtDate()}`, pageW - M, 54, { align: "right" });
-      pdf.setTextColor(33, 37, 41);
-    };
-
-    let pageNo = 1;
-    const footer = () => {
-      pdf.setDrawColor(230); pdf.setLineWidth(0.5);
-      pdf.line(M, pageH - 40, pageW - M, pageH - 40);
-      pdf.setFontSize(10); pdf.setTextColor(...brand.gray);
-      pdf.text("Generated by EmpManager v1.0", M, pageH - 20);
-      pdf.text(String(pageNo), pageW - M, pageH - 20, { align: "right" });
-      pageNo++;
-    };
-
-    // capture helper — higher scale for sharpness
-    const capture = async (node) => {
-      if (!node) return null;
-      const canvas = await html2canvas(node, { scale: 3, backgroundColor: "#ffffff" });
-      return canvas.toDataURL("image/png");
-    };
-
-    // SAFE image placement using getImageProperties (prevents invalid coords)
-    const placeImage = (imgData, x, y, maxW, maxH) => {
-      if (!imgData || !maxW || !maxH) return { w: 0, h: 0 };
-      try {
-        const props = pdf.getImageProperties(imgData);
-        let w = props?.width || maxW;
-        let h = props?.height || maxH;
-        const ratio = Math.min(maxW / w, maxH / h);
-        w = Math.max(1, w * ratio);
-        h = Math.max(1, h * ratio);
-        const px = x + (maxW - w) / 2;
-        const py = y + (maxH - h) / 2;
-        pdf.addImage(imgData, "PNG", px, py, w, h, undefined, "FAST");
-        return { w, h };
-      } catch {
-        pdf.addImage(imgData, "PNG", x, y, maxW, maxH, undefined, "FAST");
-        return { w: maxW, h: maxH };
-      }
-    };
-
-    // Quick summaries
-    const typeTotals = leaveData.map(d => ({ type: d.name, totalDays: d.value }));
-    const totalDays = Math.max(1, typeTotals.reduce((s, r) => s + (r.totalDays || 0), 0));
-    const typeRows = typeTotals.map(r => ([
-      r.type,
-      (r.totalDays || 0).toString(),
-      `${Math.round(((r.totalDays || 0) / totalDays) * 100)}%`
-    ]));
-    const statusRows = [
-      ["Approved", stats.approved],
-      ["Pending",  stats.pending],
-      ["Rejected", stats.rejected],
-      ["Total Requests", stats.total]
-    ];
-
-    /* -------- Cover Page -------- */
-    header("Leave Analytics Report");
-    // stat cards
-    const cardW = (pageW - M * 2 - 24) / 2;
-    const cardH = 64;
-    pdf.setFont("helvetica", "bold"); pdf.setFontSize(12);
-    const drawCard = (x, y, label, value, colorRGB) => {
-      pdf.setFillColor(245); pdf.roundedRect(x, y, cardW, cardH, 8, 8, "F");
-      pdf.setDrawColor(...colorRGB); pdf.roundedRect(x, y, cardW, cardH, 8, 8);
-      pdf.setTextColor(...colorRGB); pdf.text(label, x + 14, y + 22);
-      pdf.setFontSize(20); pdf.text(String(value), x + 14, y + 46);
       pdf.setFontSize(12);
-      pdf.setTextColor(33, 37, 41);
-    };
-    drawCard(M, 84, "Total Leaves", stats.total, [59, 130, 246]);
-    drawCard(M + cardW + 24, 84, "Approved", stats.approved, [16, 185, 129]);
-    drawCard(M, 84 + cardH + 16, "Pending", stats.pending, [245, 158, 11]);
-    drawCard(M + cardW + 24, 84 + cardH + 16, "Rejected", stats.rejected, [239, 68, 68]);
-
-    // tables
-    autoTable(pdf, {
-      startY: 84 + cardH * 2 + 36,
-      styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
-      headStyles: { fillColor: brand.primary },
-      head: [["Status Summary", "Count"]],
-      body: statusRows,
-      theme: "striped",
-      tableWidth: (pageW - M * 2 - 16) / 2,
-      margin: { left: M, right: M }
-    });
-
-    autoTable(pdf, {
-      startY: 84 + cardH * 2 + 36,
-      styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
-      headStyles: { fillColor: brand.primary },
-      head: [["Leave Type", "Days", "%"]],
-      body: typeRows,
-      theme: "striped",
-      tableWidth: (pageW - M * 2 - 16) / 2,
-      margin: { left: M + (pageW - M * 2 - 16) / 2 + 16, right: M }
-    });
-    footer();
-
-    /* -------- Charts Page (bigger charts) -------- */
-    pdf.addPage();
-    header("Distribution & Status");
-    const distImg = await capture(distRef.current);
-    const statusImg = await capture(statusRef.current);
-
-    // make each chart taller for visibility
-    const slotW = (pageW - M * 2 - 16) / 2;
-    const slotH = 360; // ↑ bigger than before
-    if (distImg) placeImage(distImg, M, 84, slotW, slotH);
-    if (statusImg) placeImage(statusImg, M + slotW + 16, 84, slotW, slotH);
-    footer();
-
-    /* -------- Trend Page -------- */
-    pdf.addPage();
-    header("Monthly Leave Trend");
-    const trendImg = await capture(trendRef.current);
-    if (trendImg) placeImage(trendImg, M, 84, pageW - M * 2, 340);
-    footer();
-
-    /* -------- Leave Balance + Upcoming -------- */
-    pdf.addPage();
-    header("Balance & Upcoming Leaves");
-
-    // Balance table — no tip, only the table when available
-    if (balance) {
-      const b = balance;
-      autoTable(pdf, {
-        startY: 84,
-        styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
-        headStyles: { fillColor: brand.primary },
-        head: [[`Leave Balance — ${balanceEmp}`, "Total", "Used", "Remaining"]],
-        body: [
-          ["Annual", b.Annual?.total ?? 0, b.Annual?.used ?? 0, b.Annual?.remaining ?? 0],
-          ["Sick",   b.Sick?.total ?? 0,   b.Sick?.used ?? 0,   b.Sick?.remaining ?? 0],
-          ["Casual", b.Casual?.total ?? 0, b.Casual?.used ?? 0, b.Casual?.remaining ?? 0],
-          ["Other",  b.Other?.total ?? 0,  b.Other?.used ?? 0,  b.Other?.remaining ?? 0]
-        ],
-        theme: "striped",
-        margin: { left: M, right: M },
-        tableWidth: (pageW - M * 2)
-      });
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('MOF', 27, 25, { align: 'center' });
+      generatePDFContent();
     }
 
-    const startY = pdf.lastAutoTable?.finalY ? pdf.lastAutoTable.finalY + 24 : 84;
-    autoTable(pdf, {
-      startY,
-      styles: { font: "helvetica", fontSize: 9, cellPadding: 5 },
-      headStyles: { fillColor: brand.primary },
-      head: [["Employee", "Emp ID", "Type", "From", "To", "Days", "Status"]],
-      body: upcoming.slice(0, 25).map(u => ([
-        u.name, u.empId, u.type,
-        new Date(u.from).toLocaleDateString(),
-        new Date(u.to).toLocaleDateString(),
-        String(u.days), u.status
-      ])),
-      theme: "striped",
-      margin: { left: M, right: M }
-    });
+    const generatePDFContent = () => {
+      // Company header
+      pdf.setTextColor(...textColor);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(companyName, 45, 18);
+      
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(companyAddress, 45, 25);
+      pdf.text(companyContact, 45, 30);
+      pdf.text(companyWebsite, 45, 35);
 
-    footer();
+      // Report title with professional styling
+      pdf.setFillColor(...lightGray);
+      pdf.rect(15, 40, 180, 10, 'F');
+      pdf.setTextColor(...primaryColor);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('LEAVE MANAGEMENT REPORT', 105, 47, { align: 'center' });
 
-    pdf.save(`leave-report-${yearFilter}.pdf`);
+      // Report metadata
+      pdf.setTextColor(...textColor);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Report Generated: ${reportDate} at ${reportTime}`, 15, 58);
+      pdf.text(`Year: ${yearFilter}`, 15, 63);
+      pdf.text(`Report ID: MOF-LM-${Date.now().toString().slice(-6)}`, 15, 68);
+
+      // Summary statistics
+      pdf.setFillColor(...secondaryColor);
+      pdf.rect(15, 75, 180, 8, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('LEAVE SUMMARY', 20, 81);
+
+      pdf.setTextColor(...textColor);
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Total Leave Requests: ${stats.total}`, 20, 90);
+      pdf.text(`Approved: ${stats.approved}`, 20, 95);
+      pdf.text(`Pending: ${stats.pending}`, 20, 100);
+      pdf.text(`Rejected: ${stats.rejected}`, 20, 105);
+
+      // Calculate leave type totals
+      const typeTotals = leaveData.map(d => ({ type: d.name, totalDays: d.value }));
+      const totalDays = Math.max(1, typeTotals.reduce((s, r) => s + (r.totalDays || 0), 0));
+      
+      pdf.text(`Total Leave Days: ${totalDays}`, 20, 110);
+      typeTotals.forEach((item, index) => {
+        const percentage = Math.round(((item.totalDays || 0) / totalDays) * 100);
+        pdf.text(`${item.type}: ${item.totalDays} days (${percentage}%)`, 20, 115 + (index * 5));
+      });
+
+      // Prepare table data for leave requests
+      const headers = [["Employee", "Emp ID", "Type", "From", "To", "Days", "Status", "Reason"]];
+      
+      const data = filteredLeaves.slice(0, 50).map(leave => [
+        leave.name || 'N/A',
+        leave.empId || 'N/A',
+        leave.type || 'N/A',
+        leave.from ? new Date(leave.from).toLocaleDateString() : 'N/A',
+        leave.to ? new Date(leave.to).toLocaleDateString() : 'N/A',
+        leave.days?.toString() || '0',
+        leave.status || 'N/A',
+        (leave.reason || 'N/A').substring(0, 30) + (leave.reason?.length > 30 ? '...' : '')
+      ]);
+
+      // Create professional table
+      autoTable(pdf, {
+        head: headers,
+        body: data,
+        startY: 140,
+        theme: 'grid',
+        headStyles: {
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: textColor,
+          cellPadding: 2
+        },
+        alternateRowStyles: {
+          fillColor: [249, 250, 251]
+        },
+        margin: { left: 15, right: 15 },
+        styles: {
+          lineColor: [209, 213, 219],
+          lineWidth: 0.5,
+          halign: 'left',
+          valign: 'middle',
+          overflow: 'linebreak'
+        },
+        didDrawPage: (data) => {
+          // Add header and footer to each page
+          addHeaderFooter();
+        }
+      });
+
+      // Professional footer
+      const pageCount = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        addHeaderFooter();
+      }
+
+      // Save PDF with professional naming
+      const fileName = `MOF_Leave_Management_Report_${yearFilter}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+    };
+
+    const addHeaderFooter = () => {
+      const pageCount = pdf.internal.getNumberOfPages();
+      const currentPage = pdf.internal.getCurrentPageInfo().pageNumber;
+      
+      // Footer background
+      pdf.setFillColor(...lightGray);
+      pdf.rect(0, 275, 210, 20, 'F');
+      
+      // Footer content
+      pdf.setTextColor(...textColor);
+      pdf.setFontSize(8);
+      pdf.text(`Page ${currentPage} of ${pageCount}`, 15, 283);
+      pdf.text(`Generated on ${new Date().toLocaleString()}`, 105, 283, { align: 'center' });
+      pdf.text(companyName, 195, 283, { align: 'right' });
+      
+      // Footer line
+      pdf.setDrawColor(...primaryColor);
+      pdf.setLineWidth(0.5);
+      pdf.line(15, 285, 195, 285);
+      
+      // Disclaimer
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text("This report is generated by Mount Olive Farm House Management System", 105, 290, { align: 'center' });
+    };
   };
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -478,21 +514,29 @@ export const ELeavePlanner = ({ darkMode }) => {
   };
 
   return (
-    <div className={`p-6 font-sans min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`p-6 font-sans min-h-screen ${darkMode ? "bg-gray-900 text-white" : "light-beige"}`}>
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Leave Management System</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>
           {activeTab === "requests" ? "Manage and track employee leave requests" : "View leave analytics and summary reports"}
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex mb-6 border-b dark:border-gray-700">
+      <div className={`flex mb-6 border-b ${
+        darkMode ? 'border-gray-700' : 'border-gray-200'
+      }`}>
         <button
           onClick={() => setActiveTab("requests")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
-            activeTab === "requests" ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400" : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
+            activeTab === "requests" 
+              ? "border-b-2 border-orange-500 text-orange-500" 
+              : darkMode 
+                ? "text-gray-400 hover:text-orange-400" 
+                : "text-gray-600 hover:text-orange-500"
           }`}
         >
           <Calendar size={18} /><span>Leave Requests</span>
@@ -500,7 +544,11 @@ export const ELeavePlanner = ({ darkMode }) => {
         <button
           onClick={() => setActiveTab("summary")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
-            activeTab === "summary" ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400" : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
+            activeTab === "summary" 
+              ? "border-b-2 border-orange-500 text-orange-500" 
+              : darkMode 
+                ? "text-gray-400 hover:text-orange-400" 
+                : "text-gray-600 hover:text-orange-500"
           }`}
         >
           <BarChart3 size={18} /><span>Analytics & Reports</span>
@@ -513,13 +561,29 @@ export const ELeavePlanner = ({ darkMode }) => {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard title="Total Leaves" value={stats.total} subtitle="All time" icon={Calendar}
-              color={{ bg:"bg-blue-100 dark:bg-blue-800", text:"text-blue-500 dark:text-blue-300", value:"text-blue-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-blue-800" : "bg-blue-100", 
+                text: darkMode ? "text-blue-300" : "text-blue-500", 
+                value: "text-blue-500" 
+              }} darkMode={darkMode}/>
             <StatCard title="Pending" value={stats.pending} subtitle="Awaiting approval" icon={Clock}
-              color={{ bg:"bg-yellow-100 dark:bg-yellow-800", text:"text-yellow-500 dark:text-yellow-300", value:"text-yellow-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-yellow-800" : "bg-yellow-100", 
+                text: darkMode ? "text-yellow-300" : "text-yellow-500", 
+                value: "text-yellow-500" 
+              }} darkMode={darkMode}/>
             <StatCard title="Approved" value={stats.approved} subtitle="Leaves granted" icon={User}
-              color={{ bg:"bg-green-100 dark:bg-green-800", text:"text-green-500 dark:text-green-300", value:"text-green-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-green-800" : "bg-green-100", 
+                text: darkMode ? "text-green-300" : "text-green-500", 
+                value: "text-green-500" 
+              }} darkMode={darkMode}/>
             <StatCard title="Rejected" value={stats.rejected} subtitle="Leaves denied" icon={AlertCircle}
-              color={{ bg:"bg-red-100 dark:bg-red-800", text:"text-red-500 dark:text-red-300", value:"text-red-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-red-800" : "bg-red-100", 
+                text: darkMode ? "text-red-300" : "text-red-500", 
+                value: "text-red-500" 
+              }} darkMode={darkMode}/>
           </div>
 
           {/* Actions */}
@@ -561,10 +625,12 @@ export const ELeavePlanner = ({ darkMode }) => {
           </div>
 
           {/* Table */}
-          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 mb-6`}>
+          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border mb-6`}>
             <div className={`flex justify-between items-center p-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
               <h3 className="font-medium">Leave Requests</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{filteredLeaves.length} records found</span>
+              <span className={`text-xs ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>{filteredLeaves.length} records found</span>
             </div>
             {loading ? (
               <div className="text-center py-8">Loading leave data...</div>
@@ -599,10 +665,10 @@ export const ELeavePlanner = ({ darkMode }) => {
                         <td className="p-3">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                             r.status === "Approved"
-                              ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200"
+                              ? darkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-700"
                               : r.status === "Pending"
-                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200"
-                              : "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                              ? darkMode ? "bg-yellow-800 text-yellow-200" : "bg-yellow-100 text-yellow-700"
+                              : darkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-700"
                           }`}>{r.status}</span>
                         </td>
                         <td className="p-3">
@@ -615,7 +681,9 @@ export const ELeavePlanner = ({ darkMode }) => {
                     ))}
                     {!loading && filteredLeaves.length === 0 && (
                       <tr>
-                        <td className="p-3 text-sm text-gray-500 dark:text-gray-400" colSpan={10}>No leave records found.</td>
+                        <td className={`p-3 text-sm colSpan={10} ${
+                          darkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>No leave records found.</td>
                       </tr>
                     )}
                   </tbody>
@@ -629,13 +697,33 @@ export const ELeavePlanner = ({ darkMode }) => {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/40" onClick={() => { setShowForm(false); setEditing(null); }} />
               <div className={`relative p-6 rounded-lg shadow w-full max-w-3xl max-h-screen overflow-y-auto ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-                <button onClick={() => { setShowForm(false); setEditing(null); }} className="absolute right-3 top-3 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"><X /></button>
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className={`absolute right-3 top-3 text-gray-500 ${
+                  darkMode ? 'hover:text-gray-300' : 'hover:text-gray-700'
+                }`}><X /></button>
                 <h3 className="text-lg font-semibold mb-4">{editing ? "Update Leave Request" : "New Leave Request"}</h3>
                 <form onSubmit={submitForm} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block mb-1 text-sm">Employee ID *</label>
-                    <input type="text" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                           value={form.empId} onChange={(e) => setForm({ ...form, empId: e.target.value })} required />
+                    <label className="block mb-1 text-sm">Employee *</label>
+                    <select className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                            value={form.empId} onChange={(e) => {
+                              const value = e.target.value;
+                              setForm({ ...form, empId: value });
+                              
+                              // Auto-fetch employee name when employee ID changes
+                              if (value.trim()) {
+                                const employee = allEmployees.find(emp => emp.id === value.trim());
+                                if (employee) {
+                                  setForm(prev => ({ ...prev, name: employee.name }));
+                                }
+                              }
+                            }} required>
+                      <option value="">Select Employee</option>
+                      {allEmployees.map((employee) => (
+                        <option key={employee._id} value={employee.id}>
+                          {employee.id} - {employee.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">Name *</label>
@@ -776,7 +864,9 @@ export const ELeavePlanner = ({ darkMode }) => {
                 </div>
 
                 {!balance ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Enter/select an Employee ID to view leave balance.</p>
+                  <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>Enter/select an Employee ID to view leave balance.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -832,12 +922,14 @@ export const ELeavePlanner = ({ darkMode }) => {
                   <div className="flex justify-between mb-2">
                     <div>
                       <h5 className="font-semibold">{u.name}</h5>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{u.empId}</p>
+                      <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>{u.empId}</p>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      u.status === "Approved" ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200" :
-                      u.status === "Pending" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200" :
-                      "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                      u.status === "Approved" ? (darkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-700") :
+                      u.status === "Pending" ? (darkMode ? "bg-yellow-800 text-yellow-200" : "bg-yellow-100 text-yellow-700") :
+                      (darkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-700")
                     }`}>
                       {u.status}
                     </span>
@@ -850,7 +942,9 @@ export const ELeavePlanner = ({ darkMode }) => {
                 </div>
               ))}
               {upcoming.length === 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 col-span-3 text-center py-8">
+                <p className={`text-sm col-span-3 text-center py-8 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
                   No upcoming leaves{upcomingEmp ? ` for ${upcomingEmp}` : ""}.
                 </p>
               )}

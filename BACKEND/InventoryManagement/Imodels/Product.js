@@ -171,14 +171,17 @@ productSchema.statics.calculateExpiryDate = function(category, creationDate) {
 productSchema.methods.updateStatus = function() {
   const now = new Date();
   const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+  
   // Reset status
   this.status = 'In Stock';
+
   // Check stock levels
   if (this.stock.quantity <= 0) {
     this.status = 'Out of Stock';
   } else if (this.stock.quantity < this.minStockLevel) {
     this.status = 'Low Stock';
   }
+
   // Check expiry (only if not already out of stock or low stock)
   if (this.status === 'In Stock') {
     if (this.expiryDate <= twoDaysFromNow && this.expiryDate >= now) {
@@ -187,6 +190,7 @@ productSchema.methods.updateStatus = function() {
       this.status = 'Out of Stock';
     }
   }
+  
   return this.status;
 };
 

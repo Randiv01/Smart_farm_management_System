@@ -8,6 +8,7 @@ import {
   updateEmployee,
   deleteEmployee,
   generatePDF,
+  getNextEmployeeId,
 } from "../E-control/employeeController.js"; // note `.js` extension
 
 const router = express.Router();
@@ -19,12 +20,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Routes
+// Routes - specific routes first, then parameterized routes
 router.get("/", getEmployees);
-router.get("/:id", getEmployeeById);
+router.get("/get-next-id", getNextEmployeeId);
 router.post("/", upload.fields([{ name: "photo" }, { name: "cv" }]), addEmployee);
+router.get("/:id/pdf", generatePDF);
+router.get("/:id", getEmployeeById);
 router.put("/:id", upload.fields([{ name: "photo" }, { name: "cv" }]), updateEmployee);
 router.delete("/:id", deleteEmployee);
-router.get("/:id/pdf", generatePDF);
 
 export default router;   // ✅ default export

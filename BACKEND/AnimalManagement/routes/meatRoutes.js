@@ -23,6 +23,29 @@ router.post("/", async (req, res) => {
       notes,
     } = meatBatchData;
 
+    // Validate required fields
+    if (!batchName || !animalType || !meatType || !quantity || !productionDate || !expiryDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: batchName, animalType, meatType, quantity, productionDate, expiryDate",
+      });
+    }
+
+    // Validate dates
+    const prodDate = new Date(productionDate);
+    const expDate = new Date(expiryDate);
+    
+    // Compare using UTC to avoid timezone issues
+    const prodUTC = Date.UTC(prodDate.getFullYear(), prodDate.getMonth(), prodDate.getDate());
+    const expUTC = Date.UTC(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+    
+    if (expUTC <= prodUTC) {
+      return res.status(400).json({
+        success: false,
+        message: "Expiry date must be after production date",
+      });
+    }
+
     const meatBatch = new MeatProductivity({
       batchName,
       animalType,
@@ -40,17 +63,40 @@ router.post("/", async (req, res) => {
 
     // Emit socket notification
     req.app.get("io").emit("meatAdded", {
-      message: `New meat batch ${meatBatch.batchId} added`,
+      message: `New meat batch ${meatBatch.batchId} added successfully`,
       batchId: meatBatch.batchId,
       batchName: meatBatch.batchName,
+      type: "success"
     });
 
     res.status(201).json({
-      message: "Meat batch created successfully",
+      success: true,
+      message: `Meat batch ${meatBatch.batchId} created successfully`,
       data: meatBatch,
     });
   } catch (error) {
-    res.status(400).json({
+    console.error('Create meat batch error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: errors
+      });
+    }
+
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Batch ID already exists",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
       message: error.message || "Error creating meat batch",
     });
   }
@@ -152,27 +198,64 @@ router.put("/:id", async (req, res) => {
       notes,
     } = updateData;
 
+    // Validate dates if both are provided
+    if (productionDate && expiryDate) {
+      const prodDate = new Date(productionDate);
+      const expDate = new Date(expiryDate);
+      
+      // Compare using UTC to avoid timezone issues
+      const prodUTC = Date.UTC(prodDate.getFullYear(), prodDate.getMonth(), prodDate.getDate());
+      const expUTC = Date.UTC(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+      
+      if (expUTC <= prodUTC) {
+        return res.status(400).json({
+          success: false,
+          message: "Expiry date must be after production date",
+        });
+      }
+    }
+
     const meatBatch = await MeatProductivity.findByIdAndUpdate(
       req.params.id,
       { batchName, animalType, meatType, quantity, unit, productionDate, expiryDate, status, healthCondition, notes },
       { new: true, runValidators: true }
     );
 
-    if (!meatBatch) return res.status(404).json({ message: "Meat batch not found" });
+    if (!meatBatch) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Meat batch not found" 
+      });
+    }
 
     // Emit socket notification
     req.app.get("io").emit("meatUpdated", {
-      message: `Meat batch ${meatBatch.batchId} updated`,
+      message: `Meat batch ${meatBatch.batchId} updated successfully`,
       batchId: meatBatch.batchId,
       batchName: meatBatch.batchName,
+      type: "success"
     });
 
     res.status(200).json({
-      message: "Meat batch updated successfully",
+      success: true,
+      message: `Meat batch ${meatBatch.batchId} updated successfully`,
       data: meatBatch,
     });
   } catch (error) {
-    res.status(400).json({
+    console.error('Update meat batch error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
       message: error.message || "Error updating meat batch",
     });
   }
@@ -182,20 +265,29 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const meatBatch = await MeatProductivity.findByIdAndDelete(req.params.id);
-    if (!meatBatch) return res.status(404).json({ message: "Meat batch not found" });
+    if (!meatBatch) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Meat batch not found" 
+      });
+    }
 
     // Emit socket notification
     req.app.get("io").emit("meatDeleted", {
-      message: `Meat batch ${meatBatch.batchId} deleted`,
+      message: `Meat batch ${meatBatch.batchId} deleted successfully`,
       batchId: meatBatch.batchId,
       batchName: meatBatch.batchName,
+      type: "success"
     });
 
     res.status(200).json({
-      message: "Meat batch deleted successfully",
+      success: true,
+      message: `Meat batch ${meatBatch.batchId} deleted successfully`,
     });
   } catch (error) {
-    res.status(400).json({
+    console.error('Delete meat batch error:', error);
+    res.status(500).json({
+      success: false,
       message: error.message || "Error deleting meat batch",
     });
   }
@@ -260,6 +352,7 @@ router.post("/:id/harvest", async (req, res) => {
     });
 
     res.status(200).json({
+      success: true,
       message: "Batch harvested successfully",
       data: meatBatch,
     });
@@ -296,38 +389,60 @@ router.get("/harvest/history", async (req, res) => {
   }
 });
 
-// Get meat production analytics
+// Get comprehensive meat production analytics
 router.get("/analytics/production", async (req, res) => {
   try {
-    const { period, animalType } = req.query; // period: day, week, month, year
+    const { period, animalType, startDate, endDate } = req.query;
     
-    let groupByFormat, dateField;
+    // Set default date range if not provided
+    const now = new Date();
+    let defaultStartDate;
     
     switch (period) {
       case "day":
+        defaultStartDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case "week":
+        defaultStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "month":
+        defaultStartDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case "year":
+        defaultStartDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      default:
+        defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const queryStartDate = startDate ? new Date(startDate) : defaultStartDate;
+    const queryEndDate = endDate ? new Date(endDate) : now;
+
+    let matchStage = {
+      slaughterDate: { $gte: queryStartDate, $lte: queryEndDate }
+    };
+    
+    if (animalType) {
+      matchStage.animalType = animalType;
+    }
+
+    // Get production data by period
+    let groupByFormat;
+    switch (period) {
+      case "day":
         groupByFormat = "%Y-%m-%d";
-        dateField = "slaughterDate";
         break;
       case "week":
         groupByFormat = "%Y-%U";
-        dateField = "slaughterDate";
         break;
       case "month":
         groupByFormat = "%Y-%m";
-        dateField = "slaughterDate";
         break;
       case "year":
         groupByFormat = "%Y";
-        dateField = "slaughterDate";
         break;
       default:
-        groupByFormat = "%Y-%m";
-        dateField = "slaughterDate";
-    }
-
-    let matchStage = {};
-    if (animalType) {
-      matchStage.animalType = animalType;
+        groupByFormat = "%Y-%m-%d";
     }
 
     const productionData = await HarvestHistory.aggregate([
@@ -335,46 +450,76 @@ router.get("/analytics/production", async (req, res) => {
       {
         $group: {
           _id: {
-            date: { $dateToString: { format: groupByFormat, date: `$${dateField}` } },
+            date: { $dateToString: { format: groupByFormat, date: "$slaughterDate" } },
             animalType: "$animalType"
           },
           totalMeat: { $sum: "$totalMeatProduced" },
-          batchCount: { $sum: 1 }
+          batchCount: { $sum: 1 },
+          avgMeatPerBatch: { $avg: "$totalMeatProduced" }
         }
       },
       { $sort: { "_id.date": 1 } }
     ]);
 
-    // Get active vs harvested counts
-    const activeBatches = await MeatProductivity.countDocuments({ isActive: true });
-    const harvestedBatches = await MeatProductivity.countDocuments({ isActive: false });
-
-    // Get animal type distribution
-    const animalDistribution = await HarvestHistory.aggregate([
+    // Get total statistics
+    const totalStats = await HarvestHistory.aggregate([
+      { $match: matchStage },
       {
         $group: {
-          _id: "$animalType",
+          _id: null,
           totalMeat: { $sum: "$totalMeatProduced" },
-          batchCount: { $sum: 1 }
+          totalBatches: { $sum: 1 },
+          avgMeatPerBatch: { $avg: "$totalMeatProduced" }
         }
       }
     ]);
 
+    // Get animal type distribution
+    const animalDistribution = await HarvestHistory.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: "$animalType",
+          totalMeat: { $sum: "$totalMeatProduced" },
+          batchCount: { $sum: 1 },
+          avgMeatPerBatch: { $avg: "$totalMeatProduced" }
+        }
+      },
+      { $sort: { totalMeat: -1 } }
+    ]);
+
     // Get storage locations
     const storageDistribution = await HarvestHistory.aggregate([
-      { $match: { storageLocation: { $exists: true, $ne: "" } } },
+      { 
+        $match: { 
+          ...matchStage,
+          storageLocation: { $exists: true, $ne: "" } 
+        } 
+      },
       {
         $group: {
           _id: "$storageLocation",
           totalMeat: { $sum: "$totalMeatProduced" },
           batchCount: { $sum: 1 }
         }
-      }
+      },
+      { $sort: { totalMeat: -1 } }
     ]);
 
+    // Get active vs harvested counts
+    const activeBatches = await MeatProductivity.countDocuments({ isActive: true });
+    const harvestedBatches = await MeatProductivity.countDocuments({ isActive: false });
+
     res.status(200).json({
+      success: true,
       data: {
+        period,
+        dateRange: {
+          start: queryStartDate,
+          end: queryEndDate
+        },
         productionTrend: productionData,
+        totalStats: totalStats[0] || { totalMeat: 0, totalBatches: 0, avgMeatPerBatch: 0 },
         batchStats: {
           active: activeBatches,
           harvested: harvestedBatches,
@@ -385,8 +530,122 @@ router.get("/analytics/production", async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(400).json({
+    console.error('Production analytics error:', error);
+    res.status(500).json({
+      success: false,
       message: error.message || "Error fetching production analytics",
+    });
+  }
+});
+
+// Get detailed meat counts by time period
+router.get("/analytics/counts", async (req, res) => {
+  try {
+    const { period = "month", animalType, startDate, endDate } = req.query;
+    
+    const now = new Date();
+    let defaultStartDate;
+    
+    switch (period) {
+      case "day":
+        defaultStartDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case "week":
+        defaultStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "month":
+        defaultStartDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case "year":
+        defaultStartDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      default:
+        defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const queryStartDate = startDate ? new Date(startDate) : defaultStartDate;
+    const queryEndDate = endDate ? new Date(endDate) : now;
+
+    let matchStage = {
+      slaughterDate: { $gte: queryStartDate, $lte: queryEndDate }
+    };
+    
+    if (animalType) {
+      matchStage.animalType = animalType;
+    }
+
+    // Get counts by period
+    let groupByFormat;
+    switch (period) {
+      case "day":
+        groupByFormat = "%Y-%m-%d";
+        break;
+      case "week":
+        groupByFormat = "%Y-%U";
+        break;
+      case "month":
+        groupByFormat = "%Y-%m";
+        break;
+      case "year":
+        groupByFormat = "%Y";
+        break;
+      default:
+        groupByFormat = "%Y-%m-%d";
+    }
+
+    const countsData = await HarvestHistory.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: groupByFormat, date: "$slaughterDate" } }
+          },
+          totalMeat: { $sum: "$totalMeatProduced" },
+          batchCount: { $sum: 1 },
+          animalTypes: { $addToSet: "$animalType" }
+        }
+      },
+      { $sort: { "_id.date": 1 } }
+    ]);
+
+    // Get summary statistics
+    const summaryStats = await HarvestHistory.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          totalMeat: { $sum: "$totalMeatProduced" },
+          totalBatches: { $sum: 1 },
+          avgMeatPerBatch: { $avg: "$totalMeatProduced" },
+          minMeat: { $min: "$totalMeatProduced" },
+          maxMeat: { $max: "$totalMeatProduced" }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        period,
+        dateRange: {
+          start: queryStartDate,
+          end: queryEndDate
+        },
+        countsData,
+        summaryStats: summaryStats[0] || {
+          totalMeat: 0,
+          totalBatches: 0,
+          avgMeatPerBatch: 0,
+          minMeat: 0,
+          maxMeat: 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Meat counts analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error fetching meat counts",
     });
   }
 });
@@ -422,6 +681,31 @@ router.get("/dashboard/stats", async (req, res) => {
     
     const totalMeatProduced = totalMeatResult.length > 0 ? totalMeatResult[0].totalMeat : 0;
 
+    // Get meat type counts for active batches
+    const meatTypeCounts = await MeatProductivity.aggregate([
+      { $match: { isActive: true } },
+      {
+        $group: {
+          _id: "$meatType",
+          count: { $sum: 1 },
+          totalQuantity: { $sum: "$quantity" }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Get harvested meat types with total quantities from HarvestHistory
+    const harvestedMeatTypes = await HarvestHistory.aggregate([
+      {
+        $group: {
+          _id: "$meatType",
+          count: { $sum: 1 },
+          totalMeatProduced: { $sum: "$totalMeatProduced" }
+        }
+      },
+      { $sort: { totalMeatProduced: -1 } }
+    ]);
+
     res.status(200).json({
       data: {
         totalBatches,
@@ -430,7 +714,9 @@ router.get("/dashboard/stats", async (req, res) => {
         freshBatches,
         nearExpiryBatches,
         criticalBatches,
-        totalMeatProduced
+        totalMeatProduced,
+        meatTypeCounts,
+        harvestedMeatTypes
       },
     });
   } catch (error) {

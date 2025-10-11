@@ -1,0 +1,124 @@
+# Dependencies
+node_modules/
+BACKEND/node_modules/
+FRONTEND/node_modules/
+BACKEND/PlantManagement/node_modules/
+
+# Build outputs
+FRONTEND/build/
+FRONTEND/dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+BACKEND/coverage/
+FRONTEND/coverage/
+
+# Upload directories (contains user uploaded files)
+BACKEND/uploads/
+BACKEND/HealthManagement/Health_uploads/
+BACKEND/PlantManagement/Uploads/
+
+# Allow animal management images but exclude other file types
+BACKEND/AnimalManagement/uploads/*
+!BACKEND/AnimalManagement/uploads/*.jpg
+!BACKEND/AnimalManagement/uploads/*.jpeg
+!BACKEND/AnimalManagement/uploads/*.png
+!BACKEND/AnimalManagement/uploads/*.gif
+!BACKEND/AnimalManagement/uploads/*.webp
+
+# Employee management uploads - exclude all files except images
+BACKEND/EmployeeManager/uploads/*
+!BACKEND/EmployeeManager/uploads/
+!BACKEND/EmployeeManager/uploads/*.jpg
+!BACKEND/EmployeeManager/uploads/*.jpeg
+!BACKEND/EmployeeManager/uploads/*.png
+!BACKEND/EmployeeManager/uploads/*.gif
+!BACKEND/EmployeeManager/uploads/*.webp
+!BACKEND/EmployeeManager/uploads/*.JPG
+!BACKEND/EmployeeManager/uploads/*.JPEG
+!BACKEND/EmployeeManager/uploads/*.PNG
+!BACKEND/EmployeeManager/uploads/*.GIF
+!BACKEND/EmployeeManager/uploads/*.WEBP
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Debug files
+*.debug
+
+# System Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+
+# Package manager files
+package-lock.json
+yarn.lock
+.pnp
+.pnp.js
+
+# Cache directories
+.cache/
+.parcel-cache/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env.test
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*

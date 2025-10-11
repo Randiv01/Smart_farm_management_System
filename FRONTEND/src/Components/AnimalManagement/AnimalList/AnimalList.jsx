@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext.js";
-import { QRCodeCanvas } from "qrcode.react";
 import {
   Search,
   Filter,
@@ -13,16 +12,21 @@ import {
   RefreshCw,
   AlertCircle,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  QrCode
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { QRCodeCanvas } from 'qrcode.react';
+import QRCode from 'qrcode';
+import { useNotifications } from '../UI/Notification';
 
 export default function AnimalList() {
   const { type } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { addNotification } = useNotifications();
   const darkMode = theme === "dark";
 
   const [animals, setAnimals] = useState([]);
@@ -56,6 +60,7 @@ export default function AnimalList() {
     includeQR: false
   });
 
+
   useEffect(() => {
     document.title = "Animal List";
   }, []);
@@ -67,7 +72,10 @@ export default function AnimalList() {
         const res = await fetch("http://localhost:5000/zones");
         if (res.ok) {
           const data = await res.json();
+          console.log("Zones data:", data); // Debug log
           setZones(data.zones || []);
+        } else {
+          console.error("Failed to fetch zones:", res.status, res.statusText);
         }
       } catch (err) {
         console.error("Failed to fetch zones:", err);
@@ -78,7 +86,11 @@ export default function AnimalList() {
 
   // Helper function to safely get zone information
   const getZoneInfo = (animal) => {
+    try {
     if (!animal) return { name: "Not assigned", id: null };
+      
+      console.log("Getting zone info for animal:", animal); // Debug log
+      console.log("Available zones:", zones); // Debug log
     
     if (animal.assignedZone && typeof animal.assignedZone === 'object') {
       return {
@@ -102,6 +114,10 @@ export default function AnimalList() {
     }
     
     return { name: "Not assigned", id: null };
+    } catch (error) {
+      console.error("Error in getZoneInfo:", error);
+      return { name: "Error", id: null };
+    }
   };
 
   // Fetch data with zone information - UPDATED: Handle batch records properly
@@ -159,28 +175,78 @@ export default function AnimalList() {
     setPopup({
       show: true,
       message: isBatch 
-        ? `Are you sure you want to delete this entire batch? This will delete all ${animalType?.name.toLowerCase()}s in this batch.` 
-        : "Are you sure you want to delete this animal?",
+        ? `Are you sure you want to delete this entire batch? This will delete all ${animalType?.name.toLowerCase()}s in this batch and free up zone space.` 
+        : "Are you sure you want to delete this animal? This will also delete related productivity records.",
       success: false,
       type: "delete",
       confirmAction: async () => {
         try {
+          let res;
           if (isBatch) {
             // Delete batch record (single record representing the batch)
-            const res = await fetch(`http://localhost:5000/animals/${animalId}`, {
+            res = await fetch(`http://localhost:5000/animals/${animalId}`, {
               method: "DELETE",
             });
             if (!res.ok) throw new Error("Failed to delete batch");
           } else {
             // Delete individual animal
-            const res = await fetch(`http://localhost:5000/animals/${animalId}`, {
+            res = await fetch(`http://localhost:5000/animals/${animalId}`, {
               method: "DELETE",
             });
             if (!res.ok) throw new Error("Failed to delete animal");
           }
+          
+          // Parse the response to get deletion details
+          const result = await res.json();
+          console.log("Delete result:", result); // Debug log
+          
+          // Create detailed success message
+          let successMessage = isBatch ? "Batch deleted successfully!" : "Animal deleted successfully!";
+          
+          if (result.details) {
+            const details = result.details;
+            const detailMessages = [];
+            
+            if (details.batchAnimals) {
+              detailMessages.push(`${details.batchAnimals} batch animals`);
+            }
+            if (details.individualAnimals) {
+              detailMessages.push(`${details.individualAnimals} individual animals`);
+            }
+            if (details.animalsDeleted) {
+              detailMessages.push(`${details.animalsDeleted} animals`);
+            }
+            if (details.productivityRecords) {
+              detailMessages.push(`${details.productivityRecords} productivity records`);
+            }
+            if (details.feedingRecords) {
+              detailMessages.push(`${details.feedingRecords} feeding records`);
+            }
+            if (details.harvestRecords) {
+              detailMessages.push(`${details.harvestRecords} harvest records`);
+            }
+            if (details.meatRecords) {
+              detailMessages.push(`${details.meatRecords} meat records`);
+            }
+            if (details.notifications) {
+              detailMessages.push(`${details.notifications} notifications`);
+            }
+            if (details.zoneOccupancyReduced) {
+              detailMessages.push(`freed ${details.zoneOccupancyReduced} zone spaces`);
+            }
+            if (details.affectedZones) {
+              detailMessages.push(`${details.affectedZones} zones updated`);
+            }
+            
+            if (detailMessages.length > 0) {
+              successMessage += ` Deleted: ${detailMessages.join(", ")}.`;
+            }
+          }
+          
           fetchData();
-          showPopup(isBatch ? "Batch deleted successfully!" : "Animal deleted successfully!", true, "save");
+          showPopup(successMessage, true, "save");
         } catch (err) {
+          console.error("Delete error:", err); // Debug log
           showPopup(err.message, false, "error");
         }
       },
@@ -240,6 +306,8 @@ export default function AnimalList() {
     }
   };
 
+
+
   // Get appropriate fields based on management type
   const getDisplayFields = () => {
     if (!animalType) return [];
@@ -271,6 +339,42 @@ export default function AnimalList() {
   const getDisplayCount = (animal) => {
     // FIXED: Always use count field if it exists, otherwise default to 1
     return animal.isBatch ? (animal.count || 1) : 1;
+  };
+
+  // QR Code functions
+  const createQRData = (animal) => {
+    return JSON.stringify({
+      id: animal._id,
+      type: animal.isBatch ? "batch" : "animal",
+      animalId: animal.animalId,
+      name: animal.data?.name || animal.animalId,
+      animalType: animalType?.name || "Unknown"
+    });
+  };
+
+  const handleDownloadQR = async (animal) => {
+    try {
+      const qrData = createQRData(animal);
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, qrData, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      const link = document.createElement('a');
+      link.download = `${animal.isBatch ? 'Batch' : 'Animal'}_${animal.animalId}_QR.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+      
+      addNotification('QR code downloaded successfully!', 'success');
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      addNotification('Failed to generate QR code', 'error');
+    }
   };
 
   // Advanced search & filter logic
@@ -432,7 +536,7 @@ export default function AnimalList() {
     }
   };
 
-  // Export to PDF function - UPDATED for batch records
+  // Export to PDF function - UPDATED for batch records with professional styling
   const exportToPDF = (data) => {
     try {
       const doc = new jsPDF({
@@ -441,14 +545,83 @@ export default function AnimalList() {
         format: 'a4'
       });
 
-      // Add title
+      // Company information
+      const companyName = "Mount Olive Farm House";
+      const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+      const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+      const reportDate = new Date().toLocaleDateString();
+      const reportTime = new Date().toLocaleTimeString();
+      
+      // Professional color scheme
+      const primaryColor = [34, 197, 94]; // Green
+      const secondaryColor = [16, 185, 129]; // Teal
+      const accentColor = [59, 130, 246]; // Blue
+      const textColor = [31, 41, 55]; // Dark gray
+      const lightGray = [243, 244, 246];
+
+      // Add real company logo
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 15, 10, 20, 20);
+          generatePDFContent();
+        };
+        logoImg.onerror = () => {
+          // Fallback to placeholder if logo fails to load
+          doc.setFillColor(...primaryColor);
+          doc.rect(15, 10, 20, 20, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('MOF', 22, 22, { align: 'center' });
+          generatePDFContent();
+        };
+        logoImg.src = '/logo512.png';
+      } catch (error) {
+        console.error('Error loading logo:', error);
+        // Fallback to placeholder
+        doc.setFillColor(...primaryColor);
+        doc.rect(15, 10, 20, 20, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 22, 22, { align: 'center' });
+        generatePDFContent();
+      }
+
+      const generatePDFContent = () => {
+
+      // Company header
+      doc.setTextColor(...textColor);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(companyName, 40, 15);
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(companyAddress, 40, 20);
+      doc.text(companyContact, 40, 24);
+
+      // Report title with professional styling
+      doc.setFillColor(...lightGray);
+      doc.rect(15, 30, 270, 10, 'F');
+      doc.setTextColor(...primaryColor);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${animalType.name} List - ${new Date().toLocaleDateString()}`, 14, 15);
+      doc.text(`${animalType.name.toUpperCase()} INVENTORY REPORT`, 150, 37, { align: 'center' });
+
+      // Report metadata
+      doc.setTextColor(...textColor);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 15, 45);
+      doc.text(`Total Records: ${data.length}`, 15, 49);
+      doc.text(`Report ID: MOF-AL-${Date.now().toString().slice(-6)}`, 15, 53);
 
       // Prepare table data
       const headers = [
-        'ID', 
+        'Animal/Batch ID', 
         'Zone',
         'Count',
         ...displayFields.map(f => f.label)
@@ -457,52 +630,74 @@ export default function AnimalList() {
       const tableData = data.map(animal => [
         getGroupIdentifier(animal),
         getZoneInfo(animal).name,
-        getDisplayCount(animal).toString(), // FIXED: Use getDisplayCount function
+        getDisplayCount(animal).toString(),
         ...displayFields.map(field => animal.data[field.name] || '-')
       ]);
 
-      // Create table
+      // Create professional table
       autoTable(doc, {
         head: [headers],
         body: tableData,
-        startY: 20,
+        startY: 60,
         theme: 'grid',
         headStyles: {
-          fillColor: darkMode ? [55, 65, 81] : [79, 70, 229],
+          fillColor: primaryColor,
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 10
+          fontSize: 10,
+          cellPadding: 4
         },
         bodyStyles: {
           fontSize: 9,
-          textColor: darkMode ? [229, 231, 235] : [0, 0, 0],
-          fillColor: darkMode ? [31, 41, 55] : [255, 255, 255]
+          textColor: textColor,
+          cellPadding: 3
         },
         alternateRowStyles: {
-          fillColor: darkMode ? [40, 50, 65] : [240, 240, 240]
+          fillColor: [249, 250, 251]
         },
-        margin: { top: 20 },
+        margin: { left: 15, right: 15 },
         styles: {
-          cellPadding: 2,
+          lineColor: [209, 213, 219],
+          lineWidth: 0.5,
           halign: 'left',
           valign: 'middle',
           overflow: 'linebreak'
         }
       });
 
-      // Add page numbers
+      // Professional footer
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 195, 297, 15, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
         doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10, { align: 'right' });
+        doc.text(`Page ${i} of ${pageCount}`, 15, 202);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 148, 202, { align: 'center' });
+        doc.text(companyName, 282, 202, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(15, 204, 282, 204);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 148, 208, { align: 'center' });
       }
 
-      // Save PDF
-      doc.save(`${animalType.name}_List_${new Date().toISOString().split('T')[0]}.pdf`);
-      
-      showPopup("PDF downloaded successfully!", true, "save");
+        // Save PDF with professional naming
+        const fileName = `MOF_${animalType.name}_Inventory_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        
+        showPopup("PDF downloaded successfully!", true, "save");
+      };
     } catch (error) {
       console.error("Error exporting to PDF:", error);
       showPopup("Failed to export PDF", false, "error");
@@ -842,47 +1037,33 @@ export default function AnimalList() {
                 >
                   {/* QR Code + Animal/Batch ID */}
                   <td className="p-3">
-                    <div className="flex flex-col items-center justify-center">
-                      {animal.isBatch ? (
+                    <div className="flex flex-col items-center justify-center gap-2">
                         <div className="text-center">
-                          <QRCodeCanvas 
-                            value={animal.batchId || animal.animalId} 
-                            size={60} 
-                            level="H" 
-                            className="mx-auto"
-                          />
-                          <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {animal.isBatch ? (
                             <strong>Batch: {animal.animalId}</strong>
+                          ) : (
+                            <strong>{animal.data?.name || animal.animalId}</strong>
+                          )}
                           </div>
-                        </div>
-                      ) : animalType.managementType !== "individual" ? (
-                        <div className="text-center">
+                        <div className="flex justify-center">
                           <QRCodeCanvas 
-                            value={getGroupIdentifier(animal)} 
-                            size={60} 
-                            level="H" 
-                            className="mx-auto"
+                            value={createQRData(animal)}
+                            size={80}
+                            level="M"
+                            includeMargin={true}
+                            className="border border-gray-200 dark:border-gray-600 rounded"
                           />
-                          <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                            {animalType.managementType === "batch" ? "Batch: " : "ID: "}
-                            {getGroupIdentifier(animal)}
                           </div>
                         </div>
-                      ) : animal.qrCode ? (
-                        <div className="text-center">
-                          <QRCodeCanvas 
-                            value={animal.qrCode} 
-                            size={60} 
-                            level="H" 
-                            className="mx-auto"
-                          />
-                          <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                            {animal.animalId}
-                          </div>
-                        </div>
-                      ) : (
-                        "-"
-                      )}
+                      <button
+                        onClick={() => handleDownloadQR(animal)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-btn-teal text-white rounded hover:bg-teal-700 transition-colors"
+                        title="Download QR Code"
+                      >
+                        <QrCode size={12} />
+                        QR
+                      </button>
                     </div>
                   </td>
 
@@ -979,10 +1160,20 @@ export default function AnimalList() {
                           </button>
                           <button
                             onClick={() => {
+                              if (zones.length === 0) {
+                                showPopup("No zones available. Please create zones first.", false, "error");
+                                return;
+                              }
                               setAnimalToMove(animal);
                               setMoveZoneId("");
                             }}
-                            className="px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"
+                            className={`px-2 py-1 rounded ${
+                              zones.length === 0 
+                                ? "bg-gray-400 text-gray-200 cursor-not-allowed" 
+                                : "bg-purple-600 text-white hover:bg-purple-700"
+                            }`}
+                            disabled={zones.length === 0}
+                            title={zones.length === 0 ? "No zones available" : "Move to another zone"}
                           >
                             🏠 Move
                           </button>
@@ -1015,22 +1206,36 @@ export default function AnimalList() {
                 ? (animalType.managementType === "batch" ? "Batch" : "Hive/Farm") 
                 : animalToMove.data?.name} to another zone
             </h3>
+            {zones.length === 0 && (
+              <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg">
+                <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                  No zones available. Please create zones first.
+                </p>
+              </div>
+            )}
             <select
               value={moveZoneId}
               onChange={(e) => setMoveZoneId(e.target.value)}
               className="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Select a zone</option>
-              {zones.map(zone => (
+              {zones.length === 0 ? (
+                <option value="" disabled>No zones available</option>
+              ) : (
+                zones.map(zone => {
+                  console.log("Zone in dropdown:", zone); // Debug log
+                  return (
                 <option 
                   key={zone._id} 
                   value={zone._id}
                   disabled={zone.currentOccupancy >= zone.capacity && zone._id !== getZoneInfo(animalToMove).id}
                 >
-                  {zone.name} ({zone.currentOccupancy}/{zone.capacity})
+                      {zone.name || zone.zoneName} ({zone.currentOccupancy || 0}/{zone.capacity || 0})
                   {zone.currentOccupancy >= zone.capacity && zone._id !== getZoneInfo(animalToMove).id && " - FULL"}
                 </option>
-              ))}
+                  );
+                })
+              )}
             </select>
             <div className="flex justify-end gap-2">
               <button
@@ -1046,6 +1251,8 @@ export default function AnimalList() {
                     return;
                   }
                   
+                  console.log("Moving animal:", animalToMove._id, "to zone:", moveZoneId); // Debug log
+                  
                   try {
                     // FIXED: Use single endpoint for both individual and batch animals
                     const res = await fetch(`http://localhost:5000/animals/${animalToMove._id}/move-zone`, {
@@ -1056,17 +1263,27 @@ export default function AnimalList() {
                     
                     if (!res.ok) {
                       const errorData = await res.json();
+                      console.error("Move zone error:", errorData); // Debug log
                       throw new Error(errorData.message || "Failed to move animal");
                     }
+                    
+                    const result = await res.json();
+                    console.log("Move zone success:", result); // Debug log
                     
                     showPopup(animalToMove.isBatch ? "Batch moved successfully!" : "Animal moved successfully!");
                     setAnimalToMove(null);
                     fetchData();
                   } catch (err) {
+                    console.error("Move zone error:", err); // Debug log
                     showPopup(err.message, false, "error");
                   }
                 }}
-                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+                disabled={zones.length === 0}
+                className={`px-4 py-2 rounded ${
+                  zones.length === 0 
+                    ? "bg-gray-400 text-gray-200 cursor-not-allowed" 
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
               >
                 Move
               </button>
@@ -1217,6 +1434,7 @@ export default function AnimalList() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -81,7 +81,9 @@ app.use("/animal-uploads", express.static(animalUploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/Health_Uploads", express.static(healthUploadsDir));
 app.use("/plant-uploads", express.static(plantUploadsDir));
+app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
 
+// ----------------------- Batch Expiry Notification Function -----------------------
 const checkExpiryNotifications = async () => {
   try {
     const now = new Date();
@@ -105,7 +107,7 @@ const checkExpiryNotifications = async () => {
   }
 };
 
-// NEW: Set up interval for expiry checks (every 12 hours)
+// Set up interval for expiry checks (every 12 hours)
 setInterval(checkExpiryNotifications, 12 * 60 * 60 * 1000);
 
 // ----------------------- Multer setup -----------------------
@@ -135,16 +137,22 @@ import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import chatbotRoutes from "./AnimalManagement/routes/chatbotRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
+import feedingRoutes from "./AnimalManagement/routes/feedingRoutes.js";
+import automatedFeedingRoutes from "./AnimalManagement/routes/automatedFeedingRoutes.js";
 import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js"; // ⚠️ Renamed to avoid conflict
 import {
   sendMedicalRequest,
   testEmail,
 } from "./AnimalManagement/controllers/medicalRequestController.js";
 import animalProductivityRouter from "./AnimalManagement/routes/animalProductivityRoutes.js";
+import { productivityNotificationRouter } from "./AnimalManagement/routes/productivityNotificationRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
+import notificationRoutes from "./AnimalManagement/routes/notificationRoutes.js";
 import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
-import HarvestHistory from ".//AnimalManagement/models/HarvestHistory.js";
+import HarvestHistory from "./AnimalManagement/models/HarvestHistory.js";
+import NotificationService from "./AnimalManagement/services/notificationService.js";
+import automatedFeedingService from "./AnimalManagement/services/automatedFeedingService.js";
 
 // Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
@@ -180,11 +188,11 @@ import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
 import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
+import salaryRoutes from "./EmployeeManager/E-route/salaryRoutes.js";
+import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
 
 // ESP32 Proxy Routes
 import esp32Routes from "./routes/esp32Routes.js";
-
-app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
 
 // ----------------------- Debug env variables -----------------------
 console.log(
@@ -203,13 +211,17 @@ app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
+app.use("/api/feeding", feedingRoutes);
+app.use("/api/automated-feeding", automatedFeedingRoutes);
 app.use("/api/users", userRoutes);
 // IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
 app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
 app.use("/animal-productivity", animalProductivityRouter);
+app.use("/api/notifications", productivityNotificationRouter);
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 app.use("/api/meats", meatRoutes);
+app.use("/api/animal-management/notifications", notificationRoutes);
 
 // Health Management
 app.use("/api/doctors", doctorRoutes); // ✅ Only HealthManagement doctors here
@@ -245,6 +257,8 @@ app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
+app.use("/api/salary", salaryRoutes);
+app.use("/api/employee-reports", reportRoutes);
 
 // ESP32 Proxy Routes - These proxy requests to your ESP32 device
 app.use("/", esp32Routes);
@@ -340,9 +354,31 @@ const connectDB = async () => {
 // ----------------------- Start Server -----------------------
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () =>
-    console.log(`🚀 Server running on port ${PORT}`)
-  );
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    
+    // Start notification service
+    console.log('🔔 Starting notification service...');
+    
+    // Run initial notification check
+    NotificationService.runAllChecks();
+    
+    // Schedule notification checks every 5 minutes
+    setInterval(() => {
+      NotificationService.runAllChecks();
+    }, 5 * 60 * 1000);
+    
+    // Clean up expired notifications every hour
+    setInterval(() => {
+      NotificationService.cleanupExpiredNotifications();
+    }, 60 * 60 * 1000);
+    
+    console.log('✅ Notification service started');
+    
+    // Start automated feeding service
+    automatedFeedingService.start();
+    console.log('🤖 Automated feeding service started');
+  });
 });
 
 export default app;
