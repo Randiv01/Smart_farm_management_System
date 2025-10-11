@@ -104,14 +104,13 @@ export const getEmployeeReport = async (req, res) => {
       onLeave: attendanceData.filter(a => a.status === 'On Leave').length
     };
     
-    // Get overtime data for current month
+    // Get overtime data for current month (include all statuses for comprehensive view)
     const overtimeData = await Overtime.find({
       employee: employee._id,
       date: {
         $gte: currentMonth,
         $lt: nextMonth
-      },
-      status: 'Approved'
+      }
     });
     
     const totalOvertimeHours = overtimeData.reduce((total, ot) => {
@@ -132,8 +131,7 @@ export const getEmployeeReport = async (req, res) => {
       date: {
         $gte: lastMonthStart,
         $lt: currentMonth
-      },
-      status: 'Approved'
+      }
     });
     
     const lastMonthOvertimeHours = lastMonthOvertime.reduce((total, ot) => {
