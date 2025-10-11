@@ -6,7 +6,10 @@ class AutomatedFeedingService {
   constructor() {
     this.isRunning = false;
     this.checkInterval = null;
-    this.checkIntervalMs = 3000; // Check every 3 seconds for immediate response
+    this.overdueInterval = null;
+    this.checkIntervalMs = 500; // Check every 500ms for more responsive execution
+    this.executedFeedings = new Set(); // Track recently executed feedings to prevent duplicates
+    this.esp32Ip = process.env.ESP32_IP || "192.168.1.8"; // Default IP
   }
 
   // Start the automated feeding service
@@ -21,13 +24,20 @@ class AutomatedFeedingService {
     
     // Check immediately on start
     this.checkScheduledFeedings();
+    this.handleOverdueFeedings();
     
     // Set up interval checking
     this.checkInterval = setInterval(() => {
       this.checkScheduledFeedings();
     }, this.checkIntervalMs);
+    
+    // Set up overdue feeding check (every 5 minutes)
+    this.overdueInterval = setInterval(() => {
+      this.handleOverdueFeedings();
+    }, 300000); // 5 minutes
 
-    console.log(`✅ Automated feeding service started (checking every ${this.checkIntervalMs / 1000} seconds)`);
+    console.log(`✅ Automated feeding service started (checking every ${this.checkIntervalMs}ms)`);
+    console.log(`🔄 Real-time feeding scheduler is now active - will trigger feeding immediately when countdown reaches 0`);
   }
 
   // Stop the automated feeding service
@@ -44,6 +54,11 @@ class AutomatedFeedingService {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
+    
+    if (this.overdueInterval) {
+      clearInterval(this.overdueInterval);
+      this.overdueInterval = null;
+    }
 
     console.log("✅ Automated feeding service stopped");
   }
@@ -54,32 +69,49 @@ class AutomatedFeedingService {
       const now = new Date();
       const currentTime = now.getTime();
       
-      console.log(`🔍 Checking for scheduled feedings at ${now.toLocaleString()}`);
+      console.log(`🕐 Checking for due feedings at ${now.toLocaleString()}`);
       
-      // Find all scheduled feedings that are due (within the next 5 seconds)
+      // Find all scheduled feedings that are due (exactly at or past the scheduled time)
       const dueFeedings = await FeedingHistory.find({
         feedingTime: {
-          $lte: new Date(currentTime + 5000), // Due within next 5 seconds
-          $gte: new Date(currentTime - 300000) // But not more than 5 minutes ago
+          $lte: new Date(currentTime), // Due at or before current time
+          $gte: new Date(currentTime - 300000) // But not more than 5 minutes ago (extended window to catch missed feedings)
         },
-        immediate: false,
-        status: { $in: ["scheduled", null] } // Not completed, failed, or cancelled
+        status: { $in: ["scheduled", null] } // Not completed, failed, or cancelled (removed immediate filter to handle both types)
       })
       .populate("zoneId", "name type")
       .populate("foodId", "name remaining unit")
       .sort({ feedingTime: 1 });
 
-      console.log(`📋 Found ${dueFeedings.length} scheduled feeding(s) to check`);
-      
       if (dueFeedings.length > 0) {
-        console.log(`🕐 Found ${dueFeedings.length} scheduled feeding(s) due for execution`);
+        console.log(`🕐 Found ${dueFeedings.length} scheduled feeding(s) due for execution at ${now.toLocaleString()}`);
         
         for (const feeding of dueFeedings) {
+          // Create unique key to prevent duplicate execution
+          const feedingKey = `${feeding._id}_${feeding.feedingTime.getTime()}`;
+          
+          console.log(`📋 Checking feeding: ${feeding._id}, Scheduled: ${feeding.feedingTime.toLocaleString()}, Status: ${feeding.status}`);
+          
+          // Skip if already executed recently (within 30 seconds)
+          if (this.executedFeedings.has(feedingKey)) {
+            console.log(`⏭️ Skipping already executed feeding: ${feedingKey}`);
+            continue;
+          }
+          
           console.log(`🍽️ Processing feeding: Zone ${feeding.zoneId?.name}, Feed ${feeding.foodId?.name}, Time ${feeding.feedingTime.toLocaleString()}`);
+          
+          // Mark as being executed
+          this.executedFeedings.add(feedingKey);
+          
+          // Remove from executed set after 30 seconds to allow retries
+          setTimeout(() => {
+            this.executedFeedings.delete(feedingKey);
+          }, 30000);
+          
           await this.executeScheduledFeeding(feeding);
         }
       } else {
-        console.log(`✅ No scheduled feedings due at this time`);
+        console.log(`✅ No feedings due at ${now.toLocaleString()}`);
       }
     } catch (error) {
       console.error("❌ Error checking scheduled feedings:", error);
@@ -120,13 +152,17 @@ class AutomatedFeedingService {
         return;
       }
 
-      // Get ESP32 IP from environment or configuration
-      const esp32Ip = process.env.ESP32_IP || "192.168.1.8"; // Default IP
+      // Use configured ESP32 IP
+      const esp32Ip = this.esp32Ip;
+      
+      console.log(`🔗 Attempting to connect to ESP32 at IP: ${esp32Ip}`);
       
       // Check network connectivity first
       const networkStatus = await this.checkNetworkConnectivity(esp32Ip);
+      console.log(`📡 Network status: ${networkStatus}`);
       
       // Send feeding command to ESP32
+      console.log(`📤 Sending feeding command: ${feeding.quantity}g to ${esp32Ip}`);
       const feedingResult = await this.sendFeedingCommandToESP32(esp32Ip, feeding.quantity);
       
       if (feedingResult.success) {
@@ -150,6 +186,10 @@ class AutomatedFeedingService {
         this.sendFeedingNotification(feeding, "completed");
         
       } else {
+        console.log(`❌ Feeding command failed: ${feedingResult.error}`);
+        console.log(`🔍 Device status: ${feedingResult.deviceStatus}`);
+        console.log(`🔍 Network status: ${networkStatus}`);
+        
         // Check if we should retry
         const shouldRetry = attemptCount < (feeding.maxRetries || 3);
         
@@ -207,6 +247,18 @@ class AutomatedFeedingService {
   // Send feeding command to ESP32
   async sendFeedingCommandToESP32(esp32Ip, quantity) {
     try {
+      // Check if we're in test mode (ESP32 IP is set to 'test' or 'mock')
+      if (esp32Ip === 'test' || esp32Ip === 'mock') {
+        console.log(`🧪 Test mode: Simulating feeding of ${quantity}g`);
+        // Simulate feeding delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return {
+          success: true,
+          response: `Test feeding completed: ${quantity}g dispensed`,
+          deviceStatus: "Test Mode"
+        };
+      }
+
       const response = await fetch(`http://${esp32Ip}/feed`, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
@@ -305,6 +357,80 @@ class AutomatedFeedingService {
       console.error("Error getting next scheduled feeding:", error);
       return null;
     }
+  }
+
+  // Manual trigger for testing - execute all due feedings immediately
+  async triggerDueFeedings() {
+    console.log("🔧 Manual trigger: Checking for due feedings...");
+    await this.checkScheduledFeedings();
+  }
+
+  // Handle overdue feedings (feedings that should have been executed but weren't)
+  async handleOverdueFeedings() {
+    try {
+      const now = new Date();
+      const currentTime = now.getTime();
+      
+      console.log(`🔍 Checking for overdue feedings at ${now.toLocaleString()}`);
+      
+      // Find feedings that are overdue (more than 5 minutes past their scheduled time)
+      const overdueFeedings = await FeedingHistory.find({
+        feedingTime: {
+          $lt: new Date(currentTime - 300000) // More than 5 minutes ago
+        },
+        status: { $in: ["scheduled", null] }
+      })
+      .populate("zoneId", "name type")
+      .populate("foodId", "name remaining unit")
+      .sort({ feedingTime: 1 });
+
+      if (overdueFeedings.length > 0) {
+        console.log(`⚠️ Found ${overdueFeedings.length} overdue feeding(s):`);
+        
+        for (const feeding of overdueFeedings) {
+          console.log(`  - ${feeding.feedingTime.toLocaleString()}: Zone ${feeding.zoneId?.name}, Feed ${feeding.foodId?.name}`);
+          
+          // Update status to indicate it was missed
+          feeding.status = "failed";
+          feeding.failureReason = "Missed scheduled time - feeding was overdue";
+          feeding.lastAttemptAt = new Date();
+          await feeding.save();
+        }
+      } else {
+        console.log(`✅ No overdue feedings found`);
+      }
+    } catch (error) {
+      console.error("❌ Error handling overdue feedings:", error);
+    }
+  }
+
+  // Force execute a specific feeding (for testing)
+  async forceExecuteFeeding(feedingId) {
+    try {
+      const feeding = await FeedingHistory.findById(feedingId)
+        .populate("zoneId", "name type")
+        .populate("foodId", "name remaining unit");
+
+      if (feeding) {
+        console.log(`🔧 Force executing feeding: ${feedingId}`);
+        await this.executeScheduledFeeding(feeding);
+      } else {
+        console.log(`❌ Feeding not found: ${feedingId}`);
+      }
+    } catch (error) {
+      console.error("Error force executing feeding:", error);
+    }
+  }
+
+  // Set ESP32 IP address
+  setEsp32Ip(ip) {
+    this.esp32Ip = ip;
+    console.log(`🔧 ESP32 IP updated to: ${ip}`);
+  }
+
+  // Get ESP32 IP address
+  getEsp32Ip() {
+    return this.esp32Ip;
   }
 }
 

@@ -188,6 +188,7 @@ import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 import salaryRoutes from "./EmployeeManager/E-route/salaryRoutes.js";
+import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
 
 // ----------------------- Debug env variables -----------------------
 console.log(
@@ -252,6 +253,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 app.use("/api/salary", salaryRoutes);
+app.use("/api/employee-reports", reportRoutes);
 
 // Customer Profile Image Upload (fallback route)
 app.use(

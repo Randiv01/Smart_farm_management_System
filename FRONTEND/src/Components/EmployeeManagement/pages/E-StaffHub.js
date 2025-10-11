@@ -69,6 +69,12 @@ const ageFromISO = (iso) => {
 export const StaffHub = () => {
   const { theme } = useETheme();
   const darkMode = theme === 'dark';
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Staff Hub - Employee Manager";
+  }, []);
+
   const [activeTab, setActiveTab] = useState("employees");
   const [showForm, setShowForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,6 +94,12 @@ export const StaffHub = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [emailModal, setEmailModal] = useState(null);
+  const [emailData, setEmailData] = useState({
+    subject: "",
+    message: "",
+    fromEmail: "sarah.emp@mountolive.com" // Employee manager's email
+  });
 
   const formDataTemplate = {
     // common
@@ -99,15 +111,17 @@ export const StaffHub = () => {
     joined: "",
     photoFile: null,
     cvFile: null,
-    // med
     email: "",
+    department: "",
+    address: "",
+    status: "Active",
+    // med
     licenseNumber: "",
     specializations: "",
     qualifications: "",
     yearsOfExperience: "",
     dateOfBirth: "",
     gender: "Male",
-    address: "",
     password: "",
   };
 
@@ -308,7 +322,7 @@ export const StaffHub = () => {
 
     // Check if form has required data
     console.log("Current form data:", formData);
-    if (!formData.name || !formData.contact || !formData.title || !formData.joined) {
+    if (!formData.name || !formData.contact || !formData.title || !formData.joined || !formData.email || !formData.department || !formData.address) {
       alert("Please fill in all required fields");
       return;
     }
@@ -626,6 +640,10 @@ export const StaffHub = () => {
         title: item.title,
         type: item.type,
         joined: item.joined,
+        email: item.email || "",
+        department: item.department || "",
+        address: item.address || "",
+        status: item.status || "Active",
       });
     } else if (type === "doctor") {
       setFormData({
@@ -663,9 +681,54 @@ export const StaffHub = () => {
     setShowForm(true);
   };
 
+  /* ---------- email ---------- */
+  const handleEmailChange = (e) => {
+    const { name, value } = e.target;
+    setEmailData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailData.subject.trim() || !emailData.message.trim()) {
+      alert("Please fill in both subject and message");
+      return;
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, form: true }));
+      
+      // For now, we'll use mailto: to open the default email client
+      // In a real implementation, you would send this to your backend
+      
+      // Format employee email as employeename@mountolive.com
+      const employeeName = emailModal.employee.name.toLowerCase().replace(/\s+/g, '');
+      const employeeEmail = `${employeeName}@mountolive.com`;
+      
+      const mailtoLink = `mailto:${employeeEmail}?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.message)}`;
+      window.open(mailtoLink);
+      
+      setSuccessMessage(`Email opened for ${emailModal.employee.name}`);
+      setEmailModal(null);
+      setEmailData({
+        subject: "",
+        message: "",
+        fromEmail: "sarah.emp@mountolive.com"
+      });
+      
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error) {
+      console.error("Error sending email:", error);
+      alert("Error sending email. Please try again.");
+    } finally {
+      setLoading(prev => ({ ...prev, form: false }));
+    }
+  };
+
   /* ---------- export ---------- */
   const handleDownloadPDF = (type) => {
-    const doc = new jsPDF('p', 'mm', 'a4');
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for better table visibility
     
     // Company information
     const companyName = "Mount Olive Farm House";
@@ -790,18 +853,22 @@ export const StaffHub = () => {
       ]);
     } else {
       reportTitle = "EMPLOYEE STAFF REPORT";
-      headers = ["Emp ID", "Name", "Contact No", "Job Title", "Type", "Joined"];
+      headers = ["Emp ID", "Name", "Contact No", "Email", "Job Title", "Department", "Type", "Status", "Joined", "Address"];
       body = employees.map((e) => [
         e.id,
         e.name,
         e.contact,
+        e.email || "—",
         e.title,
+        e.department || "—",
         e.type,
+        e.status || "Active",
         e.joined,
+        e.address || "—",
       ]);
     }
 
-    doc.text(reportTitle, 105, 49, { align: 'center' });
+    doc.text(reportTitle, 148, 49, { align: 'center' }); // Centered for landscape
 
     // Report metadata
     doc.setTextColor(...textColor);
@@ -816,29 +883,46 @@ export const StaffHub = () => {
       head: [headers],
       body: body,
       startY: 80,
-      theme: 'grid',
+      theme: 'striped',
       headStyles: {
-        fillColor: primaryColor,
+        fillColor: [34, 197, 94], // Green color
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 10,
-        cellPadding: 4
+        fontSize: 9,
+        cellPadding: 6,
+        halign: 'center'
       },
       bodyStyles: {
-        fontSize: 9,
+        fontSize: 8,
         textColor: textColor,
-        cellPadding: 3
+        cellPadding: 4,
+        halign: 'left',
+        valign: 'middle'
       },
       alternateRowStyles: {
-        fillColor: [249, 250, 251]
+        fillColor: [248, 250, 252]
       },
       margin: { left: 20, right: 20 },
       styles: {
-        lineColor: [209, 213, 219],
-        lineWidth: 0.5,
+        lineColor: [226, 232, 240],
+        lineWidth: 0.3,
         halign: 'left',
         valign: 'middle',
-        overflow: 'linebreak'
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { cellWidth: 15 }, // No
+        1: { cellWidth: 25 }, // Emp ID
+        2: { cellWidth: 30 }, // Name
+        3: { cellWidth: 32 }, // Contact
+        4: { cellWidth: 40 }, // Email
+        5: { cellWidth: 35 }, // Job Title
+        6: { cellWidth: 32 }, // Department
+        7: { cellWidth: 22 }, // Type
+        8: { cellWidth: 22 }, // Status
+        9: { cellWidth: 25 }, // Joined
+        10: { cellWidth: 45 } // Address
       }
     });
 
@@ -849,24 +933,24 @@ export const StaffHub = () => {
       
       // Footer background
       doc.setFillColor(...lightGray);
-      doc.rect(0, 280, 210, 20, 'F');
+      doc.rect(0, 200, 297, 15, 'F'); // Landscape dimensions
       
       // Footer content
       doc.setTextColor(...textColor);
       doc.setFontSize(8);
-      doc.text(`Page ${i} of ${pageCount}`, 20, 288);
-      doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 288, { align: 'center' });
-      doc.text(companyName, 190, 288, { align: 'right' });
+      doc.text(`Page ${i} of ${pageCount}`, 20, 208);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, 148, 208, { align: 'center' });
+      doc.text(companyName, 277, 208, { align: 'right' });
       
       // Footer line
       doc.setDrawColor(...primaryColor);
       doc.setLineWidth(0.5);
-      doc.line(20, 290, 190, 290);
+      doc.line(20, 198, 277, 198);
       
       // Disclaimer
       doc.setTextColor(100, 100, 100);
       doc.setFontSize(7);
-      doc.text("This report is generated by Mount Olive Farm House Management System", 105, 295, { align: 'center' });
+      doc.text("This report is generated by Mount Olive Farm House Management System", 148, 215, { align: 'center' });
     }
 
       // Save PDF with professional naming
@@ -918,34 +1002,37 @@ export const StaffHub = () => {
 
   /* ---------- tables ---------- */
   const renderEmployeeTable = () => (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto shadow-lg rounded-lg">
       <div
-        className={`rounded-lg overflow-hidden shadow ${
-          darkMode ? "bg-gray-800" : "bg-gray-50"
+        className={`${
+          darkMode ? "bg-gray-800" : "bg-white"
         }`}
       >
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-full">
           <thead
-            className={`${darkMode ? "bg-gray-800 text-white" : "bg-gray-100"}`}
+            className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-50"}`}
           >
             <tr>
-              <th className="px-4 py-3 text-left">No</th>
-              <th className="px-4 py-3 text-left">Emp ID</th>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-left">Contact No</th>
-              <th className="px-4 py-3 text-left">Job Title</th>
-              <th className="px-4 py-3 text-left">Type</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Joined</th>
-              <th className="px-4 py-3 text-left">Photo</th>
-              <th className="px-4 py-3 text-left">CV</th>
-              <th className="px-4 py-3 text-left">Actions</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">No</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Emp ID</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Name</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Contact</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Email</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Job Title</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Department</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Joined</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Address</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Photo</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">CV</th>
+              <th className="px-3 py-4 text-left font-semibold text-xs uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading.employees ? (
               <tr>
-                <td colSpan="10" className="px-6 py-8 text-center">
+                <td colSpan="14" className="px-6 py-8 text-center">
                   <div className="flex justify-center items-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
                     Loading employees...
@@ -955,7 +1042,7 @@ export const StaffHub = () => {
             ) : filteredEmployees.length === 0 ? (
               <tr>
                 <td
-                  colSpan="10"
+                  colSpan="14"
                   className={`px-6 py-8 text-center ${
                     darkMode ? "text-gray-400" : "text-gray-500"
                   }`}
@@ -969,18 +1056,36 @@ export const StaffHub = () => {
               filteredEmployees.map((employee, index) => (
                 <tr
                   key={employee.id}
-                  className={`transition ${
-                    darkMode ? "hover:bg-gray-600 text-white" : "hover:bg-gray-100"
+                  className={`border-b transition duration-200 ${
+                    darkMode 
+                      ? "border-gray-700 hover:bg-gray-700 text-white" 
+                      : "border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <td className="px-4 py-3 font-medium">{index + 1}</td>
-                  <td className="px-4 py-3 font-medium">{employee.id}</td>
-                  <td className="px-4 py-3">{employee.name}</td>
-                  <td className="px-4 py-3">{employee.contact}</td>
-                  <td className="px-4 py-3">{employee.title}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {index + 1}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
+                    {employee.id}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {employee.name}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.contact}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.email || "—"}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    {employee.title}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.department || "—"}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs ${
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         employee.type === "Full-time"
                           ? "bg-green-100 text-green-800"
                           : employee.type === "Part-time"
@@ -991,74 +1096,87 @@ export const StaffHub = () => {
                       {employee.type}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs ${
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         employee.status === "Active"
                           ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          : employee.status === "Inactive"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-orange-100 text-orange-800"
                       }`}
                     >
-                      {employee.status}
+                      {employee.status || "Active"}
                     </span>
                   </td>
-                  <td className="px-4 py-3">{employee.joined}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {employee.joined}
+                  </td>
+                  <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                    <div className="truncate" title={employee.address}>
+                      {employee.address || "—"}
+                    </div>
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap">
                     {employee.photo ? (
                       <img
                         src={`http://localhost:5000${employee.photo}`}
                         alt="Employee"
-                        className="h-10 w-10 rounded-full object-cover cursor-pointer"
+                        className="h-12 w-12 rounded-full object-cover cursor-pointer border-2 border-gray-200 hover:border-blue-500 transition-colors"
                         onClick={() => setSelectedPhoto(`http://localhost:5000${employee.photo}`)}
                       />
                     ) : (
-                      "—"
+                      <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                        <User size={20} className="text-gray-400" />
+                      </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-4 whitespace-nowrap">
                     {employee.cv ? (
                       <a
                         href={`http://localhost:5000${employee.cv}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center text-blue-500 hover:underline"
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
                       >
-                        <FileText size={14} className="mr-1" /> View
+                        <FileText size={12} className="mr-1" />
+                        View
                       </a>
                     ) : (
-                      "—"
+                      <span className="text-gray-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                  <td className="px-3 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => setQrItem({ ...employee, type: "employee" })}
-                        className={`p-1.5 rounded transition ${
-                          darkMode ? 'hover:bg-gray-500' : 'hover:bg-gray-200'
-                        }`}
+                        className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
                         title="Generate QR Code"
                       >
-                        <QrCode size={16} className="text-purple-500" />
+                        <QrCode size={16} />
                       </button>
                       <a
                         href={`http://localhost:5000/api/employees/${employee.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex items-center text-green-500 hover:underline p-1.5 rounded transition ${
-                          darkMode ? 'hover:bg-gray-500' : 'hover:bg-gray-200'
-                        }`}
+                        className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
                         title="Generate PDF Report"
                       >
-                        <FileText size={14} className="mr-1" /> PDF
+                        <FileText size={16} />
                       </a>
                       <button
+                        onClick={() => setEmailModal({ employee: employee })}
+                        className="p-2 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Send Email"
+                      >
+                        <Mail size={16} />
+                      </button>
+                      <button
                         onClick={() => handleEdit(employee, "employee")}
-                        className={`p-1.5 rounded transition ${
-                          darkMode ? 'hover:bg-gray-500' : 'hover:bg-gray-200'
-                        }`}
+                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit Employee"
                       >
-                        <Edit size={16} className="text-blue-500" />
+                        <Edit size={16} />
                       </button>
                       <button
                         onClick={() =>
@@ -1068,12 +1186,10 @@ export const StaffHub = () => {
                             name: employee.name,
                           })
                         }
-                        className={`p-1.5 rounded transition ${
-                          darkMode ? 'hover:bg-gray-500' : 'hover:bg-gray-200'
-                        }`}
+                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete Employee"
                       >
-                        <Trash2 size={16} className="text-red-500" />
+                        <Trash2 size={16} />
                       </button>
                       {/* Removed Activate/Deactivate toggle button as requested */}
                     </div>
@@ -1915,6 +2031,139 @@ export const StaffHub = () => {
         </div>
       )}
 
+      {/* Email Modal */}
+      {emailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-2xl rounded-lg shadow-xl ${
+            darkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`px-6 py-4 border-b ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h3 className={`text-lg font-semibold ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Send Email to {emailModal.employee.name}
+                </h3>
+                <button
+                  onClick={() => setEmailModal(null)}
+                  className={`p-2 rounded-full transition ${
+                    darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  From (Employee Manager)
+                </label>
+                <input
+                  type="email"
+                  value={emailData.fromEmail}
+                  disabled
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 border-gray-600'
+                      : 'bg-gray-100 text-gray-500 border-gray-300'
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  To
+                </label>
+                <input
+                  type="email"
+                  value={`${emailModal.employee.name.toLowerCase().replace(/\s+/g, '')}@mountolive.com`}
+                  disabled
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 border-gray-600'
+                      : 'bg-gray-100 text-gray-500 border-gray-300'
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="subject"
+                  value={emailData.subject}
+                  onChange={handleEmailChange}
+                  placeholder="Enter email subject"
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-800 text-white border-gray-600 placeholder-gray-400'
+                      : 'border-gray-300 placeholder-gray-500'
+                  }`}
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Message <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  name="message"
+                  value={emailData.message}
+                  onChange={handleEmailChange}
+                  rows={6}
+                  placeholder="Enter your message here..."
+                  className={`w-full px-3 py-2 rounded-md text-sm border ${
+                    darkMode
+                      ? 'bg-gray-800 text-white border-gray-600 placeholder-gray-400'
+                      : 'border-gray-300 placeholder-gray-500'
+                  }`}
+                />
+              </div>
+            </div>
+            
+            <div className={`px-6 py-4 border-t flex justify-end space-x-3 ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <button
+                onClick={() => setEmailModal(null)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  darkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendEmail}
+                disabled={loading.form}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  loading.form
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {loading.form ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -2308,6 +2557,102 @@ export const StaffHub = () => {
                       </select>
                       {errors.type && (
                         <p className="text-red-500 text-xs mt-1">{errors.type}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="employeename@mountolive.com"
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.email ? "border-red-500" : ""}`}
+                      />
+                      {errors.email && (
+                        <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Department <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="department"
+                        value={formData.department}
+                        onChange={handleChange}
+                        required
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600"
+                            : "border-gray-300"
+                        } ${errors.department ? "border-red-500" : ""}`}
+                      >
+                        <option value="">Select Department</option>
+                        <option value="Farm Operations">Farm Operations</option>
+                        <option value="Inventory Management">Inventory Management</option>
+                        <option value="Health Management">Health Management</option>
+                        <option value="Administration">Administration</option>
+                        <option value="Employee Management">Employee Management</option>
+                        <option value="Plant Management">Plant Management</option>
+                        <option value="Animal Management">Animal Management</option>
+                      </select>
+                      {errors.department && (
+                        <p className="text-red-500 text-xs mt-1">{errors.department}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Status
+                      </label>
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600"
+                            : "border-gray-300"
+                        } ${errors.status ? "border-red-500" : ""}`}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                      </select>
+                      {errors.status && (
+                        <p className="text-red-500 text-xs mt-1">{errors.status}</p>
+                      )}
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">
+                        Address <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        required
+                        rows={3}
+                        placeholder="Enter complete address"
+                        className={`w-full px-3 py-2 rounded-md text-sm border ${
+                          darkMode
+                            ? "bg-gray-800 text-white border-gray-600 placeholder-gray-400"
+                            : "border-gray-300 placeholder-gray-500"
+                        } ${errors.address ? "border-red-500" : ""}`}
+                      />
+                      {errors.address && (
+                        <p className="text-red-500 text-xs mt-1">{errors.address}</p>
                       )}
                     </div>
                   </div>

@@ -154,7 +154,51 @@ export const getReports = async (req, res) => {
     const attendanceRate = totalRecords > 0 ? Math.round((presentRecords / totalRecords) * 100) : 0;
     const lateArrivals = records.filter(record => record.status === "Late").length;
 
-    const response = { chartData: reports, attendanceRate, lateArrivals };
+    // Calculate employee statistics for Top Performers chart
+    const employeeStatsMap = {};
+    records.forEach(record => {
+      if (!employeeStatsMap[record.employeeId]) {
+        employeeStatsMap[record.employeeId] = {
+          employeeId: record.employeeId,
+          name: record.name,
+          present: 0,
+          absent: 0,
+          late: 0,
+          leave: 0,
+          total: 0
+        };
+      }
+      employeeStatsMap[record.employeeId].total++;
+      if (record.status === "Present") employeeStatsMap[record.employeeId].present++;
+      if (record.status === "Absent") employeeStatsMap[record.employeeId].absent++;
+      if (record.status === "Late") employeeStatsMap[record.employeeId].late++;
+      if (record.status === "On Leave") employeeStatsMap[record.employeeId].leave++;
+    });
+
+    // Convert to array and sort by present count (top performers)
+    const employeeStats = Object.values(employeeStatsMap)
+      .sort((a, b) => b.present - a.present)
+      .slice(0, 10); // Top 10 performers
+
+    // If no data, provide empty array with message
+    if (employeeStats.length === 0) {
+      employeeStats.push({
+        employeeId: "no-data",
+        name: "No attendance data available",
+        present: 0,
+        absent: 0,
+        late: 0,
+        leave: 0,
+        total: 0
+      });
+    }
+
+    const response = { 
+      chartData: reports, 
+      attendanceRate, 
+      lateArrivals, 
+      employeeStats 
+    };
     console.log("Sending response:", response);
     res.json(response);
   } catch (error) {

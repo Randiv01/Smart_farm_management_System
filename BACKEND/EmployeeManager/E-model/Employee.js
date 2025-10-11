@@ -10,6 +10,10 @@ const EmployeeSchema = new mongoose.Schema({
   joined: { type: String, required: true },
   photo: { type: String }, // file path
   cv: { type: String },    // file path
+  email: { type: String, required: true },
+  department: { type: String, required: true },
+  address: { type: String, required: true },
+  status: { type: String, default: "Active", enum: ["Active", "Inactive", "Suspended"] }
 });
 
 const Employee = mongoose.model("Employee", EmployeeSchema);

@@ -253,3 +253,216 @@ export const getOvertimeAnalytics = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Export overtime records to PDF
+export const exportOvertimePDF = async (req, res) => {
+  try {
+    const { month, year, employeeId } = req.query;
+    
+    console.log("Starting PDF generation with params:", { month, year, employeeId });
+    
+    // Use PDFDocument from pdfkit (same as employee controller)
+    const PDFDocument = (await import('pdfkit')).default;
+    const doc = new PDFDocument({ 
+      margin: 40,
+      autoFirstPage: true,
+      size: 'A4'
+    });
+    
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=Overtime_Records_${year || 'All'}_${month || 'All'}.pdf`);
+    console.log("PDFDocument created and headers set");
+
+    // Pipe PDF to response
+    doc.pipe(res);
+    
+    // Company information
+    const companyName = "Mount Olive Farm House";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
+    
+    // Header section with light green background
+    doc.rect(40, 40, 515, 80).fill('#90EE90'); // Light green background
+    
+    // Company name - large, bold, dark blue
+    doc.fontSize(24)
+       .font('Helvetica-Bold')
+       .fillColor('#1e3a8a') // Dark blue
+       .text(companyName, 297, 60, { align: 'center' });
+    
+    // Report title
+    doc.fontSize(18)
+       .fillColor('#1e3a8a') // Dark blue
+       .text('OVERTIME REPORT', 297, 85, { align: 'center' });
+    
+    // Company details
+    doc.fontSize(10)
+       .font('Helvetica')
+       .fillColor('#374151') // Gray
+       .text(companyAddress, 297, 105, { align: 'center' })
+       .text(companyContact, 297, 115, { align: 'center' });
+    
+    // Report metadata
+    doc.fontSize(10)
+       .fillColor('#374151')
+       .text(`Report Generated: ${reportDate} at ${reportTime}`, 60, 140);
+    
+    const monthName = month ? new Date(year, month - 1).toLocaleString('default', { month: 'long' }) : 'All Months';
+    const periodText = month && year ? `${monthName} ${year}` : 'All Time';
+    doc.text(`Period: ${periodText}`, 60, 155);
+    
+    const reportId = `MOF-OT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    doc.text(`Report ID: ${reportId}`, 60, 170);
+
+    // Build query for overtime records
+    let query = {};
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+      query.date = { $gte: startDate, $lte: endDate };
+    }
+    if (employeeId) {
+      query.employee = employeeId;
+    }
+
+    console.log("Querying overtime records with query:", query);
+    const overtimeRecords = await Overtime.find(query)
+      .populate("employee", "name id")
+      .sort({ date: -1 });
+    console.log(`Found ${overtimeRecords.length} overtime records`);
+
+    // Calculate summary statistics
+    let totalOvertimeHours = 0;
+    let totalRecords = overtimeRecords.length;
+    let approvedRecords = 0;
+    let pendingRecords = 0;
+
+    overtimeRecords.forEach(record => {
+      if (typeof record.overtimeHours === 'string') {
+        const [hours, minutes] = record.overtimeHours.split(':').map(Number);
+        totalOvertimeHours += hours + (minutes / 60);
+      } else {
+        totalOvertimeHours += record.overtimeHours || 0;
+      }
+      
+      if (record.status === 'Approved') approvedRecords++;
+      if (record.status === 'Pending') pendingRecords++;
+    });
+
+    // Overtime Summary Section
+    doc.fontSize(14)
+       .font('Helvetica-Bold')
+       .fillColor('#22c55e') // Green
+       .text("OVERTIME SUMMARY", 60, 200);
+
+    // Summary table using simple text formatting
+    const summaryData = [
+      ['Total Records', totalRecords.toString()],
+      ['Approved Records', approvedRecords.toString()],
+      ['Pending Records', pendingRecords.toString()],
+      ['Total Overtime Hours', `${Math.floor(totalOvertimeHours)}:${String(Math.round((totalOvertimeHours % 1) * 60)).padStart(2, '0')}`]
+    ];
+
+    let currentY = 230;
+    summaryData.forEach(([label, value]) => {
+      doc.fontSize(11)
+         .font('Helvetica-Bold')
+         .fillColor('#374151')
+         .text(label + ':', 60, currentY);
+      
+      doc.fontSize(11)
+         .font('Helvetica')
+         .fillColor('#22c55e')
+         .text(value, 200, currentY);
+      
+      currentY += 20;
+    });
+
+    // Detailed Overtime Data Section
+    currentY += 20;
+    doc.fontSize(14)
+       .font('Helvetica-Bold')
+       .fillColor('#1e3a8a') // Blue
+       .text("DETAILED OVERTIME DATA", 60, currentY);
+
+    if (overtimeRecords.length > 0) {
+      currentY += 30;
+      
+      // Table headers
+      doc.fontSize(10)
+         .font('Helvetica-Bold')
+         .fillColor('#1e3a8a')
+         .text('Date', 60, currentY)
+         .text('Employee', 150, currentY)
+         .text('Regular', 280, currentY)
+         .text('Overtime', 350, currentY)
+         .text('Total', 420, currentY);
+      
+      currentY += 20;
+      
+      // Table data
+      overtimeRecords.forEach(record => {
+        doc.fontSize(9)
+           .font('Helvetica')
+           .fillColor('#374151')
+           .text(new Date(record.date).toLocaleDateString(), 60, currentY)
+           .text(record.employee?.name || 'Unknown', 150, currentY)
+           .text(`${record.regularHours || 8}:00`, 280, currentY)
+           .text(record.overtimeHours?.toString() || '0', 350, currentY)
+           .text(record.totalHours?.toString() || `${(record.regularHours || 8) + (record.overtimeHours || 0)}`, 420, currentY);
+        
+        currentY += 15;
+        
+        // Add page break if needed
+        if (currentY > 700) {
+          doc.addPage();
+          currentY = 60;
+        }
+      });
+    } else {
+      doc.fontSize(12)
+         .font('Helvetica')
+         .fillColor('#374151')
+         .text('No overtime records found for the selected period', 297, currentY + 30, { align: 'center' });
+    }
+
+    // Footer
+    const pageCount = doc.bufferedPageRange().count;
+    for (let i = 0; i < pageCount; i++) {
+      doc.switchToPage(i);
+      
+      // Footer background
+      doc.rect(40, 750, 515, 30).fill('#f9fafb'); // Light gray
+      
+      // Footer content
+      doc.fontSize(8)
+         .font('Helvetica')
+         .fillColor('#374151')
+         .text(`Page ${i + 1} of ${pageCount}`, 60, 760)
+         .text(`Generated on ${new Date().toLocaleString()}`, 297, 760, { align: 'center' })
+         .text(companyName, 555, 760, { align: 'right' });
+      
+      // Footer line
+      doc.strokeColor('#22c55e')
+         .lineWidth(2)
+         .moveTo(60, 755)
+         .lineTo(555, 755)
+         .stroke();
+    }
+
+    // Finalize PDF
+    console.log("Finalizing PDF...");
+    doc.end();
+    console.log("PDF generation completed successfully");
+  } catch (error) {
+    console.error("Export overtime PDF error:", error);
+    console.error("Error stack:", error.stack);
+    res.status(500).json({ 
+      message: "Error exporting overtime PDF",
+      error: error.message,
+      stack: error.stack 
+    });
+  }
+};

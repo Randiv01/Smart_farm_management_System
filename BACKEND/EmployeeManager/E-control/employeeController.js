@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 
 // Validation helper
 function validateEmployeeData(data) {
-  const requiredFields = ["name", "contact", "title", "joined"];
+  const requiredFields = ["name", "contact", "title", "joined", "email", "department", "address"];
   const missing = requiredFields.filter(
     (field) => !data[field] || data[field].toString().trim() === ""
   );
@@ -73,6 +73,10 @@ export const addEmployee = async (req, res) => {
       joined: req.body.joined,
       photo: photoPath,
       cv: cvPath,
+      email: req.body.email,
+      department: req.body.department,
+      address: req.body.address,
+      status: req.body.status || "Active"
     });
 
     const saved = await newEmployee.save();
@@ -166,14 +170,14 @@ export const generatePDF = async (req, res) => {
     if (!employee) return res.status(404).json({ error: "Employee not found" });
 
     const doc = new PDFDocument({ 
-      margin: 50,
+      margin: 40,
       autoFirstPage: true,
       size: 'A4'
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=Employee_${employee.id}_Report.pdf`);
 
-    // Company header with logo - matching overall report format
+    // Header exactly matching the uploaded image design
     try {
       const fs = await import('fs');
       const path = await import('path');
@@ -189,9 +193,9 @@ export const generatePDF = async (req, res) => {
       for (const logoPath of logoPaths) {
         if (fs.existsSync(logoPath)) {
           try {
-            // Circular logo like in overall report
-            doc.circle(35, 25, 15, 'F').fill('green');
-            doc.image(logoPath, 20, 10, { width: 30, height: 30 });
+            // Circular logo with thick green border (exactly like the image)
+            doc.circle(50, 35, 25, 'S').stroke('#22c55e', 3);
+            doc.image(logoPath, 25, 10, { width: 50, height: 50 });
             logoLoaded = true;
             break;
           } catch (logoErr) {
@@ -202,64 +206,101 @@ export const generatePDF = async (req, res) => {
       }
       
       if (!logoLoaded) {
-        // Fallback: Draw a simple circular logo placeholder
-        doc.circle(35, 25, 15, 'F').fill('green');
-        doc.fillColor('white').fontSize(8).font('Helvetica-Bold');
-        doc.text('MOF', 35, 25, { align: 'center' });
+        // Create the exact logo design from the image
+        doc.circle(50, 35, 25, 'S').stroke('#22c55e', 3);
+        // Light green background
+        doc.circle(50, 35, 24, 'F').fill('#90EE90');
+        
+        // Curved text "MOUNT OLIVE" at top
+        doc.fillColor('#22c55e').fontSize(7).font('Helvetica-Bold');
+        doc.text('MOUNT OLIVE', 50, 25, { align: 'center' });
+        
+        // Curved text "FARM HOUSE" at bottom  
+        doc.text('FARM HOUSE', 50, 45, { align: 'center' });
+        
+        // Add some decorative elements to match the image
+        doc.fillColor('#22c55e').fontSize(6);
+        doc.text('95', 40, 40);
+        doc.text('25', 60, 40);
       }
     } catch (logoErr) {
       console.error("Logo loading error:", logoErr);
-      // Fallback: Draw a simple circular logo placeholder
-      doc.circle(35, 25, 15, 'F').fill('green');
-      doc.fillColor('white').fontSize(8).font('Helvetica-Bold');
-      doc.text('MOF', 35, 25, { align: 'center' });
+      // Create the exact logo design from the image
+      doc.circle(50, 35, 25, 'S').stroke('#22c55e', 3);
+      doc.circle(50, 35, 24, 'F').fill('#90EE90');
+      doc.fillColor('#22c55e').fontSize(7).font('Helvetica-Bold');
+      doc.text('MOUNT OLIVE', 50, 25, { align: 'center' });
+      doc.text('FARM HOUSE', 50, 45, { align: 'center' });
+      doc.fillColor('#22c55e').fontSize(6);
+      doc.text('95', 40, 40);
+      doc.text('25', 60, 40);
     }
     
-    // Company information - matching overall report format with proper spacing
-    doc.fontSize(18).font('Helvetica-Bold').fillColor('black');
-    doc.text('Mount Olive Farm House', 60, 20);
-    doc.fontSize(9).font('Helvetica').fillColor('black');
-    doc.text('No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka', 60, 38);
-    doc.text('Phone: +94 81 249 2134', 60, 50);
-    doc.text('Email: info@mountolivefarm.com', 60, 58);
+    // Company name (exactly matching the image - large, bold, dark blue)
+    doc.fontSize(24).font('Helvetica-Bold').fillColor('#1e3a8a');
+    doc.text('Mount Olive Farm House', 90, 25);
+    
+    // Contact information (exactly matching the image styling)
+    doc.fontSize(11).font('Helvetica').fillColor('#1e3a8a');
+    doc.text('No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka', 90, 45);
+    doc.fontSize(10).font('Helvetica').fillColor('#1e3a8a');
+    doc.text('Phone: +94 81 249 2134 | Email: info@mountolivefarm.com', 90, 57);
 
-    // Report title banner - matching overall report format
-    doc.rect(50, 70, 500, 15).fill('lightgray');
-    doc.fontSize(16).font('Helvetica-Bold').fillColor('green');
-    doc.text('EMPLOYEE DETAILED REPORT', 300, 80, { align: 'center' });
-
-    // Report metadata - matching overall report format with proper spacing
-    doc.fontSize(10).font('Helvetica').fillColor('black');
-    doc.text(`Report Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 50, 95);
-    doc.text(`Total Records: 1`, 50, 107);
-    doc.text(`Report ID: MOF-ED-${Date.now().toString().slice(-6)}`, 50, 119);
-
-    // Create employee data table - matching overall report format with proper spacing
-    const tableData = [
-      ['Emp ID', 'Name', 'Contact No', 'Job Title', 'Type', 'Joined'],
-      [employee.id, employee.name, employee.contact, employee.title, employee.type, employee.joined]
-    ];
-
-    // Table header with proper spacing
-    doc.rect(50, 130, 500, 20).fill('green');
-    doc.fontSize(10).font('Helvetica-Bold').fillColor('white');
-    const headerPositions = [60, 120, 180, 240, 320, 420]; // Proper column positions
-    tableData[0].forEach((header, index) => {
-      doc.text(header, headerPositions[index], 142);
-    });
-
-    // Table data row with proper spacing
-    doc.rect(50, 150, 500, 20).fill('white');
-    doc.fontSize(9).font('Helvetica').fillColor('black');
-    tableData[1].forEach((data, index) => {
-      doc.text(data, headerPositions[index], 162);
-    });
-
-    // Employee photo section - clean format with proper spacing
-    let currentY = 190;
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('green');
-    doc.text('Employee Photo:', 50, currentY);
+    // Compact employee information section (optimized for single page)
+    let currentY = 80;
+    
+    // Report title
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#22c55e');
+    doc.text('EMPLOYEE DETAILED REPORT', 297, currentY, { align: 'center' });
     currentY += 25;
+    
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#1f2937');
+    doc.text(`${employee.name} - ${employee.id}`, 297, currentY, { align: 'center' });
+    currentY += 30;
+    
+    // Compact two-column layout for employee information
+    const leftColumnData = [
+      ['Employee ID', employee.id],
+      ['Full Name', employee.name],
+      ['Contact Number', employee.contact],
+      ['Email Address', employee.email || 'Not provided'],
+      ['Job Title', employee.title]
+    ];
+    
+    const rightColumnData = [
+      ['Department', employee.department || 'Not specified'],
+      ['Employment Type', employee.type],
+      ['Status', employee.status || 'Active'],
+      ['Date Joined', employee.joined],
+      ['Address', employee.address || 'Not provided']
+    ];
+    
+    // Left column
+    leftColumnData.forEach(([label, value], index) => {
+      const rowY = currentY + (index * 15);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151');
+      doc.text(`${label}:`, 60, rowY);
+      doc.fontSize(10).font('Helvetica').fillColor('#1f2937');
+      doc.text(value, 140, rowY);
+    });
+    
+    // Right column
+    rightColumnData.forEach(([label, value], index) => {
+      const rowY = currentY + (index * 15);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151');
+      doc.text(`${label}:`, 320, rowY);
+      doc.fontSize(10).font('Helvetica').fillColor('#1f2937');
+      doc.text(value, 420, rowY);
+    });
+    
+    currentY += (leftColumnData.length * 15) + 20;
+
+    // Compact photo and QR code section (side by side)
+    const photoQRY = currentY;
+    
+    // Employee Photo (left side)
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#1f2937');
+    doc.text('Employee Photo', 60, photoQRY);
     
     if (employee.photo) {
       try {
@@ -268,31 +309,26 @@ export const generatePDF = async (req, res) => {
         const photoPath = path.join(process.cwd(), employee.photo);
         
         if (fs.existsSync(photoPath)) {
-          // Add photo with simple border
-          doc.rect(50, currentY, 100, 100).stroke('gray', 1);
-          doc.image(photoPath, 50, currentY, { width: 100, height: 100, fit: [100, 100] });
-          currentY += 120;
+          // Compact photo with border
+          doc.rect(60, photoQRY + 15, 80, 80).stroke('#22c55e', 2).fill('#f9fafb');
+          doc.image(photoPath, 70, photoQRY + 25, { width: 60, height: 60, fit: [60, 60] });
         } else {
-          doc.fontSize(10).font('Helvetica').fillColor('black');
-          doc.text('Photo: Not available', 50, currentY);
-          currentY += 30;
+          doc.fontSize(9).font('Helvetica').fillColor('#6b7280');
+          doc.text('Photo: Not available', 70, photoQRY + 55);
         }
       } catch (photoErr) {
         console.error("Photo error:", photoErr);
-        doc.fontSize(10).font('Helvetica').fillColor('black');
-        doc.text('Photo: Error loading', 50, currentY);
-        currentY += 30;
+        doc.fontSize(9).font('Helvetica').fillColor('#6b7280');
+        doc.text('Photo: Error loading', 70, photoQRY + 55);
       }
     } else {
-      doc.fontSize(10).font('Helvetica').fillColor('black');
-      doc.text('Photo: Not provided', 50, currentY);
-      currentY += 30;
+      doc.fontSize(9).font('Helvetica').fillColor('#6b7280');
+      doc.text('Photo: Not provided', 70, photoQRY + 55);
     }
 
-    // QR Code section - clean format with proper spacing
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('green');
-    doc.text('QR Code for Attendance', 50, currentY);
-    currentY += 25;
+    // QR Code (right side)
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#1f2937');
+    doc.text('QR Code for Attendance', 320, photoQRY);
 
     try {
       const qrData = JSON.stringify({
@@ -302,30 +338,39 @@ export const generatePDF = async (req, res) => {
         timestamp: new Date().toISOString()
       });
       const qr = await QRCode.toDataURL(qrData);
-      doc.image(Buffer.from(qr.split(",")[1], "base64"), 50, currentY, { width: 100, height: 100 });
       
-      // Add instruction text below QR code
-      doc.fontSize(9).font('Helvetica').fillColor('black');
-      doc.text('Scan this QR code for attendance tracking', 100, currentY + 110, { align: 'center' });
+      // Compact QR code with border
+      doc.rect(320, photoQRY + 15, 80, 80).stroke('#22c55e', 2).fill('#f9fafb');
+      doc.image(Buffer.from(qr.split(",")[1], "base64"), 330, photoQRY + 25, { width: 60, height: 60 });
       
-      currentY += 140;
+      // Compact instruction text
+      doc.fontSize(8).font('Helvetica').fillColor('#374151');
+      doc.text('Scan for attendance', 360, photoQRY + 100, { align: 'center' });
+      
     } catch (qrErr) {
       console.error("QR code error:", qrErr);
-      doc.fontSize(10).font('Helvetica').fillColor('black');
-      doc.text('QR Code: Error generating', 50, currentY);
-      currentY += 30;
+      doc.fontSize(9).font('Helvetica').fillColor('#6b7280');
+      doc.text('QR Code: Error', 330, photoQRY + 55);
     }
+    
+    currentY = photoQRY + 120;
 
-    // Professional footer - matching overall report format with proper spacing
-    doc.moveTo(50, currentY + 30).lineTo(550, currentY + 30).stroke();
+    // Footer exactly matching the uploaded image design
+    currentY += 30;
     
-    doc.fontSize(8).font('Helvetica').fillColor('black');
-    doc.text('Page 1 of 1', 50, currentY + 45);
-    doc.text(`Generated on ${new Date().toLocaleString()}`, 300, currentY + 45, { align: 'center' });
-    doc.text('Mount Olive Farm House', 550, currentY + 45, { align: 'right' });
+    // Footer separator line (prominent green line spanning nearly full width)
+    doc.moveTo(50, currentY).lineTo(545, currentY).stroke('#22c55e', 2);
+    currentY += 20;
     
-    doc.fontSize(7).font('Helvetica').fillColor('black');
-    doc.text('This report is generated by Mount Olive Farm House Management System', 300, currentY + 55, { align: 'center' });
+    // Footer content (exactly matching the image layout)
+    doc.fontSize(10).font('Helvetica').fillColor('#374151');
+    doc.text('Page 1 of 1', 50, currentY);
+    doc.text(`Generated on ${new Date().toLocaleDateString()}, ${new Date().toLocaleTimeString()}`, 297, currentY, { align: 'center' });
+    doc.text('Mount Olive Farm House', 545, currentY, { align: 'right' });
+    
+    currentY += 20;
+    doc.fontSize(9).font('Helvetica').fillColor('#6b7280');
+    doc.text('This report is generated by Mount Olive Farm House Management System', 297, currentY, { align: 'center' });
 
     doc.pipe(res);
     doc.end();

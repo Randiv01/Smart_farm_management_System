@@ -83,4 +83,94 @@ router.get("/next-feeding", async (req, res) => {
   }
 });
 
+// Trigger due feedings manually (for testing)
+router.post("/trigger-due", async (req, res) => {
+  try {
+    await automatedFeedingService.triggerDueFeedings();
+    res.json({
+      success: true,
+      message: "Due feedings triggered successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Handle overdue feedings
+router.post("/handle-overdue", async (req, res) => {
+  try {
+    await automatedFeedingService.handleOverdueFeedings();
+    res.json({
+      success: true,
+      message: "Overdue feedings handled successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Force execute a specific feeding (for testing)
+router.post("/force-execute/:feedingId", async (req, res) => {
+  try {
+    const { feedingId } = req.params;
+    await automatedFeedingService.forceExecuteFeeding(feedingId);
+    res.json({
+      success: true,
+      message: `Feeding ${feedingId} force executed successfully`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Set ESP32 IP address
+router.post("/esp32-ip", (req, res) => {
+  try {
+    const { ip } = req.body;
+    if (!ip) {
+      return res.status(400).json({
+        success: false,
+        message: "IP address is required"
+      });
+    }
+    
+    automatedFeedingService.setEsp32Ip(ip);
+    res.json({
+      success: true,
+      message: `ESP32 IP updated to ${ip}`,
+      data: { esp32Ip: ip }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Get ESP32 IP address
+router.get("/esp32-ip", (req, res) => {
+  try {
+    const esp32Ip = automatedFeedingService.getEsp32Ip();
+    res.json({
+      success: true,
+      data: { esp32Ip }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 export default router;

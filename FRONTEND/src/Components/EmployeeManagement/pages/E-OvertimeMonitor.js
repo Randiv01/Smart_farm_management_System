@@ -55,6 +55,12 @@ const makeOvertimeIdFallback = (record) => {
 export const OvertimeMonitor = () => {
   const { theme } = useETheme();
   const darkMode = theme === 'dark';
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Overtime Monitor - Employee Manager";
+  }, []);
+
   const [activeTab, setActiveTab] = useState('records');
 
   const [overtimeRecords, setOvertimeRecords] = useState([]);
@@ -333,47 +339,24 @@ export const OvertimeMonitor = () => {
     return `${whole}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  // ===== Export CURRENT TABLE VIEW as PDF (uses Overtime ID) =====
+  // ===== Export CURRENT TABLE VIEW as PDF (calls backend API) =====
   const handleExportPDF = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const title = `Overtime Records - ${new Date(0, filters.month - 1).toLocaleString('default', {
-      month: 'long',
-    })} ${filters.year}`;
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (filters.month) params.append('month', filters.month);
+    if (filters.year) params.append('year', filters.year);
+    if (filters.employee) params.append('employeeId', filters.employee);
 
-    doc.setFontSize(16);
-    doc.text(title, 14, 14);
-
-    const body = overtimeRecords.map((r) => [
-      r.overtimeId || makeOvertimeIdFallback(r), // <-- OVERTIME ID
-      r.employee?.name || '',
-      new Date(r.date).toLocaleDateString(),
-      formatHours(r.regularHours),
-      formatHours(r.overtimeHours),
-      formatHours(r.totalHours),
-      r.description || '-',
-    ]);
-
-    autoTable(doc, {
-      head: [['ID', 'Employee', 'Date', 'Regular Hours', 'Overtime Hours', 'Total Hours', 'Description']],
-      body,
-      startY: 20,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [33, 150, 243] },
-    });
-
-    // footer summary
-    const endY = doc.lastAutoTable.finalY || 20;
-    doc.setFontSize(12);
-    doc.text(`Total Overtime: ${formatHours(totalOvertimeHours)}`, 14, endY + 10);
-    doc.text(
-      `Average per Employee: ${formatHours(avgPerEmployeeHours)} hours/month`,
-      80,
-      endY + 10
-    );
-
-    doc.save(
-      `overtime-records-${filters.year}-${String(filters.month).padStart(2, '0')}.pdf`
-    );
+    // Create download URL
+    const downloadUrl = `http://localhost:5000/api/overtime/export/pdf?${params.toString()}`;
+    
+    // Create a temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `overtime-records-${filters.month || 'all'}-${filters.year || 'all'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handlePageChange = (newPage) => setPagination((p) => ({ ...p, page: newPage }));

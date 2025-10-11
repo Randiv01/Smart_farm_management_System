@@ -22,6 +22,11 @@ export const Dashboard = ({ setActiveModule }) => {
   const darkMode = theme === 'dark';
   const [showLoader, setShowLoader] = useState(true); // Loader state
 
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Dashboard - Employee Manager";
+  }, []);
+
   const modules = [
     { id: "staff", name: "Staff Hub", icon: <Users size={24} />, count: 48, change: "+2" },
     { id: "attendance", name: "Attendance Tracker", icon: <ClipboardCheck size={24} />, count: 42, change: "-3" },

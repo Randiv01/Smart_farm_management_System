@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { QrCode, X, Clock, UserCheck, AlertCircle, Type } from 'lucide-react';
+import { QrCode, X, Clock, UserCheck, AlertCircle } from 'lucide-react';
 import jsQR from 'jsqr';
 
 const QRScanner = ({ darkMode, onScan, onClose }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState(null);
-  const [manualInput, setManualInput] = useState('');
-  const [showManualInput, setShowManualInput] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const videoRef = useRef(null);
@@ -180,7 +178,7 @@ const QRScanner = ({ darkMode, onScan, onClose }) => {
           </button>
         </div>
 
-        {!isScanning && !scanResult && !showManualInput && (
+        {!isScanning && !scanResult && (
           <div className="text-center py-8">
             <QrCode size={64} className="mx-auto text-gray-400 mb-4" />
             <p className="text-gray-500 mb-4">Scan employee QR code to mark attendance</p>
@@ -202,14 +200,6 @@ const QRScanner = ({ darkMode, onScan, onClose }) => {
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
               >
                 Start Camera Scanning
-              </button>
-              <div className="text-sm text-gray-500">or</div>
-              <button
-                onClick={() => setShowManualInput(true)}
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition flex items-center justify-center gap-2"
-              >
-                <Type size={16} />
-                Manual QR Code Input
               </button>
               <div className="text-sm text-gray-500">or</div>
               <div className="space-y-2">
@@ -249,58 +239,6 @@ const QRScanner = ({ darkMode, onScan, onClose }) => {
           </div>
         )}
 
-        {showManualInput && (
-          <div className="text-center py-8">
-            <Type size={64} className="mx-auto text-purple-400 mb-4" />
-            <p className="text-gray-500 mb-4">Enter QR code data from StaffHub</p>
-            <div className="space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-yellow-800 font-medium mb-2">📋 How to get QR data:</p>
-                <p className="text-xs text-yellow-700">
-                  1. Go to StaffHub page<br/>
-                  2. Click "Generate QR Code" for an employee<br/>
-                  3. In the QR modal, press F12 to open developer tools<br/>
-                  4. Go to Console tab<br/>
-                  5. Look for "QR Code data:" in the console<br/>
-                  6. Copy the JSON data and paste it below
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  QR Code Data (JSON format):
-                </label>
-                <textarea
-                  value={manualInput}
-                  onChange={(e) => setManualInput(e.target.value)}
-                  placeholder='{"id":"EMP001","name":"John Doe","type":"employee","timestamp":"2024-01-01T00:00:00.000Z"}'
-                  className="w-full p-3 border border-gray-300 rounded-md text-sm font-mono"
-                  rows={4}
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    try {
-                      const data = JSON.parse(manualInput);
-                      handleScan(JSON.stringify(data));
-                    } catch (err) {
-                      setError('Invalid JSON format. Please check your input.');
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition"
-                >
-                  Process QR Data
-                </button>
-                <button
-                  onClick={() => setShowManualInput(false)}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {isScanning && (
           <div className="text-center">
@@ -328,14 +266,7 @@ const QRScanner = ({ darkMode, onScan, onClose }) => {
               </p>
             </div>
             <p className="text-sm text-gray-500 mb-4">Position the employee QR code within the frame - it will be detected automatically</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowManualInput(true)}
-                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition flex items-center justify-center gap-2"
-              >
-                <Type size={16} />
-                Manual Input
-              </button>
+            <div className="flex justify-center">
               <button
                 onClick={stopScanning}
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"

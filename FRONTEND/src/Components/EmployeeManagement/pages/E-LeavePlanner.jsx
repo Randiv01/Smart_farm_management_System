@@ -42,6 +42,11 @@ const ChartContainer = React.forwardRef(({ title, children, darkMode, className 
 
 export const ELeavePlanner = () => {
   const { theme } = useETheme();
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Leave Management - Employee Manager";
+  }, []);
   const darkMode = theme === 'dark';
   const [activeTab, setActiveTab] = useState("requests");
   const [statusFilter, setStatusFilter] = useState("All Status");

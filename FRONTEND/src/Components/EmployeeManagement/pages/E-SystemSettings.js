@@ -99,6 +99,12 @@ const ImageModal = ({ src, onClose, darkMode }) => (
 const ESystemSettings = () => {
   const { theme, toggleTheme } = useETheme();
   const darkMode = theme === 'dark';
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "System Settings - Employee Manager";
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [showLoader, setShowLoader] = useState(true); // Loader state
   const [socket, setSocket] = useState(null);

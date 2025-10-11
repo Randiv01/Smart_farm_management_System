@@ -129,16 +129,22 @@ export default function FeedingScheduler() {
     
     // Check if we have a saved ESP32 IP and test connection
     if (esp32Ip) {
+      // Sync ESP32 IP with backend service
+      syncEsp32IpWithBackend();
       testEsp32Connection();
     }
   }, []);
 
   // Set up countdown timer
   useEffect(() => {
-    calculateCountdown();
+    calculateCountdown().catch(error => {
+      console.error('Error in initial countdown calculation:', error);
+    });
     
     const countdownInterval = setInterval(() => {
-      calculateCountdown();
+      calculateCountdown().catch(error => {
+        console.error('Error in countdown calculation:', error);
+      });
     }, 1000);
 
     return () => clearInterval(countdownInterval);
@@ -146,14 +152,39 @@ export default function FeedingScheduler() {
 
   // Set up real-time updates for automated feeding status
   useEffect(() => {
-    const statusInterval = setInterval(() => {
-      fetchAutomatedFeedingStatus();
-      fetchNextScheduledFeeding();
-      refreshFeedingData(); // Also refresh history data
-    }, 5000); // Update every 5 seconds for immediate updates
-
-    return () => clearInterval(statusInterval);
-  }, []);
+    let statusInterval;
+    
+    const updateInterval = () => {
+      // Check if we have a feeding due soon (within 30 seconds)
+      const hasFeedingSoon = nextScheduledFeeding && nextScheduledFeeding.feedingTime && 
+        (new Date(nextScheduledFeeding.feedingTime).getTime() - new Date().getTime()) <= 30000;
+      
+      // Use faster updates when feeding is due soon, slower otherwise
+      const intervalMs = hasFeedingSoon ? 500 : 5000; // 500ms for more responsive updates
+      
+      statusInterval = setInterval(() => {
+        fetchAutomatedFeedingStatus();
+        fetchNextScheduledFeeding();
+        refreshFeedingData(); // Also refresh history data
+      }, intervalMs);
+      
+      return intervalMs;
+    };
+    
+    // Set initial interval
+    const initialInterval = updateInterval();
+    
+    // Update interval when nextScheduledFeeding changes
+    const intervalUpdateTimer = setInterval(() => {
+      clearInterval(statusInterval);
+      updateInterval();
+    }, 10000); // Check every 10 seconds if we need to change update frequency
+    
+    return () => {
+      clearInterval(statusInterval);
+      clearInterval(intervalUpdateTimer);
+    };
+  }, [nextScheduledFeeding]);
 
   // Update max quantity when feed changes
   useEffect(() => {
@@ -231,10 +262,34 @@ export default function FeedingScheduler() {
   };
 
   // Save ESP32 IP configuration
-  const saveEsp32Config = () => {
-    localStorage.setItem("esp32Ip", esp32Ip);
-    testEsp32Connection();
-    setShowEsp32Config(false);
+  const saveEsp32Config = async () => {
+    if (!esp32Ip.trim()) {
+      showPopup("error", "Please enter ESP32 IP address");
+      return;
+    }
+
+    try {
+      // Save to backend service
+      const response = await fetch("http://localhost:5000/api/automated-feeding/esp32-ip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ip: esp32Ip }),
+      });
+
+      if (response.ok) {
+        localStorage.setItem("esp32Ip", esp32Ip);
+        setShowEsp32Config(false);
+        showPopup("success", "ESP32 IP saved successfully");
+        
+        // Test connection after saving
+        testEsp32Connection();
+      } else {
+        showPopup("error", "Failed to save ESP32 IP to backend");
+      }
+    } catch (error) {
+      console.error("Error saving ESP32 IP:", error);
+      showPopup("error", "Failed to save ESP32 IP");
+    }
   };
 
   // Event handlers
@@ -639,8 +694,47 @@ export default function FeedingScheduler() {
     }
   };
 
+  // Manual trigger for testing due feedings
+  const triggerDueFeedings = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/automated-feeding/trigger-due", {
+        method: "POST",
+      });
+      
+      if (response.ok) {
+        showPopup("success", "Due feedings triggered successfully");
+        await refreshFeedingData();
+        await fetchNextScheduledFeeding();
+      } else {
+        showPopup("error", "Failed to trigger due feedings");
+      }
+    } catch (error) {
+      console.error("Error triggering due feedings:", error);
+      showPopup("error", "Failed to trigger due feedings");
+    }
+  };
+
+  // Sync ESP32 IP with backend service
+  const syncEsp32IpWithBackend = async () => {
+    if (!esp32Ip) return;
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/automated-feeding/esp32-ip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ip: esp32Ip }),
+      });
+      
+      if (response.ok) {
+        console.log(`ESP32 IP synced with backend: ${esp32Ip}`);
+      }
+    } catch (error) {
+      console.error("Error syncing ESP32 IP:", error);
+    }
+  };
+
   // Calculate countdown time
-  const calculateCountdown = () => {
+  const calculateCountdown = async () => {
     if (!nextScheduledFeeding || !nextScheduledFeeding.feedingTime) {
       setCountdownTime(null);
       return;
@@ -650,9 +744,46 @@ export default function FeedingScheduler() {
     const feedingTime = new Date(nextScheduledFeeding.feedingTime).getTime();
     const timeDiff = feedingTime - now;
 
-    // If time has passed or is within 3 seconds, show as "due"
-    if (timeDiff <= 3000) {
+    // If time has passed or is within 1 second, show as "due" and trigger refresh
+    if (timeDiff <= 1000) {
       setCountdownTime({ days: 0, hours: 0, minutes: 0, seconds: 0, isDue: true });
+      
+      // Trigger immediate refresh when countdown reaches 0 to check for execution
+      if (timeDiff <= 0) {
+        // Immediate refresh without delay for faster execution
+        fetchNextScheduledFeeding();
+        refreshFeedingData();
+        
+        // Also trigger manual feeding check to ensure immediate execution
+        try {
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/automated-feeding/check`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            console.log('Manual feeding check triggered successfully');
+          }
+          
+          // Also handle any overdue feedings
+          const overdueResponse = await fetch(`${process.env.REACT_APP_API_URL}/automated-feeding/handle-overdue`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (overdueResponse.ok) {
+            console.log('Overdue feedings handled successfully');
+          }
+        } catch (error) {
+          console.error('Failed to trigger manual feeding check:', error);
+        }
+      }
       return;
     }
 
@@ -902,6 +1033,13 @@ export default function FeedingScheduler() {
             <Settings className="text-blue-500" size={20} />
             Automated Feeding System
           </h3>
+          <button
+            onClick={triggerDueFeedings}
+            className="px-3 py-2 rounded-lg font-medium transition-colors bg-blue-500 hover:bg-blue-600 text-white text-sm"
+            title="Test trigger for due feedings"
+          >
+            Test Trigger
+          </button>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={async () => {
@@ -1012,11 +1150,14 @@ export default function FeedingScheduler() {
                   {countdownTime ? (
                     <div className={`text-xs font-mono ${
                       countdownTime.isDue 
-                        ? "text-red-600 dark:text-red-400 font-bold" 
+                        ? "text-red-600 dark:text-red-400 font-bold animate-pulse" 
                         : "text-orange-600 dark:text-orange-400"
                     }`}>
                       {countdownTime.isDue ? (
-                        "DUE NOW!"
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                          DUE NOW!
+                        </div>
                       ) : (
                         <>
                           {countdownTime.days > 0 && `${countdownTime.days}d `}

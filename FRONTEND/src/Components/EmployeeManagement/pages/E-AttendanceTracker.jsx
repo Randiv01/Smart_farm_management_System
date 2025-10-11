@@ -85,6 +85,12 @@ const ChartContainer = ({ title, children, darkMode, className = "" }) => (
 export const AttendanceTracker = () => {
   const { theme } = useETheme();
   const darkMode = theme === 'dark';
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Attendance Management - Employee Manager";
+  }, []);
+
   const getLocalDateString = (dateObj) => {
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -103,6 +109,7 @@ export const AttendanceTracker = () => {
   const [reportStats, setReportStats] = useState({ attendanceRate: 0, lateArrivals: 0 });
   const [allEmployees, setAllEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [reportPeriod, setReportPeriod] = useState("thisweek");
   const [formData, setFormData] = useState({
@@ -339,9 +346,10 @@ export const AttendanceTracker = () => {
     try {
       const params = {};
       if (selectedDate) params.date = selectedDate;
-      if (searchTerm) params.search = searchTerm;
+      if (debouncedSearchTerm.trim()) params.search = debouncedSearchTerm.trim();
       console.log("=== FETCHING ATTENDANCE DATA ===");
       console.log("Fetching attendance data with params:", params);
+      console.log("Search term:", debouncedSearchTerm);
       const { data } = await axios.get("/api/attendance", { params });
       console.log("Attendance data received:", data);
       console.log("Attendance data type:", typeof data);
@@ -381,6 +389,7 @@ export const AttendanceTracker = () => {
       console.log("Report data received:", data);
       setChartData(data.chartData || []);
       setReportStats({ attendanceRate: data.attendanceRate || 0, lateArrivals: data.lateArrivals || 0 });
+      console.log("Employee stats received:", data.employeeStats);
       setEmployeeStats(data.employeeStats || []);
       setAttendanceTrend((data.chartData || []).map((item) => ({
         day: new Date(item.period).toLocaleDateString("en-US", { weekday: "short" }),
@@ -407,6 +416,15 @@ export const AttendanceTracker = () => {
     fetchAllEmployees(); // Fetch all employees for dropdown
   }, []);
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     if (activeTab === "daily") {
       fetchAttendanceData();
@@ -415,7 +433,7 @@ export const AttendanceTracker = () => {
       fetchReportData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedDate, searchTerm, reportPeriod]);
+  }, [activeTab, selectedDate, debouncedSearchTerm, reportPeriod]);
 
   const handleInputChange = async (e) => {
     const { name, value } = e.target;
@@ -656,6 +674,9 @@ export const AttendanceTracker = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                {loading && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 ml-2"></div>
+                )}
               </div>
               <button
                 className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
@@ -668,6 +689,13 @@ export const AttendanceTracker = () => {
                 <Filter size={18} />
                 <span>Clear Filter</span>
               </button>
+              {searchTerm && (
+                <div className={`px-3 py-1 rounded-md text-sm ${
+                  darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {attendanceData.length} result{attendanceData.length !== 1 ? 's' : ''} found
+                </div>
+              )}
             </div>
             <div className="flex flex-col md:flex-row gap-2 items-start md:items-center w-full md:w-auto">
               <input
@@ -850,7 +878,10 @@ export const AttendanceTracker = () => {
                       <td colSpan="8" className={`px-4 py-6 text-center ${
                         darkMode ? 'text-gray-400' : 'text-gray-500'
                       }`}>
-                        No attendance records found for the selected date
+                        {searchTerm 
+                          ? `No attendance records found for "${searchTerm}" on ${new Date(selectedDate).toLocaleDateString()}`
+                          : `No attendance records found for ${new Date(selectedDate).toLocaleDateString()}`
+                        }
                       </td>
                     </tr>
                   )}
@@ -1296,17 +1327,27 @@ export const AttendanceTracker = () => {
                 </ChartContainer>
 
                 <ChartContainer title="Top Performers" darkMode={darkMode}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={employeeStats.slice(0, 5)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#4B5563" : "#E5E7EB"} />
-                      <XAxis dataKey="name" stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
-                      <YAxis stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Area type="monotone" dataKey="present" name="Present" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
-                      <Area type="monotone" dataKey="late" name="Late" stackId="1" stroke="#eab308" fill="#eab308" fillOpacity={0.3} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {employeeStats.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={employeeStats.slice(0, 5)}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#4B5563" : "#E5E7EB"} />
+                        <XAxis dataKey="name" stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                        <YAxis stroke={darkMode ? "#9CA3AF" : "#6B7280"} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Area type="monotone" dataKey="present" name="Present" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
+                        <Area type="monotone" dataKey="late" name="Late" stackId="1" stroke="#eab308" fill="#eab308" fillOpacity={0.3} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className={`flex items-center justify-center h-full ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <div className="text-center">
+                        <BarChart3 size={48} className="mx-auto mb-2 opacity-50" />
+                        <p>No attendance data available for the selected period</p>
+                        <p className="text-sm mt-1">Add some attendance records to see top performers</p>
+                      </div>
+                    </div>
+                  )}
                 </ChartContainer>
               </div>
 

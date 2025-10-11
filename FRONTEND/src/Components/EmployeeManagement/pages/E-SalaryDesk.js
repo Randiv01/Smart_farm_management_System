@@ -39,6 +39,12 @@ const API_BASE_URL = 'http://localhost:5000/api';
 export const SalaryDesk = () => {
   const { theme } = useETheme();
   const darkMode = theme === 'dark';
+
+  // Set browser tab title
+  useEffect(() => {
+    document.title = "Salary Management - Employee Manager";
+  }, []);
+
   const [activeTab, setActiveTab] = useState("payroll");
   const [showLoader, setShowLoader] = useState(true);
   
@@ -855,7 +861,7 @@ export const SalaryDesk = () => {
   };
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'light-beige'}`}>
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
