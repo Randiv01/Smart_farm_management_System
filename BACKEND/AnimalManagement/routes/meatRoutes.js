@@ -32,7 +32,14 @@ router.post("/", async (req, res) => {
     }
 
     // Validate dates
-    if (new Date(productionDate) >= new Date(expiryDate)) {
+    const prodDate = new Date(productionDate);
+    const expDate = new Date(expiryDate);
+    
+    // Compare using UTC to avoid timezone issues
+    const prodUTC = Date.UTC(prodDate.getFullYear(), prodDate.getMonth(), prodDate.getDate());
+    const expUTC = Date.UTC(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+    
+    if (expUTC <= prodUTC) {
       return res.status(400).json({
         success: false,
         message: "Expiry date must be after production date",
@@ -192,11 +199,20 @@ router.put("/:id", async (req, res) => {
     } = updateData;
 
     // Validate dates if both are provided
-    if (productionDate && expiryDate && new Date(productionDate) >= new Date(expiryDate)) {
-      return res.status(400).json({
-        success: false,
-        message: "Expiry date must be after production date",
-      });
+    if (productionDate && expiryDate) {
+      const prodDate = new Date(productionDate);
+      const expDate = new Date(expiryDate);
+      
+      // Compare using UTC to avoid timezone issues
+      const prodUTC = Date.UTC(prodDate.getFullYear(), prodDate.getMonth(), prodDate.getDate());
+      const expUTC = Date.UTC(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+      
+      if (expUTC <= prodUTC) {
+        return res.status(400).json({
+          success: false,
+          message: "Expiry date must be after production date",
+        });
+      }
     }
 
     const meatBatch = await MeatProductivity.findByIdAndUpdate(
@@ -336,6 +352,7 @@ router.post("/:id/harvest", async (req, res) => {
     });
 
     res.status(200).json({
+      success: true,
       message: "Batch harvested successfully",
       data: meatBatch,
     });
@@ -664,6 +681,31 @@ router.get("/dashboard/stats", async (req, res) => {
     
     const totalMeatProduced = totalMeatResult.length > 0 ? totalMeatResult[0].totalMeat : 0;
 
+    // Get meat type counts for active batches
+    const meatTypeCounts = await MeatProductivity.aggregate([
+      { $match: { isActive: true } },
+      {
+        $group: {
+          _id: "$meatType",
+          count: { $sum: 1 },
+          totalQuantity: { $sum: "$quantity" }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Get harvested meat types with total quantities from HarvestHistory
+    const harvestedMeatTypes = await HarvestHistory.aggregate([
+      {
+        $group: {
+          _id: "$meatType",
+          count: { $sum: 1 },
+          totalMeatProduced: { $sum: "$totalMeatProduced" }
+        }
+      },
+      { $sort: { totalMeatProduced: -1 } }
+    ]);
+
     res.status(200).json({
       data: {
         totalBatches,
@@ -672,7 +714,9 @@ router.get("/dashboard/stats", async (req, res) => {
         freshBatches,
         nearExpiryBatches,
         criticalBatches,
-        totalMeatProduced
+        totalMeatProduced,
+        meatTypeCounts,
+        harvestedMeatTypes
       },
     });
   } catch (error) {

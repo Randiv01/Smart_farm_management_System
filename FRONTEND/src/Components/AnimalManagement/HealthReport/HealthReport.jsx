@@ -873,10 +873,10 @@ const handleMedicalRequest = async () => {
                               {getGroupIdentifier(animal)}
                             </div>
                           </div>
-                        ) : animal.qrCode ? (
+                        ) : animal.qrCode || animal.animalId ? (
                           <div className="text-center">
                             <QRCodeCanvas 
-                              value={animal.qrCode} 
+                              value={animal.qrCode || animal.animalId} 
                               size={60} 
                               level="H" 
                               className="mx-auto"

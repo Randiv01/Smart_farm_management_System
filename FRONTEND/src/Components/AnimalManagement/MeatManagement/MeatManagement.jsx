@@ -98,6 +98,7 @@ export default function MeatProductivityDashboard() {
     nearExpiryBatches: 0,
     criticalBatches: 0,
     totalMeatProduced: 0,
+    harvestedMeatTypes: [],
   });
   const [filters, setFilters] = useState({
     animalType: "",
@@ -177,6 +178,13 @@ export default function MeatProductivityDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (showAnalytics) {
+      fetchProductionAnalytics();
+      fetchMeatCounts();
+    }
+  }, [analyticsPeriod]);
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
@@ -242,15 +250,23 @@ export default function MeatProductivityDashboard() {
 
     const animalTypeData = {};
     const meatTypeData = {};
+    const meatTypeCounts = {};
     const statusData = {};
     const monthlyData = {};
 
     batches.forEach(batch => {
+      // Normalize quantity to kg for analytics (supports 'kg' and 'lbs')
+      const quantityInKg = batch.unit === 'lbs' ? (batch.quantity || 0) * 0.453592 : (batch.quantity || 0);
+
       if (!animalTypeData[batch.animalType]) animalTypeData[batch.animalType] = 0;
-      animalTypeData[batch.animalType] += batch.quantity;
+      animalTypeData[batch.animalType] += quantityInKg;
 
       if (!meatTypeData[batch.meatType]) meatTypeData[batch.meatType] = 0;
-      meatTypeData[batch.meatType] += batch.quantity;
+      meatTypeData[batch.meatType] += quantityInKg;
+
+      // Count individual batches per meat type
+      if (!meatTypeCounts[batch.meatType]) meatTypeCounts[batch.meatType] = 0;
+      meatTypeCounts[batch.meatType] += 1;
 
       if (!statusData[batch.status]) statusData[batch.status] = 0;
       statusData[batch.status] += 1;
@@ -260,12 +276,13 @@ export default function MeatProductivityDashboard() {
         year: 'numeric',
       });
       if (!monthlyData[monthYear]) monthlyData[monthYear] = 0;
-      monthlyData[monthYear] += batch.quantity;
+      monthlyData[monthYear] += quantityInKg;
     });
 
     setAnalyticsData({
       animalTypeData,
       meatTypeData,
+      meatTypeCounts,
       statusData,
       monthlyData,
     });
@@ -278,7 +295,10 @@ export default function MeatProductivityDashboard() {
         params: { period: analyticsPeriod }
       });
       if (response.data.success) {
-        setAnalyticsData(response.data.data);
+        setAnalyticsData(prev => ({
+          ...prev,
+          ...response.data.data
+        }));
       } else {
         addNotification("Failed to load production analytics", "error");
       }
@@ -326,20 +346,23 @@ export default function MeatProductivityDashboard() {
   };
 
   const deleteBatch = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this batch?")) return;
+    if (!window.confirm("Are you sure you want to delete this batch? This action cannot be undone.")) return;
 
     try {
+      setIsLoading(true);
       const response = await axios.delete(`http://localhost:5000/api/meats/${id}`);
       if (response.data.success) {
         addNotification(response.data.message || "Batch deleted successfully", "success");
+        fetchData();
       } else {
         addNotification(response.data.message || "Failed to delete batch", "error");
       }
-      fetchData();
     } catch (err) {
       console.error("Failed to delete batch:", err);
       const errorMsg = err.response?.data?.message || "Failed to delete batch";
       addNotification(errorMsg, "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -873,10 +896,11 @@ export default function MeatProductivityDashboard() {
     if (!formData.expiryDate) newErrors.expiryDate = "Expiry date is required";
 
     if (formData.productionDate && formData.expiryDate) {
-      const productionDate = new Date(formData.productionDate);
-      const expiryDate = new Date(formData.expiryDate);
+      // Compare only the date strings to avoid timezone issues
+      const prodDate = formData.productionDate;
+      const expDate = formData.expiryDate;
 
-      if (expiryDate <= productionDate) {
+      if (expDate <= prodDate) {
         newErrors.expiryDate = "Expiry date must be after production date";
       }
     }
@@ -905,6 +929,9 @@ export default function MeatProductivityDashboard() {
     try {
       setIsLoading(true);
 
+      // Log the data being sent for debugging
+      console.log("Submitting form data:", formData);
+
       let response;
       if (editingBatchId) {
         response = await axios.put(`http://localhost:5000/api/meats/${editingBatchId}`, formData);
@@ -914,28 +941,39 @@ export default function MeatProductivityDashboard() {
 
       if (response.data.success) {
         addNotification(response.data.message || (editingBatchId ? "Batch updated successfully" : "Batch created successfully"), "success");
+        
+        // Auto-close form after success
+        setTimeout(() => {
+          setShowForm(false);
+          setEditingBatchId(null);
+          setFormData({
+            batchName: "",
+            animalType: "",
+            meatType: "",
+            quantity: "",
+            unit: "kg",
+            productionDate: "",
+            expiryDate: "",
+            status: "Fresh",
+            healthCondition: "Good",
+            notes: "",
+          });
+        }, 500);
+        
+        fetchData();
       } else {
         addNotification(response.data.message || "Failed to save batch", "error");
       }
-
-      setShowForm(false);
-      setEditingBatchId(null);
-      setFormData({
-        batchName: "",
-        animalType: "",
-        meatType: "",
-        quantity: "",
-        unit: "kg",
-        productionDate: "",
-        expiryDate: "",
-        status: "Fresh",
-        healthCondition: "Good",
-        notes: "",
-      });
-      fetchData();
     } catch (err) {
       console.error("Failed to save batch:", err);
-      const errorMsg = err.response?.data?.message || "Failed to save batch";
+      console.error("Error response:", err.response?.data);
+      
+      // Display detailed validation errors if available
+      let errorMsg = err.response?.data?.message || "Failed to save batch";
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        errorMsg = err.response.data.errors.join(", ");
+      }
+      
       addNotification(errorMsg, "error");
     } finally {
       setIsLoading(false);
@@ -951,23 +989,26 @@ export default function MeatProductivityDashboard() {
       setIsLoading(true);
       const response = await axios.post(`http://localhost:5000/api/meats/${harvestingBatchId}/harvest`, harvestFormData);
       
-      if (response.data.success) {
+      if (response.data.success || response.data.message) {
         addNotification(response.data.message || "Batch harvested successfully", "success");
+        
+        // Auto-close form after success
+        setTimeout(() => {
+          setShowHarvestForm(false);
+          setHarvestingBatchId(null);
+          setHarvestFormData({
+            slaughterDate: "",
+            totalMeatProduced: "",
+            storageLocation: "",
+            harvestNotes: "",
+          });
+        }, 500);
+        
+        fetchData();
+        fetchHarvestHistory();
       } else {
         addNotification(response.data.message || "Failed to harvest batch", "error");
       }
-      
-      setShowHarvestForm(false);
-      setHarvestingBatchId(null);
-      setHarvestFormData({
-        slaughterDate: "",
-        totalMeatProduced: "",
-        storageLocation: "",
-        harvestNotes: "",
-      });
-      
-      fetchData();
-      fetchHarvestHistory();
     } catch (err) {
       console.error("Failed to harvest batch:", err);
       const errorMsg = err.response?.data?.message || "Failed to harvest batch";
@@ -1036,6 +1077,49 @@ export default function MeatProductivityDashboard() {
             Add New Batch
           </button>
         </div>
+      </div>
+
+      {/* Harvested Meat Types Summary */}
+      <div className={`${darkMode ? "bg-gray-800" : "bg-white"} p-6 rounded-2xl shadow-lg mb-8`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Package size={20} />
+            Harvested Meat Types
+          </h3>
+          <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+            Total: {stats.totalMeatProduced.toFixed(2)} kg
+          </div>
+        </div>
+        {stats.harvestedMeatTypes && stats.harvestedMeatTypes.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {stats.harvestedMeatTypes.map((meatType) => (
+              <div
+                key={meatType._id}
+                className={`${darkMode ? "bg-gray-700" : "bg-gray-50"} border ${darkMode ? "border-gray-600" : "border-gray-200"} rounded-xl p-4`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl" aria-hidden>{getMeatIcon(meatType._id)}</span>
+                  <div className="flex-1">
+                    <div className="font-semibold">{meatType._id}</div>
+                    <div className={`${darkMode ? "text-gray-300" : "text-gray-600"} text-sm`}>Harvested</div>
+                  </div>
+                </div>
+                <div className={`mt-2 pt-2 border-t ${darkMode ? "border-gray-600" : "border-gray-200"}`}>
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Batches:</span>
+                    <span className="text-lg font-bold">{meatType.count}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Total:</span>
+                    <span className="text-sm font-semibold">{Number(meatType.totalMeatProduced).toFixed(2)} kg</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={`${darkMode ? "text-gray-400" : "text-gray-500"}`}>No harvested meat types found</div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -1499,13 +1583,13 @@ export default function MeatProductivityDashboard() {
       )}
 
       {/* Harvest History Section */}
-      {showHarvestHistory && showFilters && (
+      {showHarvestHistory && (
         <div className="mb-8">
           <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg mb-6`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <History size={20} />
-                Harvest History Filters
+                Harvest History
               </h3>
               <div className="flex gap-3">
                 <button
@@ -1514,7 +1598,7 @@ export default function MeatProductivityDashboard() {
                     darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-200 hover:bg-gray-300 text-gray-800"
                   } transition-all`}
                 >
-                  Clear All
+                  Clear Filters
                 </button>
                 <button
                   onClick={fetchHarvestHistory}
@@ -1741,22 +1825,40 @@ export default function MeatProductivityDashboard() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => openForm(batch._id)}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all ${
+                              darkMode 
+                                ? "bg-blue-900/30 text-blue-400 hover:bg-blue-900/50" 
+                                : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            }`}
+                            title="Edit batch"
                           >
+                            <Eye size={14} />
                             Edit
                           </button>
                           {batch.isActive && (
                             <button
                               onClick={() => harvestBatch(batch._id)}
-                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                              className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all ${
+                                darkMode 
+                                  ? "bg-green-900/30 text-green-400 hover:bg-green-900/50" 
+                                  : "bg-green-100 text-green-700 hover:bg-green-200"
+                              }`}
+                              title="Harvest batch"
                             >
+                              <Scissors size={14} />
                               Harvest
                             </button>
                           )}
                           <button
                             onClick={() => deleteBatch(batch._id)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all ${
+                              darkMode 
+                                ? "bg-red-900/30 text-red-400 hover:bg-red-900/50" 
+                                : "bg-red-100 text-red-700 hover:bg-red-200"
+                            }`}
+                            title="Delete batch"
                           >
+                            <XCircle size={14} />
                             Delete
                           </button>
                         </div>
@@ -1930,7 +2032,7 @@ export default function MeatProductivityDashboard() {
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                     Expiry Date *
                   </label>
-                  <div className="flex gap-2 mb-2">
+                  <div className="flex flex-wrap gap-2 mb-2">
                     <button
                       type="button"
                       onClick={() => calculateExpiryDate(7)}
@@ -1957,6 +2059,42 @@ export default function MeatProductivityDashboard() {
                       }`}
                     >
                       1 Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => calculateExpiryDate(60)}
+                      className={`px-3 py-1 text-xs rounded ${
+                        darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                    >
+                      2 Months
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => calculateExpiryDate(90)}
+                      className={`px-3 py-1 text-xs rounded ${
+                        darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                    >
+                      3 Months
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => calculateExpiryDate(180)}
+                      className={`px-3 py-1 text-xs rounded ${
+                        darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                    >
+                      6 Months
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => calculateExpiryDate(365)}
+                      className={`px-3 py-1 text-xs rounded ${
+                        darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                    >
+                      1 Year
                     </button>
                   </div>
                   <input

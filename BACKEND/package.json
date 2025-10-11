@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "seed:meat": "node AnimalManagement/scripts/seedMeatData.js",
+    "seed:animals": "node AnimalManagement/scripts/seedAnimalData.js"
   },
   "author": "randiv",
   "license": "ISC",
