@@ -35,10 +35,17 @@ FRONTEND/coverage/
 
 # Upload directories (contains user uploaded files)
 BACKEND/uploads/
-BACKEND/AnimalManagement/uploads/
 BACKEND/EmployeeManager/uploads/
 BACKEND/HealthManagement/Health_uploads/
 BACKEND/PlantManagement/Uploads/
+
+# Allow animal management images but exclude other file types
+BACKEND/AnimalManagement/uploads/*
+!BACKEND/AnimalManagement/uploads/*.jpg
+!BACKEND/AnimalManagement/uploads/*.jpeg
+!BACKEND/AnimalManagement/uploads/*.png
+!BACKEND/AnimalManagement/uploads/*.gif
+!BACKEND/AnimalManagement/uploads/*.webp
 
 # IDE specific files
 .vscode/
