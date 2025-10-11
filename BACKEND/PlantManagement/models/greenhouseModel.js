@@ -5,6 +5,11 @@ const GreenhouseSchema = new mongoose.Schema({
   location: { type: String, required: true },
   temperature: { type: Number },
   humidity: { type: Number },
+  status: { 
+    type: String, 
+    enum: ['Active', 'Inactive', 'Maintenance'], 
+    default: 'Active' 
+  },
 }, { timestamps: true });
 
 export default mongoose.model('greenhouse', GreenhouseSchema);

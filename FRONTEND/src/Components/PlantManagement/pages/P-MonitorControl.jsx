@@ -1,441 +1,1219 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import Card from '../P-Card.jsx';
-import { Thermometer, Droplet, Sprout, Wind, Lightbulb, Waves, AlertTriangle, WifiOff, Bell } from 'lucide-react';
+import { Thermometer, Droplet, Sprout, Wind, Lightbulb, Waves, AlertTriangle, Bell, Clock, Wifi, RefreshCw, Settings } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Loader from '../Loader/Loader';
-import '../styles/P-MonitorControl.css';
-import "../styles/theme.css";
+import axios from 'axios';
+import esp32WebSocketService from '../../../utils/esp32WebSocketService';
 
 const MonitorControl = () => {
-  const {
-    t
-  } = useLanguage();
+  // const { t } = useLanguage(); // Unused for now
   const [selectedGreenhouse, setSelectedGreenhouse] = useState('GH-01');
+  const [validGreenhouses, setValidGreenhouses] = useState([]);
+  const [historicalData, setHistoricalData] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [autoMode, setAutoMode] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [customIP, setCustomIP] = useState('');
+  const [isConnectingToCustomIP, setIsConnectingToCustomIP] = useState(false);
   const [telemetryData, setTelemetryData] = useState({
     temperature: 25,
     humidity: 65,
-    soilMoisture: 42,
+    soilMoisture: 1500,
+    ipAddress: '172.20.10.2',
+    signalStrength: -55,
+    connectedSSID: 'Danuz',
+    webSocketClients: 0,
+    dhtSensorWorking: true,
     controls: {
-      fan: {
-        status: 'on',
-        lastToggled: '2023-07-14 15:30'
-      },
-      lights: {
-        status: 'off',
-        lastToggled: '2023-07-14 18:00'
-      },
-      waterPump: {
-        status: 'off',
-        lastToggled: '2023-07-14 12:15'
-      }
+      fan: { status: 'off', lastToggled: null, timer: null },
+      lights: { status: 'off', lastToggled: null, timer: null },
+      waterPump: { status: 'off', lastToggled: null, timer: null },
+      heater: { status: 'off', lastToggled: null, timer: null }
     }
   });
-  const [historicalData, setHistoricalData] = useState([]);
-  const [alerts, setAlerts] = useState([{
-    id: 1,
-    type: 'temperature',
-    message: 'Temperature above threshold (30°C)',
-    timestamp: '2023-07-14 14:23'
-  }, {
-    id: 2,
-    type: 'connection',
-    message: 'Connection lost to sensor node #3',
-    timestamp: '2023-07-14 10:45'
-  }, {
-    id: 3,
-    type: 'moisture',
-    message: 'Soil moisture below threshold (30%)',
-    timestamp: '2023-07-14 08:12'
-  }]);
-  const [loading, setLoading] = useState(true);
+  const [timerSettings, setTimerSettings] = useState({
+    fan: { hours: 0, minutes: 0, active: false },
+    lights: { hours: 0, minutes: 0, active: false },
+    waterPump: { hours: 0, minutes: 0, active: false },
+    heater: { hours: 0, minutes: 0, active: false }
+  });
   
-  // Sample greenhouse options
-  const greenhouseOptions = [{
-    id: 'GH-01',
-    name: 'Greenhouse 1 - Tomato'
-  }, {
-    id: 'GH-02',
-    name: 'Greenhouse 2 - Cucumber'
-  }, {
-    id: 'GH-03',
-    name: 'Greenhouse 3 - Lettuce'
-  }, {
-    id: 'GH-04',
-    name: 'Greenhouse 4 - Strawberry'
-  }, {
-    id: 'GH-05',
-    name: 'Greenhouse 5 - Chili'
-  }];
+  const pollingIntervalRef = useRef(null);
+  const retryCountRef = useRef(0);
   
-  // Generate mock historical data
+  // ESP32 WebSocket service integration
+  // const [esp32ConnectionStatus, setESP32ConnectionStatus] = useState('disconnected'); // Unused for now
+  const [esp32CurrentIP, setESP32CurrentIP] = useState(null);
+
+  // Fetch valid greenhouses on component mount
   useEffect(() => {
-    const generateHistoricalData = () => {
-      setLoading(true);
-      const data = [];
+    const fetchValidGreenhouses = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/greenhouses');
+        // Handle both response formats: {success: true, data: [...]} or direct array
+        const greenhousesData = response.data.success ? response.data.data : response.data;
+        setValidGreenhouses(greenhousesData);
+      } catch (error) {
+        console.error('Error fetching valid greenhouses:', error);
+      }
+    };
+
+    fetchValidGreenhouses();
+  }, []);
+
+  // Test connection function
+  const testConnection = async () => {
+    try {
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
+      const response = await fetch(`/health`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return false;
+    }
+  };
+
+  // ESP32 WebSocket service connection management
+  const connectESP32WebSocket = useCallback(() => {
+    console.log('🔄 Starting ESP32 WebSocket connection...');
+    setConnectionStatus('connecting');
+    setLoading(true);
+
+    // Set up event listeners
+    esp32WebSocketService.on('connected', (data) => {
+      console.log('✅ ESP32 WebSocket connected:', data);
+      // setESP32ConnectionStatus('connected'); // Unused for now
+      setESP32CurrentIP(data.ip);
+      setConnectionStatus('connected');
+      setLoading(false);
+    });
+
+    esp32WebSocketService.on('disconnected', () => {
+      console.log('❌ ESP32 WebSocket disconnected');
+      // setESP32ConnectionStatus('disconnected'); // Unused for now
+      setESP32CurrentIP(null);
+      setConnectionStatus('disconnected');
+      setLoading(false);
+    });
+
+    esp32WebSocketService.on('connecting', () => {
+      console.log('🔄 ESP32 WebSocket connecting...');
+      // setESP32ConnectionStatus('connecting'); // Unused for now
+      setConnectionStatus('connecting');
+    });
+
+    esp32WebSocketService.on('data', (data) => {
+      console.log('📊 ESP32 data received:', data);
+      handleESP32Data(data);
+    });
+
+    esp32WebSocketService.on('error', (error) => {
+      console.error('❌ ESP32 WebSocket error:', error);
+      // setESP32ConnectionStatus('error'); // Unused for now
+      setConnectionStatus('disconnected');
+      setLoading(false);
+      
+      // Fallback to HTTP polling after WebSocket failure
+      console.log('🔄 Falling back to HTTP polling...');
+      startPolling();
+    });
+
+    // Connect to ESP32
+    esp32WebSocketService.connect();
+  }, []);
+
+  const disconnectESP32WebSocket = () => {
+    console.log('🔌 Disconnecting ESP32 WebSocket...');
+    esp32WebSocketService.disconnect();
+    // setESP32ConnectionStatus('disconnected'); // Unused for now
+    setESP32CurrentIP(null);
+  };
+
+  // Improved HTTP Polling implementation (fallback)
+  const startPolling = async () => {
+    if (selectedGreenhouse !== 'GH-01') {
+      setConnectionStatus('disconnected');
+      setLoading(false);
+      return;
+    }
+
+    console.log('🔄 Starting HTTP polling to ESP32 (fallback mode)');
+    setConnectionStatus('connecting');
+    setLoading(true);
+    
+    retryCountRef.current = 0;
+
+    // Test connection first
+    const isReachable = await testConnection();
+    if (!isReachable) {
+      console.log('❌ ESP32 not reachable');
+      handleFetchError();
+      return;
+    }
+
+    // Fetch data immediately
+    fetchDataWithRetry();
+
+    // Set up polling every 2 seconds (as requested)
+    pollingIntervalRef.current = setInterval(() => {
+      if (connectionStatus === 'connected') {
+        fetchDataWithRetry();
+      }
+    }, 2000);
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setConnectionStatus('disconnected');
+    setLoading(false);
+  };
+
+  const fetchDataWithRetry = async () => {
+    try {
+      await fetchData();
+      retryCountRef.current = 0;
+    } catch (error) {
+      console.error('❌ Fetch failed, scheduling retry:', error.message);
+      handleFetchError();
+    }
+  };
+
+  const handleFetchError = () => {
+    retryCountRef.current += 1;
+    const maxRetries = 2;
+    
+    if (retryCountRef.current > maxRetries) {
+      console.log('❌ Max retries reached, stopping polling');
+      setConnectionStatus('disconnected');
+      setLoading(false);
+      return;
+    }
+
+    const retryDelay = Math.min(1000 * Math.pow(2, retryCountRef.current), 3000);
+    
+    console.log(`🔁 Retrying in ${retryDelay}ms (attempt ${retryCountRef.current}/${maxRetries})`);
+    
+    setConnectionStatus('connecting');
+    
+    setTimeout(() => {
+      fetchDataWithRetry();
+    }, retryDelay);
+  };
+
+  const fetchData = async () => {
+    try {
+      console.log('📡 Fetching data from ESP32...');
+      
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(`/status?_t=${Date.now()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Data received successfully:', data);
+      
+      handleESP32Data(data);
+      setConnectionStatus('connected');
+      setLoading(false);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Fetch error details:', error);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - ESP32 not responding');
+      }
+      throw new Error('Network error - Check if ESP32 is reachable');
+    }
+  };
+
+  const handleESP32Data = (data) => {
+    // Handle null values from ESP32 (when sensor is not working)
+    const temperature = data.temperature !== null && data.temperature !== undefined ? data.temperature : null;
+    const humidity = data.humidity !== null && data.humidity !== undefined ? data.humidity : null;
+    const dhtSensorWorking = data.dhtSensorWorking !== undefined ? data.dhtSensorWorking : false;
+
+    console.log('Sensor data received:', {
+      temperature,
+      humidity,
+      dhtSensorWorking,
+      soilMoisture: data.soilMoisture
+    });
+
+    setTelemetryData(prev => ({
+      ...prev,
+      temperature: temperature,
+      humidity: humidity,
+      soilMoisture: data.soilMoisture || 1500,
+      ipAddress: data.ipAddress || '172.20.10.2',
+      signalStrength: data.signalStrength || -55,
+      connectedSSID: data.connectedSSID || 'Danuz',
+      webSocketClients: data.webSocketClients || 0,
+      dhtSensorWorking: dhtSensorWorking,
+      controls: {
+        ...prev.controls,
+        fan: { ...prev.controls.fan, status: data.fanState ? 'on' : 'off' },
+        lights: { ...prev.controls.lights, status: data.lightState ? 'on' : 'off' },
+        waterPump: { ...prev.controls.waterPump, status: data.pumpState ? 'on' : 'off' },
+        heater: { ...prev.controls.heater, status: data.heaterState ? 'on' : 'off' }
+      }
+    }));
+
+    // Update auto mode
+    setAutoMode(data.autoMode !== undefined ? data.autoMode : true);
+
+    // Only add to historical data if sensors are working and have valid values
+    if (dhtSensorWorking && temperature !== null && humidity !== null) {
       const now = new Date();
-      for (let i = 23; i >= 0; i--) {
-        const hour = now.getHours() - i;
-        const formattedHour = `${hour < 0 ? 24 + hour : hour}:00`;
-        data.push({
-          time: formattedHour,
-          temperature: Math.round((22 + Math.random() * 8) * 10) / 10,
-          humidity: Math.round((55 + Math.random() * 20) * 10) / 10,
-          soilMoisture: Math.round((35 + Math.random() * 25) * 10) / 10
+      const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+      
+      setHistoricalData(prev => {
+        const newData = [...prev, {
+          time: timeString,
+          temperature: temperature,
+          humidity: humidity,
+          soilMoisture: data.soilMoisture
+        }];
+        
+        return newData.slice(-50);
+      });
+    }
+
+    // Check for alerts
+    checkAlerts(data, dhtSensorWorking, temperature, humidity);
+  };
+
+  const checkAlerts = (data, dhtSensorWorking, temperature, humidity) => {
+    const newAlerts = [];
+    const now = new Date().toLocaleString();
+
+    // DHT Sensor alerts
+    if (!dhtSensorWorking) {
+      newAlerts.push({
+        id: Date.now(),
+        type: 'temperature',
+        message: 'DHT22 Sensor Not Working - Check wiring and connections',
+        timestamp: now
+      });
+    } else {
+      // Temperature alerts (only if sensor is working)
+      if (temperature > 30) {
+        newAlerts.push({
+          id: Date.now() + 1,
+          type: 'temperature',
+          message: `Temperature above threshold (${temperature}°C)`,
+          timestamp: now
+        });
+      } else if (temperature < 15) {
+        newAlerts.push({
+          id: Date.now() + 2,
+          type: 'temperature',
+          message: `Temperature below threshold (${temperature}°C)`,
+          timestamp: now
         });
       }
-      return data;
-    };
-    
-    // Simulate data loading delay
-    setTimeout(() => {
-      setHistoricalData(generateHistoricalData());
-      setLoading(false);
-    }, 1000);
-  }, [selectedGreenhouse]);
-  
-  // Simulate WebSocket connection for real-time updates
-  useEffect(() => {
-    if (selectedGreenhouse === 'GH-01') {
-      const interval = setInterval(() => {
-        setTelemetryData(prev => ({
-          ...prev,
-          temperature: Math.round((prev.temperature + (Math.random() - 0.5) * 0.5) * 10) / 10,
-          humidity: Math.round((prev.humidity + (Math.random() - 0.5) * 1) * 10) / 10,
-          soilMoisture: Math.round((prev.soilMoisture + (Math.random() - 0.5) * 0.8) * 10) / 10
-        }));
-      }, 3000);
-      return () => clearInterval(interval);
+
+      // Humidity alerts (only if sensor is working)
+      if (humidity < 40) {
+        newAlerts.push({
+          id: Date.now() + 3,
+          type: 'humidity',
+          message: `Humidity below threshold (${humidity}%)`,
+          timestamp: now
+        });
+      } else if (humidity > 80) {
+        newAlerts.push({
+          id: Date.now() + 4,
+          type: 'humidity',
+          message: `Humidity above threshold (${humidity}%)`,
+          timestamp: now
+        });
+      }
     }
-  }, [selectedGreenhouse]);
-  
-  const handleGreenhouseChange = e => {
-    setLoading(true);
-    setSelectedGreenhouse(e.target.value);
-    // Reset data for non-GH-01 greenhouses
-    if (e.target.value !== 'GH-01') {
-      setTelemetryData({
-        temperature: null,
-        humidity: null,
-        soilMoisture: null,
-        controls: {
-          fan: {
-            status: 'off',
-            lastToggled: 'N/A'
-          },
-          lights: {
-            status: 'off',
-            lastToggled: 'N/A'
-          },
-          waterPump: {
-            status: 'off',
-            lastToggled: 'N/A'
-          }
-        }
+
+    // Soil moisture alerts (always works)
+    if (data.soilMoisture > 2000) {
+      newAlerts.push({
+        id: Date.now() + 5,
+        type: 'moisture',
+        message: `Soil moisture critical (${data.soilMoisture}) - Needs watering`,
+        timestamp: now
       });
-      setHistoricalData([]);
-    } else {
-      // Reset to default data for GH-01
-      setTelemetryData({
-        temperature: 25,
-        humidity: 65,
-        soilMoisture: 42,
-        controls: {
-          fan: {
-            status: 'on',
-            lastToggled: '2023-07-14 15:30'
-          },
-          lights: {
-            status: 'off',
-            lastToggled: '2023-07-14 18:00'
-          },
-          waterPump: {
-            status: 'off',
-            lastToggled: '2023-07-14 12:15'
-          }
-        }
+    } else if (data.soilMoisture < 1000) {
+      newAlerts.push({
+        id: Date.now() + 6,
+        type: 'moisture',
+        message: `Soil moisture too wet (${data.soilMoisture})`,
+        timestamp: now
       });
     }
-    
-    // Simulate loading delay when switching greenhouses
-    setTimeout(() => {
-      setLoading(false);
-    }, 800);
+
+    setAlerts(prev => {
+      const allAlerts = [...newAlerts, ...prev];
+      const uniqueAlerts = allAlerts.filter((alert, index, self) => 
+        index === self.findIndex(a => a.id === alert.id)
+      );
+      return uniqueAlerts.slice(-10);
+    });
   };
-  
-  const toggleControl = control => {
+
+  // Control commands via ESP32 WebSocket service or HTTP
+  const sendControlCommand = async (device, action, duration = null) => {
     if (selectedGreenhouse !== 'GH-01') {
       alert('Control not available. Equipment not connected.');
       return;
     }
-    setTelemetryData(prev => ({
-      ...prev,
-      controls: {
-        ...prev.controls,
-        [control]: {
-          status: prev.controls[control].status === 'on' ? 'off' : 'on',
-          lastToggled: new Date().toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          }).replace(',', '')
-        }
+
+    console.log(`🎮 Sending control command: ${device} ${action}${duration ? ` for ${duration} minutes` : ''}`);
+
+    // Try ESP32 WebSocket service first if connected
+    if (esp32WebSocketService.getConnectionStatus() === 'connected') {
+      const success = esp32WebSocketService.sendControlCommand(device, action, duration);
+      
+      if (success) {
+        console.log(`✅ ESP32 WebSocket control command sent: ${device} ${action}`);
+        
+        const now = new Date().toLocaleString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+
+        setTelemetryData(prev => ({
+          ...prev,
+          controls: {
+            ...prev.controls,
+            [device]: {
+              ...prev.controls[device],
+              status: action === 'on' ? 'on' : 'off',
+              lastToggled: now,
+              timer: duration
+            }
+          }
+        }));
+
+        return;
+      } else {
+        console.warn('⚠️ ESP32 WebSocket command failed, falling back to HTTP');
       }
-    }));
-  };
-  
-  const getGaugeColor = (value, type) => {
-    if (type === 'temperature') {
-      if (value < 18) return '#29B6F6'; // cold
-      if (value > 28) return '#EF5350'; // hot
-      return '#66BB6A'; // optimal
-    } else if (type === 'humidity') {
-      if (value < 40) return '#EF5350'; // dry
-      if (value > 80) return '#29B6F6'; // wet
-      return '#66BB6A'; // optimal
-    } else if (type === 'soilMoisture') {
-      if (value < 30) return '#EF5350'; // dry
-      if (value > 70) return '#29B6F6'; // wet
-      return '#66BB6A'; // optimal
     }
-  };
-  
-  const getGaugeBorderColor = type => {
-    if (type === 'temperature') return '#EF5350'; // red for temperature
-    if (type === 'humidity') return '#29B6F6'; // blue for humidity
-    return '#66BB6A'; // green for soil moisture
-  };
-  
-  const getAlertIcon = type => {
-    switch (type) {
-      case 'temperature':
-        return <Thermometer size={16} />;
-      case 'humidity':
-        return <Droplet size={16} />;
-      case 'moisture':
-        return <Sprout size={16} />;
-      case 'connection':
-        return <WifiOff size={16} />;
-      default:
-        return <AlertTriangle size={16} />;
+
+    // Fallback to HTTP if WebSocket not available
+    try {
+      const response = await fetch(`/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          device: device,
+          action: action,
+          duration: duration
+        })
+      });
+      
+      if (response.ok) {
+        console.log(`✅ HTTP control command sent: ${device} ${action}`);
+        
+        const now = new Date().toLocaleString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+
+        setTelemetryData(prev => ({
+          ...prev,
+          controls: {
+            ...prev.controls,
+            [device]: {
+              ...prev.controls[device],
+              status: action === 'on' ? 'on' : 'off',
+              lastToggled: now,
+              timer: duration
+            }
+          }
+        }));
+
+        // Refresh data after control command
+        setTimeout(fetchData, 1000);
+      } else {
+        throw new Error(`Control command failed with status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ HTTP control command error:', error);
+      alert(`Failed to send control command: ${error.message}`);
     }
-  };
-  
-  // Calculate the percentage for the gauge circle
-  const calculateGaugePercentage = (value, min, max) => {
-    if (value === null) return 0;
-    const percentage = (value - min) / (max - min) * 100;
-    return Math.min(Math.max(percentage, 0), 100);
-  };
-  
-  // Calculate the stroke dash offset for the gauge
-  const calculateStrokeDashOffset = percentage => {
-    const circumference = 2 * Math.PI * 45; // 45 is the radius of the circle
-    return circumference - percentage / 100 * circumference;
-  };
-  
-  const renderEquipmentNotConnectedMessage = () => {
-    if (selectedGreenhouse !== 'GH-01') {
-      return <div className="not-connected-message">
-          <AlertTriangle size={24} />
-          <p>Equipment not connected for {selectedGreenhouse}. Limited data available.</p>
-        </div>;
-    }
-    return null;
   };
 
-  // Show loader while data is being loaded
-  if (loading) {
-    return <Loader darkMode={false} />;
+  const toggleControl = (device) => {
+    // Lights can be controlled in both auto and manual modes
+    if (device === 'lights') {
+      const currentStatus = telemetryData.controls[device].status;
+      const newStatus = currentStatus === 'on' ? 'off' : 'on';
+      sendControlCommand(device, newStatus);
+      return;
+    }
+
+    // For other devices (fan, waterPump, heater), only allow control in manual mode
+    if (autoMode) {
+      alert(`Cannot manually control ${device} in Auto Mode. Switch to Manual Mode first.`);
+      return;
+    }
+
+    const currentStatus = telemetryData.controls[device].status;
+    const newStatus = currentStatus === 'on' ? 'off' : 'on';
+    
+    sendControlCommand(device, newStatus);
+  };
+
+  const setTimer = (device, hours, minutes) => {
+    // Lights can have timer in both modes
+    if (device !== 'lights' && autoMode) {
+      alert(`Cannot set timer for ${device} in Auto Mode. Switch to Manual Mode first.`);
+      return;
+    }
+
+    if (hours === 0 && minutes === 0) {
+      setTimerSettings(prev => ({
+        ...prev,
+        [device]: { ...prev[device], active: false }
+      }));
+      sendControlCommand(device, 'off');
+      return;
+    }
+
+    const totalMinutes = (hours * 60) + minutes;
+    setTimerSettings(prev => ({
+      ...prev,
+      [device]: { hours, minutes, active: true }
+    }));
+
+    sendControlCommand(device, 'on', totalMinutes);
+  };
+
+  const toggleAutoMode = async () => {
+    if (selectedGreenhouse !== 'GH-01') {
+      alert('Auto mode not available. Equipment not connected.');
+      return;
+    }
+
+    const newMode = !autoMode;
+    setAutoMode(newMode);
+    
+    console.log(`🔄 Toggling mode to: ${newMode ? 'AUTO' : 'MANUAL'}`);
+    
+    // Try ESP32 WebSocket service first if connected
+    if (esp32WebSocketService.getConnectionStatus() === 'connected') {
+      const success = esp32WebSocketService.sendModeCommand(newMode ? 'auto' : 'manual');
+      
+      if (success) {
+        console.log(`✅ ESP32 WebSocket mode changed to: ${newMode ? 'AUTO' : 'MANUAL'}`);
+        return;
+      } else {
+        console.warn('⚠️ ESP32 WebSocket mode command failed, falling back to HTTP');
+      }
+    }
+
+    // Fallback to HTTP if WebSocket not available
+    try {
+      const response = await fetch(`/toggleMode`);
+      if (response.ok) {
+        console.log(`✅ HTTP mode changed to: ${newMode ? 'AUTO' : 'MANUAL'}`);
+        setTimeout(fetchData, 1000);
+      } else {
+        throw new Error('Mode toggle failed');
+      }
+    } catch (error) {
+      console.error('❌ HTTP mode toggle error:', error);
+      setAutoMode(!newMode);
+      alert('Failed to toggle mode. Please try again.');
+    }
+  };
+
+  const manualRefresh = () => {
+    if (selectedGreenhouse === 'GH-01') {
+      setConnectionStatus('connecting');
+      setLoading(true);
+      fetchDataWithRetry();
+    }
+  };
+
+  const connectToCustomIP = async () => {
+    if (!customIP.trim()) {
+      alert('Please enter a valid IP address');
+      return;
+    }
+
+    // Validate IP format
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    if (!ipRegex.test(customIP.trim())) {
+      alert('Please enter a valid IP address format (e.g., 192.168.1.100)');
+      return;
+    }
+
+    setIsConnectingToCustomIP(true);
+    setConnectionStatus('connecting');
+    setLoading(true);
+
+    try {
+      console.log(`🔍 Testing connection to custom IP: ${customIP}`);
+      
+      // Test connection first
+      const response = await fetch(`http://${customIP}/health`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (response.ok) {
+        console.log(`✅ Successfully connected to ESP32 at ${customIP}`);
+        
+        // Update ESP32 WebSocket service with custom IP
+        esp32WebSocketService.setCustomIP(customIP);
+        
+        // Try WebSocket connection first
+        esp32WebSocketService.connect();
+        
+        // Also update backend configuration
+        await fetch(`/api/esp32/set-custom-ip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ip: customIP })
+        });
+
+        setConnectionStatus('connected');
+        setLoading(false);
+        alert(`✅ Successfully connected to ESP32 at ${customIP}`);
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to connect to ${customIP}:`, error);
+      setConnectionStatus('disconnected');
+      setLoading(false);
+      alert(`❌ Failed to connect to ${customIP}. Please check:\n1. ESP32 is powered on\n2. ESP32 is connected to WiFi\n3. IP address is correct\n4. You're on the same network`);
+    } finally {
+      setIsConnectingToCustomIP(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedGreenhouse === 'GH-01') {
+      // Try ESP32 WebSocket connection first, fallback to HTTP polling
+      connectESP32WebSocket();
+    } else {
+      // Disconnect ESP32 WebSocket and stop polling for other greenhouses
+      disconnectESP32WebSocket();
+      stopPolling();
+      // Set mock data for other greenhouses
+      setTelemetryData(prev => ({
+        ...prev,
+        temperature: 24.0,
+        humidity: 60,
+        soilMoisture: 1200,
+        ipAddress: '192.168.1.100',
+        signalStrength: -65,
+        connectedSSID: 'Mock Network',
+        dhtSensorWorking: true
+      }));
+      setConnectionStatus('disconnected');
+    }
+
+    return () => {
+      disconnectESP32WebSocket();
+      stopPolling();
+    };
+  }, [selectedGreenhouse, connectESP32WebSocket]);
+
+  const handleGreenhouseChange = (e) => {
+    const newGreenhouse = e.target.value;
+    setSelectedGreenhouse(newGreenhouse);
+    setAlerts([]);
+  };
+
+  const getGaugeColor = (value, type) => {
+    if (value === null || value === undefined) return '#ccc';
+    
+    if (type === 'temperature') {
+      if (value < 18) return '#29B6F6';
+      if (value > 28) return '#EF5350';
+      return '#66BB6A';
+    } else if (type === 'humidity') {
+      if (value < 40) return '#EF5350';
+      if (value > 80) return '#29B6F6';
+      return '#66BB6A';
+    } else if (type === 'soilMoisture') {
+      const percentage = Math.max(0, Math.min(100, 100 - ((value - 1000) / (2000 - 1000)) * 100));
+      if (percentage < 30) return '#EF5350';
+      if (percentage > 70) return '#29B6F6';
+      return '#66BB6A';
+    }
+    return '#999';
+  };
+
+  const calculateGaugePercentage = (value, min, max) => {
+    if (value === null || value === undefined) return 0;
+    const percentage = ((value - min) / (max - min)) * 100;
+    return Math.min(Math.max(percentage, 0), 100);
+  };
+
+  const calculateStrokeDashOffset = (percentage) => {
+    const circumference = 2 * Math.PI * 45;
+    return circumference - (percentage / 100) * circumference;
+  };
+
+  const convertToPercentage = (value, type) => {
+    if (value === null || value === undefined) return 'N/A';
+    
+    if (type === 'humidity') {
+      return `${Math.round(value)}%`;
+    } else if (type === 'soilMoisture') {
+      const percentage = Math.max(0, Math.min(100, 100 - ((value - 1000) / (2000 - 1000)) * 100));
+      return `${Math.round(percentage)}%`;
+    }
+    return value;
+  };
+
+  const getConnectionStatusColor = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'bg-green-500';
+      case 'connecting': return 'bg-yellow-500';
+      default: return 'bg-red-500';
+    }
+  };
+
+  const getConnectionStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'CONNECTED';
+      case 'connecting': return `CONNECTING... (${retryCountRef.current} retries)`;
+      default: return 'DISCONNECTED';
+    }
+  };
+
+  const TimerModal = ({ device, isOpen, onClose }) => {
+    const [hours, setHours] = useState(0);
+    const [minutes, setMinutes] = useState(0);
+
+    const handleSetTimer = () => {
+      if (hours > 0 || minutes > 0) {
+        setTimer(device, hours, minutes);
+      }
+      onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-80">
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Set Timer for {device.charAt(0).toUpperCase() + device.slice(1)}</h3>
+          
+          <div className="flex gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Hours</label>
+              <input 
+                type="number" 
+                min="0" 
+                max="23"
+                value={hours}
+                onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Minutes</label>
+              <input 
+                type="number" 
+                min="0" 
+                max="59"
+                value={minutes}
+                onChange={(e) => setMinutes(parseInt(e.target.value) || 0)}
+                className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={handleSetTimer}
+              className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600"
+            >
+              Set Timer
+            </button>
+            <button 
+              onClick={onClose}
+              className="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 py-2 rounded hover:bg-gray-400 dark:hover:bg-gray-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ControlButton = ({ device, label, icon: Icon }) => {
+    const [showTimer, setShowTimer] = useState(false);
+    const status = telemetryData.controls[device]?.status === 'on';
+    const timerActive = timerSettings[device]?.active;
+
+    // Lights can always be controlled, other devices only in manual mode
+    const isDisabled = device !== 'lights' && autoMode;
+
+    return (
+      <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="flex items-center gap-3">
+          <Icon size={20} className="text-gray-700 dark:text-gray-300" />
+          <div>
+            <h4 className="m-0 text-base font-medium text-gray-900 dark:text-white">{label}</h4>
+            <p className="mt-1 mb-0 text-xs text-gray-500 dark:text-gray-400">
+              Last toggled: {telemetryData.controls[device]?.lastToggled}
+              {timerActive && ` | Timer: ${timerSettings[device].hours}h ${timerSettings[device].minutes}m`}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {/* On/Off Button - FIXED COLORS */}
+          <button 
+            className={`relative w-14 h-7 rounded-full border-none cursor-pointer transition-all duration-300 p-0 ${
+              status ? 'bg-green-500' : 'bg-red-500'
+            } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} 
+            onClick={() => toggleControl(device)}
+            disabled={isDisabled}
+            title={isDisabled ? 'Switch to Manual Mode to control' : status ? 'Turn Off' : 'Turn On'}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white transition-transform duration-300 ${
+              status ? 'translate-x-7' : 'translate-x-0'
+            }`}></span>
+          </button>
+          
+          {/* Timer Button - FIXED SPACING */}
+          <button 
+            onClick={() => setShowTimer(true)}
+            className={`p-2 rounded border ${
+              isDisabled 
+                ? 'text-gray-400 border-gray-300 cursor-not-allowed bg-gray-100 dark:bg-gray-700' 
+                : 'text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:text-blue-600 hover:border-blue-400 bg-white dark:bg-gray-700'
+            }`}
+            title={isDisabled ? 'Switch to Manual Mode to set timer' : 'Set Timer'}
+            disabled={isDisabled}
+          >
+            <Clock size={16} />
+          </button>
+        </div>
+
+        <TimerModal 
+          device={device}
+          isOpen={showTimer}
+          onClose={() => setShowTimer(false)}
+        />
+      </div>
+    );
+  };
+
+  if (loading && connectionStatus === 'connecting') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader darkMode={false} />
+      </div>
+    );
   }
-  
-  return <div className="monitor-control">
-      <div className="monitor-header">
-        <h1>Monitor & Control</h1>
-        <div className="greenhouse-selector">
-          <label htmlFor="greenhouseSelect">Select Greenhouse:</label>
-          <select id="greenhouseSelect" value={selectedGreenhouse} onChange={handleGreenhouseChange}>
-            {greenhouseOptions.map(option => <option key={option.id} value={option.id}>
-                {option.name}
-              </option>)}
+
+  return (
+    <div className="flex flex-col gap-6 p-4">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Monitor & Control</h1>
+        <div className="flex items-center gap-3">
+          <label htmlFor="greenhouseSelect" className="font-medium text-gray-700 dark:text-gray-300">Select Greenhouse:</label>
+          <select 
+            id="greenhouseSelect" 
+            value={selectedGreenhouse} 
+            onChange={handleGreenhouseChange}
+            className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-w-64"
+          >
+            {validGreenhouses.map(greenhouse => (
+              <option key={greenhouse._id} value={greenhouse.greenhouseName}>
+                {greenhouse.greenhouseName} {greenhouse.greenhouseName === 'GH-01' ? '(Real Data)' : '(Mock Data)'}
+              </option>
+            ))}
           </select>
         </div>
       </div>
-      {renderEquipmentNotConnectedMessage()}
-      <div className="gauges-container">
-        <Card className="gauge-card">
-          <div className="gauge-title">
-            <Thermometer size={20} />
-            <h3>Temperature</h3>
+
+      {/* Custom IP Connection Panel */}
+      {selectedGreenhouse === 'GH-01' && (
+        <Card className="p-4 mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">🔗 Custom ESP32 Connection</h3>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-48">
+              <label htmlFor="customIP" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                ESP32 IP Address
+              </label>
+              <input
+                id="customIP"
+                type="text"
+                value={customIP}
+                onChange={(e) => setCustomIP(e.target.value)}
+                placeholder="e.g., 172.20.10.2, 192.168.1.100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <button
+                onClick={connectToCustomIP}
+                disabled={isConnectingToCustomIP || !customIP.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isConnectingToCustomIP ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <Wifi size={16} />
+                    Connect
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setCustomIP('')}
+                className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                title="Clear IP"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <div className="gauge">
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              {/* Background circle */}
-              <circle cx="60" cy="60" r="45" fill="none" stroke="#E0E0E0" strokeWidth="10" />
-              {/* Colored border */}
-              <circle cx="60" cy="60" r="52" fill="none" stroke={getGaugeBorderColor('temperature')} strokeWidth="2" />
-              {/* Value fill */}
-              {telemetryData.temperature !== null && <circle cx="60" cy="60" r="45" fill="none" stroke={getGaugeColor(telemetryData.temperature, 'temperature')} strokeWidth="10" strokeDasharray={`${2 * Math.PI * 45}`} strokeDashoffset={calculateStrokeDashOffset(calculateGaugePercentage(telemetryData.temperature, 10, 40))} strokeLinecap="round" transform="rotate(-90 60 60)" />}
-              <text x="60" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" fill={telemetryData.temperature !== null ? getGaugeColor(telemetryData.temperature, 'temperature') : '#999'}>
-                {telemetryData.temperature !== null ? telemetryData.temperature : 'N/A'}
-              </text>
-              <text x="60" y="75" textAnchor="middle" fontSize="14" fill="currentColor">
-                °C
-              </text>
-            </svg>
-          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            💡 Enter the ESP32's IP address to connect directly. Check the ESP32's serial monitor for the current IP address.
+          </p>
         </Card>
-        <Card className="gauge-card">
-          <div className="gauge-title">
-            <Droplet size={20} />
-            <h3>Humidity</h3>
+      )}
+
+      {/* Error message for non-GH-01 greenhouses */}
+      {selectedGreenhouse !== 'GH-01' && (
+        <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-200 px-4 py-3 rounded">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            <span className="font-medium">Equipment Not Connected</span>
           </div>
-          <div className="gauge">
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              {/* Background circle */}
-              <circle cx="60" cy="60" r="45" fill="none" stroke="#E0E0E0" strokeWidth="10" />
-              {/* Colored border */}
-              <circle cx="60" cy="60" r="52" fill="none" stroke={getGaugeBorderColor('humidity')} strokeWidth="2" />
-              {/* Value fill */}
-              {telemetryData.humidity !== null && <circle cx="60" cy="60" r="45" fill="none" stroke={getGaugeColor(telemetryData.humidity, 'humidity')} strokeWidth="10" strokeDasharray={`${2 * Math.PI * 45}`} strokeDashoffset={calculateStrokeDashOffset(calculateGaugePercentage(telemetryData.humidity, 0, 100))} strokeLinecap="round" transform="rotate(-90 60 60)" />}
-              <text x="60" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" fill={telemetryData.humidity !== null ? getGaugeColor(telemetryData.humidity, 'humidity') : '#999'}>
-                {telemetryData.humidity !== null ? telemetryData.humidity : 'N/A'}
-              </text>
-              <text x="60" y="75" textAnchor="middle" fontSize="14" fill="currentColor">
-                %
-              </text>
-            </svg>
+          <p className="mt-1">Real-time monitoring and control is only available for GH-01. Other greenhouses show mock data.</p>
+        </div>
+      )}
+
+      {/* Connection Status */}
+      <div className={`flex items-center gap-3 p-3 rounded text-white ${getConnectionStatusColor()}`}>
+        <Wifi size={20} />
+        <div className="flex-1">
+          <div className="flex justify-between items-center">
+            <span>Connection: {getConnectionStatusText()} ({esp32WebSocketService.getConnectionStatus() === 'connected' ? 'ESP32 WebSocket' : 'HTTP Polling'})</span>
+            <span className="text-sm bg-black bg-opacity-20 px-2 py-1 rounded">
+              {selectedGreenhouse === 'GH-01' ? 'Real Data' : 'Mock Data'}
+            </span>
           </div>
-        </Card>
-        <Card className="gauge-card">
-          <div className="gauge-title">
-            <Sprout size={20} />
-            <h3>Soil Moisture</h3>
-          </div>
-          <div className="gauge">
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              {/* Background circle */}
-              <circle cx="60" cy="60" r="45" fill="none" stroke="#E0E0E0" strokeWidth="10" />
-              {/* Colored border */}
-              <circle cx="60" cy="60" r="52" fill="none" stroke={getGaugeBorderColor('soilMoisture')} strokeWidth="2" />
-              {/* Value fill */}
-              {telemetryData.soilMoisture !== null && <circle cx="60" cy="60" r="45" fill="none" stroke={getGaugeColor(telemetryData.soilMoisture, 'soilMoisture')} strokeWidth="10" strokeDasharray={`${2 * Math.PI * 45}`} strokeDashoffset={calculateStrokeDashOffset(calculateGaugePercentage(telemetryData.soilMoisture, 0, 100))} strokeLinecap="round" transform="rotate(-90 60 60)" />}
-              <text x="60" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" fill={telemetryData.soilMoisture !== null ? getGaugeColor(telemetryData.soilMoisture, 'soilMoisture') : '#999'}>
-                {telemetryData.soilMoisture !== null ? telemetryData.soilMoisture : 'N/A'}
-              </text>
-              <text x="60" y="75" textAnchor="middle" fontSize="14" fill="currentColor">
-                %
-              </text>
-            </svg>
-          </div>
-        </Card>
-      </div>
-      {selectedGreenhouse === 'GH-01' && <div className="charts-container">
-          <Card className="chart-card">
-            <h3>24-Hour History</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={historicalData} margin={{
-            top: 20,
-            right: 30,
-            left: 0,
-            bottom: 10
-          }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="temperature" name="Temperature (°C)" stroke="#EF5350" activeDot={{
-              r: 8
-            }} />
-                <Line yAxisId="right" type="monotone" dataKey="humidity" name="Humidity (%)" stroke="#29B6F6" activeDot={{
-              r: 8
-            }} />
-                <Line yAxisId="right" type="monotone" dataKey="soilMoisture" name="Soil Moisture (%)" stroke="#66BB6A" activeDot={{
-              r: 8
-            }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>}
-      <div className="control-panel">
-        <h3>Manual Control Panel</h3>
-        <div className="controls">
-          <div className="control-item">
-            <div className="control-info">
-              <Wind size={20} />
-              <div className="control-details">
-                <h4>Fan</h4>
-                <p>Last toggled: {telemetryData.controls.fan.lastToggled}</p>
+          
+          {connectionStatus === 'connected' && (
+            <div className="text-sm mt-1 opacity-90">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <strong>📡 ESP32 IP:</strong> {esp32CurrentIP || telemetryData.ipAddress}
+                </div>
+                <div>
+                  <strong>💪 Signal:</strong> {telemetryData.signalStrength ? `${telemetryData.signalStrength} dBm` : 'N/A'}
+                </div>
+                <div>
+                  <strong>📶 Network:</strong> {telemetryData.connectedSSID}
+                </div>
+                <div>
+                  <strong>🔧 DHT Status:</strong> 
+                  <span className={`ml-1 ${telemetryData.dhtSensorWorking ? 'text-green-300' : 'text-yellow-300'}`}>
+                    {telemetryData.dhtSensorWorking ? '✅ WORKING' : '❌ NOT WORKING'}
+                  </span>
+                </div>
               </div>
             </div>
-            <button className={`toggle-button ${telemetryData.controls.fan.status}`} onClick={() => toggleControl('fan')}>
-              <span className="toggle-slider"></span>
-              <span className="toggle-text">{telemetryData.controls.fan.status}</span>
-            </button>
-          </div>
-          <div className="control-item">
-            <div className="control-info">
-              <Lightbulb size={20} />
-              <div className="control-details">
-                <h4>Lights</h4>
-                <p>Last toggled: {telemetryData.controls.lights.lastToggled}</p>
-              </div>
-            </div>
-            <button className={`toggle-button ${telemetryData.controls.lights.status}`} onClick={() => toggleControl('lights')}>
-              <span className="toggle-slider"></span>
-              <span className="toggle-text">{telemetryData.controls.lights.status}</span>
-            </button>
-          </div>
-          <div className="control-item">
-            <div className="control-info">
-              <Waves size={20} />
-              <div className="control-details">
-                <h4>Water Pump</h4>
-                <p>Last toggled: {telemetryData.controls.waterPump.lastToggled}</p>
-              </div>
-            </div>
-            <button className={`toggle-button ${telemetryData.controls.waterPump.status}`} onClick={() => toggleControl('waterPump')}>
-              <span className="toggle-slider"></span>
-              <span className="toggle-text">{telemetryData.controls.waterPump.status}</span>
-            </button>
-          </div>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <button 
+            onClick={manualRefresh}
+            disabled={connectionStatus === 'connecting'}
+            className="px-3 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 text-sm flex items-center gap-1 disabled:opacity-50"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+          <button 
+            onClick={async () => {
+              console.log('🧪 Testing ESP32 connectivity...');
+              const result = await esp32WebSocketService.testHTTPConnection();
+              if (result.success) {
+                alert(`✅ ESP32 found at ${result.ip}`);
+              } else {
+                alert('❌ No ESP32 devices found');
+              }
+            }}
+            className="px-3 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 text-sm flex items-center gap-1"
+            title="Test ESP32 Connectivity"
+          >
+            <Settings size={14} />
+            Test
+          </button>
         </div>
       </div>
-      <div className="control-alerts-container">
-        <Card className="alerts-panel">
-          <div className="alerts-header">
-            <h3>Alerts & Notifications</h3>
-            <span className="alert-count">{selectedGreenhouse === 'GH-01' ? alerts.length : 0}</span>
+
+      {/* Auto/Manual Mode Toggle */}
+      {selectedGreenhouse === 'GH-01' && (
+        <div className="flex justify-center">
+          <button 
+            onClick={toggleAutoMode}
+            disabled={connectionStatus !== 'connected'}
+            className={`px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
+              autoMode 
+                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                : 'bg-gray-500 text-white hover:bg-gray-600'
+            }`}
+          >
+            {autoMode ? '🔧 AUTO MODE' : '✋ MANUAL MODE'}
+          </button>
+        </div>
+      )}
+
+      {/* Sensor Gauges */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Temperature Gauge */}
+        <Card className="flex flex-col items-center p-6">
+          <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-gray-300">
+            <Thermometer size={20} />
+            <h3 className="text-lg font-medium m-0">Temperature</h3>
+            {!telemetryData.dhtSensorWorking && (
+              <span className="text-red-500 text-sm bg-red-100 dark:bg-red-900 px-2 py-1 rounded">SENSOR ERROR</span>
+            )}
           </div>
-          {selectedGreenhouse === 'GH-01' ? <div className="alerts-list">
-              {alerts.map(alert => <div key={alert.id} className="alert-item">
-                  <div className="alert-icon">
-                    {getAlertIcon(alert.type)}
-                  </div>
-                  <div className="alert-content">
-                    <p className="alert-message">{alert.message}</p>
-                    <p className="alert-timestamp">{alert.timestamp}</p>
-                  </div>
-                </div>)}
-              <div className="connection-status">
-                <div className="status-indicator connected"></div>
-                <span>WebSocket Connected</span>
-              </div>
-            </div> : <div className="no-alerts-message">
-              <WifiOff size={24} />
-              <p>No alerts available. Equipment not connected.</p>
-              <div className="connection-status">
-                <div className="status-indicator disconnected"></div>
-                <span>WebSocket Disconnected</span>
-              </div>
-            </div>}
+          <div className="flex justify-center items-center text-gray-700 dark:text-gray-300">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="45" fill="none" stroke="#E0E0E0" strokeWidth="10" />
+              {telemetryData.dhtSensorWorking && telemetryData.temperature !== null ? (
+                <>
+                  <circle 
+                    cx="60" cy="60" r="45" fill="none" 
+                    stroke={getGaugeColor(telemetryData.temperature, 'temperature')} 
+                    strokeWidth="10" 
+                    strokeDasharray={`${2 * Math.PI * 45}`} 
+                    strokeDashoffset={calculateStrokeDashOffset(calculateGaugePercentage(telemetryData.temperature, 10, 40))} 
+                    strokeLinecap="round" 
+                    transform="rotate(-90 60 60)" 
+                  />
+                  <text x="60" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" 
+                        fill={getGaugeColor(telemetryData.temperature, 'temperature')}>
+                    {telemetryData.temperature?.toFixed(1) || 'N/A'}
+                  </text>
+                  <text x="60" y="75" textAnchor="middle" fontSize="14" fill="currentColor">
+                    °C
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle 
+                    cx="60" cy="60" r="45" fill="none" 
+                    stroke="#ccc" 
+                    strokeWidth="10" 
+                    strokeDasharray="20 10" 
+                    strokeLinecap="round" 
+                    transform="rotate(-90 60 60)" 
+                  />
+                  <text x="60" y="60" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#999">
+                    SENSOR ERROR
+                  </text>
+                </>
+              )}
+            </svg>
+          </div>
+        </Card>
+
+        {/* Humidity Gauge */}
+        <Card className="flex flex-col items-center p-6">
+          <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-gray-300">
+            <Droplet size={20} />
+            <h3 className="text-lg font-medium m-0">Humidity</h3>
+            {!telemetryData.dhtSensorWorking && (
+              <span className="text-red-500 text-sm bg-red-100 dark:bg-red-900 px-2 py-1 rounded">SENSOR ERROR</span>
+            )}
+          </div>
+          <div className="flex justify-center items-center text-gray-700 dark:text-gray-300">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="45" fill="none" stroke="#E0E0E0" strokeWidth="10" />
+              {telemetryData.dhtSensorWorking && telemetryData.humidity !== null ? (
+                <>
+                  <circle 
+                    cx="60" cy="60" r="45" fill="none" 
+                    stroke={getGaugeColor(telemetryData.humidity, 'humidity')} 
+                    strokeWidth="10" 
+                    strokeDasharray={`${2 * Math.PI * 45}`} 
+                    strokeDashoffset={calculateStrokeDashOffset(calculateGaugePercentage(telemetryData.humidity, 0, 100))} 
+                    strokeLinecap="round" 
+                    transform="rotate(-90 60 60)" 
+                  />
+                  <text x="60" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" 
+                        fill={getGaugeColor(telemetryData.humidity, 'humidity')}>
+                    {telemetryData.humidity?.toFixed(1) || 'N/A'}%
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle 
+                    cx="60" cy="60" r="45" fill="none" 
+                    stroke="#ccc" 
+                    strokeWidth="10" 
+                    strokeDasharray="20 10" 
+                    strokeLinecap="round" 
+                    transform="rotate(-90 60 60)" 
+                  />
+                  <text x="60" y="60" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#999">
+                    SENSOR ERROR
+                  </text>
+                </>
+              )}
+            </svg>
+          </div>
+        </Card>
+
+        {/* Soil Moisture Gauge */}
+        <Card className="flex flex-col items-center p-6">
+          <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-gray-300">
+            <Sprout size={20} />
+            <h3 className="text-lg font-medium m-0">Soil Moisture</h3>
+          </div>
+          <div className="flex justify-center items-center text-gray-700 dark:text-gray-300">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="45" fill="none" stroke="#E0E0E0" strokeWidth="10" />
+              <circle 
+                cx="60" cy="60" r="45" fill="none" 
+                stroke={getGaugeColor(telemetryData.soilMoisture, 'soilMoisture')} 
+                strokeWidth="10" 
+                strokeDasharray={`${2 * Math.PI * 45}`} 
+                strokeDashoffset={calculateStrokeDashOffset(calculateGaugePercentage(telemetryData.soilMoisture, 1000, 2000))} 
+                strokeLinecap="round" 
+                transform="rotate(-90 60 60)" 
+              />
+              <text x="60" y="55" textAnchor="middle" fontSize="24" fontWeight="bold" 
+                    fill={getGaugeColor(telemetryData.soilMoisture, 'soilMoisture')}>
+                {convertToPercentage(telemetryData.soilMoisture, 'soilMoisture')}
+              </text>
+            </svg>
+          </div>
         </Card>
       </div>
-    </div>;
+
+      {/* Historical Chart - Only show when DHT sensor is working */}
+      {selectedGreenhouse === 'GH-01' && historicalData.length > 0 && telemetryData.dhtSensorWorking && (
+        <Card className="p-6">
+          <h3 className="mt-0 mb-4 text-lg font-medium text-gray-900 dark:text-white">Sensor History</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={historicalData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="time" interval={Math.ceil(historicalData.length / 10)} />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line yAxisId="left" type="monotone" dataKey="temperature" name="Temperature (°C)" stroke="#EF5350" dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="humidity" name="Humidity (%)" stroke="#29B6F6" dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="soilMoisture" name="Soil Moisture" stroke="#66BB6A" dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Control Panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Manual Control Panel */}
+        <Card className="p-6">
+          <h3 className="mt-0 mb-4 text-lg font-medium text-gray-900 dark:text-white">Manual Control Panel</h3>
+          <div className="flex flex-col gap-4">
+            <ControlButton device="fan" label="Fan" icon={Wind} />
+            <ControlButton device="lights" label="Lights" icon={Lightbulb} />
+            <ControlButton device="waterPump" label="Water Pump" icon={Waves} />
+            <ControlButton device="heater" label="Heater" icon={Thermometer} />
+          </div>
+          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200 m-0">
+              💡 <strong>Note:</strong> Lights can be controlled in both Auto and Manual modes. Fan, Water Pump, and Heater can only be controlled in Manual Mode.
+            </p>
+          </div>
+        </Card>
+
+        {/* Alerts Panel */}
+        <Card className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="mt-0 text-lg font-medium text-gray-900 dark:text-white">Alerts & Notifications</h3>
+            <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-semibold">
+              {alerts.length}
+            </span>
+          </div>
+          
+          <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
+            {alerts.length > 0 ? (
+              alerts.map((alert) => (
+                <div key={alert.id} className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded">
+                  <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="m-0 text-sm font-medium text-red-800 dark:text-red-200">{alert.message}</p>
+                    <p className="m-0 text-xs text-red-600 dark:text-red-300 mt-1">{alert.timestamp}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="m-0">No alerts at the moment</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
 };
 
 export default MonitorControl;

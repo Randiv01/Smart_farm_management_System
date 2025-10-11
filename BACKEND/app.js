@@ -165,6 +165,7 @@ import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
 import pestRoutes from "./PlantManagement/Routes/pestRoutes.js";
 import consultationRoutes from "./PlantManagement/Routes/consultationRoutes.js";
+import dashboardRoutes from "./PlantManagement/Routes/dashboardRoutes.js";
 
 // Inventory Management
 import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
@@ -179,6 +180,9 @@ import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
 import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
+
+// ESP32 Proxy Routes
+import esp32Routes from "./routes/esp32Routes.js";
 
 app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
 
@@ -226,6 +230,7 @@ app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
 app.use("/api/pests", pestRoutes);
 app.use("/api/consultations", consultationRoutes);
+app.use("/api", dashboardRoutes);
 
 // Inventory Management
 app.use("/api/inventory/products", productRoutes);
@@ -240,6 +245,9 @@ app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
+
+// ESP32 Proxy Routes - These proxy requests to your ESP32 device
+app.use("/", esp32Routes);
 
 // Customer Profile Image Upload (fallback route)
 app.use(

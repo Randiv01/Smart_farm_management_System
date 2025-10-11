@@ -110,20 +110,41 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       
       if (!token) return;
       
-      const response = await axios.get("http://localhost:5000/api/refill-requests/notifications", {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { limit: 10 }
-      });
+      // Fetch both refill request notifications and general notifications for Inventory Management
+      const [refillResponse, generalResponse] = await Promise.all([
+        axios.get("http://localhost:5000/api/refill-requests/notifications", {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { limit: 10 }
+        }).catch(() => ({ data: [] })),
+        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } }))
+      ]);
       
-      // Merge with existing notifications, avoiding duplicates
+      // Combine both notification sources
+      const refillNotifications = refillResponse.data || [];
+      const generalNotifications = generalResponse.data?.data?.notifications || [];
+      
+      // Convert general notifications to match the expected format
+      const convertedGeneralNotifications = generalNotifications.map(notification => ({
+        id: notification._id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type === 'success' ? 'harvest' : notification.type,
+        priority: notification.type === 'success' ? 'medium' : 'low',
+        read: notification.read,
+        timestamp: notification.createdAt,
+        data: notification.data
+      }));
+      
+      // Merge all notifications, avoiding duplicates
+      const allNotifications = [...refillNotifications, ...convertedGeneralNotifications];
       setNotifications(prev => {
         const existingIds = new Set(prev.map(n => n.id));
-        const newNotifications = response.data.filter(n => !existingIds.has(n.id));
+        const newNotifications = allNotifications.filter(n => !existingIds.has(n.id));
         return [...newNotifications, ...prev].slice(0, 20); // Keep only latest 20
       });
       
       // Update unread count
-      setUnreadCount(response.data.filter(n => !n.read).length);
+      setUnreadCount(allNotifications.filter(n => !n.read).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
@@ -134,10 +155,21 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const markAsRead = async (id) => {
     try {
       const token = localStorage.getItem("token");
-      if (token) {
-        await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      
+      // Find the notification to determine its type
+      const notification = notifications.find(n => n.id === id);
+      
+      if (notification) {
+        // Mark as read in the appropriate system
+        if (notification.type === 'harvest') {
+          // Mark general notification as read
+          await axios.patch(`http://localhost:5000/api/notifications/${id}/read`);
+        } else if (token) {
+          // Mark refill request notification as read
+          await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
       }
       
       setNotifications(prev => 
@@ -221,6 +253,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       case "refillRequestUpdate": return <CheckCircle size={16} className="text-green-500" />;
       case "lowStock": return <AlertTriangle size={16} className="text-yellow-500" />;
       case "order": return <Package size={16} className="text-purple-500" />;
+      case "harvest": return <CheckCircle size={16} className="text-green-600" />;
       default: return <Bell size={16} className="text-gray-500" />;
     }
   };
