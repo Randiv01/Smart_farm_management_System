@@ -73,46 +73,67 @@ export const getRecentCheckins = async (req, res) => {
 export const getReports = async (req, res) => {
   try {
     const { period = "thisweek" } = req.query;
+    console.log("getReports called with period:", period);
 
     const now = new Date();
+    console.log("Current server time:", now.toISOString());
+    console.log("Current server date string:", now.toDateString());
+    
+    // Fix timezone issue - use local date instead of UTC
+    const localDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    console.log("Local date (fixed):", localDate.toISOString());
+    
     let startDate, endDate;
 
     switch (period) {
       case "thisweek":
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - now.getDay());
-        endDate = new Date(now);
-        endDate.setDate(now.getDate() + (6 - now.getDay()));
+        // Use local date to avoid timezone issues
+        const dayOfWeek = localDate.getDay();
+        startDate = new Date(localDate);
+        startDate.setDate(localDate.getDate() - dayOfWeek);
+        endDate = new Date(localDate);
+        endDate.setDate(localDate.getDate() + (6 - dayOfWeek));
         break;
       case "lastweek":
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - now.getDay() - 7);
-        endDate = new Date(now);
-        endDate.setDate(now.getDate() - now.getDay() - 1);
+        const lastWeekDayOfWeek = localDate.getDay();
+        startDate = new Date(localDate);
+        startDate.setDate(localDate.getDate() - lastWeekDayOfWeek - 7);
+        endDate = new Date(localDate);
+        endDate.setDate(localDate.getDate() - lastWeekDayOfWeek - 1);
         break;
       case "thismonth":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        startDate = new Date(localDate.getFullYear(), localDate.getMonth(), 1);
+        endDate = new Date(localDate.getFullYear(), localDate.getMonth() + 1, 0);
         break;
       case "lastmonth":
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        startDate = new Date(localDate.getFullYear(), localDate.getMonth() - 1, 1);
+        endDate = new Date(localDate.getFullYear(), localDate.getMonth(), 0);
         break;
       default:
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - now.getDay());
-        endDate = new Date(now);
-        endDate.setDate(now.getDate() + (6 - now.getDay()));
+        const defaultDayOfWeek = localDate.getDay();
+        startDate = new Date(localDate);
+        startDate.setDate(localDate.getDate() - defaultDayOfWeek);
+        endDate = new Date(localDate);
+        endDate.setDate(localDate.getDate() + (6 - defaultDayOfWeek));
     }
 
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
 
+    console.log("Date range for reports:", {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      startDateString: startDate.toDateString(),
+      endDateString: endDate.toDateString()
+    });
+
     const records = await Attendance.find({ date: { $gte: startDate, $lte: endDate } });
+    console.log("Found records count:", records.length);
 
     const reportsByDate = {};
     records.forEach(record => {
       const dateStr = record.date.toISOString().split("T")[0];
+      console.log("Processing record date:", dateStr, "for employee:", record.employeeId);
       if (!reportsByDate[dateStr]) {
         reportsByDate[dateStr] = { period: dateStr, present: 0, absent: 0, leave: 0, late: 0 };
       }
@@ -126,12 +147,16 @@ export const getReports = async (req, res) => {
       new Date(a.period) - new Date(b.period)
     );
 
+    console.log("Final reports data:", reports);
+
     const totalRecords = records.length;
     const presentRecords = records.filter(r => r.status === "Present" || r.status === "Late").length;
     const attendanceRate = totalRecords > 0 ? Math.round((presentRecords / totalRecords) * 100) : 0;
     const lateArrivals = records.filter(record => record.status === "Late").length;
 
-    res.json({ chartData: reports, attendanceRate, lateArrivals });
+    const response = { chartData: reports, attendanceRate, lateArrivals };
+    console.log("Sending response:", response);
+    res.json(response);
   } catch (error) {
     res.status(500).json({ message: "Error fetching reports data" });
   }
@@ -275,6 +300,343 @@ export const updateAttendance = async (req, res) => {
       return res.status(400).json({ message: "Invalid record ID format" });
     }
     res.status(500).json({ message: "Error updating attendance record" });
+  }
+};
+
+// QR Code scan endpoint
+export const scanQRCode = async (req, res) => {
+  try {
+    console.log("=== QR SCAN REQUEST RECEIVED ===");
+    console.log("Request body:", req.body);
+    console.log("Request headers:", req.headers);
+    
+    const { employeeId, name, timestamp } = req.body;
+    
+    if (!employeeId || !name) {
+      console.log("Missing required fields:", { employeeId, name });
+      return res.status(400).json({ message: "Employee ID and name are required" });
+    }
+    
+    // Import Employee model to verify employee exists
+    const Employee = (await import("../E-model/Employee.js")).default;
+    
+    // Verify employee exists in the system
+    const employee = await Employee.findOne({ id: employeeId });
+    if (!employee) {
+      return res.status(404).json({ message: `Employee ${employeeId} not found in StaffHub` });
+    }
+    
+    console.log("QR scan for verified employee:", employee);
+    
+    const currentTime = new Date();
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    
+    // Format time for display
+    const timeString = currentTime.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    console.log("Date range for search:", { today, tomorrow, employeeId });
+    
+    // Check if record already exists for today - try multiple approaches
+    let existingRecord = await Attendance.findOne({
+      employeeId,
+      date: { $gte: today, $lt: tomorrow }
+    });
+    
+    // If not found with date range, try finding by employeeId and today's date string
+    if (!existingRecord) {
+      const todayString = today.toISOString().split('T')[0];
+      existingRecord = await Attendance.findOne({
+        employeeId,
+        date: todayString
+      });
+    }
+    
+    // If still not found, try finding any record for this employee today
+    if (!existingRecord) {
+      existingRecord = await Attendance.findOne({
+        employeeId,
+        date: { $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()) }
+      });
+    }
+    
+    console.log("Existing record check:", existingRecord);
+    
+    if (existingRecord) {
+      // Employee already has a record for today
+      console.log("Employee has existing record. Check-out status:", existingRecord.checkOut);
+      console.log("Check-out comparison:", existingRecord.checkOut === "-", "Value:", `"${existingRecord.checkOut}"`);
+      
+      // More flexible check-out detection
+      const isCheckedOut = existingRecord.checkOut && 
+                          existingRecord.checkOut !== "-" && 
+                          existingRecord.checkOut !== "" && 
+                          existingRecord.checkOut !== null && 
+                          existingRecord.checkOut !== undefined;
+      
+      console.log("Is already checked out:", isCheckedOut);
+      
+      if (!isCheckedOut) {
+        try {
+          // Employee is checking out - with overtime calculation
+          console.log("Processing check-out for employee:", employeeId);
+          existingRecord.checkOut = timeString;
+          
+          // Update status to Present
+          existingRecord.status = "Present";
+          
+          console.log("Saving updated record...");
+          const updatedRecord = await existingRecord.save();
+          console.log("Check-out recorded successfully:", updatedRecord);
+          
+          // Precise overtime calculation - calculate exact time worked beyond 5 PM
+          let overtimeHours = 0;
+          let overtimeMinutes = 0;
+          let regularHours = 8; // Default to 8 hours
+          let totalHours = 8;
+          let overtimeTimeString = "0:00"; // Format: "2:30"
+          
+          try {
+            // Parse the checkout time to get exact overtime - improved parsing
+            console.log("Processing checkout time for overtime:", timeString);
+            
+            let hour = 0;
+            let minute = 0;
+            
+            if (timeString.includes('PM')) {
+              const timePart = timeString.split(' ')[0]; // Get "08:03" from "08:03 PM"
+              const [hourStr, minuteStr] = timePart.split(':');
+              hour = parseInt(hourStr);
+              minute = parseInt(minuteStr);
+              
+              console.log("PM time parsing:", { timePart, hourStr, minuteStr, hour, minute });
+              
+              // Convert to 24-hour format for PM times (except 12 PM)
+              if (hour !== 12) {
+                hour += 12;
+              }
+              
+              console.log("PM time after 24-hour conversion:", { hour, minute });
+            } else if (timeString.includes('AM')) {
+              const timePart = timeString.split(' ')[0]; // Get "7:30" from "7:30 AM"
+              const [hourStr, minuteStr] = timePart.split(':');
+              hour = parseInt(hourStr);
+              minute = parseInt(minuteStr);
+              
+              // Convert 12 AM to 0
+              if (hour === 12) {
+                hour = 0;
+              }
+            } else {
+              // Handle 24-hour format (e.g., "17:30")
+              const [hourStr, minuteStr] = timeString.split(':');
+              hour = parseInt(hourStr);
+              minute = parseInt(minuteStr);
+            }
+            
+            console.log("Parsed checkout time (24-hour):", { hour, minute, originalTime: timeString });
+            
+            // Calculate overtime beyond 5:00 PM (17:00)
+            const checkoutTotalMinutes = (hour * 60) + minute;
+            const regularEndTotalMinutes = 17 * 60; // 5:00 PM = 17:00 = 1020 minutes
+            
+            console.log("Time comparison:", {
+              checkoutTotalMinutes,
+              regularEndTotalMinutes,
+              checkoutTime: `${hour}:${minute.toString().padStart(2, '0')}`,
+              regularEndTime: "17:00"
+            });
+            
+            if (checkoutTotalMinutes > regularEndTotalMinutes) {
+              const overtimeTotalMinutes = checkoutTotalMinutes - regularEndTotalMinutes;
+              overtimeHours = Math.floor(overtimeTotalMinutes / 60);
+              overtimeMinutes = overtimeTotalMinutes % 60;
+              
+              // Format overtime as "H:MM" (e.g., "2:30")
+              overtimeTimeString = `${overtimeHours}:${overtimeMinutes.toString().padStart(2, '0')}`;
+              
+              // Convert overtime to decimal hours for calculations
+              const overtimeDecimalHours = overtimeHours + (overtimeMinutes / 60);
+              totalHours = regularHours + overtimeDecimalHours;
+              
+              console.log("Overtime calculation result:", {
+                checkoutTotalMinutes,
+                regularEndTotalMinutes,
+                overtimeTotalMinutes,
+                overtimeHours,
+                overtimeMinutes,
+                overtimeTimeString,
+                overtimeDecimalHours,
+                totalHours
+              });
+            } else {
+              console.log("No overtime - checkout time is before 5:00 PM");
+            }
+          } catch (timeError) {
+            console.log("Time parsing error, using defaults:", timeError);
+          }
+          
+          // Create overtime record if employee worked overtime
+          console.log("Overtime check - overtimeHours:", overtimeHours, "overtimeMinutes:", overtimeMinutes, "overtimeTimeString:", overtimeTimeString);
+          if (overtimeHours > 0 || overtimeMinutes > 0) {
+            try {
+              console.log("Creating overtime record for employee:", employeeId, "with overtime:", overtimeTimeString);
+              const Overtime = (await import("../E-model/Overtime.js")).default;
+              
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              // Check if overtime record already exists for today
+              const existingOvertime = await Overtime.findOne({
+                employee: employee._id,
+                date: today
+              });
+              
+              if (existingOvertime) {
+                // Update existing overtime record
+                existingOvertime.overtimeHours = overtimeTimeString;
+                existingOvertime.totalHours = totalHours;
+                existingOvertime.description = `Automatic overtime from QR check-out at ${timeString} (${overtimeTimeString} overtime)`;
+                existingOvertime.status = "Pending";
+                
+                await existingOvertime.save();
+                console.log("Overtime record updated successfully:", existingOvertime);
+              } else {
+                // Create new overtime record
+                const newOvertime = new Overtime({
+                  employee: employee._id,
+                  date: today,
+                  regularHours: regularHours,
+                  overtimeHours: overtimeTimeString, // Store as "2:30" format
+                  totalHours: totalHours,
+                  description: `Automatic overtime from QR check-out at ${timeString} (${overtimeTimeString} overtime)`,
+                  status: "Pending"
+                });
+                
+                await newOvertime.save();
+                console.log("Overtime record created successfully:", newOvertime);
+              }
+            } catch (overtimeError) {
+              console.error("Error creating/updating overtime record:", overtimeError);
+              // Don't fail the checkout if overtime creation fails
+            }
+          } else {
+            console.log("No overtime - employee checked out before 5:00 PM");
+          }
+          
+          res.status(200).json({ 
+            message: "Check-out recorded successfully", 
+            record: updatedRecord,
+            action: "checkout",
+            overtimeHours: overtimeTimeString, // Return as "2:30" format
+            regularHours: regularHours,
+            totalHours: totalHours
+          });
+        } catch (checkoutError) {
+          console.error("Error during check-out process:", checkoutError);
+          console.error("Checkout error stack:", checkoutError.stack);
+          res.status(500).json({ 
+            message: "Error processing check-out", 
+            error: checkoutError.message 
+          });
+        }
+      } else {
+        // Employee already checked out
+        console.log("Employee already checked out, returning info message");
+        return res.status(200).json({ 
+          message: "Employee has already checked out for today",
+          record: existingRecord,
+          action: "already_checked_out"
+        });
+      }
+    } else {
+      // Employee is checking in for the first time today
+      // Determine initial status based on check-in time
+      let status = "Present";
+      if (currentHour > 10 || (currentHour === 10 && currentMinute > 0)) {
+        status = "Late";
+      }
+      
+      const highestRecord = await Attendance.findOne().sort({ number: -1 });
+      const nextNumber = highestRecord?.number ? highestRecord.number + 1 : 1;
+      
+      const newAttendance = new Attendance({
+        number: nextNumber,
+        employeeId: employeeId.trim(),
+        name: employee.name.trim(), // Use the name from the database, not the QR code
+        date: today,
+        checkIn: timeString,
+        checkOut: "-",
+        status: status
+      });
+      
+      const savedAttendance = await newAttendance.save();
+      console.log("Check-in recorded:", savedAttendance);
+      res.status(201).json({ 
+        message: "Check-in recorded successfully", 
+        record: savedAttendance,
+        action: "checkin"
+      });
+    }
+  } catch (error) {
+    console.error("QR scan error:", error);
+    console.error("Error stack:", error.stack);
+    res.status(500).json({ 
+      message: "Error processing QR scan", 
+      error: error.message,
+      details: error.stack 
+    });
+  }
+};
+
+// Debug endpoint to check attendance records
+export const debugAttendance = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const records = await Attendance.find({
+      employeeId,
+      date: { $gte: today, $lt: tomorrow }
+    });
+    
+    console.log("Debug attendance for", employeeId, ":", records);
+    res.json({ employeeId, today, tomorrow, records });
+  } catch (err) {
+    console.error("Debug attendance error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Debug endpoint to check current date
+export const debugDate = async (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    res.json({
+      currentTime: now.toISOString(),
+      currentDateString: now.toDateString(),
+      currentLocalDate: now.toLocaleDateString(),
+      todayStart: today.toISOString(),
+      todayStartString: today.toDateString()
+    });
+  } catch (err) {
+    console.error("Debug date error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 

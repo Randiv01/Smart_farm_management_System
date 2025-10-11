@@ -9,8 +9,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useETheme } from '../Econtexts/EThemeContext.jsx';
 
-export const AttendanceChart = ({ darkMode }) => {
+export const AttendanceChart = () => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
   const data = [
     { name: "Mon", present: 45, absent: 3, leave: 0 },
     { name: "Tue", present: 42, absent: 4, leave: 2 },

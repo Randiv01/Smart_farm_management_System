@@ -558,15 +558,25 @@ const ESystemSettings = () => {
             <h2 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
               System Settings
             </h2>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage your profile, password and account settings.</p>
+            <p className={`mt-1 text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-600'
+            }`}>Manage your profile, password and account settings.</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Preview</div>
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center bg-white dark:bg-gray-800">
+            <div className={`text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>Preview</div>
+            <div className={`w-12 h-12 rounded-full overflow-hidden border-2 flex items-center justify-center ${
+              darkMode 
+                ? 'border-gray-700 bg-gray-800' 
+                : 'border-gray-200 bg-white'
+            }`}>
               {imagePreview ? (
                 <img src={imagePreview} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <FiUser className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                <FiUser className={`w-6 h-6 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`} />
               )}
             </div>
           </div>
@@ -606,7 +616,11 @@ const ESystemSettings = () => {
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-shrink-0 w-full md:w-44">
                   <div className="relative group">
-                    <div className="w-44 h-44 rounded-2xl overflow-hidden border-4 border-gray-100 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+                    <div className={`w-44 h-44 rounded-2xl overflow-hidden border-4 bg-gradient-to-br flex items-center justify-center ${
+                      darkMode 
+                        ? 'border-gray-700 from-gray-800 to-gray-900' 
+                        : 'border-gray-100 from-gray-50 to-gray-100'
+                    }`}>
                       {imagePreview ? (
                         <img
                           src={imagePreview}
@@ -615,14 +629,20 @@ const ESystemSettings = () => {
                           onClick={() => setShowImageModal(true)}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl font-semibold text-gray-400 dark:text-gray-500">
+                        <div className={`w-full h-full flex items-center justify-center text-5xl font-semibold ${
+                          darkMode ? 'text-gray-500' : 'text-gray-400'
+                        }`}>
                           {userData.firstName?.[0] || 'S'}{userData.lastName?.[0] || ''}
                         </div>
                       )}
                     </div>
 
                     <div className="flex justify-center mt-4 gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:scale-[1.01] transition transform shadow-sm">
+                      <label className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg hover:scale-[1.01] transition transform shadow-sm ${
+                        darkMode 
+                          ? 'bg-gray-700 text-gray-200' 
+                          : 'bg-white text-gray-700'
+                      }`}>
                         <FiCamera />
                         <span className="text-sm">Change</span>
                         <input
@@ -660,7 +680,9 @@ const ESystemSettings = () => {
                     { label: 'Date of Birth', field: 'dateOfBirth', type: 'date' },
                   ].map((item) => (
                     <div key={item.field}>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{item.label}</label>
+                      <label className={`block text-sm font-medium mb-1 ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{item.label}</label>
                       <input
                         type={item.type}
                         value={
@@ -672,7 +694,7 @@ const ESystemSettings = () => {
                         disabled={item.disabled || loading}
                         className={`w-full p-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-offset-1 ${
                           validationErrors[item.field]
-                            ? 'border-red-400 ring-red-100 dark:ring-red-900'
+                            ? darkMode ? 'border-red-400 ring-red-900' : 'border-red-400 ring-red-100'
                             : darkMode
                             ? 'bg-gray-700 text-gray-200 border-gray-600 focus:ring-blue-500 focus:ring-offset-gray-800'
                             : 'bg-white text-gray-800 border-gray-200 focus:ring-blue-500 focus:ring-offset-white'
@@ -685,7 +707,9 @@ const ESystemSettings = () => {
                   ))}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                    <label className={`block text-sm font-medium mb-1 ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Role</label>
                     <input
                       type="text"
                       value={formatRole(userData.role)}
@@ -694,13 +718,17 @@ const ESystemSettings = () => {
                         darkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-gray-50 text-gray-700 border-gray-200'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Role cannot be changed</p>
+                    <p className={`text-xs mt-1 ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>Role cannot be changed</p>
                   </div>
 
                   {['animal', 'plant', 'health'].includes(userData.role) && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Specialization</label>
+                        <label className={`block text-sm font-medium mb-1 ${
+                          darkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>Specialization</label>
                         <input
                           type="text"
                           value={userData.specialization}
@@ -713,7 +741,9 @@ const ESystemSettings = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Years of Experience</label>
+                        <label className={`block text-sm font-medium mb-1 ${
+                          darkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>Years of Experience</label>
                         <input
                           type="number"
                           min="0"
@@ -727,7 +757,9 @@ const ESystemSettings = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Education</label>
+                        <label className={`block text-sm font-medium mb-1 ${
+                          darkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>Education</label>
                         <input
                           type="text"
                           value={userData.education}
@@ -743,7 +775,9 @@ const ESystemSettings = () => {
                   )}
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
+                    <label className={`block text-sm font-medium mb-1 ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Bio</label>
                     <textarea
                       value={userData.bio}
                       onChange={(e) => handleInputChange('bio', e.target.value)}
@@ -751,14 +785,16 @@ const ESystemSettings = () => {
                       maxLength="500"
                       className={`w-full p-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-offset-1 ${
                         validationErrors.bio
-                          ? 'border-red-400 ring-red-100 dark:ring-red-900'
+                          ? darkMode ? 'border-red-400 ring-red-900' : 'border-red-400 ring-red-100'
                           : darkMode
                           ? 'bg-gray-700 text-gray-200 border-gray-600 focus:ring-blue-500 focus:ring-offset-gray-800'
                           : 'bg-white text-gray-800 border-gray-200 focus:ring-blue-500 focus:ring-offset-white'
                       }`}
                       disabled={loading}
                     />
-                    <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div className={`flex justify-between mt-2 text-xs ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>
                       <span>{userData.bio.length}/500</span>
                       {validationErrors.bio && <span className="text-red-500">{validationErrors.bio}</span>}
                     </div>
@@ -769,7 +805,11 @@ const ESystemSettings = () => {
               <div className="flex items-center justify-end gap-3 mt-2">
                 <button
                   onClick={() => { setUserData((prev) => ({ ...prev })); showMessage('success', 'No changes to revert ✨', 1800); }}
-                  className="px-4 py-2 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:shadow"
+                  className={`px-4 py-2 rounded-full hover:shadow ${
+                    darkMode 
+                      ? 'bg-gray-700 text-gray-200' 
+                      : 'bg-gray-100 text-gray-700'
+                  }`}
                 >
                   Cancel
                 </button>
@@ -787,10 +827,14 @@ const ESystemSettings = () => {
           {/* Password Tab */}
           {activeTab === 'password' && (
             <div className="space-y-6 max-w-xl">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Change Password</h3>
+              <h3 className={`text-lg font-semibold ${
+                darkMode ? 'text-gray-100' : 'text-gray-900'
+              }`}>Change Password</h3>
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password *</label>
+                  <label className={`block text-sm font-medium mb-1 ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Current Password *</label>
                   <input
                     type="password"
                     value={passwordData.currentPassword}
@@ -803,7 +847,9 @@ const ESystemSettings = () => {
                   {validationErrors.currentPassword && <p className="text-xs text-red-500 mt-1">{validationErrors.currentPassword}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password *</label>
+                  <label className={`block text-sm font-medium mb-1 ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>New Password *</label>
                   <input
                     type="password"
                     value={passwordData.newPassword}
@@ -816,7 +862,9 @@ const ESystemSettings = () => {
                   {validationErrors.newPassword && <p className="text-xs text-red-500 mt-1">{validationErrors.newPassword}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password *</label>
+                  <label className={`block text-sm font-medium mb-1 ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Confirm New Password *</label>
                   <input
                     type="password"
                     value={passwordData.confirmPassword}
@@ -845,14 +893,26 @@ const ESystemSettings = () => {
           {/* Account Tab */}
           {activeTab === 'account' && (
             <div className="space-y-6">
-              <div className="p-4 border border-yellow-200 dark:border-yellow-800 rounded-xl bg-yellow-50 dark:bg-yellow-900/20">
+              <div className={`p-4 border rounded-xl ${
+                darkMode 
+                  ? 'border-yellow-800 bg-yellow-900/20' 
+                  : 'border-yellow-200 bg-yellow-50'
+              }`}>
                 <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-800/30">
-                    <FiAlertCircle className="w-6 h-6 text-yellow-600 dark:text-yellow-300" />
+                  <div className={`p-2 rounded-lg ${
+                    darkMode ? 'bg-yellow-800/30' : 'bg-yellow-100'
+                  }`}>
+                    <FiAlertCircle className={`w-6 h-6 ${
+                      darkMode ? 'text-yellow-300' : 'text-yellow-600'
+                    }`} />
                   </div>
                   <div>
-                    <h4 className="text-lg font-medium text-yellow-800 dark:text-yellow-200">Deactivate Account</h4>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">Deactivating your account will disable your profile and remove it from public view. You can reactivate your account by logging in again.</p>
+                    <h4 className={`text-lg font-medium ${
+                      darkMode ? 'text-yellow-200' : 'text-yellow-800'
+                    }`}>Deactivate Account</h4>
+                    <p className={`text-sm mt-1 ${
+                      darkMode ? 'text-yellow-300' : 'text-yellow-700'
+                    }`}>Deactivating your account will disable your profile and remove it from public view. You can reactivate your account by logging in again.</p>
                     <div className="mt-3">
                       <button
                         onClick={handleDeactivateAccount}
@@ -866,14 +926,26 @@ const ESystemSettings = () => {
                 </div>
               </div>
 
-              <div className="p-4 border border-red-200 dark:border-red-800 rounded-xl bg-red-50 dark:bg-red-900/20">
+              <div className={`p-4 border rounded-xl ${
+                darkMode 
+                  ? 'border-red-800 bg-red-900/20' 
+                  : 'border-red-200 bg-red-50'
+              }`}>
                 <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-800/30">
-                    <FiTrash2 className="w-6 h-6 text-red-600 dark:text-red-300" />
+                  <div className={`p-2 rounded-lg ${
+                    darkMode ? 'bg-red-800/30' : 'bg-red-100'
+                  }`}>
+                    <FiTrash2 className={`w-6 h-6 ${
+                      darkMode ? 'text-red-300' : 'text-red-600'
+                    }`} />
                   </div>
                   <div>
-                    <h4 className="text-lg font-medium text-red-800 dark:text-red-200">Delete Account</h4>
-                    <p className="text-sm text-red-700 dark:text-red-300 mt-1">Permanently delete your account and all associated data. This action cannot be undone.</p>
+                    <h4 className={`text-lg font-medium ${
+                      darkMode ? 'text-red-200' : 'text-red-800'
+                    }`}>Delete Account</h4>
+                    <p className={`text-sm mt-1 ${
+                      darkMode ? 'text-red-300' : 'text-red-700'
+                    }`}>Permanently delete your account and all associated data. This action cannot be undone.</p>
                     <div className="mt-3">
                       <button
                         onClick={handleDeleteAccount}
@@ -889,9 +961,13 @@ const ESystemSettings = () => {
             </div>
           )}
 
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+          <div className={`flex items-center justify-between mt-8 pt-6 border-t ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          }`}>
             <div className="flex items-center">
-              <span className="mr-3 text-sm text-gray-600 dark:text-gray-400">Theme</span>
+              <span className={`mr-3 text-sm ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>Theme</span>
               <button
                 onClick={toggleTheme}
                 className={`relative inline-flex items-center h-7 rounded-full w-14 transition-colors focus:outline-none ${
@@ -906,7 +982,9 @@ const ESystemSettings = () => {
                   }`}
                 />
               </button>
-              <span className="ml-3 text-sm text-gray-600 dark:text-gray-400">{darkMode ? 'Dark' : 'Light'}</span>
+              <span className={`ml-3 text-sm ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>{darkMode ? 'Dark' : 'Light'}</span>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ import { FileDown, Filter, Plus, ChevronDown, Edit, Trash2, X } from 'lucide-rea
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Loader from '../Loader/Loader.js'; // Import the Loader component
+import { useETheme } from '../Econtexts/EThemeContext.jsx';
 
 
 // ===== helpers to build a professional Overtime ID (frontend fallback) =====
@@ -51,7 +52,9 @@ const makeOvertimeIdFallback = (record) => {
   return `OT-${code}-${y}${m}${day}-${tail}`;
 };
 
-export const OvertimeMonitor = ({ darkMode }) => {
+export const OvertimeMonitor = () => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
   const [activeTab, setActiveTab] = useState('records');
 
   const [overtimeRecords, setOvertimeRecords] = useState([]);
@@ -91,7 +94,18 @@ export const OvertimeMonitor = ({ darkMode }) => {
     if (!Array.isArray(overtimeRecords) || overtimeRecords.length === 0) {
       return { totalOvertimeHours: 0, avgPerEmployeeHours: 0 };
     }
-    const total = overtimeRecords.reduce((sum, r) => sum + (Number(r.overtimeHours) || 0), 0);
+    const total = overtimeRecords.reduce((sum, r) => {
+      let hours = 0;
+      if (typeof r.overtimeHours === 'string' && r.overtimeHours.includes(':')) {
+        // Handle string format like "2:30"
+        const [h, m] = r.overtimeHours.split(':').map(Number);
+        hours = h + (m / 60);
+      } else {
+        // Handle number format
+        hours = Number(r.overtimeHours) || 0;
+      }
+      return sum + hours;
+    }, 0);
     const uniqueEmployees = new Set(overtimeRecords.map((r) => r.employee?._id || r.employee)).size;
     return {
       totalOvertimeHours: total,
@@ -105,7 +119,9 @@ export const OvertimeMonitor = ({ darkMode }) => {
       try {
         const res = await fetch('http://localhost:5000/api/employees');
         const data = await res.json();
-        setEmployees(data);
+        // Handle both old format (array) and new format ({ docs: [...] })
+        const employeesArray = Array.isArray(data) ? data : (data.docs || []);
+        setEmployees(employeesArray);
       } catch (e) {
         console.error('Error fetching employees:', e);
       }
@@ -237,6 +253,39 @@ export const OvertimeMonitor = ({ darkMode }) => {
     e.preventDefault();
     try {
       setShowLoader(true); // Show loader when submitting form
+      
+      // Calculate overtime hours if work extends beyond 5 PM
+      const workDate = new Date(formData.date);
+      const currentTime = new Date();
+      const isToday = workDate.toDateString() === currentTime.toDateString();
+      
+      let regularHours = parseFloat(formData.regularHours) || 0;
+      let overtimeHours = parseFloat(formData.overtimeHours) || 0;
+      
+      // If it's today and current time is after 5 PM, calculate overtime
+      if (isToday && currentTime.getHours() >= 17) {
+        const hoursWorkedAfter5 = currentTime.getHours() - 17;
+        const minutesWorkedAfter5 = currentTime.getMinutes();
+        const totalOvertimeToday = hoursWorkedAfter5 + (minutesWorkedAfter5 / 60);
+        
+        // Add to existing overtime hours
+        overtimeHours += totalOvertimeToday;
+        
+        // Adjust regular hours to not exceed 8 hours
+        if (regularHours > 8) {
+          const excessRegular = regularHours - 8;
+          overtimeHours += excessRegular;
+          regularHours = 8;
+        }
+      }
+      
+      const submitData = {
+        ...formData,
+        regularHours: regularHours,
+        overtimeHours: overtimeHours,
+        totalHours: regularHours + overtimeHours
+      };
+      
       const url = editingRecord
         ? `http://localhost:5000/api/overtime/${editingRecord}`
         : 'http://localhost:5000/api/overtime';
@@ -244,7 +293,7 @@ export const OvertimeMonitor = ({ darkMode }) => {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
       if (!res.ok) throw new Error('Failed to save record');
       setShowForm(false);
@@ -273,6 +322,12 @@ export const OvertimeMonitor = ({ darkMode }) => {
   };
 
   const formatHours = (hours) => {
+    // Handle string format like "2:30" or "0:00"
+    if (typeof hours === 'string' && hours.includes(':')) {
+      return hours; // Return as-is if already in H:MM format
+    }
+    
+    // Handle number format (decimal hours)
     const whole = Math.floor(Number(hours) || 0);
     const minutes = Math.round(((Number(hours) || 0) - whole) * 60);
     return `${whole}:${minutes.toString().padStart(2, '0')}`;
@@ -339,16 +394,22 @@ export const OvertimeMonitor = ({ darkMode }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-4 border-b">
+      <div className={`flex space-x-4 border-b ${
+        darkMode ? 'border-gray-700' : 'border-gray-200'
+      }`}>
         <button
           onClick={() => setActiveTab('records')}
-          className={`pb-2 px-4 ${activeTab === 'records' ? 'border-b-2 border-blue-500 text-blue-500 font-semibold' : 'text-gray-500'}`}
+          className={`pb-2 px-4 ${activeTab === 'records' ? 'border-b-2 border-blue-500 text-blue-500 font-semibold' : 
+            darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+          }`}
         >
           Overtime Records
         </button>
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`pb-2 px-4 ${activeTab === 'analytics' ? 'border-b-2 border-blue-500 text-blue-500 font-semibold' : 'text-gray-500'}`}
+          className={`pb-2 px-4 ${activeTab === 'analytics' ? 'border-b-2 border-blue-500 text-blue-500 font-semibold' : 
+            darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+          }`}
         >
           Analytics
         </button>
@@ -363,7 +424,11 @@ export const OvertimeMonitor = ({ darkMode }) => {
               <select
                 value={filters.month}
                 onChange={(e) => handleFilterChange('month', Number(e.target.value))}
-                className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                className={`border rounded-md px-2 py-1 ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-700 text-gray-200' 
+                    : 'bg-white border-gray-300 text-gray-800'
+                }`}
               >
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>
@@ -374,7 +439,11 @@ export const OvertimeMonitor = ({ darkMode }) => {
               <select
                 value={filters.year}
                 onChange={(e) => handleFilterChange('year', Number(e.target.value))}
-                className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                className={`border rounded-md px-2 py-1 ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-700 text-gray-200' 
+                    : 'bg-white border-gray-300 text-gray-800'
+                }`}
               >
                 {Array.from({ length: 5 }, (_, i) => {
                   const y = new Date().getFullYear() - 2 + i;
@@ -390,7 +459,11 @@ export const OvertimeMonitor = ({ darkMode }) => {
               <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700 hidden"
+                className={`border rounded-md px-2 py-1 hidden ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-700 text-gray-200' 
+                    : 'bg-white border-gray-300 text-gray-800'
+                }`}
               >
                 <option value="">All Status</option>
                 <option value="Pending">Pending</option>
@@ -400,7 +473,11 @@ export const OvertimeMonitor = ({ darkMode }) => {
 
               <button
                 onClick={applyFilters}
-                className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                className={`flex items-center gap-2 px-3 py-2 rounded-md ${
+                  darkMode 
+                    ? 'bg-gray-800 hover:bg-gray-700 text-gray-200' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                }`}
               >
                 <Filter size={18} />
                 <span>Filter</span>
@@ -431,29 +508,35 @@ export const OvertimeMonitor = ({ darkMode }) => {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
-              <h4 className="text-sm text-gray-500 dark:text-gray-400">Total Overtime Hours</h4>
+            <div className={`p-4 rounded-xl shadow ${
+              darkMode ? 'bg-gray-800' : 'bg-white'
+            }`}>
+              <h4 className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Overtime Hours</h4>
               <p className="text-2xl font-bold text-orange-500">
                 {formatHours(totalOvertimeHours)}
               </p>
-              <p className="text-xs text-gray-400">This selection</p>
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>This selection</p>
             </div>
-            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
-              <h4 className="text-sm text-gray-500 dark:text-gray-400">Average Per Employee</h4>
+            <div className={`p-4 rounded-xl shadow ${
+              darkMode ? 'bg-gray-800' : 'bg-white'
+            }`}>
+              <h4 className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Average Per Employee</h4>
               <p className="text-2xl font-bold text-blue-500">
                 {formatHours(avgPerEmployeeHours)}
               </p>
-              <p className="text-xs text-gray-400">hours/month</p>
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>hours/month</p>
             </div>
           </div>
 
           {/* Table (first column now Overtime ID) */}
           <div className="overflow-x-auto mt-6">
             <table className="w-full border-collapse">
-              <thead className="bg-gray-100 dark:bg-gray-800">
+              <thead className={darkMode ? 'bg-gray-800' : 'bg-gray-100'}>
                 <tr>
-                  {['ID', 'Employee', 'Date', 'Regular Hours', 'Overtime Hours', 'Total Hours', 'Actions'].map((h) => (
-                    <th key={h} className="px-4 py-2 text-left text-sm font-semibold">
+                  {['No', 'ID', 'Employee', 'Date', 'Regular Hours', 'Overtime Hours', 'Total Hours', 'Actions'].map((h) => (
+                    <th key={h} className={`px-4 py-2 text-left text-sm font-semibold ${
+                      darkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>
                       {h}
                     </th>
                   ))}
@@ -462,21 +545,28 @@ export const OvertimeMonitor = ({ darkMode }) => {
               <tbody>
                 {overtimeRecords.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-4 text-center text-gray-500">
+                    <td colSpan="8" className={`px-4 py-4 text-center ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>
                       No overtime records found
                     </td>
                   </tr>
                 ) : (
-                  overtimeRecords.map((record) => (
-                    <tr key={record._id} className="border-t dark:border-gray-700">
-                      <td className="px-4 py-2">
+                  overtimeRecords.map((record, index) => (
+                    <tr key={record._id} className={`border-t ${
+                      darkMode ? 'border-gray-700' : 'border-gray-200'
+                    }`}>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                        {index + 1}
+                      </td>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                         {record.overtimeId || makeOvertimeIdFallback(record)}
                       </td>
-                      <td className="px-4 py-2">{record.employee?.name}</td>
-                      <td className="px-4 py-2">{new Date(record.date).toLocaleDateString()}</td>
-                      <td className="px-4 py-2">{formatHours(record.regularHours)}</td>
-                      <td className="px-4 py-2">{formatHours(record.overtimeHours)}</td>
-                      <td className="px-4 py-2">{formatHours(record.totalHours)}</td>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{record.employee?.name}</td>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{new Date(record.date).toLocaleDateString()}</td>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{formatHours(record.regularHours)}</td>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{formatHours(record.overtimeHours)}</td>
+                      <td className={`px-4 py-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{formatHours(record.totalHours)}</td>
                       <td className="px-4 py-2">
                         <div className="flex gap-2">
                           <button

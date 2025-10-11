@@ -11,8 +11,10 @@ import {
   Calendar,
   X,
   Download,
-  BarChart3
+  BarChart3,
+  QrCode
 } from "lucide-react";
+import QRScanner from "../QRScanner/QRScanner";
 import {
   BarChart as RBarChart,
   Bar,
@@ -31,6 +33,7 @@ import {
   Area
 } from "recharts";
 import axios from "axios";
+import { useETheme } from '../Econtexts/EThemeContext.jsx';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Loader from "../Loader/Loader.js";// Import the Loader component
@@ -56,7 +59,7 @@ const Notification = ({ message, type, onClose }) => {
 };
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
-  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 flex flex-col`}>
+  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border flex flex-col`}>
     <div className="flex items-center justify-between mb-2">
       <h4 className="font-medium text-sm">{title}</h4>
       <div className={`p-2 rounded-full ${color.bg} ${color.text}`}>
@@ -65,19 +68,23 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
     </div>
     <div className="mt-2">
       <p className={`text-2xl font-bold ${color.value}`}>{value}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+      <p className={`text-xs mt-1 ${
+        darkMode ? 'text-gray-400' : 'text-gray-500'
+      }`}>{subtitle}</p>
     </div>
   </div>
 );
 
 const ChartContainer = ({ title, children, darkMode, className = "" }) => (
-  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 ${className}`}>
+  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border ${className}`}>
     <h4 className="font-medium mb-4">{title}</h4>
     <div className="h-64">{children}</div>
   </div>
 );
 
-export const AttendanceTracker = ({ darkMode }) => {
+export const AttendanceTracker = () => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
   const getLocalDateString = (dateObj) => {
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -94,6 +101,7 @@ export const AttendanceTracker = ({ darkMode }) => {
   const [summaryData, setSummaryData] = useState({ present: 0, absent: 0, onLeave: 0, late: 0, total: 0 });
   const [chartData, setChartData] = useState([]);
   const [reportStats, setReportStats] = useState({ attendanceRate: 0, lateArrivals: 0 });
+  const [allEmployees, setAllEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [reportPeriod, setReportPeriod] = useState("thisweek");
@@ -112,6 +120,7 @@ export const AttendanceTracker = ({ darkMode }) => {
   const [employeeStats, setEmployeeStats] = useState([]);
   const [attendanceTrend, setAttendanceTrend] = useState([]);
   const [showLoader, setShowLoader] = useState(false); // New state for loader
+  const [showQRScanner, setShowQRScanner] = useState(false); // QR scanner state
 
   // keep the original record (for date-change detection)
   const originalRecordRef = useRef(null);
@@ -130,6 +139,200 @@ export const AttendanceTracker = ({ darkMode }) => {
   const showNotification = (message, type = "success") => setNotification({ show: true, message, type });
   const closeNotification = () => setNotification({ show: false, message: "", type: "" });
 
+  // QR Code scanning functionality
+  const handleQRScan = async (scanData) => {
+    try {
+      console.log("QR Scan Data received:", scanData);
+      
+      // First, verify the employee exists in the system
+      const employeeResponse = await axios.get("/api/employees");
+      const employeeData = employeeResponse.data;
+      // Handle both old format (array) and new format ({ docs: [...] })
+      const allEmployees = Array.isArray(employeeData) ? employeeData : (employeeData.docs || []);
+      const employeeExists = allEmployees.find(emp => emp.id === scanData.id);
+      
+      if (!employeeExists) {
+        showNotification(`Employee ${scanData.id} not found in StaffHub. Please add the employee first.`, "error");
+        return;
+      }
+      
+      console.log("Employee verified:", employeeExists);
+      
+      // Create attendance record via QR scan endpoint
+      console.log("Making QR scan request to:", `${API_BASE_URL}/api/attendance/scan`);
+      console.log("Request data:", {
+        employeeId: scanData.id,
+        name: scanData.name,
+        timestamp: new Date().toISOString()
+      });
+      
+      const response = await axios.post("/api/attendance/scan", {
+        employeeId: scanData.id,
+        name: scanData.name,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log("QR Scan Response:", response);
+      console.log("QR Scan Response data:", response.data);
+      console.log("QR Scan Response status:", response.status);
+      
+            if (response.status === 201 || response.status === 200) {
+              const { action, message, overtimeHours, regularHours, totalHours } = response.data;
+              
+              if (action === "checkin") {
+                showNotification(`✅ Check-in recorded for ${scanData.name} (${scanData.id})`, "success");
+              } else if (action === "checkout") {
+                if (overtimeHours > 0) {
+                  showNotification(
+                    `✅ Check-out recorded for ${scanData.name} (${scanData.id}) - Overtime: ${overtimeHours}h (Total: ${totalHours}h)`, 
+                    "success"
+                  );
+                } else {
+                  showNotification(`✅ Check-out recorded for ${scanData.name} (${scanData.id})`, "success");
+                }
+              } else if (action === "already_checked_out") {
+                showNotification(`ℹ️ ${message} for ${scanData.name} (${scanData.id})`, "info");
+              } else {
+                showNotification(`✅ ${message} for ${scanData.name} (${scanData.id})`, "success");
+              }
+        
+        // Small delay to ensure backend processing is complete
+        setTimeout(async () => {
+          console.log("=== REFRESHING ATTENDANCE DATA AFTER QR SCAN ===");
+          // Refresh the attendance data
+          await fetchAttendanceData();
+          await fetchSummaryData();
+          console.log("=== ATTENDANCE DATA REFRESH COMPLETED ===");
+        }, 500);
+        
+        // Close the QR scanner
+        setShowQRScanner(false);
+      }
+    } catch (error) {
+      console.error("Error recording attendance:", error);
+      console.error("Full error response:", error.response);
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      
+      const errorMessage = error.response?.data?.message || error.message || "Error recording attendance. Please try again.";
+      const statusCode = error.response?.status || error.code || "Unknown";
+      
+      console.log("Error status code:", statusCode);
+      console.log("Final error message:", errorMessage);
+      
+      // Handle specific error cases
+      if (errorMessage.includes("already checked out")) {
+        showNotification(`ℹ️ ${errorMessage}`, "info");
+      } else if (statusCode === 400) {
+        showNotification(`❌ ${errorMessage}`, "error");
+      } else if (statusCode === "Unknown" || statusCode === undefined) {
+        showNotification(`❌ ${errorMessage}`, "error");
+      } else {
+        showNotification(`❌ ${errorMessage} (Status: ${statusCode})`, "error");
+      }
+    }
+  };
+
+  // Auto-mark absent employees after 12 PM (or anytime for testing)
+  const markAbsentEmployees = async () => {
+    try {
+      const currentTime = new Date();
+      // Allow marking absent at any time for testing
+      if (true) { // Changed from: if (currentTime.getHours() >= 12) {
+        // Get all employees who haven't checked in today
+        const response = await axios.get("/api/employees");
+        const employeeData = response.data;
+        // Handle both old format (array) and new format ({ docs: [...] })
+        const allEmployees = Array.isArray(employeeData) ? employeeData : (employeeData.docs || []);
+        
+        // Get today's attendance records
+        const attendanceResponse = await axios.get("/api/attendance", { 
+          params: { date: selectedDate } 
+        });
+        const todayAttendance = attendanceResponse.data;
+        const presentEmployeeIds = todayAttendance.map(record => record.employeeId);
+        
+        // Find employees who haven't checked in
+        const absentEmployees = allEmployees.filter(emp => 
+          !presentEmployeeIds.includes(emp.id)
+        );
+        
+        // Get approved leaves for today
+        const leavesResponse = await axios.get("/api/leaves");
+        const allLeaves = leavesResponse.data;
+        const today = new Date(selectedDate);
+        
+        // Filter approved leaves that cover today's date
+        const todayLeaves = allLeaves.filter(leave => {
+          if (leave.status !== "Approved") return false;
+          
+          const fromDate = new Date(leave.from);
+          const toDate = new Date(leave.to);
+          
+          // Check if today falls within the leave period
+          return today >= fromDate && today <= toDate;
+        });
+        
+        console.log("Today's approved leaves:", todayLeaves);
+        
+        // Create absent/on-leave records for employees who haven't checked in
+        let absentCount = 0;
+        let onLeaveCount = 0;
+        
+        for (const employee of absentEmployees) {
+          try {
+            // Check if employee is on approved leave today
+            const employeeLeave = todayLeaves.find(leave => leave.empId === employee.id);
+            const status = employeeLeave ? "On Leave" : "Absent";
+            
+            if (employeeLeave) {
+              onLeaveCount++;
+              console.log(`${employee.name} (${employee.id}) is on approved leave: ${employeeLeave.type} from ${employeeLeave.from} to ${employeeLeave.to}`);
+            } else {
+              absentCount++;
+            }
+            
+            await axios.post("/api/attendance", {
+              employeeId: employee.id,
+              name: employee.name,
+              date: selectedDate,
+              checkIn: "-",
+              checkOut: "-",
+              status: status
+            });
+          } catch (err) {
+            // Record might already exist, skip
+            console.log(`Record already exists for ${employee.name}`);
+          }
+        }
+        
+        if (absentEmployees.length > 0) {
+          let message = `Marked ${absentEmployees.length} employees: `;
+          if (absentCount > 0) message += `${absentCount} as absent`;
+          if (absentCount > 0 && onLeaveCount > 0) message += `, `;
+          if (onLeaveCount > 0) message += `${onLeaveCount} as on leave`;
+          
+          showNotification(message, "success");
+          await fetchAttendanceData();
+          await fetchSummaryData();
+        }
+      }
+    } catch (error) {
+      console.error("Error marking absent employees:", error);
+      showNotification("Error marking absent employees", "error");
+    }
+  };
+
+  const fetchAllEmployees = async () => {
+    try {
+      const { data } = await axios.get("/api/employees");
+      const employees = Array.isArray(data) ? data : (data.docs || []);
+      setAllEmployees(employees);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+    }
+  };
+
   const fetchAttendanceData = async () => {
     setLoading(true);
     setShowLoader(true); // Show loader when fetching data
@@ -137,9 +340,16 @@ export const AttendanceTracker = ({ darkMode }) => {
       const params = {};
       if (selectedDate) params.date = selectedDate;
       if (searchTerm) params.search = searchTerm;
+      console.log("=== FETCHING ATTENDANCE DATA ===");
+      console.log("Fetching attendance data with params:", params);
       const { data } = await axios.get("/api/attendance", { params });
+      console.log("Attendance data received:", data);
+      console.log("Attendance data type:", typeof data);
+      console.log("Attendance data length:", data ? data.length : "N/A");
       setAttendanceData(data);
+      console.log("Attendance data set in state");
     } catch (error) {
+      console.error("Error fetching attendance data:", error);
       showNotification("Error fetching attendance data. Make sure the server is running on port 5000.", "error");
     } finally { 
       setLoading(false);
@@ -150,9 +360,12 @@ export const AttendanceTracker = ({ darkMode }) => {
   const fetchSummaryData = async (dateStr = selectedDate) => {
     setShowLoader(true); // Show loader for summary data
     try {
+      console.log("Fetching summary data for date:", dateStr);
       const { data } = await axios.get(`/api/attendance/summary/${dateStr}`);
+      console.log("Summary data received:", data);
       setSummaryData(data);
     } catch (error) {
+      console.error("Error fetching summary data:", error);
       showNotification("Error fetching summary data", "error");
     } finally {
       setShowLoader(false); // Hide loader when done
@@ -163,7 +376,9 @@ export const AttendanceTracker = ({ darkMode }) => {
     setLoading(true);
     setShowLoader(true); // Show loader for report data
     try {
+      console.log("Fetching report data for period:", reportPeriod);
       const { data } = await axios.get("/api/attendance/reports", { params: { period: reportPeriod } });
+      console.log("Report data received:", data);
       setChartData(data.chartData || []);
       setReportStats({ attendanceRate: data.attendanceRate || 0, lateArrivals: data.lateArrivals || 0 });
       setEmployeeStats(data.employeeStats || []);
@@ -172,14 +387,25 @@ export const AttendanceTracker = ({ darkMode }) => {
         present: item.present,
         absent: item.absent,
       })));
-      await fetchSummaryData(todayStr);
+      // Use selectedDate instead of todayStr to ensure consistency
+      console.log("Fetching summary data with selectedDate:", selectedDate);
+      await fetchSummaryData(selectedDate);
     } catch (error) {
+      console.error("Error fetching report data:", error);
       showNotification("Error fetching report data. Make sure the server is running on port 5000.", "error");
     } finally { 
       setLoading(false);
       setShowLoader(false); // Hide loader when done
     }
   };
+
+  // Ensure selectedDate is always set to today on component mount and fetch employees
+  useEffect(() => {
+    const currentDate = getLocalDateString(new Date());
+    console.log("Setting selectedDate to:", currentDate);
+    setSelectedDate(currentDate);
+    fetchAllEmployees(); // Fetch all employees for dropdown
+  }, []);
 
   useEffect(() => {
     if (activeTab === "daily") {
@@ -191,10 +417,18 @@ export const AttendanceTracker = ({ darkMode }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedDate, searchTerm, reportPeriod]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = async (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
+
+    // Auto-fetch employee name when employee ID changes
+    if (name === "employeeId" && value.trim()) {
+      const employee = allEmployees.find(emp => emp.id === value.trim());
+      if (employee) {
+        setFormData(prev => ({ ...prev, name: employee.name }));
+      }
+    }
   };
 
   const validateForm = () => {
@@ -321,11 +555,11 @@ export const AttendanceTracker = ({ darkMode }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Present": return "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200";
-      case "Absent": return "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200";
-      case "On Leave": return "bg-orange-100 text-orange-700 dark:bg-orange-800 dark:text-orange-200";
-      case "Late": return "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200";
-      default: return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+      case "Present": return darkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-700";
+      case "Absent": return darkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-700";
+      case "On Leave": return darkMode ? "bg-orange-800 text-orange-200" : "bg-orange-100 text-orange-700";
+      case "Late": return darkMode ? "bg-yellow-800 text-yellow-200" : "bg-yellow-100 text-yellow-700";
+      default: return darkMode ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700";
     }
   };
 
@@ -371,22 +605,38 @@ export const AttendanceTracker = ({ darkMode }) => {
 
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Attendance Management System</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>
           {activeTab === "daily" ? "Track and manage daily attendance records" : "View detailed reports and analytics"}
         </p>
       </div>
 
-      <div className="flex mb-6 border-b dark:border-gray-700">
+      <div className={`flex mb-6 border-b ${
+        darkMode ? 'border-gray-700' : 'border-gray-200'
+      }`}>
         <button
           onClick={() => setActiveTab("daily")}
-          className={`px-4 py-2 font-medium flex items-center gap-2 ${activeTab === "daily" ? "border-b-2 border-green-600 text-green-600 dark:text-green-400" : "text-inherit hover:text-green-600 dark:hover:text-green-400"}`}
+          className={`px-4 py-2 font-medium flex items-center gap-2 ${
+            activeTab === "daily" 
+              ? "border-b-2 border-green-600 text-green-600" 
+              : darkMode 
+                ? "text-gray-400 hover:text-green-400" 
+                : "text-gray-600 hover:text-green-600"
+          }`}
         >
           <Calendar size={18} />
           <span>Daily Attendance</span>
         </button>
         <button
           onClick={() => setActiveTab("reports")}
-          className={`px-4 py-2 font-medium flex items-center gap-2 ${activeTab === "reports" ? "border-b-2 border-green-600 text-green-600 dark:text-green-400" : "text-inherit hover:text-green-600 dark:hover:text-green-400"}`}
+          className={`px-4 py-2 font-medium flex items-center gap-2 ${
+            activeTab === "reports" 
+              ? "border-b-2 border-green-600 text-green-600" 
+              : darkMode 
+                ? "text-gray-400 hover:text-green-400" 
+                : "text-gray-600 hover:text-green-600"
+          }`}
         >
           <BarChart3 size={18} />
           <span>Reports & Analytics</span>
@@ -408,7 +658,11 @@ export const AttendanceTracker = ({ darkMode }) => {
                 />
               </div>
               <button
-                className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-700 text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                  darkMode 
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                }`}
                 onClick={() => setSearchTerm("")}
               >
                 <Filter size={18} />
@@ -423,12 +677,26 @@ export const AttendanceTracker = ({ darkMode }) => {
                 className={`px-3 py-2 border rounded-md text-sm ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"}`}
               />
               <button
+                onClick={() => setShowQRScanner(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-md"
+              >
+                <QrCode size={18} />
+                <span>Scan QR Code</span>
+              </button>
+              <button
                 onClick={() => setShowForm(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-md"
               >
                 <Plus size={18} />
                 <span>Add Record</span>
               </button>
+          <button
+            onClick={markAbsentEmployees}
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors shadow-md"
+          >
+            <UserX size={18} />
+            <span>Mark Absent/On Leave</span>
+          </button>
             </div>
           </div>
 
@@ -438,7 +706,11 @@ export const AttendanceTracker = ({ darkMode }) => {
               value={summaryData.present}
               subtitle={`out of ${summaryData.total}`}
               icon={UserCheck}
-              color={{ bg: "bg-green-100 dark:bg-green-800", text: "text-green-500 dark:text-green-300", value: "text-green-500" }}
+              color={{ 
+                bg: darkMode ? "bg-green-800" : "bg-green-100", 
+                text: darkMode ? "text-green-300" : "text-green-500", 
+                value: "text-green-500" 
+              }}
               darkMode={darkMode}
             />
             <StatCard
@@ -446,7 +718,11 @@ export const AttendanceTracker = ({ darkMode }) => {
               value={summaryData.absent}
               subtitle={`out of ${summaryData.total}`}
               icon={UserX}
-              color={{ bg: "bg-red-100 dark:bg-red-800", text: "text-red-500 dark:text-red-300", value: "text-red-500" }}
+              color={{ 
+                bg: darkMode ? "bg-red-800" : "bg-red-100", 
+                text: darkMode ? "text-red-300" : "text-red-500", 
+                value: "text-red-500" 
+              }}
               darkMode={darkMode}
             />
             <StatCard
@@ -454,7 +730,11 @@ export const AttendanceTracker = ({ darkMode }) => {
               value={summaryData.onLeave}
               subtitle={`out of ${summaryData.total}`}
               icon={Calendar}
-              color={{ bg: "bg-orange-100 dark:bg-orange-800", text: "text-orange-500 dark:text-orange-300", value: "text-orange-500" }}
+              color={{ 
+                bg: darkMode ? "bg-orange-800" : "bg-orange-100", 
+                text: darkMode ? "text-orange-300" : "text-orange-500", 
+                value: "text-orange-500" 
+              }}
               darkMode={darkMode}
             />
             <StatCard
@@ -462,7 +742,11 @@ export const AttendanceTracker = ({ darkMode }) => {
               value={summaryData.late}
               subtitle={`out of ${summaryData.total}`}
               icon={Clock}
-              color={{ bg: "bg-yellow-100 dark:bg-yellow-800", text: "text-yellow-500 dark:text-yellow-300", value: "text-yellow-500" }}
+              color={{ 
+                bg: darkMode ? "bg-yellow-800" : "bg-yellow-100", 
+                text: darkMode ? "text-yellow-300" : "text-yellow-500", 
+                value: "text-yellow-500" 
+              }}
               darkMode={darkMode}
             />
           </div>
@@ -494,10 +778,12 @@ export const AttendanceTracker = ({ darkMode }) => {
             </ChartContainer>
           </div>
 
-          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100`}>
+          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border`}>
             <div className={`flex justify-between items-center p-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
               <h3 className="font-medium">Attendance Records</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className={`text-xs ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
                 {attendanceData.length} records found
               </span>
             </div>
@@ -561,7 +847,9 @@ export const AttendanceTracker = ({ darkMode }) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="8" className="px-4 py-6 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan="8" className={`px-4 py-6 text-center ${
+                        darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
                         No attendance records found for the selected date
                       </td>
                     </tr>
@@ -579,22 +867,29 @@ export const AttendanceTracker = ({ darkMode }) => {
                     {editingId ? <Edit size={20} /> : <Plus size={20} />}
                     {editingId ? "Edit Attendance" : "Add Attendance"}
                   </h3>
-                  <button onClick={closeForm} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                  <button onClick={closeForm} className={`text-gray-500 hover:text-gray-700 ${
+                    darkMode ? 'hover:text-gray-300' : 'hover:text-gray-700'
+                  }`}>
                     <X size={20} />
                   </button>
                 </div>
                 <form className="space-y-4" onSubmit={handleSubmit}>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Employee ID *</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium mb-1">Employee *</label>
+                    <select
                       name="employeeId"
-                      placeholder="Enter Employee ID"
                       className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} ${formErrors.employeeId ? "border-red-500" : ""}`}
                       value={formData.employeeId}
                       onChange={handleInputChange}
                       disabled={loading}
-                    />
+                    >
+                      <option value="">Select Employee</option>
+                      {allEmployees.map((employee) => (
+                        <option key={employee._id} value={employee.id}>
+                          {employee.id} - {employee.name}
+                        </option>
+                      ))}
+                    </select>
                     {formErrors.employeeId && <p className="text-red-500 text-xs mt-1">{formErrors.employeeId}</p>}
                   </div>
 
@@ -693,6 +988,15 @@ export const AttendanceTracker = ({ darkMode }) => {
             </div>
           )}
         </>
+      )}
+
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          darkMode={darkMode}
+          onScan={handleQRScan}
+          onClose={() => setShowQRScanner(false)}
+        />
       )}
 
       {activeTab === "reports" && (
@@ -808,7 +1112,7 @@ export const AttendanceTracker = ({ darkMode }) => {
                   ];
 
                   // Create professional table for summary
-                  doc.autoTable({
+                  autoTable(doc, {
                     head: [summaryData[0]],
                     body: summaryData.slice(1),
                     startY: 95,
@@ -841,7 +1145,7 @@ export const AttendanceTracker = ({ darkMode }) => {
 
                   const tableData = chartData.map((i) => [i.period, i.present, i.absent, i.leave, i.late]);
                   
-                  doc.autoTable({
+                  autoTable(doc, {
                     head: [['Date', 'Present', 'Absent', 'Leave', 'Late']],
                     body: tableData,
                     startY: finalY + 15,
@@ -913,7 +1217,11 @@ export const AttendanceTracker = ({ darkMode }) => {
                   value={`${reportStats.attendanceRate}%`}
                   subtitle="Selected period"
                   icon={UserCheck}
-                  color={{ bg: "bg-green-100 dark:bg-green-800", text: "text-green-500 dark:text-green-300", value: "text-green-500" }}
+                  color={{ 
+                    bg: darkMode ? "bg-green-800" : "bg-green-100", 
+                    text: darkMode ? "text-green-300" : "text-green-500", 
+                    value: "text-green-500" 
+                  }}
                   darkMode={darkMode}
                 />
                 <StatCard
@@ -921,7 +1229,11 @@ export const AttendanceTracker = ({ darkMode }) => {
                   value={reportStats.lateArrivals}
                   subtitle="Selected period"
                   icon={Clock}
-                  color={{ bg: "bg-yellow-100 dark:bg-yellow-800", text: "text-yellow-500 dark:text-yellow-300", value: "text-yellow-500" }}
+                  color={{ 
+                    bg: darkMode ? "bg-yellow-800" : "bg-yellow-100", 
+                    text: darkMode ? "text-yellow-300" : "text-yellow-500", 
+                    value: "text-yellow-500" 
+                  }}
                   darkMode={darkMode}
                 />
                 <StatCard
@@ -929,7 +1241,11 @@ export const AttendanceTracker = ({ darkMode }) => {
                   value={summaryData.absent}
                   subtitle="Today"
                   icon={UserX}
-                  color={{ bg: "bg-red-100 dark:bg-red-800", text: "text-red-500 dark:text-red-300", value: "text-red-500" }}
+                  color={{ 
+                    bg: darkMode ? "bg-red-800" : "bg-red-100", 
+                    text: darkMode ? "text-red-300" : "text-red-500", 
+                    value: "text-red-500" 
+                  }}
                   darkMode={darkMode}
                 />
                 <StatCard
@@ -937,7 +1253,11 @@ export const AttendanceTracker = ({ darkMode }) => {
                   value={summaryData.onLeave}
                   subtitle="Today"
                   icon={Calendar}
-                  color={{ bg: "bg-orange-100 dark:bg-orange-800", text: "text-orange-500 dark:text-orange-300", value: "text-orange-500" }}
+                  color={{ 
+                    bg: darkMode ? "bg-orange-800" : "bg-orange-100", 
+                    text: darkMode ? "text-orange-300" : "text-orange-500", 
+                    value: "text-orange-500" 
+                  }}
                   darkMode={darkMode}
                 />
               </div>

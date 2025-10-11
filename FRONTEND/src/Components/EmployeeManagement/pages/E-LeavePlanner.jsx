@@ -11,12 +11,13 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import autoTable from "jspdf-autotable";
-import Loader from "../Loader/Loader.js"; // Import the Loader component
+import Loader from "../Loader/Loader.js";
+import { useETheme } from '../Econtexts/EThemeContext.jsx'; // Import the Loader component
 
 const API = "http://localhost:5000/api/leaves";
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
-  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 flex flex-col`}>
+  <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border flex flex-col`}>
     <div className="flex items-center justify-between mb-2">
       <h4 className="font-medium text-sm">{title}</h4>
       <div className={`p-2 rounded-full ${color.bg} ${color.text}`}>
@@ -25,19 +26,23 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
     </div>
     <div className="mt-2">
       <p className={`text-2xl font-bold ${color.value}`}>{value}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+      <p className={`text-xs mt-1 ${
+        darkMode ? 'text-gray-400' : 'text-gray-500'
+      }`}>{subtitle}</p>
     </div>
   </div>
 );
 
 const ChartContainer = React.forwardRef(({ title, children, darkMode, className = "" }, ref) => (
-  <div ref={ref} className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 ${className}`}>
+  <div ref={ref} className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border ${className}`}>
     <h4 className="font-medium mb-4">{title}</h4>
     <div className="h-64">{children}</div>
   </div>
 ));
 
-export const ELeavePlanner = ({ darkMode }) => {
+export const ELeavePlanner = () => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
   const [activeTab, setActiveTab] = useState("requests");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [typeFilter, setTypeFilter] = useState("All Types");
@@ -47,6 +52,7 @@ export const ELeavePlanner = ({ darkMode }) => {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
   const [showLoader, setShowLoader] = useState(true); // Loader state
+  const [allEmployees, setAllEmployees] = useState([]);
 
   const [tableSearch, setTableSearch] = useState("");
 
@@ -105,6 +111,17 @@ export const ELeavePlanner = ({ darkMode }) => {
     if (typeFilter !== "All Types") p.append("type", typeFilter);
     if (yearFilter) p.append("year", yearFilter);
     return p.toString();
+  };
+
+  const fetchAllEmployees = async () => {
+    try {
+      const response = await fetch("/api/employees");
+      const data = await response.json();
+      const employees = Array.isArray(data) ? data : (data.docs || []);
+      setAllEmployees(employees);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+    }
   };
 
   const loadLeaves = async () => {
@@ -209,6 +226,7 @@ export const ELeavePlanner = ({ darkMode }) => {
   useEffect(() => {
     loadLeaves();
     loadTrend();
+    fetchAllEmployees(); // Fetch all employees for dropdown
     const es = new EventSource(`${API}/stream`);
     es.addEventListener("change", () => {
       loadLeaves();
@@ -491,17 +509,25 @@ export const ELeavePlanner = ({ darkMode }) => {
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Leave Management System</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>
           {activeTab === "requests" ? "Manage and track employee leave requests" : "View leave analytics and summary reports"}
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex mb-6 border-b dark:border-gray-700">
+      <div className={`flex mb-6 border-b ${
+        darkMode ? 'border-gray-700' : 'border-gray-200'
+      }`}>
         <button
           onClick={() => setActiveTab("requests")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
-            activeTab === "requests" ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400" : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
+            activeTab === "requests" 
+              ? "border-b-2 border-orange-500 text-orange-500" 
+              : darkMode 
+                ? "text-gray-400 hover:text-orange-400" 
+                : "text-gray-600 hover:text-orange-500"
           }`}
         >
           <Calendar size={18} /><span>Leave Requests</span>
@@ -509,7 +535,11 @@ export const ELeavePlanner = ({ darkMode }) => {
         <button
           onClick={() => setActiveTab("summary")}
           className={`px-4 py-2 font-medium flex items-center gap-2 ${
-            activeTab === "summary" ? "border-b-2 border-orange-500 text-orange-500 dark:text-orange-400" : "text-inherit hover:text-orange-500 dark:hover:text-orange-400"
+            activeTab === "summary" 
+              ? "border-b-2 border-orange-500 text-orange-500" 
+              : darkMode 
+                ? "text-gray-400 hover:text-orange-400" 
+                : "text-gray-600 hover:text-orange-500"
           }`}
         >
           <BarChart3 size={18} /><span>Analytics & Reports</span>
@@ -522,13 +552,29 @@ export const ELeavePlanner = ({ darkMode }) => {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard title="Total Leaves" value={stats.total} subtitle="All time" icon={Calendar}
-              color={{ bg:"bg-blue-100 dark:bg-blue-800", text:"text-blue-500 dark:text-blue-300", value:"text-blue-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-blue-800" : "bg-blue-100", 
+                text: darkMode ? "text-blue-300" : "text-blue-500", 
+                value: "text-blue-500" 
+              }} darkMode={darkMode}/>
             <StatCard title="Pending" value={stats.pending} subtitle="Awaiting approval" icon={Clock}
-              color={{ bg:"bg-yellow-100 dark:bg-yellow-800", text:"text-yellow-500 dark:text-yellow-300", value:"text-yellow-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-yellow-800" : "bg-yellow-100", 
+                text: darkMode ? "text-yellow-300" : "text-yellow-500", 
+                value: "text-yellow-500" 
+              }} darkMode={darkMode}/>
             <StatCard title="Approved" value={stats.approved} subtitle="Leaves granted" icon={User}
-              color={{ bg:"bg-green-100 dark:bg-green-800", text:"text-green-500 dark:text-green-300", value:"text-green-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-green-800" : "bg-green-100", 
+                text: darkMode ? "text-green-300" : "text-green-500", 
+                value: "text-green-500" 
+              }} darkMode={darkMode}/>
             <StatCard title="Rejected" value={stats.rejected} subtitle="Leaves denied" icon={AlertCircle}
-              color={{ bg:"bg-red-100 dark:bg-red-800", text:"text-red-500 dark:text-red-300", value:"text-red-500" }} darkMode={darkMode}/>
+              color={{ 
+                bg: darkMode ? "bg-red-800" : "bg-red-100", 
+                text: darkMode ? "text-red-300" : "text-red-500", 
+                value: "text-red-500" 
+              }} darkMode={darkMode}/>
           </div>
 
           {/* Actions */}
@@ -570,10 +616,12 @@ export const ELeavePlanner = ({ darkMode }) => {
           </div>
 
           {/* Table */}
-          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} border border-gray-100 mb-6`}>
+          <div className={`rounded-lg overflow-hidden shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border mb-6`}>
             <div className={`flex justify-between items-center p-4 ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
               <h3 className="font-medium">Leave Requests</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{filteredLeaves.length} records found</span>
+              <span className={`text-xs ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>{filteredLeaves.length} records found</span>
             </div>
             {loading ? (
               <div className="text-center py-8">Loading leave data...</div>
@@ -608,10 +656,10 @@ export const ELeavePlanner = ({ darkMode }) => {
                         <td className="p-3">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                             r.status === "Approved"
-                              ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200"
+                              ? darkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-700"
                               : r.status === "Pending"
-                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200"
-                              : "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                              ? darkMode ? "bg-yellow-800 text-yellow-200" : "bg-yellow-100 text-yellow-700"
+                              : darkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-700"
                           }`}>{r.status}</span>
                         </td>
                         <td className="p-3">
@@ -624,7 +672,9 @@ export const ELeavePlanner = ({ darkMode }) => {
                     ))}
                     {!loading && filteredLeaves.length === 0 && (
                       <tr>
-                        <td className="p-3 text-sm text-gray-500 dark:text-gray-400" colSpan={10}>No leave records found.</td>
+                        <td className={`p-3 text-sm colSpan={10} ${
+                          darkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>No leave records found.</td>
                       </tr>
                     )}
                   </tbody>
@@ -638,13 +688,33 @@ export const ELeavePlanner = ({ darkMode }) => {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/40" onClick={() => { setShowForm(false); setEditing(null); }} />
               <div className={`relative p-6 rounded-lg shadow w-full max-w-3xl max-h-screen overflow-y-auto ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-                <button onClick={() => { setShowForm(false); setEditing(null); }} className="absolute right-3 top-3 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"><X /></button>
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className={`absolute right-3 top-3 text-gray-500 ${
+                  darkMode ? 'hover:text-gray-300' : 'hover:text-gray-700'
+                }`}><X /></button>
                 <h3 className="text-lg font-semibold mb-4">{editing ? "Update Leave Request" : "New Leave Request"}</h3>
                 <form onSubmit={submitForm} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block mb-1 text-sm">Employee ID *</label>
-                    <input type="text" className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                           value={form.empId} onChange={(e) => setForm({ ...form, empId: e.target.value })} required />
+                    <label className="block mb-1 text-sm">Employee *</label>
+                    <select className={`w-full border rounded px-3 py-2 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                            value={form.empId} onChange={(e) => {
+                              const value = e.target.value;
+                              setForm({ ...form, empId: value });
+                              
+                              // Auto-fetch employee name when employee ID changes
+                              if (value.trim()) {
+                                const employee = allEmployees.find(emp => emp.id === value.trim());
+                                if (employee) {
+                                  setForm(prev => ({ ...prev, name: employee.name }));
+                                }
+                              }
+                            }} required>
+                      <option value="">Select Employee</option>
+                      {allEmployees.map((employee) => (
+                        <option key={employee._id} value={employee.id}>
+                          {employee.id} - {employee.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block mb-1 text-sm">Name *</label>
@@ -785,7 +855,9 @@ export const ELeavePlanner = ({ darkMode }) => {
                 </div>
 
                 {!balance ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Enter/select an Employee ID to view leave balance.</p>
+                  <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>Enter/select an Employee ID to view leave balance.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -841,12 +913,14 @@ export const ELeavePlanner = ({ darkMode }) => {
                   <div className="flex justify-between mb-2">
                     <div>
                       <h5 className="font-semibold">{u.name}</h5>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{u.empId}</p>
+                      <p className={`text-sm ${
+          darkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>{u.empId}</p>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      u.status === "Approved" ? "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200" :
-                      u.status === "Pending" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200" :
-                      "bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200"
+                      u.status === "Approved" ? (darkMode ? "bg-green-800 text-green-200" : "bg-green-100 text-green-700") :
+                      u.status === "Pending" ? (darkMode ? "bg-yellow-800 text-yellow-200" : "bg-yellow-100 text-yellow-700") :
+                      (darkMode ? "bg-red-800 text-red-200" : "bg-red-100 text-red-700")
                     }`}>
                       {u.status}
                     </span>
@@ -859,7 +933,9 @@ export const ELeavePlanner = ({ darkMode }) => {
                 </div>
               ))}
               {upcoming.length === 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 col-span-3 text-center py-8">
+                <p className={`text-sm col-span-3 text-center py-8 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
                   No upcoming leaves{upcomingEmp ? ` for ${upcomingEmp}` : ""}.
                 </p>
               )}
