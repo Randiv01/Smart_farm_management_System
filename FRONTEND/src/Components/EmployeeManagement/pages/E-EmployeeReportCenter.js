@@ -216,11 +216,11 @@ export const EEmployeeReportCenter = () => {
     <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "light-beige"}`}>
       <div className="max-w-full mx-auto p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 md:gap-8">
-          <aside className={`w-full lg:w-80 xl:w-96 2xl:w-[28rem] rounded-2xl sm:rounded-3xl border shadow-xl sm:shadow-2xl p-4 sm:p-6 ${
+          <aside className={`w-full lg:w-80 xl:w-96 2xl:w-[28rem] rounded-2xl sm:rounded-3xl border shadow-xl sm:shadow-2xl p-4 sm:p-6 lg:sticky lg:top-6 max-h-[calc(100vh-3rem)] overflow-y-auto ${
             darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
           }`}>
             <div className="space-y-4">
-              <div className={`flex items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border shadow-md sm:shadow-lg ${
+              <div className={`sticky top-0 z-10 flex items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border shadow-md sm:shadow-lg ${
                 darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"
               }`}>
                 <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
@@ -279,7 +279,7 @@ export const EEmployeeReportCenter = () => {
                       <button
                         key={e.id}
                         onClick={() => handleEmployeeSelect(e.id)}
-                        className={`text-left px-3 sm:px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border transition-all duration-300 shadow-md sm:shadow-lg hover:shadow-lg sm:hover:shadow-xl hover:scale-[1.01] sm:hover:scale-[1.02] ${
+                        className={`group text-left px-3 sm:px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border transition-all duration-300 shadow-md sm:shadow-lg hover:shadow-lg sm:hover:shadow-xl hover:scale-[1.01] sm:hover:scale-[1.02] ${
                           active
                             ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white border-transparent shadow-orange-500/25"
                             : darkMode
@@ -287,9 +287,9 @@ export const EEmployeeReportCenter = () => {
                             : "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                         }`}
                       >
-                        <div className="font-bold text-sm sm:text-base md:text-lg mb-1">{e.name}</div>
-                        <div className="text-xs sm:text-sm md:text-base opacity-80 mb-1">{e.title}</div>
-                        <div className="text-xs sm:text-sm opacity-70">{e.department}</div>
+                        <div className="font-bold text-sm sm:text-base md:text-lg mb-1 truncate">{e.name}</div>
+                        <div className="text-xs sm:text-sm md:text-base opacity-80 mb-1 truncate">{e.title}</div>
+                        <div className="text-xs sm:text-sm opacity-70 truncate">{e.department}</div>
                       </button>
                     );
                   })
@@ -349,34 +349,34 @@ export const EEmployeeReportCenter = () => {
                     </h4>
                   </div>
                   <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 md:gap-8">
-                    <div className={`flex items-center gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-blue-50/50"} border ${darkMode ? "border-gray-600" : "border-blue-100"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`flex items-center gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-blue-50/50"} border ${darkMode ? "border-gray-600" : "border-blue-100"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
                         <User className="w-6 h-6" />
                       </div>
                       <div>
                         <p className={`text-sm font-medium uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-blue-600"}`}>Employee ID</p>
-                        <p className="font-bold text-xl">{employeeDetails.employee.id}</p>
+                        <p className="font-bold text-xl truncate">{employeeDetails.employee.id}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-green-50/50"} border ${darkMode ? "border-gray-600" : "border-green-100"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`flex items-center gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-green-50/50"} border ${darkMode ? "border-gray-600" : "border-green-100"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-green-100 text-green-600">
                         <Briefcase className="w-6 h-6" />
                       </div>
                       <div>
                         <p className={`text-sm font-medium uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-green-600"}`}>Department</p>
-                        <p className="font-bold text-xl">{employeeDetails.employee.department}</p>
+                        <p className="font-bold text-xl truncate">{employeeDetails.employee.department}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-purple-50/50"} border ${darkMode ? "border-gray-600" : "border-purple-100"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`flex items-center gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-purple-50/50"} border ${darkMode ? "border-gray-600" : "border-purple-100"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-purple-100 text-purple-600">
                         <Award className="w-6 h-6" />
                       </div>
                       <div>
                         <p className={`text-sm font-medium uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-purple-600"}`}>Job Title</p>
-                        <p className="font-bold text-xl">{employeeDetails.employee.title}</p>
+                        <p className="font-bold text-xl truncate">{employeeDetails.employee.title}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-orange-50/50"} border ${darkMode ? "border-gray-600" : "border-orange-100"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`flex items-center gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-orange-50/50"} border ${darkMode ? "border-gray-600" : "border-orange-100"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-orange-100 text-orange-600">
                         <Calendar className="w-6 h-6" />
                       </div>
@@ -385,31 +385,31 @@ export const EEmployeeReportCenter = () => {
                         <p className="font-bold text-xl">{employeeDetails.employee.joined}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-red-50/50"} border ${darkMode ? "border-gray-600" : "border-red-100"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`flex items-center gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-red-50/50"} border ${darkMode ? "border-gray-600" : "border-red-100"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-red-100 text-red-600">
                         <Phone className="w-6 h-6" />
                       </div>
                       <div>
                         <p className={`text-sm font-medium uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-red-600"}`}>Contact</p>
-                        <p className="font-bold text-xl">{employeeDetails.employee.contact}</p>
+                        <p className="font-bold text-xl truncate">{employeeDetails.employee.contact}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-indigo-50/50"} border ${darkMode ? "border-gray-600" : "border-indigo-100"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`flex items-center gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-indigo-50/50"} border ${darkMode ? "border-gray-600" : "border-indigo-100"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-indigo-100 text-indigo-600">
                         <Mail className="w-6 h-6" />
                       </div>
                       <div>
                         <p className={`text-sm font-medium uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-indigo-600"}`}>Email</p>
-                        <p className="font-bold text-xl">{employeeDetails.employee.email || 'Not provided'}</p>
+                        <p className="font-bold text-xl truncate">{employeeDetails.employee.email || 'Not provided'}</p>
                       </div>
                     </div>
-                    <div className={`sm:col-span-2 xl:col-span-3 flex items-start gap-4 p-6 rounded-2xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50/50"} border ${darkMode ? "border-gray-600" : "border-gray-200"} hover:shadow-lg transition-all duration-300`}>
+                    <div className={`sm:col-span-2 xl:col-span-3 flex items-start gap-4 p-6 rounded-2xl min-h-[96px] ${darkMode ? "bg-gray-700/50" : "bg-gray-50/50"} border ${darkMode ? "border-gray-600" : "border-gray-200"} hover:shadow-lg transition-all duration-300`}>
                       <div className="p-3 rounded-xl bg-gray-100 text-gray-600">
                         <LocationIcon className="w-6 h-6" />
                       </div>
                       <div className="flex-1">
                         <p className={`text-sm font-medium uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Address</p>
-                        <p className="font-bold text-xl">{employeeDetails.employee.address || 'Not provided'}</p>
+                        <p className="font-bold text-xl break-words leading-relaxed">{employeeDetails.employee.address || 'Not provided'}</p>
                       </div>
                     </div>
                   </div>
