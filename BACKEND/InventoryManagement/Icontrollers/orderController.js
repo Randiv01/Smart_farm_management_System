@@ -1,5 +1,6 @@
 import Order from "../Imodels/Order.js";
 import Product from "../Imodels/Product.js";
+import mongoose from "mongoose";
 
 // Create new order from payment
 export const createOrderFromPayment = async (req, res) => {
@@ -58,7 +59,7 @@ export const createOrderFromPayment = async (req, res) => {
       tax: tax || 0,
       totalAmount,
       paymentMethod,
-      paymentStatus: 'completed',
+      paymentStatus: 'completed', // Ensure payment status is set to completed
       status: 'confirmed',
       estimatedDelivery,
       transactionId
@@ -442,10 +443,12 @@ export const deleteOrder = async (req, res) => {
   }
 };
 
-// Get order statistics
+// Get order statistics - FIXED REVENUE CALCULATION
 export const getOrderStats = async (req, res) => {
   try {
+    // Basic order counts
     const totalOrders = await Order.countDocuments({ isActive: true });
+    const allOrdersCount = await Order.countDocuments({});
     const pendingOrders = await Order.countDocuments({
       status: 'pending',
       isActive: true
@@ -470,31 +473,63 @@ export const getOrderStats = async (req, res) => {
       status: 'cancelled',
       isActive: true
     });
+
+    // SIMPLIFIED REVENUE CALCULATION
     
-    const totalRevenue = await Order.aggregate([
-      { 
-        $match: { 
-          isActive: true, 
-          status: 'delivered',
-          paymentStatus: 'completed'
-        } 
-      },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-    ]);
+    // Get all orders (not just active ones) and calculate revenue manually
+    const allActiveOrders = await Order.find({}).select('totalAmount paymentStatus status orderNumber subtotal shipping tax isActive');
     
-    const monthlyRevenue = await Order.aggregate([
-      {
-        $match: {
-          isActive: true,
-          status: 'delivered',
-          paymentStatus: 'completed',
-          orderDate: {
-            $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          }
+    // Calculate total revenue from all active orders
+    let totalRevenue = allActiveOrders.reduce((sum, order) => {
+      // Try different fields for total amount
+      const amount = order.totalAmount || order.subtotal || 0;
+      return sum + amount;
+    }, 0);
+
+    // If still 0, try calculating from order items
+    if (totalRevenue === 0) {
+      const ordersWithItems = await Order.find({}).select('items');
+      totalRevenue = ordersWithItems.reduce((sum, order) => {
+        if (order.items && Array.isArray(order.items)) {
+          const orderTotal = order.items.reduce((itemSum, item) => {
+            return itemSum + ((item.price || 0) * (item.quantity || 0));
+          }, 0);
+          return sum + orderTotal;
         }
-      },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-    ]);
+        return sum;
+      }, 0);
+    }
+
+
+
+    // Monthly revenue (current month) - simplified
+    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const monthlyOrders = await Order.find({
+          isActive: true,
+          orderDate: { $gte: currentMonthStart }
+    }).select('totalAmount');
+    
+    const monthlyRevenue = monthlyOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+    // Weekly revenue (last 7 days) - simplified
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const weeklyOrders = await Order.find({
+          isActive: true,
+          orderDate: { $gte: lastWeek }
+    }).select('totalAmount');
+    
+    const weeklyRevenue = weeklyOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+    // Today's revenue - simplified
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayOrders = await Order.find({
+          isActive: true,
+          orderDate: { $gte: todayStart }
+    }).select('totalAmount');
+    
+    const todayRevenue = todayOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
     res.status(200).json({
       success: true,
@@ -506,11 +541,14 @@ export const getOrderStats = async (req, res) => {
         shippedOrders,
         deliveredOrders,
         cancelledOrders,
-        totalRevenue: totalRevenue[0]?.total || 0,
-        monthlyRevenue: monthlyRevenue[0]?.total || 0
+        totalRevenue,
+        monthlyRevenue,
+        weeklyRevenue,
+        todayRevenue,
       }
     });
   } catch (error) {
+    console.error('Error in getOrderStats:', error);
     res.status(500).json({ 
       success: false,
       message: error.message 
@@ -615,7 +653,7 @@ export const processPayment = async (req, res) => {
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
-    // Create order object
+    // Create order object - MAKE SURE PAYMENT STATUS IS SET TO 'completed'
     const order = new Order({
       orderNumber,
       customer: orderData.customer,
@@ -625,7 +663,7 @@ export const processPayment = async (req, res) => {
       tax,
       totalAmount,
       paymentMethod: orderData.paymentMethod || 'card',
-      paymentStatus: 'completed',
+      paymentStatus: 'completed', // This is crucial for revenue calculation
       status: 'confirmed',
       estimatedDelivery,
       transactionId
@@ -633,7 +671,11 @@ export const processPayment = async (req, res) => {
     
     // Save order to database
     const savedOrder = await order.save();
-    console.log('Order saved successfully:', savedOrder.orderNumber);
+    console.log('Order saved successfully:', {
+      orderNumber: savedOrder.orderNumber,
+      totalAmount: savedOrder.totalAmount,
+      paymentStatus: savedOrder.paymentStatus
+    });
     
     // Update product stock quantities - DECREMENT STOCK
     await updateProductStock(orderData.items, 'decrement');

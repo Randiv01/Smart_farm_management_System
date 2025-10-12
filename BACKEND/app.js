@@ -182,6 +182,7 @@ import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js"
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
 import refillRequestRoutes from "./InventoryManagement/Iroutes/refillRequestRoutes.js";
+import exportMarketRoutes from "./InventoryManagement/Iroutes/IexportmarketRoutes.js";
 
 // Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
@@ -251,6 +252,7 @@ app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/refill-requests", refillRequestRoutes);
+app.use("/api/export-market", exportMarketRoutes);
 
 // Employee Management
 app.use("/api/employees", employeeRoutes);

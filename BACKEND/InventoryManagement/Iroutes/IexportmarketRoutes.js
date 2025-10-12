@@ -1,12 +1,18 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const exportMarketController = require('./IexportmarketController');
+import {
+  getAllExportMarkets,
+  getExportMarket,
+  createExportMarket,
+  updateExportMarket,
+  deleteExportMarket
+} from '../Icontrollers/IexportmarketController.js';
 
 // Routes for export market operations
-router.get('/', exportMarketController.getAllExportMarkets);
-router.get('/:id', exportMarketController.getExportMarket);
-router.post('/', exportMarketController.createExportMarket);
-router.put('/:id', exportMarketController.updateExportMarket);
-router.delete('/:id', exportMarketController.deleteExportMarket);
+router.get('/', getAllExportMarkets);
+router.get('/:id', getExportMarket);
+router.post('/', createExportMarket);
+router.put('/:id', updateExportMarket);
+router.delete('/:id', deleteExportMarket);
 
-module.exports = router;
+export default router;

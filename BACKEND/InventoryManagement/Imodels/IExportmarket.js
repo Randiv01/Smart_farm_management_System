@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const exportMarketSchema = new mongoose.Schema({
   product: {
@@ -52,4 +52,5 @@ exportMarketSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('ExportMarket', exportMarketSchema);
+const ExportMarket = mongoose.model('ExportMarket', exportMarketSchema);
+export default ExportMarket;
