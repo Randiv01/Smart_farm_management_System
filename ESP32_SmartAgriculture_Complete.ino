@@ -10,24 +10,11 @@
 const char* ssid1 = "Danuz";        // 1st priority - Mobile Hotspot
 const char* password1 = "12345678";
 
-const char* ssid2 = "SLT-Fiber-A577";    // 2nd priority - University WiFi
-const char* password2 = "5FC@a557";
+const char* ssid2 = "Iphone 11";    // 2nd priority - Home WiFi
+const char* password2 = "22222222";
 
-const char* ssid3 = "Iphone 11";    // 3rd priority - Home WiFi
-const char* password3 = "22222222";
-
-// Static IP configurations for each network
-IPAddress staticIP1(172, 20, 10, 2);    // IP for Danuz network
-IPAddress gateway1(172, 20, 10, 1);     // Gateway for Danuz
-IPAddress subnet1(255, 255, 255, 240);  // Subnet for Danuz
-
-IPAddress staticIP2(192, 168, 1, 100);  // IP for SLT-Fiber-A577 network
-IPAddress gateway2(192, 168, 1, 1);     // Gateway for SLT-Fiber-A577
-IPAddress subnet2(255, 255, 255, 0);    // Subnet for SLT-Fiber-A577
-
-IPAddress staticIP3(172, 20, 10, 3);    // IP for Iphone 11 network
-IPAddress gateway3(172, 20, 10, 1);     // Gateway for Iphone 11
-IPAddress subnet3(255, 255, 255, 240);  // Subnet for Iphone 11
+// Use DHCP for automatic IP assignment (no hardcoded IPs)
+// This ensures ESP32 gets an IP on the same network as your laptop
 
 // Sensor pins
 #define SOIL_MOISTURE_PIN 34   // GPIO34 for soil moisture sensor
@@ -104,10 +91,8 @@ void setup() {
   Serial.println("   - Fan ON >35°C, Fan OFF <35°C");
   Serial.println("   - Heater ON <28°C, Heater OFF >30°C");
   Serial.println("💡 Light Default: OFF");
-  Serial.println("📡 Static IP Configuration:");
-  Serial.println("   - Danuz: 172.20.10.2");
-  Serial.println("   - SLT-Fiber-A577: 192.168.1.100");
-  Serial.println("   - Iphone 11: 172.20.10.3");
+  Serial.println("📡 IP Configuration: DHCP (Automatic)");
+  Serial.println("   - ESP32 will get IP automatically from router");
   
   // Initialize DHT sensor with proper configuration
   initializeDHT();
@@ -214,23 +199,49 @@ void testDHTsensor() {
 void connectToWiFi() {
   Serial.println("\n🔍 Searching for available WiFi networks...");
   
+  // Scan for available networks to help with IP detection
+  scanWiFiNetworks();
+  
   // Try connecting to WiFi 1 (Danuz) with static IP
   if (connectToNetwork(ssid1, password1, 1)) {
     return;
   }
   
-  // If WiFi 1 fails, try WiFi 2 (SLT-Fiber-A577) with static IP
+  // If WiFi 1 fails, try WiFi 2 (Iphone 11) with static IP
   if (connectToNetwork(ssid2, password2, 2)) {
-    return;
-  }
-  
-  // If WiFi 2 fails, try WiFi 3 (Iphone 11) with static IP
-  if (connectToNetwork(ssid3, password3, 3)) {
     return;
   }
   
   // If all WiFi connections fail, start Access Point
   startAccessPoint();
+}
+
+void scanWiFiNetworks() {
+  Serial.println("📡 Scanning for available WiFi networks...");
+  int networksFound = WiFi.scanNetworks();
+  
+  if (networksFound == 0) {
+    Serial.println("❌ No networks found");
+    return;
+  }
+  
+  Serial.println("📶 Found " + String(networksFound) + " networks:");
+  
+  for (int i = 0; i < networksFound; i++) {
+    String ssid = WiFi.SSID(i);
+    int32_t rssi = WiFi.RSSI(i);
+    int32_t encryption = WiFi.encryptionType(i);
+    
+    // Check if this is one of our target networks
+    bool isTargetNetwork = (ssid == ssid1 || ssid == ssid2);
+    
+    if (isTargetNetwork) {
+      Serial.println("🎯 TARGET NETWORK: " + ssid + " (Signal: " + String(rssi) + " dBm)");
+    } else {
+      Serial.println("📡 " + ssid + " (Signal: " + String(rssi) + " dBm)");
+    }
+  }
+  Serial.println();
 }
 
 bool connectToNetwork(const char* ssid, const char* password, int networkNum) {
@@ -239,26 +250,8 @@ bool connectToNetwork(const char* ssid, const char* password, int networkNum) {
   WiFi.disconnect();
   delay(1000);
   
-  // Configure static IP based on network number
-  bool configSuccess = false;
-  switch(networkNum) {
-    case 1:
-      configSuccess = WiFi.config(staticIP1, gateway1, subnet1);
-      Serial.println("📡 Static IP configured: 172.20.10.2");
-      break;
-    case 2:
-      configSuccess = WiFi.config(staticIP2, gateway2, subnet2);
-      Serial.println("📡 Static IP configured: 192.168.1.100");
-      break;
-    case 3:
-      configSuccess = WiFi.config(staticIP3, gateway3, subnet3);
-      Serial.println("📡 Static IP configured: 172.20.10.3");
-      break;
-  }
-  
-  if (!configSuccess) {
-    Serial.println("❌ Failed to configure static IP for network " + String(networkNum));
-  }
+  // Use DHCP for automatic IP assignment
+  Serial.println("📡 Using DHCP for automatic IP assignment");
   
   WiFi.begin(ssid, password);
   
@@ -278,6 +271,7 @@ bool connectToNetwork(const char* ssid, const char* password, int networkNum) {
     Serial.print("🌐 Gateway: ");
     Serial.println(WiFi.gatewayIP());
     Serial.println("💪 Signal Strength: " + String(WiFi.RSSI()) + " dBm");
+    Serial.println("🌐 Connection Method: DHCP");
     return true;
   } else {
     Serial.println("\n❌ FAILED! Could not connect to WiFi " + String(networkNum));
@@ -625,6 +619,15 @@ void displaySerialData() {
   Serial.println("🔌 WebSocket Clients: " + String(webSocket.connectedClients()));
   Serial.println("🏥 Server Health: " + String(serverHealthy ? "HEALTHY" : "ISSUES"));
   Serial.println("🌡️ DHT Sensor: " + String(dhtSensorWorking ? "WORKING" : "NOT WORKING"));
+  
+  // Display connection troubleshooting info
+  if (WiFi.SSID() == ssid1) {
+    Serial.println("🔧 Connected to Danuz network (DHCP)");
+  } else if (WiFi.SSID() == ssid2) {
+    Serial.println("🔧 Connected to Iphone 11 network (DHCP)");
+  } else {
+    Serial.println("🔧 Connected to: " + WiFi.SSID() + " (DHCP)");
+  }
   
   if (dhtSensorWorking) {
     Serial.println("🌡️ Temperature: " + String(temperature, 1) + " °C");

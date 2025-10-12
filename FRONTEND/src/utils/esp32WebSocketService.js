@@ -12,12 +12,13 @@ class ESP32WebSocketService {
     this.listeners = new Map();
     this.heartbeatInterval = null;
     this.lastHeartbeat = null;
+    this.connectionCount = 0; // Track how many components are using the connection
     
-    // ESP32 IP addresses to try (from your Arduino code)
+    // ESP32 IP addresses to try (updated to match current network)
     this.esp32IPs = [
-      '192.168.1.100',  // ESP32 Current IP (SLT-Fiber-A577 network)
-      '172.20.10.2',    // Danuz network
-      '172.20.10.3',    // Iphone 11 network
+      '172.20.10.2',    // Danuz network (current IP from serial monitor)
+      '172.20.10.5',    // Danuz network (alternative)
+      '172.20.10.6',    // Iphone 11 network (next available)
       '192.168.4.1'     // ESP32 AP mode default
     ];
     
@@ -44,6 +45,13 @@ class ESP32WebSocketService {
     }
   }
 
+  // Remove all listeners for a specific event
+  removeAllListeners(event) {
+    if (this.listeners.has(event)) {
+      this.listeners.get(event).length = 0;
+    }
+  }
+
   // Emit event to listeners
   emit(event, data) {
     if (this.listeners.has(event)) {
@@ -66,6 +74,7 @@ class ESP32WebSocketService {
   // Connect to ESP32 WebSocket
   async connect() {
     if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
+      console.log('🔄 ESP32 WebSocket: Already connected or connecting, skipping...');
       return;
     }
 
@@ -283,6 +292,12 @@ class ESP32WebSocketService {
     this.emit('disconnected');
   }
 
+  // Soft disconnect - only clean up listeners, keep connection alive
+  softDisconnect() {
+    console.log('🔌 ESP32 WebSocket: Soft disconnect (keeping connection alive)...');
+    this.listeners.clear();
+  }
+
   // Get connection status
   getConnectionStatus() {
     if (this.isConnecting) {
@@ -321,6 +336,28 @@ class ESP32WebSocketService {
     
     console.log('❌ ESP32 HTTP: No devices found');
     return { success: false };
+  }
+
+  // Register component usage
+  registerComponent() {
+    this.connectionCount++;
+    console.log(`📊 ESP32 WebSocket: Component registered (${this.connectionCount} components)`);
+  }
+
+  // Unregister component usage
+  unregisterComponent() {
+    this.connectionCount = Math.max(0, this.connectionCount - 1);
+    console.log(`📊 ESP32 WebSocket: Component unregistered (${this.connectionCount} components)`);
+    
+    // If no components are using the connection, disconnect after a delay
+    if (this.connectionCount === 0) {
+      setTimeout(() => {
+        if (this.connectionCount === 0) {
+          console.log('🔌 ESP32 WebSocket: No components using connection, disconnecting...');
+          this.disconnect();
+        }
+      }, 5000); // 5 second delay before disconnecting
+    }
   }
 
   // Cleanup

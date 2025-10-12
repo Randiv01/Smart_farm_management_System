@@ -67,12 +67,19 @@ const MonitorControl = () => {
   // Test connection function
   const testConnection = async () => {
     try {
+      // Use the custom IP if available, otherwise use the first IP from the list
+      const targetIP = customIP || '172.20.10.2';
+      const url = `http://${targetIP}/health`;
+      
+      console.log(`🔗 Testing connection to: ${url}`);
+      
       // Create an AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
       
-      const response = await fetch(`/health`, {
+      const response = await fetch(url, {
         method: 'GET',
+        mode: 'cors',
         headers: {
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
@@ -91,56 +98,89 @@ const MonitorControl = () => {
   // ESP32 WebSocket service connection management
   const connectESP32WebSocket = useCallback(() => {
     console.log('🔄 Starting ESP32 WebSocket connection...');
+    
+    // Check if already connected
+    if (esp32WebSocketService.getConnectionStatus() === 'connected') {
+      console.log('✅ ESP32 WebSocket already connected');
+      setConnectionStatus('connected');
+      setLoading(false);
+      return;
+    }
+
     setConnectionStatus('connecting');
     setLoading(true);
 
-    // Set up event listeners
-    esp32WebSocketService.on('connected', (data) => {
+    // Define event handlers
+    const handleConnected = (data) => {
       console.log('✅ ESP32 WebSocket connected:', data);
-      // setESP32ConnectionStatus('connected'); // Unused for now
       setESP32CurrentIP(data.ip);
       setConnectionStatus('connected');
       setLoading(false);
-    });
+    };
 
-    esp32WebSocketService.on('disconnected', () => {
+    const handleDisconnected = () => {
       console.log('❌ ESP32 WebSocket disconnected');
-      // setESP32ConnectionStatus('disconnected'); // Unused for now
       setESP32CurrentIP(null);
       setConnectionStatus('disconnected');
       setLoading(false);
-    });
+    };
 
-    esp32WebSocketService.on('connecting', () => {
+    const handleConnecting = () => {
       console.log('🔄 ESP32 WebSocket connecting...');
-      // setESP32ConnectionStatus('connecting'); // Unused for now
       setConnectionStatus('connecting');
-    });
+    };
 
-    esp32WebSocketService.on('data', (data) => {
+    const handleData = (data) => {
       console.log('📊 ESP32 data received:', data);
       handleESP32Data(data);
-    });
+    };
 
-    esp32WebSocketService.on('error', (error) => {
+    const handleError = (error) => {
       console.error('❌ ESP32 WebSocket error:', error);
-      // setESP32ConnectionStatus('error'); // Unused for now
       setConnectionStatus('disconnected');
       setLoading(false);
       
       // Fallback to HTTP polling after WebSocket failure
       console.log('🔄 Falling back to HTTP polling...');
       startPolling();
-    });
+    };
 
-    // Connect to ESP32
+    // Set up event listeners
+    esp32WebSocketService.on('connected', handleConnected);
+    esp32WebSocketService.on('disconnected', handleDisconnected);
+    esp32WebSocketService.on('connecting', handleConnecting);
+    esp32WebSocketService.on('data', handleData);
+    esp32WebSocketService.on('error', handleError);
+
+    // Store handlers for cleanup
+    esp32WebSocketService._componentHandlers = {
+      connected: handleConnected,
+      disconnected: handleDisconnected,
+      connecting: handleConnecting,
+      data: handleData,
+      error: handleError
+    };
+
+    // Register this component and connect to ESP32
+    esp32WebSocketService.registerComponent();
     esp32WebSocketService.connect();
   }, []);
 
   const disconnectESP32WebSocket = () => {
     console.log('🔌 Disconnecting ESP32 WebSocket...');
-    esp32WebSocketService.disconnect();
-    // setESP32ConnectionStatus('disconnected'); // Unused for now
+    
+    // Clean up event listeners if they exist
+    if (esp32WebSocketService._componentHandlers) {
+      esp32WebSocketService.off('connected', esp32WebSocketService._componentHandlers.connected);
+      esp32WebSocketService.off('disconnected', esp32WebSocketService._componentHandlers.disconnected);
+      esp32WebSocketService.off('connecting', esp32WebSocketService._componentHandlers.connecting);
+      esp32WebSocketService.off('data', esp32WebSocketService._componentHandlers.data);
+      esp32WebSocketService.off('error', esp32WebSocketService._componentHandlers.error);
+      esp32WebSocketService._componentHandlers = null;
+    }
+    
+    // Unregister this component instead of disconnecting
+    esp32WebSocketService.unregisterComponent();
     setESP32CurrentIP(null);
   };
 
@@ -222,12 +262,19 @@ const MonitorControl = () => {
     try {
       console.log('📡 Fetching data from ESP32...');
       
+      // Use the custom IP if available, otherwise use the first IP from the list
+      const targetIP = customIP || '172.20.10.2';
+      const url = `http://${targetIP}/status?_t=${Date.now()}`;
+      
+      console.log(`🔗 Fetching from: ${url}`);
+      
       // Create an AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
-      const response = await fetch(`/status?_t=${Date.now()}`, {
+      const response = await fetch(url, {
         method: 'GET',
+        mode: 'cors',
         headers: {
           'Accept': 'application/json',
           'Cache-Control': 'no-cache',
@@ -592,6 +639,7 @@ const MonitorControl = () => {
       // Test connection first
       const response = await fetch(`http://${customIP}/health`, {
         method: 'GET',
+        mode: 'cors',
         headers: {
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
@@ -656,7 +704,18 @@ const MonitorControl = () => {
     }
 
     return () => {
-      disconnectESP32WebSocket();
+      // Only clean up event listeners, don't disconnect WebSocket
+      // as it might be needed by other components
+      if (esp32WebSocketService._componentHandlers) {
+        esp32WebSocketService.off('connected', esp32WebSocketService._componentHandlers.connected);
+        esp32WebSocketService.off('disconnected', esp32WebSocketService._componentHandlers.disconnected);
+        esp32WebSocketService.off('connecting', esp32WebSocketService._componentHandlers.connecting);
+        esp32WebSocketService.off('data', esp32WebSocketService._componentHandlers.data);
+        esp32WebSocketService.off('error', esp32WebSocketService._componentHandlers.error);
+        esp32WebSocketService._componentHandlers = null;
+      }
+      // Unregister this component when unmounting
+      esp32WebSocketService.unregisterComponent();
       stopPolling();
     };
   }, [selectedGreenhouse, connectESP32WebSocket]);
