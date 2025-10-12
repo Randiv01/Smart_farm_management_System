@@ -279,13 +279,21 @@ export default function INotifications() {
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'critical':
-        return 'border-red-500 bg-red-50 dark:bg-red-900/30';
+        return darkMode 
+          ? 'border-red-500 bg-red-900/20 text-white' 
+          : 'border-red-500 bg-red-50 text-gray-800';
       case 'high':
-        return 'border-orange-500 bg-orange-50 dark:bg-orange-900/30';
+        return darkMode 
+          ? 'border-orange-500 bg-orange-900/20 text-white' 
+          : 'border-orange-500 bg-orange-50 text-gray-800';
       case 'medium':
-        return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30';
+        return darkMode 
+          ? 'border-yellow-500 bg-yellow-900/20 text-white' 
+          : 'border-yellow-500 bg-yellow-50 text-gray-800';
       default:
-        return 'border-blue-500 bg-blue-50 dark:bg-blue-900/30';
+        return darkMode 
+          ? 'border-blue-500 bg-blue-900/20 text-white' 
+          : 'border-blue-500 bg-blue-50 text-gray-800';
     }
   };
 
@@ -412,7 +420,9 @@ export default function INotifications() {
               key={notification.id}
               className={`p-4 rounded-lg shadow border-l-4 transition-all cursor-pointer ${
                 getPriorityColor(notification.priority)
-              } ${!notification.read ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
+              } ${!notification.read ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''} ${
+                darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'
+              }`}
               onClick={() => {
                 if (!notification.read) {
                   markAsRead(notification.id);
@@ -424,11 +434,11 @@ export default function INotifications() {
                   {getPriorityIcon(notification.priority, notification.type)}
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>
+                      <h3 className="font-semibold text-inherit">
                         {notification.title}
                       </h3>
                       <span className={`px-2 py-1 text-xs rounded-full ${
-                        darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"
+                        darkMode ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-700"
                       }`}>
                         {getTypeLabel(notification.type)}
                       </span>
@@ -436,10 +446,14 @@ export default function INotifications() {
                         <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                       )}
                     </div>
-                    <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"} mb-2`}>
+                    <p className={`text-sm mb-2 ${
+                      darkMode ? "text-gray-200" : "text-gray-600"
+                    }`}>
                       {notification.message}
                     </p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <div className={`flex items-center gap-4 text-xs ${
+                      darkMode ? "text-gray-300" : "text-gray-500"
+                    }`}>
                       <span>{notification.timeAgo || notification.formattedTime || 'Unknown time'}</span>
                       <span className="capitalize">{notification.priority} priority</span>
                     </div>
