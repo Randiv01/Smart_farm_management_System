@@ -1,6 +1,6 @@
 // FertilizingManagement.jsx
 import React, { useState, useEffect } from "react";
-import { Plus, Edit, Trash } from "lucide-react";
+import { Plus, Edit, Trash, Send } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
@@ -136,6 +136,59 @@ const FertilizingManagement = () => {
       await fetchRecords(); 
     } catch (err) { 
       console.error(err); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendNotification = async (record) => {
+    try {
+      setLoading(true);
+      const notificationData = {
+        title: 'New Fertilizing Record',
+        message: `${record.quantity}kg of ${record.fertilizerType} applied to ${record.greenhouseNo} on ${record.date}`,
+        type: 'info',
+        source: 'Plant Management',
+        targetModule: 'Inventory Management',
+        data: {
+          fertilizingId: record._id,
+          greenhouseNo: record.greenhouseNo,
+          fertilizerType: record.fertilizerType,
+          quantity: record.quantity,
+          date: record.date,
+          staff: record.staff,
+          status: record.status
+        }
+      };
+
+      // Create notification for Plant Management as well
+      const plantNotificationData = {
+        title: 'Fertilizing Record Sent',
+        message: `Fertilizing record sent to Inventory Management: ${record.quantity}kg of ${record.fertilizerType} to ${record.greenhouseNo}`,
+        type: 'info',
+        source: 'Plant Management',
+        targetModule: 'Plant Management',
+        data: {
+          fertilizingId: record._id,
+          greenhouseNo: record.greenhouseNo,
+          fertilizerType: record.fertilizerType,
+          quantity: record.quantity,
+          date: record.date,
+          staff: record.staff,
+          status: record.status
+        }
+      };
+
+      await axios.post('http://localhost:5000/api/notifications', notificationData);
+      await axios.post('http://localhost:5000/api/notifications', plantNotificationData);
+      setFormMessage({ type: "success", text: "Notification sent to Inventory Management!" });
+      
+      setTimeout(() => {
+        setFormMessage({ type: "", text: "" });
+      }, 3000);
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      setFormMessage({ type: "error", text: "Failed to send notification. Try again." });
     } finally {
       setLoading(false);
     }
@@ -314,6 +367,13 @@ const FertilizingManagement = () => {
                     title="Edit"
                   >
                     <Edit size={16}/>
+                  </button>
+                  <button 
+                    className="p-1 hover:text-green-500 transition-colors" 
+                    onClick={() => handleSendNotification(record)}
+                    title="Send to Inventory Management"
+                  >
+                    <Send size={16}/>
                   </button>
                   <button 
                     className="p-1 hover:text-red-500 transition-colors" 

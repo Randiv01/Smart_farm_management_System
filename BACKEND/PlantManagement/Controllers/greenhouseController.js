@@ -10,5 +10,5 @@ export const saveGreenhouseData = asyncHandler(async (req, res) => {
 // READ ALL
 export const getAllGreenhouses = asyncHandler(async (req, res) => {
   const greenhouses = await Greenhouse.find({});
-  res.json(greenhouses);
+  res.json({ success: true, data: greenhouses });
 });

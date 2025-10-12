@@ -39,6 +39,8 @@ import {
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { exportToPDF, exportToExcel, getExportModalConfig, EXPORT_CONFIGS } from "../utils/exportUtils";
+import { FileText, FileSpreadsheet } from "lucide-react";
 
 const Expiry = () => {
   const { theme } = useITheme();
@@ -57,6 +59,7 @@ const Expiry = () => {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [notificationMessage, setNotificationMessage] = useState("");
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const [exportModal, setExportModal] = useState(getExportModalConfig('expiryReport'));
 
   // Color palette consistent with other components
   const COLORS = {

@@ -69,8 +69,10 @@ import Orders from "./Components/InventoryManagement/Ipages/Orders.jsx";
 import Expiry from "./Components/InventoryManagement/Ipages/expiry.jsx";
 import AnimalFoodStock from "./Components/InventoryManagement/Ipages/AnimalFoodstock.jsx";
 import FertilizerStock from "./Components/InventoryManagement/Ipages/FertilizerStock.jsx";
+import ExportMarket from "./Components/InventoryManagement/Ipages/ExportMarket.jsx";
 import ISupplier from "./Components/InventoryManagement/Ipages/ISupplier.jsx";
 import ISettings from "./Components/InventoryManagement/Ipages/ISettings.jsx";
+import INotifications from "./Components/InventoryManagement/Ipages/INotifications.jsx";
 
 // ----------------- Employee Management -----------------
 import EmployeeLayoutWrapper from "./Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx";
@@ -198,7 +200,9 @@ function App() {
                               <Route path="expiry" element={<Expiry />} />
                               <Route path="animalfood" element={<AnimalFoodStock />} />
                               <Route path="FertilizerStock" element={<FertilizerStock />} />
+                              <Route path="export" element={<ExportMarket />} />
                               <Route path="isuppliers" element={<ISupplier />} />
+                              <Route path="notification" element={<INotifications />} />
                               <Route path="isettings" element={<ISettings />} />
                             </Route>
 

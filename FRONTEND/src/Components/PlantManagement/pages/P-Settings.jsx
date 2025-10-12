@@ -36,6 +36,15 @@ export default function PSettings() {
 
   const [profileImage, setProfileImage] = useState("");
   const [profileImageFile, setProfileImageFile] = useState(null);
+  
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('profileImage state changed:', profileImage);
+  }, [profileImage]);
+  
+  useEffect(() => {
+    console.log('profileImageFile state changed:', profileImageFile);
+  }, [profileImageFile]);
 
   // Theme variables
   const bgCard = theme === 'dark' ? 'bg-[#2d2d2d]' : 'bg-white';
@@ -52,7 +61,7 @@ export default function PSettings() {
     try {
       const token = localStorage.getItem("token");
       if (token) {
-        const response = await axios.get("/api/users/profile", {
+        const response = await axios.get("http://localhost:5000/api/users/profile", {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -72,7 +81,7 @@ export default function PSettings() {
         });
 
         if (user.profileImage) {
-          const imageUrl = `/api${user.profileImage}`;
+          const imageUrl = `http://localhost:5000/api${user.profileImage}`;
           setProfileImage(imageUrl);
           localStorage.setItem("profileImage", imageUrl);
         }
@@ -127,6 +136,8 @@ export default function PSettings() {
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
+    console.log('File selected:', file); // Debug log
+    
     if (file) {
       if (!file.type.startsWith('image/')) {
         setMessage({ type: "error", text: "Please select an image file" });
@@ -140,7 +151,11 @@ export default function PSettings() {
 
       setProfileImageFile(file);
       const imageUrl = URL.createObjectURL(file);
+      console.log('Generated image URL:', imageUrl); // Debug log
       setProfileImage(imageUrl);
+      
+      // Clear previous error message if any
+      setMessage({ type: "", text: "" });
     }
   };
 
@@ -179,8 +194,12 @@ export default function PSettings() {
       const formData = new FormData();
 
       // Append profile image if selected
+      console.log('profileImageFile:', profileImageFile); // Debug log
+      console.log('profileImage:', profileImage); // Debug log
+      
       if (profileImageFile) {
         formData.append("profileImage", profileImageFile);
+        console.log('Added profile image to FormData');
       }
 
       // Append other profile data
@@ -196,7 +215,7 @@ export default function PSettings() {
       console.log('Sending profile update request...');
 
       // API call with proxy support
-      const response = await axios.put("/api/users/profile", formData, {
+      const response = await axios.put("http://localhost:5000/api/users/profile", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data"
@@ -223,7 +242,7 @@ export default function PSettings() {
 
         // Update profile image
         if (userData.profileImage) {
-          const imageUrl = `/api${userData.profileImage}`;
+          const imageUrl = `http://localhost:5000/api${userData.profileImage}`;
           setProfileImage(imageUrl);
           localStorage.setItem("profileImage", imageUrl);
         }
@@ -232,7 +251,7 @@ export default function PSettings() {
         window.dispatchEvent(new CustomEvent('userProfileUpdated', {
           detail: {
             fullName,
-            profileImage: userData.profileImage ? `/api${userData.profileImage}` : profileImage,
+            profileImage: userData.profileImage ? `http://localhost:5000/api${userData.profileImage}` : profileImage,
             role: userData.role || profileForm.role
           }
         }));
@@ -315,7 +334,7 @@ export default function PSettings() {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.put("/api/users/change-password", {
+      const response = await axios.put("http://localhost:5000/api/users/change-password", {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
       }, {
@@ -389,21 +408,45 @@ export default function PSettings() {
               
               {/* Profile Image Upload */}
               <div className="flex items-center mb-8">
+                {/* Debug info */}
+                <div className="text-xs text-gray-500 mb-2">
+                  ProfileImage state: {profileImage ? 'Has image' : 'No image'}
+                </div>
                 <div className="relative mr-6">
                   {profileImage ? (
                     <div className="relative">
                       <img 
                         src={profileImage} 
                         alt="Profile" 
-                        className="w-24 h-24 rounded-full object-cover border-2 border-gray-300"
+                        style={{
+                          width: '96px',
+                          height: '96px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '2px solid #d1d5db'
+                        }}
+                        onLoad={() => console.log('Image loaded successfully:', profileImage)}
                         onError={(e) => {
+                          console.log('Image failed to load:', profileImage, e);
                           e.target.style.display = 'none';
                           const fallback = e.target.nextElementSibling;
                           if (fallback) fallback.style.display = 'flex';
                         }}
                       />
-                      <div className={`w-24 h-24 rounded-full flex items-center justify-center border-2 border-dashed ${borderColor} bg-card hidden`}>
-                        <User size={32} className={textColor} />
+                      <div 
+                        className="hidden"
+                        style={{
+                          width: '96px',
+                          height: '96px',
+                          borderRadius: '50%',
+                          border: '2px dashed #d1d5db',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: theme === 'dark' ? '#374151' : '#f9fafb'
+                        }}
+                      >
+                        <User size={32} style={{ color: theme === 'dark' ? '#d1d5db' : '#374151' }} />
                       </div>
                       <button
                         type="button"
@@ -414,8 +457,19 @@ export default function PSettings() {
                       </button>
                     </div>
                   ) : (
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center border-2 border-dashed ${borderColor}`}>
-                      <User size={32} className={textColor} />
+                    <div 
+                      style={{
+                        width: '96px',
+                        height: '96px',
+                        borderRadius: '50%',
+                        border: '2px dashed #d1d5db',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: theme === 'dark' ? '#374151' : '#f9fafb'
+                      }}
+                    >
+                      <User size={32} style={{ color: theme === 'dark' ? '#d1d5db' : '#374151' }} />
                     </div>
                   )}
                 </div>
@@ -434,6 +488,17 @@ export default function PSettings() {
                     />
                   </label>
                   <p className={`mt-2 text-sm ${textColor} opacity-70`}>JPG, PNG or GIF. Max 5MB.</p>
+                  {/* Debug button */}
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      console.log('Debug: Setting test image');
+                      setProfileImage('https://via.placeholder.com/150/000000/FFFFFF?text=Test');
+                    }}
+                    className="mt-2 px-3 py-1 text-xs bg-blue-500 text-white rounded"
+                  >
+                    Test Image
+                  </button>
                 </div>
               </div>
 

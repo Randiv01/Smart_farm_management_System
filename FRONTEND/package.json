@@ -20,7 +20,7 @@
     "chart.js": "^4.5.0",
     "chartjs-plugin-datalabels": "^2.2.0",
     "fabric": "^6.7.1",
-    "framer-motion": "^12.23.12",
+    "framer-motion": "^12.23.24",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
     "jsqr": "^1.4.0",
@@ -50,8 +50,10 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "set NODE_OPTIONS=--max-old-space-size=4096 && set GENERATE_SOURCEMAP=false && set FAST_REFRESH=false && set DISABLE_ESLINT_PLUGIN=true && react-scripts start",
+    "start-debug": "set NODE_OPTIONS=--max-old-space-size=4096 && set GENERATE_SOURCEMAP=false && set FAST_REFRESH=false && set DISABLE_ESLINT_PLUGIN=true && react-scripts start",
+    "start-simple": "react-scripts start",
+    "build": "set NODE_OPTIONS=--max-old-space-size=4096 && react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -72,5 +74,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@craco/craco": "^7.1.0",
+    "cross-env": "^10.1.0"
   }
 }

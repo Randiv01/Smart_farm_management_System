@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit, Trash } from 'lucide-react';
+import { Plus, Edit, Trash, Send } from 'lucide-react';
 import Modal from '../P-Modal.jsx';
 import { useTheme } from '../context/ThemeContext';
 import Loader from '../Loader/Loader';
@@ -65,6 +65,56 @@ const Productivity = () => {
       await axios.delete(`http://localhost:5000/api/productivity/${id}`);
       setRecords(records.filter(r => r._id !== id));
     } catch (err) { console.error(err); }
+  };
+
+  // Send harvest record to Inventory Management
+  const handleSendToInventory = async (record) => {
+    try {
+      setLoading(true);
+      const notificationData = {
+        title: 'New Harvest Record',
+        message: `${record.quantity}kg of ${record.plantType} harvested from ${record.greenhouseNo} on ${new Date(record.harvestDate).toLocaleDateString()}`,
+        type: 'success',
+        source: 'Plant Management',
+        targetModule: 'Inventory Management',
+        data: {
+          harvestId: record._id,
+          plantType: record.plantType,
+          greenhouseNo: record.greenhouseNo,
+          harvestDate: record.harvestDate,
+          quantity: record.quantity,
+          qualityGrade: record.qualityGrade,
+          worker: record.worker
+        }
+      };
+
+      // Create notification for Plant Management as well
+      const plantNotificationData = {
+        title: 'Harvest Record Sent',
+        message: `Harvest record sent to Inventory Management: ${record.quantity}kg of ${record.plantType} from ${record.greenhouseNo}`,
+        type: 'success',
+        source: 'Plant Management',
+        targetModule: 'Plant Management',
+        data: {
+          harvestId: record._id,
+          plantType: record.plantType,
+          greenhouseNo: record.greenhouseNo,
+          harvestDate: record.harvestDate,
+          quantity: record.quantity,
+          qualityGrade: record.qualityGrade,
+          worker: record.worker
+        }
+      };
+
+      await axios.post('http://localhost:5000/api/notifications', notificationData);
+      await axios.post('http://localhost:5000/api/notifications', plantNotificationData);
+      alert('Harvest record sent to Inventory Management successfully!');
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      alert('Failed to send notification. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openModal = (record = null) => {
@@ -194,8 +244,9 @@ const Productivity = () => {
                 <td className="px-4 py-2">{record.qualityGrade || '-'}</td>
                 <td className="px-4 py-2">{record.worker || '-'}</td>
                 <td className="px-4 py-2 flex gap-2">
-                  <button className="p-1 hover:text-blue-500" onClick={()=>openModal(record)}><Edit size={16}/></button>
-                  <button className="p-1 hover:text-red-500" onClick={()=>handleDelete(record._id)}><Trash size={16}/></button>
+                  <button className="p-1 hover:text-blue-500" onClick={()=>openModal(record)} title="Edit"><Edit size={16}/></button>
+                  <button className="p-1 hover:text-green-500" onClick={()=>handleSendToInventory(record)} title="Send to Inventory Management"><Send size={16}/></button>
+                  <button className="p-1 hover:text-red-500" onClick={()=>handleDelete(record._id)} title="Delete"><Trash size={16}/></button>
                 </td>
               </tr>
             ))}
