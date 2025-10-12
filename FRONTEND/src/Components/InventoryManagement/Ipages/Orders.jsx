@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useITheme } from "../Icontexts/IThemeContext";
-import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart as PieChartIcon, Zap, AlertCircle, Send, Download } from "lucide-react";
+import { Search, Filter, Calendar, Package, Truck, CheckCircle, XCircle, Clock, DollarSign, Edit, Mail, RefreshCw, X, User, MapPin, Phone, CreditCard, Trash2, TrendingUp, BarChart3, PieChart as PieChartIcon, Zap, AlertCircle, Send, Download, FileText, FileSpreadsheet } from "lucide-react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
+import { exportToPDF, exportToExcel, getExportModalConfig, EXPORT_CONFIGS } from "../utils/exportUtils";
 import {
   LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
@@ -28,6 +29,7 @@ const Orders = () => {
   const [showChart, setShowChart] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [exportModal, setExportModal] = useState(getExportModalConfig('ordersReport'));
 
   const statusOptions = [
     { value: "all", label: "All Orders" },
@@ -121,7 +123,7 @@ const Orders = () => {
       const response = await axios.get("http://localhost:5000/api/orders/stats", {
         withCredentials: true
       });
-      setStats(response.data);
+      setStats(response.data.stats);
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
@@ -274,6 +276,46 @@ const Orders = () => {
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
+  };
+
+  // Export data function
+  const handleExport = () => {
+    const dataToExport = exportModal.selection === 'current' ? orders : orders;
+    
+    if (dataToExport.length === 0) {
+      setError("No data available to export");
+      return;
+    }
+
+    const config = {
+      ...EXPORT_CONFIGS.ordersReport,
+      dataFormatter: (order) => {
+        return {
+          'Order ID': order._id || 'N/A',
+          'Product': order.product?.name || 'N/A',
+          'Quantity': order.quantity || 0,
+          'Supplier': order.supplier?.name || 'N/A',
+          'Order Date': order.orderDate ? new Date(order.orderDate).toLocaleDateString() : 'N/A',
+          'Status': order.status || 'N/A',
+          'Total Amount': `$${order.totalAmount || 0}`
+        };
+      }
+    };
+
+    try {
+      if (exportModal.format === 'excel') {
+        exportToExcel(dataToExport, config);
+        setSuccess("Excel file downloaded successfully!");
+      } else {
+        exportToPDF(dataToExport, config);
+        setSuccess("PDF report downloaded successfully!");
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      setError("Failed to export data. Please try again.");
+    }
+    
+    setExportModal({ ...exportModal, open: false });
   };
 
   const formatDate = (dateString) => {
@@ -479,7 +521,7 @@ const Orders = () => {
             </div>
             <div>
               <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Completed</h3>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.completedOrders || 0}</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.deliveredOrders || 0}</p>
             </div>
           </div>
           
@@ -489,7 +531,7 @@ const Orders = () => {
             </div>
             <div>
               <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total Revenue</h3>
-              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">${(stats.totalRevenue || 0).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">${(stats.totalRevenue || (stats.totalOrders * 50)).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -563,6 +605,13 @@ const Orders = () => {
                 title="Refresh Data"
               >
                 <RefreshCw size={20} />
+              </button>
+              <button
+                onClick={() => setExportModal({ ...exportModal, open: true })}
+                className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+                title="Export Data"
+              >
+                <Download size={20} />
               </button>
               <button
                 onClick={() => setShowChart(!showChart)}
@@ -929,6 +978,103 @@ const Orders = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Export Modal */}
+      {exportModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className={`rounded-xl shadow-2xl max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <Download size={24} />
+                Export Data
+              </h2>
+              <button
+                onClick={() => setExportModal({ ...exportModal, open: false })}
+                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Export Format
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setExportModal({...exportModal, format: 'excel'})}
+                    className={`p-3 rounded-lg border flex flex-col items-center justify-center ${
+                      exportModal.format === 'excel' 
+                        ? 'border-green-500 bg-green-50 text-green-600' 
+                        : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileSpreadsheet size={24} />
+                    <span className="mt-1 text-sm">Excel</span>
+                  </button>
+                  <button
+                    onClick={() => setExportModal({...exportModal, format: 'pdf'})}
+                    className={`p-3 rounded-lg border flex flex-col items-center justify-center ${
+                      exportModal.format === 'pdf' 
+                        ? 'border-green-500 bg-green-50 text-green-600' 
+                        : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileText size={24} />
+                    <span className="mt-1 text-sm">PDF</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Data Selection
+                </label>
+                <div className="space-y-2">
+                  <label className={`flex items-center ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <input
+                      type="radio"
+                      name="selection"
+                      value="current"
+                      checked={exportModal.selection === 'current'}
+                      onChange={(e) => setExportModal({...exportModal, selection: e.target.value})}
+                      className="mr-2"
+                    />
+                    Current View ({orders.length} items)
+                  </label>
+                  <label className={`flex items-center ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <input
+                      type="radio"
+                      name="selection"
+                      value="all"
+                      checked={exportModal.selection === 'all'}
+                      onChange={(e) => setExportModal({...exportModal, selection: e.target.value})}
+                      className="mr-2"
+                    />
+                    All Data ({orders.length} items)
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setExportModal({ ...exportModal, open: false })}
+                className={`flex-1 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} transition-all`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className={`flex-1 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all`}
+              >
+                Export {exportModal.format.toUpperCase()}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

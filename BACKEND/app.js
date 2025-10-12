@@ -173,6 +173,7 @@ import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
 import pestRoutes from "./PlantManagement/Routes/pestRoutes.js";
 import consultationRoutes from "./PlantManagement/Routes/consultationRoutes.js";
+import dashboardRoutes from "./PlantManagement/Routes/dashboardRoutes.js";
 
 // Inventory Management
 import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
@@ -181,6 +182,7 @@ import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js"
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
 import refillRequestRoutes from "./InventoryManagement/Iroutes/refillRequestRoutes.js";
+import exportMarketRoutes from "./InventoryManagement/Iroutes/IexportmarketRoutes.js";
 
 // Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
@@ -189,6 +191,9 @@ import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 import salaryRoutes from "./EmployeeManager/E-route/salaryRoutes.js";
 import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
+
+// ESP32 Proxy Routes
+import esp32Routes from "./routes/esp32Routes.js";
 
 // ----------------------- Debug env variables -----------------------
 console.log(
@@ -238,6 +243,7 @@ app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
 app.use("/api/pests", pestRoutes);
 app.use("/api/consultations", consultationRoutes);
+app.use("/api", dashboardRoutes);
 
 // Inventory Management
 app.use("/api/inventory/products", productRoutes);
@@ -246,6 +252,7 @@ app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/refill-requests", refillRequestRoutes);
+app.use("/api/export-market", exportMarketRoutes);
 
 // Employee Management
 app.use("/api/employees", employeeRoutes);
@@ -254,6 +261,9 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/employee-reports", reportRoutes);
+
+// ESP32 Proxy Routes - These proxy requests to your ESP32 device
+app.use("/", esp32Routes);
 
 // Customer Profile Image Upload (fallback route)
 app.use(

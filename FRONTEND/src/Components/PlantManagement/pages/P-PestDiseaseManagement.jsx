@@ -3,7 +3,7 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 import { useTheme } from '../context/ThemeContext';
 import Button from '../P-Button.jsx';
 import Modal from '../P-Modal.jsx';
-import { Plus, FileDown, Edit, Trash, Check, Download, UserPlus, Eye, X } from 'lucide-react';
+import { Plus, FileDown, Edit, Trash, Check, Download, UserPlus, Eye, X, Send } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const API_BASE_URL = 'http://localhost:5000/api';
@@ -238,6 +238,71 @@ const PestDiseaseManagement = () => {
     window.open(`${API_BASE_URL}/consultations/${id}/pdf`, '_blank');
   };
 
+  const handleSendToHealthManagement = async (record) => {
+    try {
+      setLoading(true);
+      const notificationData = {
+        title: 'Pest & Disease Report',
+        message: `${record.issueType} issue in ${record.greenhouseNo} - ${record.description}`,
+        type: 'warning',
+        source: 'Plant Management',
+        targetModule: 'Health Management',
+        data: {
+          pestId: record._id,
+          greenhouseNo: record.greenhouseNo,
+          issueType: record.issueType,
+          description: record.description,
+          severity: record.severity,
+          date: record.date,
+          image: record.image,
+          pdfUrl: `${API_BASE_URL}/pests/${record._id}/pdf`
+        }
+      };
+
+      // Create notification for Plant Management as well
+      const plantNotificationData = {
+        title: 'Pest Report Sent',
+        message: `Pest & Disease report sent to Health Management: ${record.issueType} in ${record.greenhouseNo}`,
+        type: 'warning',
+        source: 'Plant Management',
+        targetModule: 'Plant Management',
+        data: {
+          pestId: record._id,
+          greenhouseNo: record.greenhouseNo,
+          issueType: record.issueType,
+          description: record.description,
+          severity: record.severity,
+          date: record.date,
+          image: record.image,
+          pdfUrl: `${API_BASE_URL}/pests/${record._id}/pdf`
+        }
+      };
+
+      await fetch('http://localhost:5000/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(notificationData)
+      });
+
+      await fetch('http://localhost:5000/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(plantNotificationData)
+      });
+
+      alert('Report sent to Health Management successfully!');
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      alert('Failed to send notification. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openImageModal = (imagePath) => {
     setSelectedImage(`http://localhost:5000${imagePath}`);
     setShowImageModal(true);
@@ -417,6 +482,20 @@ const PestDiseaseManagement = () => {
                         <Trash size={14} />
                       </button>
                       <button 
+                        className="p-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
+                        onClick={() => handleDownloadPestPDF(record._id)}
+                        title="Download PDF"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button 
+                        className="p-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+                        onClick={() => handleSendToHealthManagement(record)}
+                        title="Send to Health Management"
+                      >
+                        <Send size={14} />
+                      </button>
+                      <button 
                         className="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
                         onClick={() => {
                           setSelectedPestId(record._id);
@@ -425,13 +504,6 @@ const PestDiseaseManagement = () => {
                         title="Assign Specialist"
                       >
                         <UserPlus size={14} />
-                      </button>
-                      <button 
-                        className="p-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
-                        onClick={() => handleDownloadPestPDF(record._id)}
-                        title="Download PDF"
-                      >
-                        <Download size={14} />
                       </button>
                     </div>
                   </td>
