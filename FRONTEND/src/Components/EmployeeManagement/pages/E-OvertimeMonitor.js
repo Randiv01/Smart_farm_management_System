@@ -890,7 +890,11 @@ export const OvertimeMonitor = () => {
                   value={formData.employee}
                   onChange={handleInputChange}
                   required
-                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                  className={`w-full border rounded-md px-3 py-2 ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
                 >
                   <option value="">Select Employee</option>
                   {employees.map((emp) => (
@@ -909,7 +913,11 @@ export const OvertimeMonitor = () => {
                   value={formData.date}
                   onChange={handleInputChange}
                   required
-                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                  className={`w-full border rounded-md px-3 py-2 ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
                 />
               </div>
 
@@ -924,7 +932,11 @@ export const OvertimeMonitor = () => {
                     value={formData.regularHours}
                     onChange={handleInputChange}
                     required
-                    className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                    className={`w-full border rounded-md px-3 py-2 ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }`}
                   />
                 </div>
 
@@ -938,7 +950,11 @@ export const OvertimeMonitor = () => {
                     value={formData.overtimeHours}
                     onChange={handleInputChange}
                     required
-                    className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                    className={`w-full border rounded-md px-3 py-2 ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }`}
                   />
                 </div>
               </div>
@@ -950,7 +966,11 @@ export const OvertimeMonitor = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                  className={`w-full border rounded-md px-3 py-2 ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
                 />
               </div>
 
