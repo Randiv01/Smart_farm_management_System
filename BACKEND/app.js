@@ -31,10 +31,10 @@ const io = new Server(server, {
   },
 });
 
-// Store socket.io instance in app
+// Store socket.io instance in app for controllers
 app.set("io", io);
 
-// Socket.io connection handling
+// ----------------------- Socket.io Event Handling -----------------------
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
@@ -42,7 +42,7 @@ io.on("connection", (socket) => {
     console.log("User disconnected:", socket.id);
   });
 
-  // Join user to specific room based on their role
+  // Join user-specific room
   socket.on("join-user-room", (userId) => {
     socket.join(`user-${userId}`);
   });
@@ -61,17 +61,15 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // ----------------------- Uploads Setup -----------------------
 const animalUploadsDir = path.join(__dirname, "AnimalManagement", "Uploads");
 const uploadsDir = path.join(__dirname, "uploads");
-const healthUploadsDir = path.join(
-  __dirname,
-  "HealthManagement",
-  "Health_uploads"
-);
+const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
+const animalReportsDir = path.join(__dirname, "uploads", "animal-reports");
+const plantReportsDir = path.join(__dirname, "uploads", "plant-reports");
 
-[uploadsDir, healthUploadsDir, plantUploadsDir].forEach((dir) => {
+[uploadsDir, healthUploadsDir, plantUploadsDir, animalReportsDir, plantReportsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
-    console.log(`📁 Created directory: ${dir}`);
+    console.log(` Created directory: ${dir}`);
   }
 });
 
@@ -79,7 +77,7 @@ const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 app.use("/uploads", express.static(uploadsDir));
 app.use("/animal-uploads", express.static(animalUploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
-app.use("/Health_Uploads", express.static(healthUploadsDir));
+app.use("/Health_Uploads", express.static(healthUploadsDir)); // for case-insensitive use
 app.use("/plant-uploads", express.static(plantUploadsDir));
 app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
 
@@ -111,7 +109,7 @@ const checkExpiryNotifications = async () => {
 setInterval(checkExpiryNotifications, 12 * 60 * 60 * 1000);
 
 // ----------------------- Multer setup -----------------------
-// This is just a fallback, userRoutes has its own multer configuration
+// This is a fallback; some routes define their own multer configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
@@ -121,15 +119,16 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif/;
+  const allowed = /jpeg|jpg|png|gif|pdf/;
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowed.test(ext)) cb(null, true);
-  else cb(new Error("Only images are allowed"));
+  else cb(new Error("Only images and PDF files are allowed"));
 };
 
 const upload = multer({ storage, fileFilter });
 
 // ----------------------- Import Routes -----------------------
+
 // Animal Management
 import { animalRouter } from "./AnimalManagement/routes/animalRoutes.js";
 import { animalTypeRouter } from "./AnimalManagement/routes/animalTypeRoutes.js";
@@ -139,7 +138,8 @@ import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
 import feedingRoutes from "./AnimalManagement/routes/feedingRoutes.js";
 import automatedFeedingRoutes from "./AnimalManagement/routes/automatedFeedingRoutes.js";
-import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js"; // ⚠️ Renamed to avoid conflict
+import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
+
 import {
   sendMedicalRequest,
   testEmail,
@@ -163,7 +163,9 @@ import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologist
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
 
-// Contact Us
+// Treatments and Contact
+import animalTreatmentRoutes from "./HealthManagement/Routes/H_animalTreatmentRoutes.js";
+import H_plantTreatmentRoutes from "./HealthManagement/Routes/H_plantTreatmentRoutes.js";
 import contact from "./ContactUs/routes/contactRoutes.js";
 
 // Plant Management
@@ -195,14 +197,8 @@ import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
 // ESP32 Proxy Routes
 import esp32Routes from "./routes/esp32Routes.js";
 
-// ----------------------- Debug env variables -----------------------
-console.log(
-  "OPENAI_API_KEY loaded:",
-  process.env.OPENAI_API_KEY ? "YES" : "NO"
-);
-console.log("EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
-
 // ----------------------- Routes Setup -----------------------
+
 // Chatbot
 app.use("/api/chatbot", chatbotRoutes);
 
@@ -215,23 +211,33 @@ app.use("/emergency", emergencyRoutes);
 app.use("/api/feeding", feedingRoutes);
 app.use("/api/automated-feeding", automatedFeedingRoutes);
 app.use("/api/users", userRoutes);
-// IMPORTANT: Avoid conflict with /api/doctors from HealthManagement
-app.use("/api/animal-doctors", animalDoctorRouter); // ✅ moved from /api/doctors
+// Avoid conflict with /api/doctors from HealthManagement
+app.use("/api/animal-doctors", animalDoctorRouter);
 app.use("/animal-productivity", animalProductivityRouter);
 app.use("/api/notifications", productivityNotificationRouter);
+
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
 app.use("/api/meats", meatRoutes);
 app.use("/api/animal-management/notifications", notificationRoutes);
 
 // Health Management
-app.use("/api/doctors", doctorRoutes); // ✅ Only HealthManagement doctors here
+app.use("/api/doctors", doctorRoutes);
 app.use("/api/specialists", specialistRoutes);
 app.use("/api/medicine-companies", medicineCompanyRoutes);
 app.use("/api/medistore", mediStoreRoutes);
 app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
+
+// Contact us
+app.use("/api/contact", contact);
+
+// Match frontend endpoint
+app.use("/api/animal-treatments", animalTreatmentRoutes);
+
+// NEW Plant Treatment Routes
+app.use("/api/plant-treatments", H_plantTreatmentRoutes);
 
 // Contact Us
 app.use("/api/contact", contact);
@@ -265,20 +271,16 @@ app.use("/api/employee-reports", reportRoutes);
 // ESP32 Proxy Routes - These proxy requests to your ESP32 device
 app.use("/", esp32Routes);
 
-// Customer Profile Image Upload (fallback route)
-app.use(
-  "/api/customers/profile-upload",
-  upload.single("profileImage"),
-  (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    res.json({
-      message: "Profile image uploaded successfully",
-      path: `/uploads/${req.file.filename}`,
-    });
-  }
-);
+// Customer Profile Image Upload
+app.post("/api/customers/profile-upload", upload.single("profileImage"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  res.json({
+    message: "Profile image uploaded successfully",
+    path: `/uploads/${req.file.filename}`,
+  });
+});
 
-// Add debug endpoints
+// Debug Endpoints
 app.get("/api/debug", (req, res) => {
   res.json({
     message: "Server is working",
@@ -289,11 +291,9 @@ app.get("/api/debug", (req, res) => {
 
 app.get("/api/check-db", async (req, res) => {
   try {
-    // Try to perform a simple query
     const Pest = mongoose.model("Pest");
     const consultationCount = await mongoose.model("Consultation").countDocuments();
     const pestCount = await Pest.countDocuments();
-
     res.json({
       success: true,
       message: "MongoDB is connected",
@@ -309,33 +309,31 @@ app.get("/api/check-db", async (req, res) => {
   }
 });
 
-// ----------------------- Health Check -----------------------
-app.get("/health", (req, res) =>
-  res.json({ status: "OK", message: "Server is running" })
-);
-app.get("/", (req, res) => res.send("Backend is running!"));
+// Health Check
+app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
+app.get("/", (req, res) => res.send(" Easy Farming Backend is running!"));
 
-// ----------------------- 404 -----------------------
-app.use((req, res, next) => {
-  res.status(404).json({ message: "Not Found" });
+// 404 Not Found
+app.use((req, res) => {
+  res.status(404).json({ message: "Route Not Found" });
 });
 
-// ----------------------- Error Handling Middleware -----------------------
+// Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
-  
+
   // Handle multer errors specifically
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: "File too large. Maximum size is 5MB." });
     }
   }
-  
+
   const status = err.status || 500;
   res.status(status).json({ error: err.message || "Internal server error" });
 });
 
-// ----------------------- MongoDB Connection -----------------------
+// MongoDB Connection
 const MONGO_URI =
   process.env.MONGO_URI ||
   "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
@@ -343,10 +341,10 @@ const MONGO_URI =
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(MONGO_URI);
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(` MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ MongoDB connection failed: ${error.message}`);
-    console.error(`\n💡 Troubleshooting tips:`);
+    console.error(` MongoDB connection failed: ${error.message}`);
+    console.error(`\n Troubleshooting tips:`);
     console.error(`   1. Check if your IP address is whitelisted in MongoDB Atlas`);
     console.error(`   2. Verify your MongoDB connection string in .env file`);
     console.error(`   3. Ensure your MongoDB Atlas cluster is running`);
@@ -355,33 +353,33 @@ const connectDB = async () => {
   }
 };
 
-// ----------------------- Start Server -----------------------
+// Start Server
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    
+    console.log(` Server running on port ${PORT}`);
+
     // Start notification service
-    console.log('🔔 Starting notification service...');
-    
+    console.log(' Starting notification service...');
+
     // Run initial notification check
     NotificationService.runAllChecks();
-    
+
     // Schedule notification checks every 5 minutes
     setInterval(() => {
       NotificationService.runAllChecks();
     }, 5 * 60 * 1000);
-    
+
     // Clean up expired notifications every hour
     setInterval(() => {
       NotificationService.cleanupExpiredNotifications();
     }, 60 * 60 * 1000);
-    
-    console.log('✅ Notification service started');
-    
+
+    console.log(' Notification service started');
+
     // Start automated feeding service
     automatedFeedingService.start();
-    console.log('🤖 Automated feeding service started');
+    console.log(' Automated feeding service started');
   });
 });
 

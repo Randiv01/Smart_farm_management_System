@@ -105,7 +105,7 @@ import AdminLayout from "./Components/HealthManagement/H_layouts/H_AdminLayout.j
 import DoctorLayout from "./Components/HealthManagement/H_layouts/H_DoctorLayout.js";
 import PlantPathologistLayout from "./Components/HealthManagement/H_layouts/H_PlantPathologistLayout.js";
 
-// Admin Components
+// Admin Components Health Management
 import AddminPart from "./Components/HealthManagement/AdminPart/HealthAddminPart.js";
 import DoctorDetails from "./Components/HealthManagement/AdminPart/DoctorDetails/DoctorDetails.js";
 import SpecialistDetails from "./Components/HealthManagement/AdminPart/H_SpecialistDetails/H_SpecialistDetails.js";
@@ -115,6 +115,10 @@ import TreatmentsDetails from "./Components/HealthManagement/AdminPart/Treatment
 import TreatmentsPayments from "./Components/HealthManagement/AdminPart/TreatmentsPayments/TreatmentsPayments.js";
 import AdminProfile from "./Components/HealthManagement/AdminPart/AdminProfile/AdminProfile.js";
 import H_PlantPathologist from "./Components/HealthManagement/AdminPart/H_PlantPathologist/H_PlantPathologist.js";
+import H_AnimalTretmentDetils from "./Components/HealthManagement/AdminPart/TreatmentsDetails/H_AnimalTretmentDetils.js";
+import H_PlantTretmentDetils from "./Components/HealthManagement/AdminPart/TreatmentsDetails/H_PlantTretmentDetils.js";
+import H_AnimalTretmentAddFrom from "./Components/HealthManagement/AdminPart/TreatmentsDetails/H_AnimalTretmentAddFrom.js";
+import H_PlantTretmentAddFrom from "./Components/HealthManagement/AdminPart/TreatmentsDetails/H_PlantTretmentAddFrom.js";
 
 // Doctor Components
 import DoctorDashboard from "./Components/HealthManagement/DoctorPart/DoctorDashBoard.js";
@@ -257,6 +261,15 @@ function App() {
                               <Route path="treatments-payments" element={<TreatmentsPayments />} />
                               <Route path="profile" element={<AdminProfile />} />
                               <Route path="plant-pathologist" element={<H_PlantPathologist />} />
+                              
+                              {/* Treatment Details Routes */}
+                              <Route path="H_AnimalTretmentDetils" element={<H_AnimalTretmentDetils />} />
+                              <Route path="H_PlantTretmentDetils" element={<H_PlantTretmentDetils />} />
+                              
+                              {/* Add Treatment Forms Routes */}
+                              <Route path="H_AnimalTretmentAddFrom" element={<H_AnimalTretmentAddFrom />} />
+                              <Route path="H_PlantTretmentAddFrom" element={<H_PlantTretmentAddFrom />} />
+
                             </Route>
 
                             {/* Doctor */}
@@ -273,6 +286,9 @@ function App() {
                               <Route path="vet-specialist" element={<SpecialistDetails />} />
                               <Route path="treatment-details" element={<DoctorTreatment />} />
                               <Route path="help" element={<DoctorAdditional />} />
+                              
+                              {/* Doctor can also add treatments */}
+                              <Route path="add-animal-treatment" element={<H_AnimalTretmentAddFrom />} />
                             </Route>
 
                             {/* Plant Pathologist */}
@@ -288,6 +304,10 @@ function App() {
                               <Route path="add-fertiliser" element={<H_FertiliserAdd />} />
                               <Route path="help" element={<PlantPathologistAdditional />} />
                               <Route path="profile" element={<PlantPathologistProfile />} />
+                              
+                              {/* Plant Pathologist can add plant treatments */}
+                              <Route path="add-plant-treatment" element={<H_PlantTretmentAddFrom />} />
+                              <Route path="plant-treatment-details" element={<H_PlantTretmentDetils />} />
                             </Route>
 
                             {/* ----------------- Catch All ----------------- */}
