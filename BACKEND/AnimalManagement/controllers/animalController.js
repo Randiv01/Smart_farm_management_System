@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import Animal from '../models/Animal.js';
 import AnimalType from '../models/AnimalType.js';
-import Zone from '../models/Zone.js';
 import mongoose from 'mongoose';
 import { canZoneAccommodate, updateZoneOccupancy } from '../utils/zoneOccupancy.js';
 
