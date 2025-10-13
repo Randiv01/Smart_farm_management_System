@@ -1,273 +1,285 @@
-// H_animalTreatmentController.js
-import AnimalTreatment from '../Model/H_AnimalTreatmentModel.js';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import mongoose from "mongoose";
+import H_AnimalTreatment from "../Model/H_animalTreatmentModel.js";
+import { decreaseMultipleMedicines } from "./H_MediStoreController.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export const createAnimalTreatment = async (req, res) => {
+export const addAnimalTreatment = async (req, res) => {
   try {
-    console.log('Request body:', req.body);
-    console.log('Request file:', req.file);
-
-    const { medicines: medicinesStr, ...otherFields } = req.body;
-    const medicines = medicinesStr ? JSON.parse(medicinesStr) : [];
-    
-    let reports = undefined;
-    if (req.file) {
-      reports = `/Health_uploads/animal-reports/${req.file.filename}`;
-    }
-
-    const treatmentData = {
-      ...otherFields,
+    const {
+      animalType,
+      animalCode,
+      doctor,
+      specialist,
       medicines,
-      ...(reports && { reports })
+      notes,
+      status
+    } = req.body;
+
+    // Parse medicines from JSON string if needed
+    const medicinesArray = typeof medicines === 'string' ? JSON.parse(medicines) : medicines;
+
+    // Create treatment record
+    const treatmentData = {
+      animalType,
+      animalCode,
+      doctor,
+      specialist: specialist || null,
+      medicines: medicinesArray || [],
+      notes: notes || "",
+      status: status || "active",
+      treatmentDate: new Date()
     };
 
-    console.log('Treatment data to save:', treatmentData);
-
-    const newTreatment = new AnimalTreatment(treatmentData);
-    const saved = await newTreatment.save();
-    
-    // Populate all referenced fields with correct model names
-    const populatedTreatment = await AnimalTreatment.findById(saved._id)
-      .populate('doctor')
-      .populate('specialist')
-      .populate({
-        path: 'medicines',
-        model: 'H_MediStore'
-      });
-
-    res.status(201).json({ 
-      success: true, 
-      data: populatedTreatment,
-      message: 'Animal treatment record created successfully'
-    });
-  } catch (error) {
-    console.error('Error creating animal treatment:', error);
-    
-    // Clean up uploaded file if error occurs
+    // Handle file upload
     if (req.file) {
-      const filePath = path.join(process.cwd(), 'HealthManagement', 'Health_uploads', 'animal-reports', req.file.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      treatmentData.reports = `/Health_uploads/${req.file.filename}`;
+    }
+
+    const newTreatment = new H_AnimalTreatment(treatmentData);
+    const savedTreatment = await newTreatment.save();
+
+    // Decrease medicine quantities if medicines are selected
+    if (medicinesArray && medicinesArray.length > 0) {
+      try {
+        const medicineDecreaseData = medicinesArray.map(medicineId => ({
+          medicineId,
+          decreaseAmount: 1 // Decrease by 1 unit for each selected medicine
+        }));
+
+        await decreaseMultipleMedicines(
+          { body: { medicines: medicineDecreaseData } },
+          { 
+            status: () => ({ json: () => {} }),
+            json: () => {}
+          }
+        );
+
+        console.log(`✅ Decreased quantities for ${medicinesArray.length} medicines`);
+      } catch (medicineError) {
+        console.error("❌ Error decreasing medicine quantities:", medicineError);
+        // Continue with treatment creation even if medicine update fails
       }
     }
-    
-    res.status(400).json({ 
-      success: false, 
-      error: error.message,
-      details: error.errors || 'Validation error'
+
+    // Emit socket event for real-time updates
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("treatment-added", savedTreatment);
+      io.emit("medicine-stock-updated", { medicines: medicinesArray });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Animal treatment record created successfully",
+      data: savedTreatment
+    });
+
+  } catch (err) {
+    console.error("❌ Error creating animal treatment:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      details: "Failed to create animal treatment record"
     });
   }
 };
 
-export const getAllAnimalTreatments = async (req, res) => {
+export const getAnimalTreatments = async (req, res) => {
   try {
-    const treatments = await AnimalTreatment.find()
-      .populate('doctor')
-      .populate('specialist')
-      .populate({
-        path: 'medicines',
-        model: 'H_MediStore'
-      })
+    const treatments = await H_AnimalTreatment.find()
+      .populate('doctor', 'fullName specialization')
+      .populate('specialist', 'fullName specialization')
+      .populate('medicines', 'medicine_name quantity_available unit')
       .sort({ createdAt: -1 });
 
-    console.log(`Found ${treatments.length} animal treatments`);
-    
-    res.json({ 
-      success: true, 
-      data: treatments,
-      count: treatments.length
+    res.status(200).json({
+      success: true,
+      data: treatments
     });
-  } catch (error) {
-    console.error('Error fetching animal treatments:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+  } catch (err) {
+    console.error("❌ Error fetching animal treatments:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
     });
   }
 };
 
 export const getAnimalTreatmentById = async (req, res) => {
   try {
-    const treatment = await AnimalTreatment.findById(req.params.id)
-      .populate('doctor')
-      .populate('specialist')
-      .populate({
-        path: 'medicines',
-        model: 'H_MediStore'
-      });
+    const treatment = await H_AnimalTreatment.findById(req.params.id)
+      .populate('doctor', 'fullName specialization')
+      .populate('specialist', 'fullName specialization')
+      .populate('medicines', 'medicine_name quantity_available unit');
 
     if (!treatment) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Animal treatment not found' 
+      return res.status(404).json({
+        success: false,
+        error: "Animal treatment not found"
       });
     }
-    
-    res.json({ 
-      success: true, 
-      data: treatment 
+
+    res.status(200).json({
+      success: true,
+      data: treatment
     });
-  } catch (error) {
-    console.error('Error fetching animal treatment:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+  } catch (err) {
+    console.error("❌ Error fetching animal treatment:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
     });
   }
 };
 
 export const updateAnimalTreatment = async (req, res) => {
   try {
-    const treatmentId = req.params.id;
-    let updateData = {};
-    
-    console.log('Update request body:', req.body);
-    console.log('Update request file:', req.file);
+    const {
+      animalType,
+      animalCode,
+      doctor,
+      specialist,
+      medicines,
+      notes,
+      status
+    } = req.body;
 
-    // Handle multipart/form-data
-    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
-      const { medicines: medicinesStr, ...other } = req.body;
-      updateData = { ...other };
-      if (medicinesStr) {
-        updateData.medicines = JSON.parse(medicinesStr);
+    const updateData = {
+      animalType,
+      animalCode,
+      doctor,
+      specialist: specialist || null,
+      notes: notes || "",
+      status: status || "active"
+    };
+
+    // Parse medicines from JSON string if needed
+    if (medicines) {
+      const medicinesArray = typeof medicines === 'string' ? JSON.parse(medicines) : medicines;
+      updateData.medicines = medicinesArray;
+
+      // Get current treatment to compare medicine changes
+      const currentTreatment = await H_AnimalTreatment.findById(req.params.id);
+      if (currentTreatment) {
+        const oldMedicines = currentTreatment.medicines.map(m => m.toString());
+        const newMedicines = medicinesArray;
+
+        // Find medicines that were removed (no need to increase stock)
+        // Find medicines that were added (need to decrease stock)
+        const addedMedicines = newMedicines.filter(med => !oldMedicines.includes(med));
+        
+        if (addedMedicines.length > 0) {
+          try {
+            const medicineDecreaseData = addedMedicines.map(medicineId => ({
+              medicineId,
+              decreaseAmount: 1
+            }));
+
+            await decreaseMultipleMedicines(
+              { body: { medicines: medicineDecreaseData } },
+              { 
+                status: () => ({ json: () => {} }),
+                json: () => {}
+              }
+            );
+
+            console.log(`✅ Decreased quantities for ${addedMedicines.length} newly added medicines`);
+          } catch (medicineError) {
+            console.error("❌ Error decreasing medicine quantities during update:", medicineError);
+          }
+        }
       }
-    } else {
-      updateData = req.body;
     }
 
     // Handle file upload
     if (req.file) {
-      // Delete old file if exists
-      const oldTreatment = await AnimalTreatment.findById(treatmentId);
-      if (oldTreatment?.reports) {
-        const oldFileName = path.basename(oldTreatment.reports);
-        const oldFilePath = path.join(process.cwd(), 'HealthManagement', 'Health_uploads', 'animal-reports', oldFileName);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
-      }
-      updateData.reports = `/Health_uploads/animal-reports/${req.file.filename}`;
+      updateData.reports = `/Health_uploads/${req.file.filename}`;
     }
 
-    const updated = await AnimalTreatment.findByIdAndUpdate(
-      treatmentId,
+    const updatedTreatment = await H_AnimalTreatment.findByIdAndUpdate(
+      req.params.id,
       updateData,
       { new: true, runValidators: true }
     )
-    .populate('doctor')
-    .populate('specialist')
-    .populate({
-      path: 'medicines',
-      model: 'H_MediStore'
-    });
+      .populate('doctor', 'fullName specialization')
+      .populate('specialist', 'fullName specialization')
+      .populate('medicines', 'medicine_name quantity_available unit');
 
-    if (!updated) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Animal treatment not found' 
+    if (!updatedTreatment) {
+      return res.status(404).json({
+        success: false,
+        error: "Animal treatment not found"
       });
     }
 
-    res.json({ 
-      success: true, 
-      data: updated,
-      message: 'Animal treatment updated successfully'
-    });
-  } catch (error) {
-    console.error('Error updating animal treatment:', error);
-    
-    // Clean up uploaded file if error occurs
-    if (req.file) {
-      const filePath = path.join(process.cwd(), 'HealthManagement', 'Health_uploads', 'animal-reports', req.file.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-    
-    res.status(400).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-};
-
-// NEW: Simple status update endpoint
-export const updateAnimalTreatmentStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    console.log('Updating status for treatment:', id, 'to:', status);
-
-    const updated = await AnimalTreatment.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true, runValidators: true }
-    )
-    .populate('doctor')
-    .populate('specialist')
-    .populate({
-      path: 'medicines',
-      model: 'H_MediStore'
+    res.status(200).json({
+      success: true,
+      message: "Animal treatment updated successfully",
+      data: updatedTreatment
     });
 
-    if (!updated) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Animal treatment not found' 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      data: updated,
-      message: 'Status updated successfully'
-    });
-  } catch (error) {
-    console.error('Error updating status:', error);
-    res.status(400).json({ 
-      success: false, 
-      error: error.message 
+  } catch (err) {
+    console.error("❌ Error updating animal treatment:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
     });
   }
 };
 
 export const deleteAnimalTreatment = async (req, res) => {
   try {
-    const treatment = await AnimalTreatment.findById(req.params.id);
-    
-    if (!treatment) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Animal treatment not found' 
+    const deletedTreatment = await H_AnimalTreatment.findByIdAndDelete(req.params.id);
+
+    if (!deletedTreatment) {
+      return res.status(404).json({
+        success: false,
+        error: "Animal treatment not found"
       });
     }
 
-    // Delete associated report file
-    if (treatment.reports) {
-      const fileName = path.basename(treatment.reports);
-      const filePath = path.join(process.cwd(), 'HealthManagement', 'Health_uploads', 'animal-reports', fileName);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+    res.status(200).json({
+      success: true,
+      message: "Animal treatment deleted successfully"
+    });
+  } catch (err) {
+    console.error("❌ Error deleting animal treatment:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
+export const updateTreatmentStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const updatedTreatment = await H_AnimalTreatment.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    )
+      .populate('doctor', 'fullName specialization')
+      .populate('specialist', 'fullName specialization')
+      .populate('medicines', 'medicine_name quantity_available unit');
+
+    if (!updatedTreatment) {
+      return res.status(404).json({
+        success: false,
+        error: "Animal treatment not found"
+      });
     }
 
-    await AnimalTreatment.findByIdAndDelete(req.params.id);
-    
-    res.json({ 
-      success: true, 
-      message: 'Animal treatment deleted successfully' 
+    res.status(200).json({
+      success: true,
+      message: "Treatment status updated successfully",
+      data: updatedTreatment
     });
-  } catch (error) {
-    console.error('Error deleting animal treatment:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+  } catch (err) {
+    console.error("❌ Error updating treatment status:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message
     });
   }
 };

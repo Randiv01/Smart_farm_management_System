@@ -504,7 +504,7 @@ Last Updated: ${new Date(record.updatedAt).toLocaleDateString()}
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-light-beige dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-xl font-semibold text-blue-700 mb-4">Loading animal treatment records...</div>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mx-auto"></div>
@@ -516,9 +516,9 @@ Last Updated: ${new Date(record.updatedAt).toLocaleDateString()}
   const displayRecords = filteredRecords.length > 0 ? filteredRecords : records;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-light-beige dark:bg-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white shadow-lg rounded-lg p-6">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-lg rounded-lg p-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -731,7 +731,14 @@ Last Updated: ${new Date(record.updatedAt).toLocaleDateString()}
                                   checked={editFormData.medicines.includes(med._id)}
                                   onChange={() => handleMedicineToggle(med._id)}
                                 />
-                                <span>{med.medicine_name}</span>
+                                <span>
+                                  {med.medicine_name} 
+                                  <span className={`text-xs ml-2 ${
+                                    med.quantity_available > 0 ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    ({med.quantity_available} {med.unit} available)
+                                  </span>
+                                </span>
                               </label>
                             ))}
                           </div>
@@ -740,7 +747,14 @@ Last Updated: ${new Date(record.updatedAt).toLocaleDateString()}
                             {rec.medicines && rec.medicines.length > 0 ? (
                               rec.medicines.map((med, index) => (
                                 <div key={index} className="text-sm mb-1">
-                                  • {getMedicineName(med)}
+                                  • {getMedicineName(med)} 
+                                  {med.quantity_available !== undefined && (
+                                    <span className={`text-xs ml-2 ${
+                                      med.quantity_available > 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      ({med.quantity_available} {med.unit || 'units'})
+                                    </span>
+                                  )}
                                 </div>
                               ))
                             ) : (
