@@ -7,10 +7,10 @@
 #include <ArduinoJson.h>
 
 // WiFi Credentials - Replace with your networks
-const char* ssid1 = "Danuz";        // 1st priority - Mobile Hotspot
+const char* ssid1 = "Danuz";        // 1st priority - Mobile Hotspot 01
 const char* password1 = "12345678";
 
-const char* ssid2 = "Iphone 11";    // 2nd priority - Home WiFi
+const char* ssid2 = "iPhone 11";    // 2nd priority - Mobile Hotspot 02 (correct iPhone casing)
 const char* password2 = "22222222";
 
 // Use DHCP for automatic IP assignment (no hardcoded IPs)
@@ -64,7 +64,7 @@ unsigned long pumpTimerEnd = 0;
 unsigned long heaterTimerEnd = 0;
 
 // WiFi connection variables
-int wifiTimeout = 15000; // 15 seconds timeout for each WiFi
+int wifiTimeout = 30000; // 30 seconds timeout for each WiFi (more reliable for hotspots)
 String connectedSSID = "";
 unsigned long lastReconnectAttempt = 0;
 const unsigned long RECONNECT_INTERVAL = 30000; // 30 seconds
