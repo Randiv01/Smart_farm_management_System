@@ -29,9 +29,10 @@ export default function PTopNavbar({ sidebarOpen, onMenuClick }) {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/notifications/Plant Management');
+        const response = await axios.get('http://localhost:5000/api/animal-management/notifications');
         if (response.data.success) {
-          const unreadNotifications = response.data.data.notifications.filter(n => !n.read);
+          const list = Array.isArray(response.data.data) ? response.data.data : (response.data.data?.notifications || []);
+          const unreadNotifications = list.filter(n => !n.read);
           setUnreadCount(unreadNotifications.length);
         }
       } catch (error) {

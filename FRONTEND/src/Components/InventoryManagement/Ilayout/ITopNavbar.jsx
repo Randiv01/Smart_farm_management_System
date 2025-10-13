@@ -116,12 +116,14 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
           headers: { Authorization: `Bearer ${token}` },
           params: { limit: 10 }
         }).catch(() => ({ data: [] })),
-        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } }))
+        axios.get("http://localhost:5000/api/animal-management/notifications").catch(() => ({ data: { data: [] } }))
       ]);
       
       // Combine both notification sources
       const refillNotifications = refillResponse.data || [];
-      const generalNotifications = generalResponse.data?.data?.notifications || [];
+      const generalNotifications = Array.isArray(generalResponse.data?.data)
+        ? generalResponse.data.data
+        : (generalResponse.data?.data?.notifications || []);
       
       // Convert general notifications to match the expected format
       const convertedGeneralNotifications = generalNotifications.map(notification => ({
@@ -163,7 +165,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
         // Mark as read in the appropriate system
         if (notification.type === 'harvest') {
           // Mark general notification as read
-          await axios.patch(`http://localhost:5000/api/notifications/${id}/read`);
+          await axios.patch(`http://localhost:5000/api/animal-management/notifications/${id}/read`);
         } else if (token) {
           // Mark refill request notification as read
           await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #log { background-color: #f8f9fa; padding: 10px; height: 300px; overflow-y: auto; border: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+    <h1>ESP32 WebSocket Connection Test</h1>
+    
+    <div id="status" class="status info">Ready to test connection...</div>
+    
+    <button onclick="testConnection()">Test WebSocket Connection</button>
+    <button onclick="testHTTP()">Test HTTP Connection</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <h3>Connection Log:</h3>
+    <div id="log"></div>
+
+    <script>
+        let ws = null;
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logEntry.style.color = type === 'error' ? '#721c24' : type === 'success' ? '#155724' : '#0c5460';
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function testHTTP() {
+            addLog('Testing HTTP connection to ESP32...');
+            fetch('http://172.20.10.2/status')
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                })
+                .then(data => {
+                    addLog('✅ HTTP connection successful!', 'success');
+                    addLog(`📊 Temperature: ${data.temperature}°C`, 'success');
+                    addLog(`💧 Humidity: ${data.humidity}%`, 'success');
+                    addLog(`🌱 Soil Moisture: ${data.soilMoisture}`, 'success');
+                    updateStatus('HTTP connection working!', 'success');
+                })
+                .catch(error => {
+                    addLog(`❌ HTTP connection failed: ${error.message}`, 'error');
+                    updateStatus('HTTP connection failed', 'error');
+                });
+        }
+
+        function testConnection() {
+            addLog('🔄 Attempting WebSocket connection to ws://172.20.10.2:81...');
+            updateStatus('Connecting to WebSocket...', 'info');
+
+            try {
+                ws = new WebSocket('ws://172.20.10.2:81');
+
+                ws.onopen = function(event) {
+                    addLog('✅ WebSocket connection opened successfully!', 'success');
+                    updateStatus('WebSocket connected!', 'success');
+                    
+                    // Send a test message
+                    const testMessage = JSON.stringify({ type: 'getData' });
+                    addLog(`📤 Sending test message: ${testMessage}`);
+                    ws.send(testMessage);
+                };
+
+                ws.onmessage = function(event) {
+                    addLog(`📥 Received message: ${event.data}`, 'success');
+                    try {
+                        const data = JSON.parse(event.data);
+                        addLog(`📊 Parsed data - Temp: ${data.temperature}°C, Humidity: ${data.humidity}%`, 'success');
+                    } catch (e) {
+                        addLog(`⚠️ Could not parse message as JSON: ${e.message}`);
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    addLog(`❌ WebSocket connection closed. Code: ${event.code}, Reason: ${event.reason}`, 'error');
+                    updateStatus('WebSocket connection closed', 'error');
+                    
+                    // Log common close codes
+                    switch(event.code) {
+                        case 1000:
+                            addLog('ℹ️ Normal closure');
+                            break;
+                        case 1006:
+                            addLog('ℹ️ Abnormal closure (no close frame)');
+                            break;
+                        case 1011:
+                            addLog('ℹ️ Server error');
+                            break;
+                        default:
+                            addLog(`ℹ️ Unknown close code: ${event.code}`);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    addLog(`❌ WebSocket error: ${error}`, 'error');
+                    updateStatus('WebSocket connection error', 'error');
+                };
+
+            } catch (error) {
+                addLog(`❌ Failed to create WebSocket: ${error.message}`, 'error');
+                updateStatus('Failed to create WebSocket', 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Test HTTP connection on page load
+        window.onload = function() {
+            addLog('🚀 WebSocket test page loaded');
+            testHTTP();
+        };
+    </script>
+</body>
+</html>
+

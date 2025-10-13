@@ -101,12 +101,14 @@ export default function INotifications() {
           headers: { Authorization: `Bearer ${token}` },
           params: { limit: 50 }
         }).catch(() => ({ data: [] })),
-        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } }))
+        axios.get("http://localhost:5000/api/animal-management/notifications").catch(() => ({ data: { data: [] } }))
       ]);
       
       // Combine both notification sources
       const refillNotifications = refillResponse.data || [];
-      const generalNotifications = generalResponse.data?.data?.notifications || [];
+      const generalNotifications = Array.isArray(generalResponse.data?.data)
+        ? generalResponse.data.data
+        : (generalResponse.data?.data?.notifications || []);
       
       // Convert general notifications to match the expected format
       const convertedGeneralNotifications = generalNotifications.map(notification => ({
@@ -176,7 +178,7 @@ export default function INotifications() {
         // Mark as read in the appropriate system
         if (notification.type === 'harvest') {
           // Mark general notification as read
-          await axios.patch(`http://localhost:5000/api/notifications/${notificationId}/read`);
+          await axios.patch(`http://localhost:5000/api/animal-management/notifications/${notificationId}/read`);
         } else if (token) {
           // Mark refill request notification as read
           await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${notificationId}/read`, {}, {
@@ -203,7 +205,7 @@ export default function INotifications() {
       
       for (const notification of unreadNotifications) {
         if (notification.type === 'harvest') {
-          await axios.patch(`http://localhost:5000/api/notifications/${notification.id}/read`);
+          await axios.patch(`http://localhost:5000/api/animal-management/notifications/${notification.id}/read`);
         } else if (token) {
           await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${notification.id}/read`, {}, {
             headers: { Authorization: `Bearer ${token}` }
