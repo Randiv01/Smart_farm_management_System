@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-// Animal Treatment Form Component
-const H_AnimalTretmentAddFrom = () => {
+function H_AnimalTretmentAddFrom() {
   const [animalTypes, setAnimalTypes] = useState([
     "Cow",
     "Hen",
@@ -33,7 +32,6 @@ const H_AnimalTretmentAddFrom = () => {
   const [debugInfo, setDebugInfo] = useState("");
   const navigate = useNavigate();
 
-  // Status options
   const statusOptions = [
     { value: "diagnosed", label: "Diagnosed" },
     { value: "active", label: "Under Treatment" },
@@ -43,13 +41,11 @@ const H_AnimalTretmentAddFrom = () => {
   ];
 
   useEffect(() => {
-    // Fetch doctors, specialists, and medicines
     const fetchData = async () => {
       try {
         setError("");
         setLoading(true);
-        
-        // First test if models are registered
+
         try {
           const modelsTest = await axios.get("http://localhost:5000/api/test-models");
           console.log("Models test:", modelsTest.data);
@@ -58,24 +54,24 @@ const H_AnimalTretmentAddFrom = () => {
           console.error("Models test failed:", testError);
           setDebugInfo("Models test failed - check server");
         }
-        
+
         const [doctorsRes, specialistsRes, medicinesRes] = await Promise.all([
           axios.get("http://localhost:5000/api/doctors", { timeout: 10000 }),
           axios.get("http://localhost:5000/api/specialists", { timeout: 10000 }),
           axios.get("http://localhost:5000/api/medistore", { timeout: 10000 })
         ]);
-        
+
         console.log("Doctors:", doctorsRes.data);
         console.log("Specialists:", specialistsRes.data);
         console.log("Medicines:", medicinesRes.data);
-        
+
         setDoctors(doctorsRes.data);
         setSpecialists(specialistsRes.data);
         setMedicines(medicinesRes.data);
       } catch (error) {
         console.error("Error fetching data:", error);
         let errorMessage = "Failed to load form data. ";
-        
+
         if (error.code === 'ECONNREFUSED') {
           errorMessage += "Cannot connect to server. Please make sure the backend is running on port 5000.";
         } else if (error.response?.data?.error) {
@@ -87,7 +83,7 @@ const H_AnimalTretmentAddFrom = () => {
         } else {
           errorMessage += error.message;
         }
-        
+
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -100,7 +96,6 @@ const H_AnimalTretmentAddFrom = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear errors when user starts typing
     if (error) setError("");
     if (success) setSuccess("");
   };
@@ -108,19 +103,18 @@ const H_AnimalTretmentAddFrom = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 10 * 1024 * 1024;
       
       if (!allowedTypes.includes(file.type)) {
         setError("Please select a valid file type (JPEG, JPG, PNG, PDF)");
-        e.target.value = ""; // Clear the file input
+        e.target.value = "";
         return;
       }
       
       if (file.size > maxSize) {
         setError("File size too large. Maximum size is 10MB.");
-        e.target.value = ""; // Clear the file input
+        e.target.value = "";
         return;
       }
       
@@ -146,9 +140,7 @@ const H_AnimalTretmentAddFrom = () => {
       setFormData((prev) => ({ ...prev, animalType: trimmedType }));
       setNewAnimalType("");
       setSuccess(`New animal type "${trimmedType}" added successfully!`);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(""), 3000);
+      setTimeout(() => setSuccess("") , 3000);
     } else if (newAnimalType.trim() === "") {
       setError("Please enter an animal type");
     } else {
@@ -157,22 +149,10 @@ const H_AnimalTretmentAddFrom = () => {
   };
 
   const validateForm = () => {
-    if (!formData.animalType.trim()) {
-      setError("Animal type is required");
-      return false;
-    }
-    if (!formData.animalCode.trim()) {
-      setError("Animal code is required");
-      return false;
-    }
-    if (!formData.doctor) {
-      setError("Veterinary surgeon is required");
-      return false;
-    }
-    if (!formData.status) {
-      setError("Treatment status is required");
-      return false;
-    }
+    if (!formData.animalType.trim()) { setError("Animal type is required"); return false; }
+    if (!formData.animalCode.trim()) { setError("Animal code is required"); return false; }
+    if (!formData.doctor) { setError("Veterinary surgeon is required"); return false; }
+    if (!formData.status) { setError("Treatment status is required"); return false; }
     return true;
   };
 
@@ -182,11 +162,7 @@ const H_AnimalTretmentAddFrom = () => {
     setError("");
     setSuccess("");
 
-    // Validate form
-    if (!validateForm()) {
-      setLoading(false);
-      return;
-    }
+    if (!validateForm()) { setLoading(false); return; }
 
     try {
       const data = new FormData();
@@ -197,43 +173,21 @@ const H_AnimalTretmentAddFrom = () => {
       data.append("status", formData.status);
       data.append("notes", formData.notes.trim());
       data.append("medicines", JSON.stringify(formData.medicines));
-      
-      if (formData.reports) {
-        data.append("reports", formData.reports);
-      }
-
-      console.log("Submitting form data:", {
-        animalType: formData.animalType,
-        animalCode: formData.animalCode,
-        doctor: formData.doctor,
-        specialist: formData.specialist,
-        status: formData.status,
-        medicines: formData.medicines,
-        notes: formData.notes,
-        hasFile: !!formData.reports
-      });
-
-      // Log FormData contents for debugging
-      for (let [key, value] of data.entries()) {
-        console.log(`FormData: ${key} =`, value);
-      }
+      if (formData.reports) data.append("reports", formData.reports);
 
       const response = await axios.post(
         "http://localhost:5000/api/animal-treatments", 
         data, 
         {
-          headers: { 
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
           timeout: 30000
         }
       );
 
       if (response.data.success) {
         console.log("Record saved successfully:", response.data);
-        setSuccess("Animal treatment record saved successfully!");
-        
-        // Reset form
+        setSuccess("Animal treatment record saved successfully and medicine stock updated!");
+
         setFormData({
           animalType: "",
           animalCode: "",
@@ -244,15 +198,11 @@ const H_AnimalTretmentAddFrom = () => {
           notes: "",
           status: "active"
         });
-        
-        // Clear file input
+
         const fileInput = document.querySelector('input[type="file"]');
         if (fileInput) fileInput.value = "";
 
-        // Navigate back to treatments page after successful submission
-        setTimeout(() => {
-          navigate("/admin/treatments-details");
-        }, 2000);
+        setTimeout(() => { navigate("/admin/treatments-details"); }, 2000);
       } else {
         throw new Error(response.data.error || "Failed to save record");
       }
@@ -280,9 +230,7 @@ const H_AnimalTretmentAddFrom = () => {
     }
   };
 
-  const handleBack = () => {
-    navigate("/admin/treatments-details");
-  };
+  const handleBack = () => { navigate("/admin/treatments-details"); };
 
   const getDoctorName = (doctorId) => {
     const doctor = doctors.find(d => d._id === doctorId);
@@ -309,10 +257,10 @@ const H_AnimalTretmentAddFrom = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 flex justify-center">
+    <div className="min-h-screen bg-light-beige dark:bg-slate-900 p-6 flex justify-center">
       <form
         onSubmit={handleSubmit}
-        className="bg-white shadow-lg rounded-lg p-6 w-full max-w-4xl space-y-6"
+        className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-lg rounded-lg p-6 w-full max-w-4xl space-y-6"
       >
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-blue-700">
@@ -395,12 +343,7 @@ const H_AnimalTretmentAddFrom = () => {
               placeholder="Add New Animal Type"
               value={newAnimalType}
               onChange={(e) => setNewAnimalType(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddAnimalType();
-                }
-              }}
+              onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddAnimalType(); } }}
               className="border p-2 rounded flex-1 focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
             <button
@@ -543,7 +486,7 @@ const H_AnimalTretmentAddFrom = () => {
                         <span className={`text-sm ml-2 ${
                           med.quantity_available > 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          ({med.quantity_available} available)
+                          ({med.quantity_available} {med.unit} available)
                         </span>
                       )}
                     </span>
@@ -552,7 +495,7 @@ const H_AnimalTretmentAddFrom = () => {
               </div>
               {formData.medicines.length > 0 && (
                 <p className="text-sm text-green-600 mt-2">
-                  {formData.medicines.length} medicine(s) selected
+                  {formData.medicines.length} medicine(s) selected - Stock will be decreased by 1 unit each
                 </p>
               )}
             </>
@@ -611,10 +554,11 @@ const H_AnimalTretmentAddFrom = () => {
 
         <p className="text-sm text-gray-500 text-center border-t pt-4">
           * Required fields. All data will be saved to the database and files will be stored in the Health_uploads folder.
+          Medicine stock levels will be automatically decreased when treatment is saved.
         </p>
 
         {/* Debug Info */}
-        <div className="bg-gray-100 p-3 rounded text-xs">
+        <div className="bg-gray-100 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 p-3 rounded text-xs">
           <strong>Debug Info:</strong> 
           <div>Doctors: {doctors.length}</div>
           <div>Specialists: {specialists.length}</div>
@@ -630,6 +574,6 @@ const H_AnimalTretmentAddFrom = () => {
       </form>
     </div>
   );
-};
+}
 
 export default H_AnimalTretmentAddFrom;
