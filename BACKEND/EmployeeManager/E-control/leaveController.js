@@ -1,4 +1,5 @@
 import Leave from "../E-model/Leave.js";
+import ENotification from "../E-model/ENotification.js";
 import EventEmitter from "events";
 
 // Simple in-process pub-sub for SSE
@@ -48,6 +49,32 @@ export const createLeave = async (req, res, next) => {
       reason: payload.reason || "",
       status: payload.status || "Pending",
     });
+    
+    // Create notification for new leave request
+    try {
+      await ENotification.create({
+        title: 'New Leave Request',
+        message: `New leave request from ${leave.name} for ${leave.type} leave from ${new Date(leave.from).toLocaleDateString()} to ${new Date(leave.to).toLocaleDateString()}`,
+        type: 'warning',
+        category: 'leave_management',
+        priority: 'high',
+        isRead: false,
+        scheduledTime: new Date(),
+        metadata: {
+          actionRequired: true,
+          actionType: 'review_leave',
+          employeeName: leave.name,
+          employeeId: leave.empId,
+          department: 'General', // You can enhance this to get actual department
+          leaveId: leave._id,
+          leaveType: leave.type
+        }
+      });
+    } catch (notificationError) {
+      console.error('Failed to create leave notification:', notificationError);
+      // Don't fail the leave creation if notification fails
+    }
+    
     leaveBus.emit("changed", { action: "created", leave });
     res.status(201).json(leave);
   } catch (e) {
@@ -70,6 +97,38 @@ export const updateLeave = async (req, res, next) => {
     }
     const leave = await Leave.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!leave) return res.status(404).json({ error: "Leave not found" });
+    
+    // Create notification for leave status change (approval/rejection)
+    if (update.status && update.status !== 'Pending') {
+      try {
+        const notificationType = update.status === 'Approved' ? 'success' : 'error';
+        const notificationTitle = update.status === 'Approved' ? 'Leave Request Approved' : 'Leave Request Rejected';
+        const notificationMessage = `Your ${leave.type} leave request from ${new Date(leave.from).toLocaleDateString()} to ${new Date(leave.to).toLocaleDateString()} has been ${update.status.toLowerCase()}`;
+        
+        await ENotification.create({
+          title: notificationTitle,
+          message: notificationMessage,
+          type: notificationType,
+          category: 'leave_management',
+          priority: 'medium',
+          isRead: false,
+          scheduledTime: new Date(),
+          metadata: {
+            actionRequired: false,
+            employeeName: leave.name,
+            employeeId: leave.empId,
+            department: 'General',
+            leaveId: leave._id,
+            leaveType: leave.type,
+            status: update.status
+          }
+        });
+      } catch (notificationError) {
+        console.error('Failed to create leave status notification:', notificationError);
+        // Don't fail the leave update if notification fails
+      }
+    }
+    
     leaveBus.emit("changed", { action: "updated", leave });
     res.json(leave);
   } catch (e) {

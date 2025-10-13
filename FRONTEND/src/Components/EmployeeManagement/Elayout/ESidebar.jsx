@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Users, Calendar, Clock, Plane, CreditCard, BarChart3, Settings } from "lucide-react";
+import { Home, Users, Bell, Calendar, Clock, Plane, CreditCard, BarChart3, Settings } from "lucide-react";
 
 export default function ESidebar({ darkMode, sidebarOpen, toggleSidebar }) {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ export default function ESidebar({ darkMode, sidebarOpen, toggleSidebar }) {
     { path: "/EmployeeManagement/overtime", icon: Clock, label: "Overtime" },
     { path: "/EmployeeManagement/salary", icon: CreditCard, label: "Salary Desk" },
     { path: "/EmployeeManagement/reports", icon: BarChart3, label: "Reports" },
+    { path: "/EmployeeManagement/notifications", icon: Bell, label: "Notifications" },
     { path: "/EmployeeManagement/settings", icon: Settings, label: "Settings" },
   ];
 

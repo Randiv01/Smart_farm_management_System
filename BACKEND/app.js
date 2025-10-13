@@ -65,8 +65,9 @@ const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_upload
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 const animalReportsDir = path.join(__dirname, "uploads", "animal-reports");
 const plantReportsDir = path.join(__dirname, "uploads", "plant-reports");
+const employeeUploadsDir = path.join(__dirname, "EmployeeManager", "E-uploads");
 
-[uploadsDir, healthUploadsDir, plantUploadsDir, animalReportsDir, plantReportsDir].forEach((dir) => {
+[uploadsDir, healthUploadsDir, plantUploadsDir, animalReportsDir, plantReportsDir, employeeUploadsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
     console.log(` Created directory: ${dir}`);
@@ -80,6 +81,7 @@ app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/Health_Uploads", express.static(healthUploadsDir)); // for case-insensitive use
 app.use("/plant-uploads", express.static(plantUploadsDir));
 app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
+app.use("/employee-uploads", express.static(employeeUploadsDir));
 
 // ----------------------- Batch Expiry Notification Function -----------------------
 const checkExpiryNotifications = async () => {
@@ -193,6 +195,9 @@ import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 import salaryRoutes from "./EmployeeManager/E-route/salaryRoutes.js";
 import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
+import employeeDashboardRoutes from "./EmployeeManager/E-route/dashboardRoutes.js";
+import employeeNotificationRoutes from "./EmployeeManager/E-route/ENotificationRoutes.js";
+import employeeNotificationScheduler from "./EmployeeManager/E-services/ENotificationScheduler.js";
 
 // ESP32 Proxy Routes
 import esp32Routes from "./routes/esp32Routes.js";
@@ -267,6 +272,8 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/employee-reports", reportRoutes);
+app.use("/api/dashboard", employeeDashboardRoutes);
+app.use("/api/employee-notifications", employeeNotificationRoutes);
 
 // ESP32 Proxy Routes - These proxy requests to your ESP32 device
 app.use("/", esp32Routes);
@@ -375,7 +382,12 @@ connectDB().then(() => {
       NotificationService.cleanupExpiredNotifications();
     }, 60 * 60 * 1000);
 
-    console.log(' Notification service started');
+    console.log('✅ Notification service started');
+    
+    // Start employee management notification scheduler
+    console.log('🔔 Starting Employee Management notification scheduler...');
+    employeeNotificationScheduler.start();
+    console.log('✅ Employee Management notification scheduler started');
 
     // Start automated feeding service
     automatedFeedingService.start();

@@ -78,6 +78,7 @@ import INotifications from "./Components/InventoryManagement/Ipages/INotificatio
 import EmployeeLayoutWrapper from "./Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx";
 import { Dashboard as EDashboard } from "./Components/EmployeeManagement/pages/E-Dashboard.js";
 import { StaffHub as EStaffHub } from "./Components/EmployeeManagement/pages/E-StaffHub.js";
+import { ENotifications } from "./Components/EmployeeManagement/pages/ENotifications.jsx";
 import { AttendanceTracker as EAttendanceTracker } from "./Components/EmployeeManagement/pages/E-AttendanceTracker.jsx";
 import { ELeavePlanner } from "./Components/EmployeeManagement/pages/E-LeavePlanner.jsx";
 import { OvertimeMonitor as EOvertimeMonitor } from "./Components/EmployeeManagement/pages/E-OvertimeMonitor.js";
@@ -214,6 +215,7 @@ function App() {
                             <Route path="/EmployeeManagement/*" element={<EmployeeLayoutWrapper />}>
                               <Route index element={<EDashboard />} />
                               <Route path="staff" element={<EStaffHub />} />
+                              <Route path="notifications" element={<ENotifications />} />
                               <Route path="attendance" element={<EAttendanceTracker />} />
                               <Route path="leave" element={<ELeavePlanner />} />
                               <Route path="overtime" element={<EOvertimeMonitor />} />
