@@ -163,19 +163,22 @@ export const deleteEmployee = async (req, res) => {
   }
 };
 
-// Get Caretakers (employees with "Care Taker" job title)
-export const getCaretakers = async (req, res) => {
+// Get Employees by Job Title (e.g., Care Taker)
+export const getEmployeesByTitle = async (req, res) => {
   try {
-    console.log("getCaretakers endpoint called");
-    const caretakers = await Employee.find({ 
-      title: { $regex: /care\s*taker/i },
-      status: "Active" 
-    }).select('id name department title contact');
+    const { title } = req.params;
+    console.log("Fetching employees with title:", title);
     
-    console.log(`Found ${caretakers.length} active caretakers`);
-    res.json({ caretakers });
+    // Case-insensitive search for job title
+    const employees = await Employee.find({ 
+      title: { $regex: new RegExp(title, 'i') },
+      status: "Active" // Only active employees
+    }).select('id name department contact email');
+    
+    console.log(`Found ${employees.length} employees with title: ${title}`);
+    res.json({ employees });
   } catch (err) {
-    console.error("Get caretakers error:", err);
+    console.error("Get employees by title error:", err);
     res.status(500).json({ error: err.message });
   }
 };

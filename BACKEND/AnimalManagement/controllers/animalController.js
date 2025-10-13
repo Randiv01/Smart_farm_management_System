@@ -872,6 +872,10 @@ export const moveAnimalToZone = async (req, res) => {
     const { animalId } = req.params;
     const { zoneId } = req.body;
 
+    if (!zoneId) {
+      return res.status(400).json({ message: 'Zone ID is required' });
+    }
+
     const animal = await Animal.findById(animalId);
     if (!animal) return res.status(404).json({ message: 'Animal not found' });
 
@@ -879,8 +883,11 @@ export const moveAnimalToZone = async (req, res) => {
     const newZone = await Zone.findById(zoneId);
     if (!newZone) return res.status(404).json({ message: 'Zone not found' });
 
-    // Check if new zone can accommodate the animal
-    const accommodationCheck = await canZoneAccommodate(zoneId, 1);
+    // Get the count for batch animals or 1 for individual animals
+    const animalCount = animal.isBatch ? (animal.count || 1) : 1;
+
+    // Check if new zone can accommodate the animal(s)
+    const accommodationCheck = await canZoneAccommodate(zoneId, animalCount);
     if (!accommodationCheck.canAccommodate) {
       return res.status(400).json({ 
         message: 'Cannot move animal to zone', 
@@ -894,12 +901,12 @@ export const moveAnimalToZone = async (req, res) => {
 
     // Update occupancy in both zones
     if (oldZoneId) {
-      await updateZoneOccupancy(oldZoneId.toString(), -1);
+      await updateZoneOccupancy(oldZoneId.toString(), -animalCount);
     }
-    await updateZoneOccupancy(zoneId, 1);
+    await updateZoneOccupancy(zoneId, animalCount);
 
     res.json({ 
-      message: 'Animal moved successfully',
+      message: animal.isBatch ? 'Batch moved successfully' : 'Animal moved successfully',
       animal: await Animal.findById(animalId).populate('assignedZone')
     });
   } catch (error) {
