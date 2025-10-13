@@ -937,55 +937,54 @@ const MonitorControl = () => {
         </div>
       </div>
 
-      {/* Custom IP Connection Panel */}
+      {/* Compact ESP32 Connection Card */}
       {selectedGreenhouse === 'GH-01' && (
-        <Card className="p-4 mb-6">
-          <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">🔗 Custom ESP32 Connection</h3>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex-1 min-w-48">
-              <label htmlFor="customIP" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                ESP32 IP Address
-              </label>
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                <Wifi size={16} className="text-white" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white m-0">ESP32 Connection</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 m-0">
+                  {customIP || 'Auto-connect (172.20.10.2)'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
               <input
-                id="customIP"
                 type="text"
                 value={customIP}
                 onChange={(e) => setCustomIP(e.target.value)}
-                placeholder="e.g., 172.20.10.2, 192.168.1.100"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
+                placeholder="IP address"
+                className="w-32 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
               />
-            </div>
-            <div className="flex items-end gap-2">
               <button
                 onClick={connectToCustomIP}
                 disabled={isConnectingToCustomIP || !customIP.trim()}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-sm"
+                title="Connect to custom IP"
               >
                 {isConnectingToCustomIP ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    Connecting...
-                  </>
+                  <RefreshCw size={12} className="animate-spin" />
                 ) : (
-                  <>
-                    <Wifi size={16} />
-                    Connect
-                  </>
+                  <Wifi size={12} />
                 )}
               </button>
-              <button
-                onClick={() => setCustomIP('')}
-                className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                title="Clear IP"
-              >
-                ✕
-              </button>
+              {customIP && (
+                <button
+                  onClick={() => setCustomIP('')}
+                  className="px-2 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm"
+                  title="Clear IP"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            💡 Enter the ESP32's IP address to connect directly. Check the ESP32's serial monitor for the current IP address.
-          </p>
-        </Card>
+        </div>
       )}
 
       {/* Error message for non-GH-01 greenhouses */}
