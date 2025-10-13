@@ -336,100 +336,83 @@ export const EEmployeeReportCenter = () => {
                   </p>
                 </div>
 
-                {/* Export Button */}
-                <div className="mb-8">
-                  <button 
-                    onClick={handleExportReport}
-                    disabled={loading}
-                    className={`inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 text-xl font-bold ${
-                      loading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
-                    }`}
-                  >
-                    {loading ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    ) : (
-                      <FileDown className="w-6 h-6" />
-                    )}
-                    <span>{loading ? 'Exporting...' : 'Export Full Report'}</span>
-                  </button>
-                </div>
 
                 {/* Personal Information Section */}
-                <section className={`rounded-2xl border shadow-lg p-8 ${
+                <section className={`rounded-2xl border shadow-lg p-5 ${
                   darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
                 }`}>
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="p-3 rounded-xl bg-indigo-500 text-white">
-                      <User className="w-7 h-7" />
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-xl bg-indigo-500 text-white">
+                      <User className="w-5 h-5" />
                     </div>
-                    <h4 className={`text-2xl font-bold ${
+                    <h4 className={`text-xl font-bold ${
                       darkMode ? "text-gray-100" : "text-gray-900"
                     }`}>
                       Personal Information
                     </h4>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <div className={`flex items-center gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <User className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <User className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
                       </div>
-                      <div>
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Employee ID</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.id}</p>
-                      </div>
-                    </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <Briefcase className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Department</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.department}</p>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Employee ID</p>
+                        <p className={`font-semibold text-base ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.id}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <Award className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <Briefcase className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
                       </div>
-                      <div>
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Job Title</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.title}</p>
-                      </div>
-                    </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <Calendar className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Joined Date</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.joined}</p>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Department</p>
+                        <p className={`font-semibold text-base break-words whitespace-normal ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.department}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <Phone className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <Award className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
                       </div>
-                      <div>
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Contact</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.contact}</p>
-                      </div>
-                    </div>
-                    <div className={`flex items-center gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <Mail className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Email</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.email || 'Not provided'}</p>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Job Title</p>
+                        <p className={`font-semibold text-base break-words whitespace-normal ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.title}</p>
                       </div>
                     </div>
-                    <div className={`sm:col-span-2 xl:col-span-3 flex items-start gap-4 p-6 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
-                      <div className={`p-3 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                        <LocationIcon className={`w-6 h-6 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <Calendar className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
                       </div>
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Address</p>
-                        <p className={`font-bold text-xl ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.address || 'Not provided'}</p>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Joined Date</p>
+                        <p className={`font-semibold text-base ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.joined}</p>
+                      </div>
+                    </div>
+                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <Phone className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Contact</p>
+                        <p className={`font-semibold text-base break-words whitespace-normal ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.contact}</p>
+                      </div>
+                    </div>
+                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <Mail className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Email</p>
+                        <p className={`font-semibold text-base break-words whitespace-normal ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.email || 'Not provided'}</p>
+                      </div>
+                    </div>
+                    <div className={`sm:col-span-2 xl:col-span-3 flex items-start gap-3 p-4 rounded-xl border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+                      <div className={`p-2 rounded-xl ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                        <LocationIcon className={`w-5 h-5 ${darkMode ? "text-gray-200" : "text-gray-600"}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>Address</p>
+                        <p className={`font-semibold text-base break-words whitespace-normal ${darkMode ? "text-white" : "text-gray-900"}`}>{employeeDetails.employee.address || 'Not provided'}</p>
                       </div>
                     </div>
                   </div>
@@ -538,102 +521,6 @@ export const EEmployeeReportCenter = () => {
                   </div>
                 </section>
 
-                {/* Available Reports Section */}
-                <section className={`rounded-2xl border shadow-lg p-8 ${
-                  darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-                }`}>
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="p-3 rounded-xl bg-indigo-500 text-white">
-                      <FileText className="w-7 h-7" />
-                    </div>
-                    <h4 className={`text-2xl font-bold ${
-                      darkMode ? "text-gray-100" : "text-gray-900"
-                    }`}>
-                      Available Reports
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {[
-                      { 
-                        label: "Attendance Report", 
-                        desc: "Monthly attendance summary with detailed breakdown", 
-                        tone: "blue", 
-                        type: "attendance",
-                        icon: Calendar,
-                        bgColor: "from-blue-500 to-blue-600"
-                      },
-                      { 
-                        label: "Leave Report", 
-                        desc: "Leave history, balance, and usage patterns", 
-                        tone: "orange", 
-                        type: "leave",
-                        icon: Calendar,
-                        bgColor: "from-orange-500 to-orange-600"
-                      },
-                      { 
-                        label: "Overtime Report", 
-                        desc: "Overtime hours, rates, and compensation details", 
-                        tone: "purple", 
-                        type: "overtime",
-                        icon: Clock,
-                        bgColor: "from-purple-500 to-purple-600"
-                      },
-                      { 
-                        label: "Salary Report", 
-                        desc: "Salary history, breakdown, and payment records", 
-                        tone: "green", 
-                        type: "salary",
-                        icon: DollarSign,
-                        bgColor: "from-green-500 to-green-600"
-                      },
-                    ].map((r, i) => {
-                      const IconComponent = r.icon;
-                      return (
-                        <div
-                          key={i}
-                          className={`rounded-xl border p-6 ${
-                            darkMode
-                              ? "bg-gray-700 border-gray-600"
-                              : "bg-white border-gray-200"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className={`p-3 rounded-xl bg-gradient-to-r ${r.bgColor} text-white`}>
-                                <IconComponent className="w-6 h-6" />
-                              </div>
-                              <div>
-                                <h5 className={`font-bold text-lg mb-1 ${darkMode ? "text-white" : "text-gray-900"}`}>{r.label}</h5>
-                                <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>{r.desc}</p>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDownloadReport(r.type)}
-                              disabled={loading}
-                              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${
-                                loading 
-                                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                  : `bg-gradient-to-r ${r.bgColor} text-white hover:shadow-lg`
-                              }`}
-                            >
-                              {loading ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                  <span>Downloading...</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <FileDown className="w-4 h-4" />
-                                  <span>Download</span>
-                                </div>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
               </>
             ) : (
               <section className={`h-full rounded-2xl border border-dashed p-12 flex flex-col items-center justify-center text-center ${
