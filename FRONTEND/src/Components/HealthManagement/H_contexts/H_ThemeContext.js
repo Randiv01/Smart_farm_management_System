@@ -12,9 +12,15 @@ export const useTheme = () => {
 
 export const ThemeProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('healthDarkMode') === 'true';
+    const stored = localStorage.getItem('healthDarkMode');
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
   });
-  
+
   // Modified to default to true (expanded) when no value is saved
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('healthSidebarOpen');
@@ -46,6 +52,28 @@ export const ThemeProvider = ({ children }) => {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Sync with system theme only when user has not explicitly chosen a preference
+  useEffect(() => {
+    const stored = localStorage.getItem('healthDarkMode');
+    if (stored === 'true' || stored === 'false') return;
+    const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    if (!mql) return;
+    const handleChange = (e) => setDarkMode(e.matches);
+    try {
+      mql.addEventListener('change', handleChange);
+    } catch (_) {
+      // Safari
+      mql.addListener(handleChange);
+    }
+    return () => {
+      try {
+        mql.removeEventListener('change', handleChange);
+      } catch (_) {
+        mql.removeListener(handleChange);
+      }
+    };
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ 
