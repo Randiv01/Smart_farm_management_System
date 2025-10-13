@@ -125,11 +125,7 @@ const Navbar = ({ onCartClick }) => {
           </div>
           <div className="flex items-center space-x-4 text-xs">
             <div className="flex items-center">
-<<<<<<< Updated upstream
               <Phone size={14} className="mr-1" />
-=======
-              <PhoneIcon className="h-3.5 w-3.5 mr-1" />
->>>>>>> Stashed changes
               <span>Call us: +94 81 249 2134</span>
             </div>
             <span className="hidden sm:inline">|</span>
