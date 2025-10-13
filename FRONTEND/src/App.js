@@ -70,6 +70,7 @@ import FertilizerStock from "./Components/InventoryManagement/Ipages/FertilizerS
 import ISupplier from "./Components/InventoryManagement/Ipages/ISupplier.jsx";
 import ISettings from "./Components/InventoryManagement/Ipages/ISettings.jsx";
 
+<<<<<<< Updated upstream
 // ----------------- Employee Management -----------------
 import EmployeeLayoutWrapper from "./Components/EmployeeManagement/Elayout/EmployeeLayoutWrapper.jsx";
 import { Dashboard as EDashboard } from "./Components/EmployeeManagement/pages/E-Dashboard.js";
@@ -83,6 +84,56 @@ import { SystemSettings as ESystemSettings } from "./Components/EmployeeManageme
 
 // NEW: Fertiliser Companies page
 import FertiliserCompanies from './Components/HealthManagement/PlantPathologistPart/FertiliserCompanies.js';
+=======
+// ----------------- User / Frontend Pages -----------------
+import Register from './Components/UserHome/Registration/Registration.jsx';
+import Home from './Components/UserHome/UHHome/UHHome.jsx';
+import Login from './Components/UserHome/Login/login.jsx';
+import Navbar from './Components/UserHome/UHNavbar/UHNavbar.jsx';
+import News from "./Components/UserHome/News/News.jsx"; 
+import AboutUs from "./Components/UserHome/AboutUs/AboutUs.jsx";  //about us page
+import ContactUs from "./Components/UserHome/ContactUs/ContactUs.jsx";  //cantact  us page
+
+// User Contexts
+import { CartProvider } from './Components/UserHome/UHContext/UHCartContext.jsx';
+import { AuthProvider } from './Components/UserHome/UHContext/UHAuthContext.jsx';
+import { ThemeProvider as UserThemeProvider } from './Components/UserHome/UHContext/UHThemeContext.jsx';
+
+
+// ----------------- Health Management -----------------
+import { LanguageProvider as HLanguageProvider } from './Components/HealthManagement/H_contexts/H_LanguageContext.js';
+import { ThemeProvider as HThemeProvider } from './Components/HealthManagement/H_contexts/H_ThemeContext.js';
+
+// Layouts (Health)
+import AdminLayout from './Components/HealthManagement/H_layouts/H_AdminLayout.js';
+import DoctorLayout from './Components/HealthManagement/H_layouts/H_DoctorLayout.js';
+import PlantPathologistLayout from './Components/HealthManagement/H_layouts/H_PlantPathologistLayout.js';
+
+// ADMIN COMPONENTS (Health)
+import AddminPart from './Components/HealthManagement/AdminPart/HealthAddminPart.js';
+import DoctorDetails from './Components/HealthManagement/AdminPart/DoctorDetails/DoctorDetails.js';
+import SpecialistDetails from './Components/HealthManagement/AdminPart/H_SpecialistDetails/H_SpecialistDetails.js';
+import MedicineCompany from './Components/HealthManagement/AdminPart/H_MedicineCompany/H_MedicineCompany.js';
+import MediStore from './Components/HealthManagement/AdminPart/H_MediStore/H_MediStore.js';
+import TreatmentsDetails from './Components/HealthManagement/AdminPart/TreatmentsDetails/TreatmentsDetails.js';
+import TreatmentsPayments from './Components/HealthManagement/AdminPart/TreatmentsPayments/TreatmentsPayments.js';
+import AdminProfile from './Components/HealthManagement/AdminPart/AdminProfile/AdminProfile.js';
+import H_PlantPathologist from './Components/HealthManagement/AdminPart/H_PlantPathologist/H_PlantPathologist.js';
+
+// DOCTOR COMPONENTS (Health)
+import DoctorDashboard from './Components/HealthManagement/DoctorPart/DoctorDashBoard.js';
+import HealthAnimal from './Components/HealthManagement/DoctorPart/HealthAnimal.js';
+import DoctorTreatment from './Components/HealthManagement/DoctorPart/DoctorTreatment.js';
+import DoctorAdditional from './Components/HealthManagement/DoctorPart/DoctorAdditional.js';
+
+// PLANT PATHOLOGIST COMPONENTS (Health)
+import PlantPathologistHome from "./Components/HealthManagement/PlantPathologistPart/PlantPathologistHome.js";
+import FertiliserStock from './Components/HealthManagement/PlantPathologistPart/H_FertiliserStock.js';
+import FertiliserDetails from './Components/HealthManagement/PlantPathologistPart/H_FertiliserDetails.js';
+import H_FertiliserAdd from './Components/HealthManagement/PlantPathologistPart/H_FertiliserAdd.js';
+import PlantPathologistAdditional from './Components/HealthManagement/PlantPathologistPart/PathologisticAdditional.js';
+import PlantPathologistProfile from './Components/HealthManagement/PlantPathologistPart/PathologisticProfile.js';
+>>>>>>> Stashed changes
 
 // ----------------- Plant Management -----------------
 import PLayout from "./Components/PlantManagement/P-Layout.jsx";
@@ -139,7 +190,17 @@ function App() {
       <AuthProvider>
         <UserThemeProvider>
           <CartProvider>
+<<<<<<< Updated upstream
             <CartSidebar />
+=======
+            <Routes>
+              <Route path="/" element={<><Navbar /><Home /></>} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/news" element={<News />} /> 
+              <Route path="/about" element={<><Navbar /><AboutUs /></>} /> {/* Added About Us route */}
+              <Route path="/contact" element={<><Navbar /><ContactUs /></>} /> {/*  Fixed */}
+>>>>>>> Stashed changes
 
             <HLanguageProvider>
               <HThemeProvider>
