@@ -100,7 +100,7 @@ const ChatBot = () => {
       questions: [
         {
           question: "Store location & hours",
-          answer: "Our farm store is located at:\n123 Farm Road, Countryside, CA 90210\n\nStore hours:\n• Monday-Friday: 9am-6pm\n• Saturday: 10am-4pm\n• Sunday: Closed\n\nWe also offer farm tours on weekends!",
+          answer: "Our farm store is located at:\nNo. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka\n\nStore hours:\n• Monday-Friday: 9am-6pm\n• Saturday: 10am-4pm\n• Sunday: Closed\n\nWe also offer farm tours on weekends!",
         },
         {
           question: "Available discounts & loyalty program",

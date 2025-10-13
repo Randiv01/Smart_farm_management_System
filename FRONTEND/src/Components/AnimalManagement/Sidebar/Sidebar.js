@@ -11,6 +11,7 @@ import {
   Settings,
   UserCheck,
   MapPin,
+  Beef,
 } from "lucide-react";
 
 export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) {
@@ -23,10 +24,11 @@ export default function Sidebar({ darkMode, sidebarOpen, toggleSidebar, type }) 
     { path: "/AnimalManagement/feeding-scheduler", icon: Calendar, label: "Feeding Schedule" },
     { path: "/AnimalManagement/animal-health", icon: HeartPulse, label: "Health" },
     { path: "/AnimalManagement/productivity", icon: Activity, label: "Productivity" },
-    { path: `/AnimalManagement/design-plan/${type}`, icon: Plus, label: "Design your Plan" },
+    { path: "/AnimalManagement/MeatManagement", icon: Beef, label: "MeatManagement" },
     { path: "/AnimalManagement/zones", icon: MapPin, label: "Zones / Shelters" },
+    { path: `/AnimalManagement/design-plan/${type}`, icon: Plus, label: "Design your Plan" },
     { path: "/AnimalManagement/alerts", icon: Bell, label: "Alerts" },
-    { path: "/AnimalManagement/settings", icon: Settings, label: "Settings" },
+    { path: "/AnimalManagement/settings", icon: Settings, label: "Settings" }, 
   ];
 
   // Auto-close sidebar if resized to mobile

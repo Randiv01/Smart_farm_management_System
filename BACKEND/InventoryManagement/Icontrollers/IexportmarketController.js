@@ -1,9 +1,9 @@
-const ExportMarket = require('./IExportmarket');
-const Product = require('./Product'); // Assuming Product model exists
-const mongoose = require('mongoose');
+import ExportMarket from '../Imodels/IExportmarket.js';
+import Product from '../Imodels/Product.js';
+import mongoose from 'mongoose';
 
 // Get all export market entries
-exports.getAllExportMarkets = async (req, res) => {
+export const getAllExportMarkets = async (req, res) => {
   try {
     const exportMarkets = await ExportMarket.find()
       .populate('product', 'name category stock price market')
@@ -23,7 +23,7 @@ exports.getAllExportMarkets = async (req, res) => {
 };
 
 // Get single export market entry
-exports.getExportMarket = async (req, res) => {
+export const getExportMarket = async (req, res) => {
   try {
     const exportMarket = await ExportMarket.findById(req.params.id)
       .populate('product', 'name category stock price market')
@@ -50,9 +50,33 @@ exports.getExportMarket = async (req, res) => {
 };
 
 // Create new export market entry
-exports.createExportMarket = async (req, res) => {
+export const createExportMarket = async (req, res) => {
   try {
     const { productId, exportCountry, exportDate, quantity, unit, exportPrice } = req.body;
+    
+    // Validate required fields
+    if (!productId || !exportCountry || !exportDate || !quantity || !exportPrice) {
+      return res.status(400).json({
+        success: false,
+        message: 'All required fields must be provided'
+      });
+    }
+
+    // Validate quantity is positive
+    if (quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be greater than 0'
+      });
+    }
+
+    // Validate export price is positive
+    if (exportPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Export price must be greater than 0'
+      });
+    }
     
     // Validate product exists and is marked for export
     const product = await Product.findById(productId);
@@ -74,7 +98,7 @@ exports.createExportMarket = async (req, res) => {
     if (product.stock.quantity < quantity) {
       return res.status(400).json({
         success: false,
-        message: 'Insufficient stock for export'
+        message: `Insufficient stock for export. Available: ${product.stock.quantity} ${product.stock.unit}, Requested: ${quantity} ${unit || product.stock.unit}`
       });
     }
     
@@ -94,6 +118,9 @@ exports.createExportMarket = async (req, res) => {
     product.stock.quantity -= quantity;
     await product.save();
     
+    // Populate the product field before sending response
+    await exportMarket.populate('product', 'name category stock price market');
+    
     res.status(201).json({
       success: true,
       data: exportMarket
@@ -108,11 +135,11 @@ exports.createExportMarket = async (req, res) => {
 };
 
 // Update export market entry
-exports.updateExportMarket = async (req, res) => {
+export const updateExportMarket = async (req, res) => {
   try {
     const { exportCountry, exportDate, quantity, unit, exportPrice, status } = req.body;
     
-    const exportMarket = await ExportMarket.findById(req.params.id);
+    const exportMarket = await ExportMarket.findById(req.params.id).populate('product');
     if (!exportMarket) {
       return res.status(404).json({
         success: false,
@@ -122,13 +149,13 @@ exports.updateExportMarket = async (req, res) => {
     
     // If updating quantity, validate stock
     if (quantity && quantity !== exportMarket.quantity) {
-      const product = await Product.findById(exportMarket.product);
+      const product = await Product.findById(exportMarket.product._id);
       const stockDifference = quantity - exportMarket.quantity;
       
       if (stockDifference > 0 && product.stock.quantity < stockDifference) {
         return res.status(400).json({
           success: false,
-          message: 'Insufficient stock for updated quantity'
+          message: `Insufficient stock for updated quantity. Available: ${product.stock.quantity} ${product.stock.unit}, Additional needed: ${stockDifference} ${unit || exportMarket.unit}`
         });
       }
       
@@ -163,9 +190,9 @@ exports.updateExportMarket = async (req, res) => {
 };
 
 // Delete export market entry
-exports.deleteExportMarket = async (req, res) => {
+export const deleteExportMarket = async (req, res) => {
   try {
-    const exportMarket = await ExportMarket.findById(req.params.id);
+    const exportMarket = await ExportMarket.findById(req.params.id).populate('product');
     if (!exportMarket) {
       return res.status(404).json({
         success: false,
@@ -174,11 +201,11 @@ exports.deleteExportMarket = async (req, res) => {
     }
     
     // Restore product stock
-    const product = await Product.findById(exportMarket.product);
+    const product = await Product.findById(exportMarket.product._id);
     product.stock.quantity += exportMarket.quantity;
     await product.save();
     
-    await exportMarket.remove();
+    await ExportMarket.findByIdAndDelete(req.params.id);
     
     res.status(200).json({
       success: true,

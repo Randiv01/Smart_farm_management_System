@@ -206,107 +206,205 @@ export default function HealthInfoDetails() {
 };
 
   const downloadHealthReport = async (animal) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('p', 'mm', 'a4');
     
     // Company information
     const companyName = "Mount Olive Farm House";
-    const companyAddress = "123 Farm Road, Agricultural District, Country";
-    const companyContact = "Phone: +1 (555) 123-4567 | Email: info@mountolivefarm.com";
+    const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+    const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+    const companyWebsite = "www.mountolivefarm.com";
     const reportDate = new Date().toLocaleDateString();
+    const reportTime = new Date().toLocaleTimeString();
     
-    // Add logo
-    const img = new Image();
-    img.src = "/logo512.png";
+    // Professional color scheme
+    const primaryColor = [34, 197, 94]; // Green
+    const secondaryColor = [16, 185, 129]; // Teal
+    const accentColor = [59, 130, 246]; // Blue
+    const textColor = [31, 41, 55]; // Dark gray
+    const lightGray = [243, 244, 246];
     
-    img.onload = async () => {
-      // Header with logo and company info
-      doc.addImage(img, "PNG", 14, 10, 30, 30);
-      doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
-      doc.text(companyName, 50, 15);
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.text(companyAddress, 50, 22);
-      doc.text(companyContact, 50, 29);
-      
-      // Report title
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text("ANIMAL HEALTH REPORT", 105, 45, { align: 'center' });
-      doc.setLineWidth(0.5);
-      doc.line(14, 50, 196, 50);
-      
-      // Animal information section
+    // Add real company logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.onload = () => {
+        doc.addImage(logoImg, 'PNG', 20, 15, 25, 25);
+        generatePDFContent();
+      };
+      logoImg.onerror = () => {
+        // Fallback to placeholder if logo fails to load
+        doc.setFillColor(...primaryColor);
+        doc.rect(20, 15, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('MOF', 30, 30, { align: 'center' });
+        generatePDFContent();
+      };
+      logoImg.src = '/logo512.png';
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Fallback to placeholder
+      doc.setFillColor(...primaryColor);
+      doc.rect(20, 15, 25, 25, 'F');
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
-      doc.text("Animal Information:", 14, 60);
-      doc.setFont(undefined, 'normal');
-      
-      const animalInfo = [
+      doc.text('MOF', 30, 30, { align: 'center' });
+      generatePDFContent();
+    }
+
+    const generatePDFContent = () => {
+    
+    // Company header
+    doc.setTextColor(...textColor);
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text(companyName, 50, 20);
+    
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(companyAddress, 50, 27);
+    doc.text(companyContact, 50, 32);
+    doc.text(companyWebsite, 50, 37);
+    
+    // Report title with professional styling
+    doc.setFillColor(...lightGray);
+    doc.rect(20, 45, 170, 12, 'F');
+    doc.setTextColor(...primaryColor);
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text("ANIMAL HEALTH REPORT", 105, 54, { align: 'center' });
+    
+    // Report metadata
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 20, 65);
+    doc.text(`Report ID: MOF-HR-${Date.now().toString().slice(-6)}`, 20, 70);
+    
+    // Animal information section with professional styling
+    doc.setFillColor(...secondaryColor);
+    doc.rect(20, 80, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("ANIMAL INFORMATION", 25, 86);
+    
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    const animalInfo = [
         ["Animal ID", animal.animalId || "N/A"],
-        ["Name", animal.data?.name || "N/A"],
-        ["Type", animalType.name],
-        ["Report Date", reportDate]
-      ];
-      
-      let yPos = 70;
-      animalInfo.forEach(([label, value]) => {
+        ["Animal Name", animal.data?.name || "N/A"],
+        ["Animal Type", animalType.name],
+        ["Report Date", reportDate],
+        ["Reported By", "Farm Management System"]
+    ];
+    
+    let yPos = 95;
+    animalInfo.forEach(([label, value]) => {
         doc.setFont(undefined, 'bold');
-        doc.text(`${label}:`, 20, yPos);
+        doc.text(`${label}:`, 25, yPos);
         doc.setFont(undefined, 'normal');
-        doc.text(value, 60, yPos);
-        yPos += 7;
-      });
-      
-      // Health data section
-      yPos += 5;
-      doc.setFont(undefined, 'bold');
-      doc.text("Health Assessment:", 14, yPos);
-      yPos += 10;
-      
-      // Health data table
-      const tableData = healthFields.map(field => [
+        doc.text(value, 80, yPos);
+        yPos += 6;
+    });
+    
+    // Health assessment section
+    yPos += 10;
+    doc.setFillColor(...accentColor);
+    doc.rect(20, yPos, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("HEALTH ASSESSMENT", 25, yPos + 6);
+    
+    yPos += 15;
+    
+    // Health data table with professional styling
+    const tableData = healthFields.map(field => [
         field.label, 
         animal.data?.[field.name] || "Not recorded"
-      ]);
-      
-      autoTable(doc, {
+    ]);
+    
+    autoTable(doc, {
         startY: yPos,
-        head: [["Health Parameter", "Value"]],
-        body: tableData,
+        head: [["Health Parameter", "Current Value", "Status"]],
+        body: tableData.map(row => [
+            row[0], 
+            row[1],
+            row[1] === "Not recorded" ? "Pending" : "Recorded"
+        ]),
         theme: "grid",
         headStyles: { 
-          fillColor: [60, 141, 188], 
-          textColor: 255,
-          fontStyle: 'bold'
+            fillColor: primaryColor, 
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 10
         },
+        bodyStyles: {
+            fontSize: 9,
+            cellPadding: 4,
+            textColor: textColor
+        },
+        alternateRowStyles: {
+            fillColor: [249, 250, 251]
+        },
+        margin: { left: 20, right: 20 },
         styles: {
-          fontSize: 10,
-          cellPadding: 3
-        },
-        margin: { left: 14, right: 14 }
-      });
-      
-      // Veterinarian section
-      const finalY = doc.lastAutoTable.finalY + 15;
-      doc.setFont(undefined, 'bold');
-      doc.text("Veterinarian Notes:", 14, finalY);
-      doc.setFont(undefined, 'normal');
-      doc.text("________________________________________________________________", 14, finalY + 5);
-      doc.text("________________________________________________________________", 14, finalY + 10);
-      doc.text("________________________________________________________________", 14, finalY + 15);
-      
-      // Footer with page number
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5
+        }
+    });
+    
+    // Veterinarian section
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFillColor(...secondaryColor);
+    doc.rect(20, finalY, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("VETERINARIAN NOTES", 25, finalY + 6);
+    
+    doc.setTextColor(...textColor);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text("________________________________________________________________", 20, finalY + 15);
+    doc.text("________________________________________________________________", 20, finalY + 20);
+    doc.text("________________________________________________________________", 20, finalY + 25);
+    doc.text("________________________________________________________________", 20, finalY + 30);
+    
+    // Professional footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 280, 210, 20, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
         doc.setFontSize(8);
-        doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
-        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 290, { align: 'center' });
-      }
-      
-      // Save the PDF
-      const fileName = `Health_Report_${animal.data?.name || animal.animalId || animal._id}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.text(`Page ${i} of ${pageCount}`, 20, 288);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 288, { align: 'center' });
+        doc.text(companyName, 190, 288, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(20, 290, 190, 290);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 295, { align: 'center' });
+    }
+    
+      // Save the PDF with professional naming
+      const fileName = `MOF_Health_Report_${animal.data?.name || animal.animalId || animal._id}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
     };
   };
@@ -547,12 +645,32 @@ const handleMedicalRequest = async () => {
 
   // Loading / Error
   if (loading)
-    return (
-      <div className="flex justify-center items-center h-48 text-gray-700 dark:text-gray-200">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-teal-500"></div>
-        <p className="ml-4">Loading health data...</p>
-      </div>
-    );
+  return (
+    <div className="flex flex-col justify-center items-center h-48 text-gray-700 dark:text-gray-300">
+      {/* New SVG Arc Spinner */}
+      <svg
+        className="animate-spin h-12 w-12 text-green-600 dark:text-green-400"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        ></circle>
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        ></path>
+      </svg>
+      <p className="mt-4 font-medium">Loading data...</p>
+    </div>
+  );
 
   if (error || !animalType)
     return (
@@ -581,15 +699,16 @@ const handleMedicalRequest = async () => {
     );
 
   return (
-    <div className={`min-h-screen ${darkMode ? "dark bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800"}`}>
+    <div className={`min-h-screen ${darkMode ? "dark bg-gray-900 text-gray-100" : "light-beige"}`}>
       <main className="p-5">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center mb-5 gap-4">
-          <h2 className="text-2xl font-semibold">
-            {animalType.name} Health Information
-            {animalType.managementType !== "individual" && 
-              ` (${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} View)`}
-          </h2>
+         <h2 className="text-2xl font-semibold">
+          {animalType.name.charAt(0).toUpperCase() + animalType.name.slice(1).toLowerCase()} Health Information
+          {animalType.managementType !== "individual" && 
+            ` (${animalType.managementType === "batch" ? "Batch" : "Hive/Farm"} View)`}
+        </h2>
+
           <button
             onClick={() => navigate(`/AnimalManagement/add-animal/${animalType._id}`)}
             className="flex items-center gap-2 px-4 py-2 rounded-md font-semibold bg-teal-600 text-white hover:bg-teal-700"
@@ -602,17 +721,6 @@ const handleMedicalRequest = async () => {
 
         {/* Doctor Selection */}
         <div className={`mb-4 p-3 rounded-lg ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md`}>
-          <div className="flex flex-wrap justify-between items-center gap-4 mb-3">
-            <label className="block font-medium">
-              Select Doctor for Emergency Requests:
-            </label>
-            <button
-              onClick={openAddDoctorModal}
-              className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
-            >
-              + Add New Doctor
-            </button>
-          </div>
           
           <div className="flex gap-2 items-center">
             <select
@@ -629,30 +737,12 @@ const handleMedicalRequest = async () => {
               ) : (
                 doctors.map((doctor) => (
                   <option key={doctor._id} value={doctor._id}>
-                    Dr. {doctor.name} - {doctor.specialization} ({doctor.email})
+                    {doctor.fullName} - {doctor.specializations?.[0]} ({doctor.email})
                   </option>
+
                 ))
               )}
             </select>
-            
-            {selectedDoctor && (
-              <div className="flex gap-1">
-                <button
-                  onClick={() => openEditDoctorModal(doctors.find(d => d._id === selectedDoctor))}
-                  className="p-2 rounded bg-yellow-600 text-white hover:bg-yellow-700"
-                  title="Edit Doctor"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => handleRemoveDoctor(selectedDoctor)}
-                  className="p-2 rounded bg-red-600 text-white hover:bg-red-700"
-                  title="Remove Doctor"
-                >
-                  🗑️
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -783,10 +873,10 @@ const handleMedicalRequest = async () => {
                               {getGroupIdentifier(animal)}
                             </div>
                           </div>
-                        ) : animal.qrCode ? (
+                        ) : animal.qrCode || animal.animalId ? (
                           <div className="text-center">
                             <QRCodeCanvas 
-                              value={animal.qrCode} 
+                              value={animal.qrCode || animal.animalId} 
                               size={60} 
                               level="H" 
                               className="mx-auto"

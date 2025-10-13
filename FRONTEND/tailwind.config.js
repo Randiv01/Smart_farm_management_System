@@ -4,13 +4,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "light-beige": "0 0 8px rgba(102, 187, 106, 0.6);", // 60%
+        "light-beige": "0 0 8px rgba(187, 129, 102, 0.6);", // 60%
         "dark-green": "#2e7d32",  // 30%
         "soft-white": "#ffffff",   // 10%
         "dark-bg": "#111827",
         "dark-card": "#1f2937",
         "dark-text": "#f9fafb",
         "dark-gray": "#374151",
+        
         // Additional button-specific colors
         "btn-blue": "#2563eb",       // download / export / info actions
         "btn-teal": "#059669",       // add another / accent actions

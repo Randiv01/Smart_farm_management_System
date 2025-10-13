@@ -8,9 +8,18 @@ import {
   createAttendance,
   updateAttendance,
   deleteAttendance,
+  scanQRCode,
+  debugAttendance,
+  debugDate,
 } from "../E-control/attendanceController.js";
 
 const router = express.Router();
+
+// Middleware to log all requests for debugging
+router.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, req.method === "GET" ? req.query : req.body);
+  next();
+});
 
 // Get all attendance records with optional filtering
 router.get("/", getAttendance);
@@ -27,10 +36,18 @@ router.get("/reports", getReports);
 // Create new attendance record
 router.post("/", createAttendance);
 
-// Update attendance record
+// QR Code scan endpoint
+router.post("/scan", scanQRCode);
+
+// Update attendance record (PATCH or PUT)
 router.patch("/:id", updateAttendance);
+router.put("/:id", updateAttendance);
 
 // Delete attendance record
 router.delete("/:id", deleteAttendance);
+
+// Debug endpoints
+router.get("/debug/:employeeId", debugAttendance);
+router.get("/debug-date", debugDate);
 
 export default router;

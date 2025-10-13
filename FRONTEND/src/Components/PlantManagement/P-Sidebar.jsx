@@ -12,8 +12,10 @@ import {
   Settings,
   Menu,
 } from "lucide-react";
+import { useTheme } from "./context/ThemeContext";
 
-export default function PSidebar({ darkMode, sidebarOpen, toggleSidebar }) {
+export default function PSidebar({ sidebarOpen, toggleSidebar }) {
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,7 +54,7 @@ export default function PSidebar({ darkMode, sidebarOpen, toggleSidebar }) {
       <aside
         className={`
           fixed top-0 left-0 h-full z-40 transition-all duration-300 ease-in-out
-          ${darkMode ? "bg-green-900" : "bg-green-700"} text-white flex flex-col shadow-lg overflow-hidden
+          ${theme === 'dark' ? "bg-green-900" : "bg-green-700"} text-white flex flex-col shadow-lg overflow-hidden
           ${sidebarOpen ? "w-64" : "w-0"} 
           ${sidebarOpen ? "lg:w-64" : "lg:w-20"}
         `}
@@ -87,8 +89,8 @@ export default function PSidebar({ darkMode, sidebarOpen, toggleSidebar }) {
                   }}
                   className={`
                     flex items-center w-full p-3 rounded-lg transition-all
-                    hover:bg-green-800 hover:shadow-sm
-                    ${location.pathname.startsWith(item.path) ? "bg-green-800 font-medium" : ""}
+                    ${theme === 'dark' ? "hover:bg-green-800" : "hover:bg-green-600"}
+                    ${location.pathname.startsWith(item.path) ? (theme === 'dark' ? "bg-green-800" : "bg-green-600") : ""}
                     ${sidebarOpen ? "justify-start px-4" : "justify-center"}
                     focus:outline-none focus:ring-1 focus:ring-white/50
                   `}

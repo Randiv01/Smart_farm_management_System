@@ -14,6 +14,7 @@ import {
 import { DarkModeToggle } from '../UHDarkModeToggle/UHDarkModeToggle';
 import { useAuth } from '../UHContext/UHAuthContext';
 import { useCart } from '../UHContext/UHCartContext';
+import { isManager, isNormalUser } from '../../../utils/userUtils';
 
 const Navbar = ({ onCartClick }) => {
   
@@ -21,15 +22,19 @@ const Navbar = ({ onCartClick }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const { getTotalItems, toggleCart } = useCart();
   
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
+  const userMenuRef = useRef(null);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
+  const toggleUserMenu = () => setIsUserMenuOpen(!isUserMenuOpen);
+  const closeUserMenu = () => setIsUserMenuOpen(false);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -43,13 +48,16 @@ const Navbar = ({ onCartClick }) => {
         setShowSearch(false);
         setSearchQuery('');
       }
+      if (isUserMenuOpen && userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSearch]);
+  }, [showSearch, isUserMenuOpen]);
 
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
@@ -271,42 +279,93 @@ const Navbar = ({ onCartClick }) => {
 
             {/* User Account */}
             {isAuthenticated ? (
-              <div className="relative group">
-                <button className="flex items-center space-x-1 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                    <User size={16} className="text-green-700 dark:text-green-400" />
+              <div className="relative" ref={userMenuRef}>
+                <button 
+                  onClick={toggleUserMenu}
+                  className="flex items-center space-x-1 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <div className="h-8 w-8 rounded-full overflow-hidden bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    {user?.profileImage ? (
+                      <img
+                        src={user.profileImage.startsWith('http') ? user.profileImage : `http://localhost:5000${user.profileImage}`}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.nextSibling.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <User 
+                      size={16} 
+                      className="text-green-700 dark:text-green-400"
+                      style={{ display: user?.profileImage ? "none" : "flex" }}
+                    />
                   </div>
                   <span className="hidden lg:inline text-sm font-medium">
                     {user?.firstName || user?.name?.split(' ')[0] || "User"}
                   </span>
                 </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-200 dark:border-gray-700">
-                  <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
-                    {user?.email}
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 border border-gray-200 dark:border-gray-700 z-50">
+                  <div className="px-4 py-2 flex items-center space-x-3 border-b border-gray-100 dark:border-gray-700">
+                    <div className="h-10 w-10 rounded-full overflow-hidden bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                      {user?.profileImage ? (
+                        <img
+                          src={user.profileImage.startsWith('http') ? user.profileImage : `http://localhost:5000${user.profileImage}`}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                            e.target.nextSibling.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <User 
+                        size={20} 
+                        className="text-green-700 dark:text-green-400"
+                        style={{ display: user?.profileImage ? "none" : "flex" }}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || "User"}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {user?.email}
+                      </div>
+                    </div>
                   </div>
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={closeMenu}
-                    style={{ textDecoration: 'none' }}
-                  >
-                    My Account
-                  </Link>
+                  
+                  {/* Show profile for normal users */}
+                  {isNormalUser(user) && (
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={closeUserMenu}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      My Account
+                    </Link>
+                  )}
+                  
+                  
                   <Link
                     to="/orders"
                     className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={closeMenu}
+                    onClick={closeUserMenu}
                     style={{ textDecoration: 'none' }}
                   >
                     Order History
                   </Link>
                   <button
-                    onClick={logout}
+                    onClick={() => { logout(); closeUserMenu(); }}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     <LogOut size={16} className="mr-2" /> Logout
                   </button>
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Link
@@ -400,17 +459,47 @@ const Navbar = ({ onCartClick }) => {
               <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
                 {isAuthenticated ? (
                   <>
-                    <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-                      Logged in as: {user?.email}
+                    <div className="px-3 py-2 flex items-center space-x-3">
+                      <div className="h-10 w-10 rounded-full overflow-hidden bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        {user?.profileImage ? (
+                          <img
+                            src={user.profileImage.startsWith('http') ? user.profileImage : `http://localhost:5000${user.profileImage}`}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              e.target.nextSibling.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <User 
+                          size={20} 
+                          className="text-green-700 dark:text-green-400"
+                          style={{ display: user?.profileImage ? "none" : "flex" }}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || "User"}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {user?.email}
+                        </div>
+                      </div>
                     </div>
-                    <Link
-                      to="/profile"
-                      onClick={closeMenu}
-                      className="block py-2 px-3 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      My Account
-                    </Link>
+                    
+                    {/* Show profile for normal users */}
+                    {isNormalUser(user) && (
+                      <Link
+                        to="/profile"
+                        onClick={closeMenu}
+                        className="block py-2 px-3 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        My Account
+                      </Link>
+                    )}
+                    
                     <Link
                       to="/orders"
                       onClick={closeMenu}

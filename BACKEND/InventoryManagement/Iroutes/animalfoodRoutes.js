@@ -25,5 +25,6 @@ router.put("/:id", updateAnimalFood);
 router.delete("/:id", deleteAnimalFood);
 router.patch("/refill/:id", refillAnimalFood);
 router.patch("/consume/:id", recordConsumption);
+router.put("/:id/reduce", recordConsumption);
 
 export default router;

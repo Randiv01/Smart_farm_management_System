@@ -16,14 +16,28 @@ const overtimeSchema = new mongoose.Schema({
     min: 0
   },
   overtimeHours: {
-    type: Number,
+    type: mongoose.Schema.Types.Mixed, // Allow both Number and String ("2:30" format)
     required: true,
-    min: 0
+    validate: {
+      validator: function(v) {
+        // Allow numbers (legacy) or strings in "H:MM" format
+        return typeof v === 'number' || /^\d{1,2}:\d{2}$/.test(v);
+      },
+      message: 'overtimeHours must be a number or string in "H:MM" format'
+    }
   },
   totalHours: {
     type: Number,
     required: true,
     min: 0
+  },
+  // NEW: Human-friendly OVERTIME ID
+  overtimeId: {
+    type: String,
+    unique: true,
+    index: true,
+    sparse: true, // tolerate old rows until backfilled
+    trim: true
   },
   status: {
     type: String,

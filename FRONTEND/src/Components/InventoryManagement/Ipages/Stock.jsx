@@ -2,24 +2,49 @@ import React, { useState, useEffect } from "react";
 import {
   Plus,
   Search,
-  Grid,
-  List,
   Edit,
   Trash2,
   X,
-  Download,
-  Upload,
+  RefreshCw,
   AlertCircle,
+  Minus,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Filter,
+  Info,
+  Calendar,
+  Package,
+  Zap,
+  Clock,
+  Mail,
+  MessageSquare,
+  PieChart as PieChartIcon,
+  ShoppingBag,
+  Globe,
   Image as ImageIcon,
   QrCode,
-  RefreshCw,
-  Globe,
-  ShoppingBag,
-  Info
 } from "lucide-react";
 import { useITheme } from "../Icontexts/IThemeContext";
 import axios from "axios";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { QRCodeSVG } from "qrcode.react";
+import { exportToPDF, exportToExcel, getExportModalConfig, EXPORT_CONFIGS } from "../utils/exportUtils";
+import { FileText, FileSpreadsheet } from "lucide-react";
 
 const Stock = () => {
   const { theme } = useITheme();
@@ -27,21 +52,20 @@ const Stock = () => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 20;
+  const [categoryFilter, setCategoryFilter] = useState("All Categories");
+  const [statusFilter, setStatusFilter] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRefillForm, setShowRefillForm] = useState(false);
-  const [viewMode, setViewMode] = useState("table");
   const [editingProduct, setEditingProduct] = useState(null);
   const [refillingProduct, setRefillingProduct] = useState(null);
+  const [showChart, setShowChart] = useState(true);
+  const [refillQuantity, setRefillQuantity] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const [showQRCode, setShowQRCode] = useState(null);
-  const [refillQuantity, setRefillQuantity] = useState("");
   const [showExportView, setShowExportView] = useState(false);
+  const [exportModal, setExportModal] = useState(getExportModalConfig('inventoryStock'));
   const [formData, setFormData] = useState({
     name: "",
     category: "Milk Product",
@@ -56,27 +80,47 @@ const Stock = () => {
     market: "Local",
     image: ""
   });
-  const [formErrors, setFormErrors] = useState({});
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
+
+  // Color palette consistent with AnimalFoodStock
+  const COLORS = {
+    critical: darkMode ? "#fca5a5" : "#ef4444",
+    low: darkMode ? "#fdba74" : "#f97316",
+    good: darkMode ? "#86efac" : "#22c55e",
+    background: darkMode ? "#1f2937" : "#ffffff",
+    text: darkMode ? "#e5e7eb" : "#374151",
+    grid: darkMode ? "#4b5563" : "#e5e7eb",
+  };
+
+  // Clear success messages after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   // Fetch products from API
   useEffect(() => {
     fetchProducts();
-  }, [categoryFilter, statusFilter, searchTerm, currentPage, showExportView]);
+  }, [categoryFilter, statusFilter, searchTerm, showExportView, activeTab]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       const params = {
-        category: categoryFilter !== "All" ? categoryFilter : undefined,
-        status: statusFilter !== "All" ? statusFilter : undefined,
+        category: categoryFilter !== "All Categories" ? categoryFilter : undefined,
+        status: statusFilter !== "All Statuses" ? statusFilter : undefined,
         search: searchTerm || undefined,
-        page: currentPage,
-        limit,
         market: showExportView ? "Export" : undefined
       };
+      
       const response = await axios.get("http://localhost:5000/api/inventory/products", { params });
       setInventory(response.data.products);
-      setTotalPages(response.data.totalPages);
       setError("");
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -113,31 +157,171 @@ const Stock = () => {
     return creation.toISOString().split('T')[0];
   };
 
-  // Validate form before submission
-  const validateForm = () => {
-    const errors = {};
-    if (!formData.name.trim()) {
-      errors.name = "Product name is required";
-    }
-    if (!formData.stock.quantity || formData.stock.quantity < 0) {
-      errors.quantity = "Valid stock quantity is required";
-    }
-    if (!formData.price || formData.price < 0) {
-      errors.price = "Valid price is required";
-    }
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+  // Calculate days until expiry
+  const calculateDaysUntilExpiry = (expiryDate) => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const differenceMs = expiry - today;
+    return Math.floor(differenceMs / (1000 * 60 * 60 * 24));
   };
 
-  // Helper function to display category group in UI
-  const displayCategory = (category) => {
-    if (['Vegetables', 'Fruits'].includes(category)) return 'Plant Product';
-    return 'Animal Product';
+  // Get days left text and class
+  const getDaysLeftText = (days) => {
+    if (days < 0) return `Expired ${Math.abs(days)} days ago`;
+    if (days === 0) return "Expires today";
+    return `${days} day${days > 1 ? "s" : ""} left`;
   };
+
+  const getDaysLeftClass = (days) => {
+    if (days < 0) return "text-red-600 dark:text-red-400";
+    if (days <= 7) return "text-orange-600 dark:text-orange-400";
+    if (days <= 30) return "text-yellow-600 dark:text-yellow-400";
+    return "text-green-600 dark:text-green-400";
+  };
+
+  // Get stock level class
+  const getStockLevelClass = (quantity, total) => {
+    const percentage = (quantity / total) * 100;
+    if (percentage <= 10) return "text-red-600 dark:text-red-400";
+    if (percentage <= 30) return "text-orange-600 dark:text-orange-400";
+    return "text-green-600 dark:text-green-400";
+  };
+
+  // Get stock level badge
+  const getStockLevelBadge = (quantity, total) => {
+    const percentage = (quantity / total) * 100;
+    if (percentage <= 10) return { text: "Critical", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
+    if (percentage <= 30) return { text: "Low", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" };
+    return { text: "Good", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" };
+  };
+
+  // Get status based on stock and expiry
+  const getProductStatus = (product) => {
+    const days = calculateDaysUntilExpiry(product.expiryDate);
+    const percentage = (product.stock.quantity / (product.stock.quantity + 10)) * 100; // Simplified for demo
+    
+    if (days < 0) return "Expired";
+    if (days <= 7) return "Expiring Soon";
+    if (percentage <= 10) return "Critical Stock";
+    if (percentage <= 30) return "Low Stock";
+    return "In Stock";
+  };
+
+  // Prepare chart data for stock distribution (Pie Chart)
+  const getStockChartData = () => {
+    const critical = filteredProducts.filter(product => {
+      const status = getProductStatus(product);
+      return status === "Critical Stock" || status === "Expired";
+    }).length;
+    
+    const low = filteredProducts.filter(product => {
+      const status = getProductStatus(product);
+      return status === "Low Stock" || status === "Expiring Soon";
+    }).length;
+    
+    const good = filteredProducts.filter(product => {
+      const status = getProductStatus(product);
+      return status === "In Stock";
+    }).length;
+
+    return [
+      { name: "Critical/Expired", value: critical, color: COLORS.critical },
+      { name: "Low/Expiring Soon", value: low, color: COLORS.low },
+      { name: "Good", value: good, color: COLORS.good },
+    ].filter((item) => item.value > 0);
+  };
+
+  // Prepare category-wise stock data (Bar Chart)
+  const getCategoryWiseData = () => {
+    const uniqueCategories = [...new Set(filteredProducts.map(product => product.category))];
+
+    return uniqueCategories.map(category => {
+      const categoryProducts = filteredProducts.filter(product => product.category === category);
+      const critical = categoryProducts.filter(product => {
+        const status = getProductStatus(product);
+        return status === "Critical Stock" || status === "Expired";
+      }).length;
+      
+      const low = categoryProducts.filter(product => {
+        const status = getProductStatus(product);
+        return status === "Low Stock" || status === "Expiring Soon";
+      }).length;
+      
+      const good = categoryProducts.filter(product => {
+        const status = getProductStatus(product);
+        return status === "In Stock";
+      }).length;
+
+      return {
+        category,
+        critical,
+        low,
+        good,
+        total: categoryProducts.length,
+      };
+    }).filter(category => category.total > 0);
+  };
+
+  // Filter and sort products
+  const filteredAndSortedProducts = () => {
+    let filtered = inventory.filter(product =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (categoryFilter !== "All Categories") {
+      filtered = filtered.filter(product => product.category === categoryFilter);
+    }
+
+    if (activeTab !== "all") {
+      filtered = filtered.filter(product => {
+        const status = getProductStatus(product);
+        if (activeTab === "lowStock") return status === "Low Stock";
+        if (activeTab === "criticalStock") return status === "Critical Stock";
+        if (activeTab === "expiringSoon") return status === "Expiring Soon";
+        if (activeTab === "expired") return status === "Expired";
+        return true;
+      });
+    }
+
+    if (statusFilter && statusFilter !== "All Statuses") {
+      filtered = filtered.filter(product => getProductStatus(product) === statusFilter);
+    }
+
+    if (sortConfig.key) {
+      filtered.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        if (sortConfig.key === "stock") {
+          aValue = a.stock.quantity;
+          bValue = b.stock.quantity;
+        } else if (sortConfig.key === "expiryDate") {
+          aValue = new Date(a.expiryDate);
+          bValue = new Date(b.expiryDate);
+        } else if (sortConfig.key === "price") {
+          aValue = parseFloat(a.price);
+          bValue = parseFloat(b.price);
+        }
+
+        if (typeof aValue === "string") aValue = aValue.toLowerCase();
+        if (typeof bValue === "string") bValue = bValue.toLowerCase();
+        
+        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return filtered;
+  };
+
+  const filteredProducts = filteredAndSortedProducts();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     let updatedFormData = {...formData};
+    
     if (name === "quantity") {
       updatedFormData = {
         ...formData,
@@ -183,10 +367,8 @@ const Stock = () => {
         [name]: value
       };
     }
+    
     setFormData(updatedFormData);
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: undefined }));
-    }
   };
 
   const handleEdit = (product) => {
@@ -224,6 +406,7 @@ const Stock = () => {
       setShowRefillForm(false);
       setRefillingProduct(null);
       setRefillQuantity("");
+      setSuccess("Stock refilled successfully!");
       fetchProducts();
     } catch (error) {
       console.error("Error refilling product:", error);
@@ -233,15 +416,14 @@ const Stock = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) {
-      return;
-    }
     try {
       const dataToSend = { ...formData };
       if (editingProduct) {
         await axios.put(`http://localhost:5000/api/inventory/products/${editingProduct._id}`, dataToSend);
+        setSuccess("Product updated successfully!");
       } else {
         await axios.post("http://localhost:5000/api/inventory/products", dataToSend);
+        setSuccess("Product added successfully!");
       }
       setShowAddForm(false);
       setEditingProduct(null);
@@ -260,7 +442,6 @@ const Stock = () => {
         image: ""
       });
       setImagePreview(null);
-      setFormErrors({});
       fetchProducts();
     } catch (error) {
       console.error("Error saving product:", error);
@@ -269,11 +450,10 @@ const Stock = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) {
-      return;
-    }
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
     try {
       await axios.delete(`http://localhost:5000/api/inventory/products/${id}`);
+      setSuccess("Product deleted successfully!");
       fetchProducts();
     } catch (error) {
       console.error("Error deleting product:", error);
@@ -281,156 +461,347 @@ const Stock = () => {
     }
   };
 
-  const formatStock = (stock) => {
-    return `${stock.quantity} ${stock.unit}`;
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toISOString().split('T')[0];
-  };
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'In Stock':
-        return darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800';
-      case 'Low Stock':
-        return darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800';
-      case 'Out of Stock':
-        return darkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800';
-      case 'Expiring Soon':
-        return darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-800';
-      default:
-        return darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800';
+  const handleSendEmail = (product) => {
+    try {
+      const email = "manager@example.com";
+      const subject = `Stock Alert: ${product.name}`;
+      const body = `The product "${product.name}" requires attention. Current status: ${getProductStatus(product)}. Please check inventory.`;
+      window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setSuccess(`Opening email client for ${product.name}...`);
+    } catch (error) {
+      console.error("Error opening email:", error);
+      setError("Failed to open email client. Please try again.");
     }
   };
+
+  const handleSendWhatsApp = (product) => {
+    try {
+      const phone = "1234567890";
+      const message = `Stock Alert: ${product.name} requires attention. Status: ${getProductStatus(product)}. Please check inventory.`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+      setSuccess(`Opening WhatsApp for ${product.name}...`);
+    } catch (error) {
+      console.error("Error opening WhatsApp:", error);
+      setError("Failed to open WhatsApp. Please try again.");
+    }
+  };
+
+  const requestSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === "asc" ? <ChevronUp size={16} className="inline ml-1" /> : <ChevronDown size={16} className="inline ml-1" />;
+  };
+
+  // Export data function
+  const handleExport = () => {
+    const dataToExport = exportModal.selection === 'current' ? filteredProducts : inventory;
+    
+    
+    if (dataToExport.length === 0) {
+      setError("No data available to export");
+        return;
+      }
+
+    const config = {
+      ...EXPORT_CONFIGS.inventoryStock,
+      dataFormatter: (product) => {
+        const status = getProductStatus(product);
+        const days = calculateDaysUntilExpiry(product.expiryDate);
+        return {
+          'Product Name': product.name || 'N/A',
+          'Category': product.category || 'N/A',
+          'Stock Quantity': product.stock?.quantity || 0,
+          'Unit': product.stock?.unit || 'N/A',
+          'Price': `$${product.price || 0}`,
+          'Market': product.market || 'N/A',
+          'Expiry Date': product.expiryDate ? new Date(product.expiryDate).toLocaleDateString() : 'N/A',
+          'Status': `${status} (${getDaysLeftText(days)})`
+        };
+      }
+    };
+
+    try {
+      if (exportModal.format === 'excel') {
+        exportToExcel(dataToExport, config);
+        setSuccess("Excel file downloaded successfully!");
+      } else {
+        exportToPDF(dataToExport, config);
+        setSuccess("PDF report downloaded successfully!");
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      setError("Failed to export data. Please try again.");
+    }
+    
+    setExportModal({ ...exportModal, open: false });
+  };
+
+  // Calculate summary stats
+  const getSummary = () => {
+    const totalProducts = inventory.length;
+    const lowStock = inventory.filter(product => {
+      const status = getProductStatus(product);
+      return status === "Low Stock" || status === "Expiring Soon";
+    }).length;
+    const criticalStock = inventory.filter(product => {
+      const status = getProductStatus(product);
+      return status === "Critical Stock" || status === "Expired";
+    }).length;
+    const expiringSoon = inventory.filter(product => getProductStatus(product) === "Expiring Soon").length;
+    const expired = inventory.filter(product => getProductStatus(product) === "Expired").length;
+
+    return { totalProducts, lowStock, criticalStock, expiringSoon, expired };
+  };
+
+  const summary = getSummary();
 
   const generateProductInfo = (product) => {
     return `Product: ${product.name}
 Category: ${product.category}
-Stock: ${formatStock(product.stock)}
+Stock: ${product.stock.quantity} ${product.stock.unit}
 Price: $${product.price}
-Created: ${product.creationDate ? formatDate(product.creationDate) : 'N/A'}
-Expires: ${formatDate(product.expiryDate)}
-Market: ${product.market}`;
+Market: ${product.market}
+Expiry: ${new Date(product.expiryDate).toLocaleDateString()}
+Status: ${getProductStatus(product)}`;
   };
 
   const handleExportClick = () => {
     setShowExportView(true);
-    setCurrentPage(1);
     fetchProducts();
   };
 
   const handleBackToMain = () => {
     setShowExportView(false);
-    setCurrentPage(1);
     fetchProducts();
-  };
-
-  const handleNotify = (product) => {
-    let email, phone;
-    if (['Milk Product', 'Meat', 'Eggs', 'Honey', 'Material'].includes(product.category)) {
-      email = "animal.manager@example.com";
-      phone = "1234567890";
-    } else {
-      email = "plant.manager@example.com";
-      phone = "0987654321";
-    }
-    const subject = `Low Stock Alert: ${product.name}`;
-    const body = `Dear Management,\n\nThe product "${product.name}" is running low on stock.\nCurrent stock: ${product.stock.quantity} ${product.stock.unit}\nPlease consider refilling it.\n\nBest regards,\nInventory System`;
-    window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(body)}`, '_blank');
   };
 
   if (loading) {
     return (
-      <div className={`min-h-full p-6 flex items-center justify-center ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+      <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4">Loading products...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
+          <p className="mt-4 text-lg">Loading products...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-full p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-full p-6 ${darkMode ? "bg-dark-bg text-dark-text" : "bg-light-beige text-gray-900"}`}>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <ShoppingBag className="text-green-500" size={32} />
           {showExportView ? "Export Market Products" : "Farm Inventory"}
         </h1>
-        <p className={`mt-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {showExportView ? "Viewing products marked for export market" : "Manage your farm products inventory"}
+        <p className={`mt-2 text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+          {showExportView ? "Manage products for export market" : "Efficiently manage farm product inventory and monitor stock levels"}
         </p>
       </div>
-      {/* Error Message */}
-      {error && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-800"}`}>
-          <AlertCircle size={20} className="mr-2" />
-          {error}
+
+      {/* Success Message */}
+      {success && (
+        <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-green-900/30 text-green-200" : "bg-green-100 text-green-800"} shadow-sm`}>
+          <Zap size={20} className="mr-3 flex-shrink-0" />
+          <span>{success}</span>
         </div>
       )}
-      {/* Search and Actions */}
-      <div className={`p-4 rounded-lg shadow-sm mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-        <div className="flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-4 flex-1 min-w-[300px]">
-            <div className="relative flex-1">
+
+      {/* Error Message */}
+      {error && (
+        <div className={`mb-6 p-4 rounded-lg flex items-center ${darkMode ? "bg-red-900/30 text-red-200" : "bg-red-100 text-red-800"} shadow-sm`}>
+          <AlertCircle size={20} className="mr-3 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+            <ShoppingBag className="text-blue-500" size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Total Products</h3>
+            <p className="text-2xl font-bold">{summary.totalProducts}</p>
+          </div>
+        </div>
+        <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-orange-900/30" : "bg-orange-100"}`}>
+            <AlertCircle className="text-orange-500" size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Low Stock</h3>
+            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{summary.lowStock}</p>
+          </div>
+        </div>
+        <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-red-900/30" : "bg-red-100"}`}>
+            <AlertCircle className="text-red-500" size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Critical Stock</h3>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.criticalStock}</p>
+          </div>
+        </div>
+        <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}>
+            <Clock className="text-yellow-500" size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Expiring Soon</h3>
+            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{summary.expiringSoon}</p>
+          </div>
+        </div>
+        <div className={`p-5 rounded-xl ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg transition-all hover:shadow-xl flex items-center gap-4`}>
+          <div className={`p-3 rounded-full ${darkMode ? "bg-red-900/30" : "bg-red-100"}`}>
+            <Calendar className="text-red-500" size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium mb-1 text-gray-500 dark:text-gray-400">Expired</h3>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.expired}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Action Tabs */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "all" ? "bg-green-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          All Items
+        </button>
+        <button
+          onClick={() => setActiveTab("lowStock")}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "lowStock" ? "bg-orange-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Low Stock
+        </button>
+        <button
+          onClick={() => setActiveTab("criticalStock")}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "criticalStock" ? "bg-red-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Critical Stock
+        </button>
+        <button
+          onClick={() => setActiveTab("expiringSoon")}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "expiringSoon" ? "bg-yellow-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Expiring Soon
+        </button>
+        <button
+          onClick={() => setActiveTab("expired")}
+          className={`px-4 py-2 rounded-lg transition-all ${
+            activeTab === "expired" ? "bg-red-600 text-white" : darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Expired
+        </button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className={`p-6 rounded-xl shadow-lg mb-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+          <div className="flex-1">
+            <div className="relative">
               <Search
-                size={18}
+                size={20}
                 className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
               />
               <input
                 type="text"
-                placeholder="Search products..."
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                placeholder="Search by name or category..."
+                className={`w-full pl-10 pr-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`mt-3 flex items-center gap-2 text-sm ${darkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-600 hover:text-gray-800"} transition-colors`}
             >
-              <option value="All">All Categories</option>
-              <option value="Animal Product">Animal Products</option>
-              <option value="Plant Product">Plant Products</option>
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className={`px-4 py-2 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-            >
-              <option value="All">All Statuses</option>
-              <option value="In Stock">In Stock</option>
-              <option value="Low Stock">Low Stock</option>
-              <option value="Out of Stock">Out of Stock</option>
-              <option value="Expiring Soon">Expiring Soon</option>
-            </select>
+              <Filter size={16} />
+              {showFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+            {showFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Category</label>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  >
+                    <option value="All Categories">All Categories</option>
+                    <option value="Milk Product">Milk Product</option>
+                    <option value="Meat">Meat</option>
+                    <option value="Eggs">Eggs</option>
+                    <option value="Honey">Honey</option>
+                    <option value="Material">Material</option>
+                    <option value="Vegetables">Vegetables</option>
+                    <option value="Fruits">Fruits</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  >
+                    <option value="All Statuses">All Statuses</option>
+                    <option value="In Stock">In Stock</option>
+                    <option value="Low Stock">Low Stock</option>
+                    <option value="Critical Stock">Critical Stock</option>
+                    <option value="Expiring Soon">Expiring Soon</option>
+                    <option value="Expired">Expired</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
-      
           <div className="flex items-center gap-3">
             <button
               onClick={fetchProducts}
-              className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-              title="Refresh"
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title="Refresh Data"
             >
               <RefreshCw size={20} />
             </button>
-        
+            <button
+              onClick={() => setExportModal({ ...exportModal, open: true })}
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title="Export Data"
+            >
+              <Download size={20} />
+            </button>
+            <button
+              onClick={() => setShowChart(!showChart)}
+              className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
+              title={showChart ? "Hide Charts" : "Show Charts"}
+            >
+              <PieChartIcon size={20} />
+            </button>
             {showExportView ? (
               <button
                 onClick={handleBackToMain}
-                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
                 title="Back to All Products"
               >
                 <ShoppingBag size={20} />
@@ -438,35 +809,18 @@ Market: ${product.market}`;
             ) : (
               <button
                 onClick={handleExportClick}
-                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                className={`p-2.5 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-all`}
                 title="View Export Market Products"
               >
                 <Globe size={20} />
               </button>
             )}
-        
-            <div className="flex gap-1">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-2 rounded-lg ${viewMode === 'table' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
-              >
-                <List size={20} />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}
-              >
-                <Grid size={20} />
-              </button>
-            </div>
-        
             <button
               onClick={() => {
                 setEditingProduct(null);
                 const creationDate = new Date().toISOString().split('T')[0];
                 const defaultCategory = "Milk Product";
                 const expiryDate = calculateExpiryDate(defaultCategory, creationDate);
-            
                 setFormData({
                   name: "",
                   category: defaultCategory,
@@ -482,10 +836,9 @@ Market: ${product.market}`;
                   image: ""
                 });
                 setImagePreview(null);
-                setFormErrors({});
                 setShowAddForm(true);
               }}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors duration-200"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
             >
               <Plus size={16} />
               Add Product
@@ -493,294 +846,336 @@ Market: ${product.market}`;
           </div>
         </div>
       </div>
+
+      {/* Chart Section */}
+      {showChart && (
+        <div className={`mb-6 p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <PieChartIcon size={20} />
+            Stock Overview
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Pie Chart */}
+            <div className={`${darkMode ? "bg-gray-800/50" : "bg-gray-50"} p-4 rounded-md`}>
+              <h4 className="text-md font-medium mb-3 text-center">Stock by Status</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getStockChartData()}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, value }) => (value > 0 ? `${name}: ${value}` : null)}
+                    >
+                      {getStockChartData().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
+                        border: `1px solid ${COLORS.grid}`,
+                        borderRadius: "4px",
+                        padding: "8px",
+                        color: COLORS.text,
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            {/* Bar Chart */}
+            <div className={`${darkMode ? "bg-gray-800/50" : "bg-gray-50"} p-4 rounded-md`}>
+              <h4 className="text-md font-medium mb-3 text-center">Stock by Category</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={getCategoryWiseData()}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 0,
+                      bottom: 25,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+                    <XAxis dataKey="category" stroke={COLORS.text} angle={-45} textAnchor="end" height={60} />
+                    <YAxis stroke={COLORS.text} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: COLORS.background,
+                        border: `1px solid ${COLORS.grid}`,
+                        borderRadius: "4px",
+                        padding: "8px",
+                        color: COLORS.text,
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Bar dataKey="critical" stackId="a" fill={COLORS.critical} name="Critical/Expired" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="low" stackId="a" fill={COLORS.low} name="Low/Expiring Soon" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="good" stackId="a" fill={COLORS.good} name="Good" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results Count */}
+      <div className={`mb-4 flex justify-between items-center ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+        <p className="text-sm">
+          Showing {filteredProducts.length} of {inventory.length} items
+        </p>
+        {filteredProducts.length === 0 && (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setCategoryFilter("All Categories");
+              setStatusFilter("All Statuses");
+              setActiveTab("all");
+            }}
+            className="text-sm text-green-600 dark:text-green-400 hover:underline"
+          >
+            Clear all filters
+          </button>
+        )}
+      </div>
+
       {/* Table View */}
-      {viewMode === 'table' && (
-        <div className={`rounded-lg shadow-sm overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+      <div className={`rounded-xl shadow-lg overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className={darkMode ? "bg-gray-700" : "bg-gray-50"}>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">
                   IMAGE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  PRODUCT
+                <th
+                  className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("name")}
+                >
+                  <div className="flex items-center">
+                    PRODUCT NAME {getSortIcon("name")}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  CATEGORY
+                <th
+                  className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("stock")}
+                >
+                  <div className="flex items-center">
+                    STOCK {getSortIcon("stock")}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  STOCK
+                <th
+                  className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("price")}
+                >
+                  <div className="flex items-center">
+                    PRICE {getSortIcon("price")}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  PRICE
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  EXPIRY DATE
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  MARKET
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">
                   STATUS
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                  CATEGORY
+                </th>
+                <th
+                  className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("expiryDate")}
+                >
+                  <div className="flex items-center">
+                    EXPIRY DATE {getSortIcon("expiryDate")}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider">
                   ACTIONS
                 </th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? "divide-gray-700 bg-gray-800" : "divide-gray-200 bg-white"}`}>
-              {inventory.length > 0 ? (
-                inventory.map((item) => (
-                  <tr key={item._id} className={item.status === 'Low Stock' ? `${darkMode ? 'bg-red-900/30' : 'bg-red-100'}` : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="h-10 w-10 rounded-full object-cover" />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <ImageIcon size={16} className="text-gray-500" />
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => {
+                  const daysLeft = calculateDaysUntilExpiry(product.expiryDate);
+                  const status = getProductStatus(product);
+                  const stockLevelBadge = getStockLevelBadge(product.stock.quantity, product.stock.quantity + 10);
+                  const rowBg =
+                    status === "Critical Stock" || status === "Expired"
+                      ? darkMode
+                        ? "bg-red-900/10"
+                        : "bg-red-50/50"
+                      : status === "Low Stock" || status === "Expiring Soon"
+                      ? darkMode
+                        ? "bg-orange-900/10"
+                        : "bg-orange-50/50"
+                      : "";
+
+                  return (
+                    <tr key={product._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-all ${rowBg}`}>
+                      <td className="px-6 py-4">
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} className="h-12 w-12 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" />
+                        ) : (
+                          <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600">
+                            <ImageIcon size={20} className="text-gray-500" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-medium">
+                        <div className="flex items-center">
+                          <ShoppingBag size={16} className="mr-2 text-gray-400" />
+                          {product.name}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium">{item.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {formatStock(item.stock)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      ${item.price}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {formatDate(item.expiryDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-purple-900 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
-                        {item.market}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)}`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => setShowQRCode(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
-                        title="View QR Code"
-                      >
-                        <QrCode size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleRefill(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
-                        title="Refill Stock"
-                      >
-                        Refill
-                      </button>
-                      {item.status === 'Low Stock' && (
-                        <button
-                          onClick={() => handleNotify(item)}
-                          className={`p-1 rounded-md mr-2 ${darkMode ? "text-orange-400 hover:bg-gray-700" : "text-orange-600 hover:bg-gray-100"}`}
-                          title="Notify Management"
-                        >
-                          <AlertCircle size={16} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className={`p-1 rounded-md mr-2 ${darkMode ? "text-indigo-400 hover:bg-gray-700" : "text-indigo-600 hover:bg-gray-100"}`}
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item._id)}
-                        className={`p-1 rounded-md ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-600 hover:bg-gray-100"}`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                        {product.description && (
+                          <div className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            {product.description.length > 30 ? `${product.description.substring(0, 30)}...` : product.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span>{product.stock.quantity} {product.stock.unit}</span>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 mt-1">
+                            <div
+                              className={`h-1.5 rounded-full ${
+                                status === "Critical Stock" || status === "Expired" ? "bg-red-500" : 
+                                status === "Low Stock" || status === "Expiring Soon" ? "bg-orange-500" : "bg-green-500"
+                              }`}
+                              style={{ width: `${(product.stock.quantity / (product.stock.quantity + 10)) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-green-600 dark:text-green-400">${product.price}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${stockLevelBadge.class}`}>
+                          {status}
+                        </span>
+                        <div className="text-xs mt-1">
+                          <span className={getDaysLeftClass(daysLeft)}>{getDaysLeftText(daysLeft)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${darkMode ? "bg-blue-900/50 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+                          {product.category}
+                        </span>
+                        <div className="text-xs mt-1">
+                          <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${darkMode ? "bg-purple-900/50 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
+                            {product.market}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">{new Date(product.expiryDate).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end items-center gap-1">
+                          <button
+                            onClick={() => setShowQRCode(product)}
+                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
+                            title="View QR Code"
+                          >
+                            <QrCode size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleRefill(product)}
+                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
+                            title="Refill Stock"
+                          >
+                            <Plus size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(product)}
+                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-indigo-400 hover:bg-gray-700" : "text-indigo-600 hover:bg-gray-100"}`}
+                            title="Edit Product"
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product._id)}
+                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-600 hover:bg-gray-100"}`}
+                            title="Delete Product"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleSendEmail(product)}
+                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
+                            title="Send Email Notification"
+                          >
+                            <Mail size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleSendWhatsApp(product)}
+                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-green-400 hover:bg-gray-700" : "text-green-600 hover:bg-gray-100"}`}
+                            title="Send WhatsApp Notification"
+                          >
+                            <MessageSquare size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center">
-                    No products found
+                  <td colSpan="8" className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <ShoppingBag size={48} className="text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No products found</h3>
+                      <p className={`text-sm max-w-md mx-auto ${darkMode ? "text-gray-400" : "text-gray-500"} mb-4`}>
+                        Try adjusting your search or filter criteria, or add a new product.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setSearchTerm("");
+                          setCategoryFilter("All Categories");
+                          setStatusFilter("All Statuses");
+                          setActiveTab("all");
+                        }}
+                        className="text-green-600 dark:text-green-400 hover:underline text-sm"
+                      >
+                        Clear all filters
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      )}
-      {/* Grid View */}
-      {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {inventory.length > 0 ? (
-            inventory.map((item) => (
-              <div
-                key={item._id}
-                className={`p-4 rounded-lg shadow-sm border-2 ${darkMode ? `bg-gray-800 ${item.status === 'Low Stock' ? 'border-red-700 bg-red-900/30' : 'border-gray-700'}` : `bg-white ${item.status === 'Low Stock' ? 'border-red-500 bg-red-100' : 'border-gray-200'}`}`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    {item.image ? (
-                      <img src={item.image} alt={item.name} className="h-12 w-12 rounded-full object-cover" />
-                    ) : (
-                      <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                        <ImageIcon size={20} className="text-gray-500" />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="text-lg font-medium">{item.name}</h3>
-                      <span className={`px-2 py-1 mt-1 inline-flex text-xs leading-5 font-semibold rounded-full ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
-                        {item.category}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setShowQRCode(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
-                      title="View QR Code"
-                    >
-                      <QrCode size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleRefill(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
-                      title="Refill Stock"
-                    >
-                      Refill
-                    </button>
-                    {item.status === 'Low Stock' && (
-                      <button
-                        onClick={() => handleNotify(item)}
-                        className={`p-1 rounded-md ${darkMode ? "text-orange-400 hover:bg-gray-700" : "text-orange-600 hover:bg-gray-100"}`}
-                        title="Notify Management"
-                      >
-                        <AlertCircle size={16} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className={`p-1 rounded-md ${darkMode ? "text-indigo-400 hover:bg-gray-700" : "text-indigo-600 hover:bg-gray-100"}`}
-                      title="Edit Product"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item._id)}
-                      className={`p-1 rounded-md ${darkMode ? "text-red-400 hover:bg-gray-700" : "text-red-600 hover:bg-gray-100"}`}
-                      title="Delete Product"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                      Stock:
-                    </span>
-                    <span>{formatStock(item.stock)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                      Price:
-                    </span>
-                    <span>${item.price}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                      Expires:
-                    </span>
-                    <span>{formatDate(item.expiryDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                      Market:
-                    </span>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${darkMode ? "bg-purple-900 text-purple-200" : "bg-purple-100 text-purple-800"}`}>
-                      {item.market}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                      Status:
-                    </span>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </div>
-                  {item.description && (
-                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      {item.description}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className={`col-span-3 p-8 text-center ${darkMode ? "bg-gray-800" : "bg-white"} rounded-lg`}>
-              No products found
-            </div>
-          )}
-        </div>
-      )}
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-between items-center mt-6">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-300 dark:bg-gray-700 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
-          >
-            Previous
-          </button>
-          <span>Page {currentPage} of {totalPages}</span>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-300 dark:bg-gray-700 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      </div>
+
       {/* Add/Edit Product Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-8 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className={`rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">
-                {editingProduct ? (formData.market === "Export" ? "Edit Export Product" : "Edit Product") : (formData.market === "Export" ? "Add Export Product" : "Add New Product")}
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                {editingProduct ? <Edit size={24} /> : <Plus size={24} />}
+                {editingProduct ? "Edit Product" : "Add New Product"}
               </h2>
               <button
                 onClick={() => {
                   setShowAddForm(false);
                   setEditingProduct(null);
                   setImagePreview(null);
-                  setFormErrors({});
                 }}
-                className={darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}
+                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Image Upload */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
+            <form onSubmit={handleSubmit}>
+              <div className="mb-5">
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Product Image
-                  <span title="Upload a high-quality image of the product (optional)" className="cursor-pointer">
-                    <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                  </span>
                 </label>
                 <div className="flex items-center gap-4">
                   <div className="flex-shrink-0">
@@ -793,9 +1188,8 @@ Market: ${product.market}`;
                     )}
                   </div>
                   <label className="cursor-pointer">
-                    <span className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 transition-colors duration-200">
-                      <Upload size={16} />
-                      {imagePreview ? "Change Image" : "Upload Image"}
+                    <span className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-all">
+                      Upload Image
                     </span>
                     <input
                       type="file"
@@ -807,209 +1201,159 @@ Market: ${product.market}`;
                   </label>
                 </div>
               </div>
-              {/* Product Details */}
-              <div className="border-t pt-4 border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold mb-4">Product Details</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                      Product Name *
-                      <span title="Enter the name of the product" className="cursor-pointer">
-                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                      required
-                      placeholder="e.g., Organic Honey"
-                    />
-                    {formErrors.name && (
-                      <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                      Description
-                      <span title="Enter a description of the product (optional)" className="cursor-pointer">
-                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                      </span>
-                    </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                      placeholder="e.g., Fresh organic honey from local bees"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                        Category *
-                        <span title="Select the product category" className="cursor-pointer">
-                          <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                        </span>
-                      </label>
-                      <select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                      >
-                        <optgroup label="Animal Products">
-                          <option value="Milk Product">Milk Product</option>
-                          <option value="Meat">Meat</option>
-                          <option value="Eggs">Eggs</option>
-                          <option value="Honey">Honey</option>
-                          <option value="Material">Material</option>
-                        </optgroup>
-                        <optgroup label="Plant Products">
-                          <option value="Vegetables">Vegetables</option>
-                          <option value="Fruits">Fruits</option>
-                        </optgroup>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                        Market *
-                        <span title="Select Local for domestic sales or Export for international markets" className="cursor-pointer">
-                          <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                        </span>
-                      </label>
-                      <select
-                        name="market"
-                        value={formData.market}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                      >
-                        <option value="Local">Local</option>
-                        <option value="Export">Export</option>
-                      </select>
-                      {formErrors.market && (
-                        <p className="text-red-500 text-xs mt-1">{formErrors.market}</p>
-                      )}
-                    </div>
-                  </div>
+
+              <div className="mb-5">
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Product Name *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  required
+                  placeholder="Enter product name"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Category *
+                  </label>
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  >
+                    <option value="Milk Product">Milk Product</option>
+                    <option value="Meat">Meat</option>
+                    <option value="Eggs">Eggs</option>
+                    <option value="Honey">Honey</option>
+                    <option value="Material">Material</option>
+                    <option value="Vegetables">Vegetables</option>
+                    <option value="Fruits">Fruits</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Market *
+                  </label>
+                  <select
+                    name="market"
+                    value={formData.market}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  >
+                    <option value="Local">Local</option>
+                    <option value="Export">Export</option>
+                  </select>
                 </div>
               </div>
-              {/* Stock and Pricing */}
-              <div className="border-t pt-4 border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold mb-4">Stock & Pricing</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                      Stock Quantity *
-                      <span title="Enter the quantity available" className="cursor-pointer">
-                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      name="quantity"
-                      value={formData.stock.quantity}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                      required
-                      min="0"
-                      placeholder="e.g., 100"
-                    />
-                    {formErrors.quantity && (
-                      <p className="text-red-500 text-xs mt-1">{formErrors.quantity}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                      Unit *
-                      <span title="Select the unit of measurement" className="cursor-pointer">
-                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                      </span>
-                    </label>
-                    <select
-                      name="unit"
-                      value={formData.stock.unit}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                    >
-                      <option value="kg">kg</option>
-                      <option value="liter">liter</option>
-                      <option value="dozen">dozen</option>
-                      <option value="jar">jar</option>
-                      <option value="unit">unit</option>
-                      <option value="pack">pack</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                    Price ($) *
-                    <span title="Enter the price per unit" className="cursor-pointer">
-                      <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                    </span>
+
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Stock Quantity *
                   </label>
                   <input
                     type="number"
-                    name="price"
-                    value={formData.price}
+                    name="quantity"
+                    value={formData.stock.quantity}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
                     required
                     min="0"
-                    step="0.01"
-                    placeholder="e.g., 5.99"
+                    placeholder="Quantity"
                   />
-                  {formErrors.price && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.price}</p>
-                  )}
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Unit *
+                  </label>
+                  <select
+                    name="unit"
+                    value={formData.stock.unit}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  >
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="liter">liter</option>
+                    <option value="dozen">dozen</option>
+                    <option value="jar">jar</option>
+                    <option value="unit">unit</option>
+                    <option value="pack">pack</option>
+                  </select>
                 </div>
               </div>
-              {/* Dates */}
-              <div className="border-t pt-4 border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold mb-4">Dates</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                      Creation Date *
-                      <span title="Select the date the product was added" className="cursor-pointer">
-                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                      </span>
-                    </label>
-                    <input
-                      type="date"
-                      name="creationDate"
-                      value={formData.creationDate}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}>
-                      Expiry Date *
-                      <span title="Auto-calculated based on category" className="cursor-pointer">
-                        <Info size={16} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                      </span>
-                    </label>
-                    <input
-                      type="date"
-                      name="expiryDate"
-                      value={formData.expiryDate}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500 opacity-50 cursor-not-allowed`}
-                      required
-                      readOnly
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Auto-calculated based on category
-                    </p>
-                  </div>
+
+              <div className="mb-5">
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Price ($) *
+                </label>
+                <input
+                  type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  required
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="mb-5">
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                  rows={3}
+                  placeholder="Product description..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Creation Date *
+                  </label>
+                  <input
+                    type="date"
+                    name="creationDate"
+                    value={formData.creationDate}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    Expiry Date *
+                  </label>
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    value={formData.expiryDate}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all opacity-50 cursor-not-allowed`}
+                    required
+                    readOnly
+                  />
+                  <p className={`text-xs mt-1.5 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    Auto-calculated based on category
+                  </p>
                 </div>
               </div>
-              {/* Form Actions */}
+
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
@@ -1017,15 +1361,14 @@ Market: ${product.market}`;
                     setShowAddForm(false);
                     setEditingProduct(null);
                     setImagePreview(null);
-                    setFormErrors({});
                   }}
-                  className={`px-6 py-2 rounded-md ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
+                  className={`px-4 py-2.5 rounded-lg ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-all`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200"
+                  className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
                 >
                   {editingProduct ? "Update Product" : "Add Product"}
                 </button>
@@ -1034,51 +1377,54 @@ Market: ${product.market}`;
           </div>
         </div>
       )}
+
       {/* Refill Modal */}
       {showRefillForm && refillingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-lg shadow-lg max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Refill {refillingProduct.name}</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className={`rounded-xl shadow-2xl max-w-lg w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <Plus size={24} />
+                Refill {refillingProduct.name}
+              </h2>
               <button
                 onClick={() => {
                   setShowRefillForm(false);
                   setRefillingProduct(null);
                 }}
-                className={darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}
+                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
               >
                 <X size={20} />
               </button>
             </div>
-        
             <form onSubmit={handleRefillSubmit}>
-              <div className="mb-4">
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  Current Stock: {refillingProduct.stock.quantity} {refillingProduct.stock.unit}
-                </label>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  Current Expiry: {formatDate(refillingProduct.expiryDate)}
-                </label>
+              <div className="mb-5">
+                <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-100"} mb-4`}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Current Stock</p>
+                      <p className="font-semibold">{refillingProduct.stock.quantity} {refillingProduct.stock.unit}</p>
+                    </div>
+                    <div>
+                      <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Market</p>
+                      <p className="font-semibold">{refillingProduct.market}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-          
-              <div className="mb-4">
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+              <div className="mb-5">
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
                   Refill Quantity *
                 </label>
                 <input
                   type="number"
                   value={refillQuantity}
                   onChange={(e) => setRefillQuantity(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"} focus:ring-2 focus:ring-green-500`}
+                  className={`w-full px-4 py-2.5 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"} focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
                   required
                   min="1"
                   placeholder="Enter quantity to add"
                 />
-              </div>
-              <div className="mb-4">
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  Note: Refilling will update the creation date and recalculate the expiry date based on the current date.
-                </label>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
@@ -1087,93 +1433,146 @@ Market: ${product.market}`;
                     setShowRefillForm(false);
                     setRefillingProduct(null);
                   }}
-                  className={`px-4 py-2 rounded-md ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-colors duration-200`}
+                  className={`px-4 py-2.5 rounded-lg ${darkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-900 hover:bg-gray-300"} transition-all`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200"
+                  className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
                 >
-                  Refill
+                  Refill Stock
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
       {/* QR Code Modal */}
       {showQRCode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-lg shadow-lg max-w-sm w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className={`rounded-xl shadow-2xl max-w-sm w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Product QR Code</h2>
               <button
                 onClick={() => setShowQRCode(null)}
-                className={darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}
+                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
               >
                 <X size={20} />
               </button>
             </div>
-        
             <div className="flex flex-col items-center">
-              <div className="bg-white p-4 rounded-lg mb-4" id="qrcode-container">
+              <div className="bg-white p-4 rounded-lg mb-4">
                 <QRCodeSVG
                   value={generateProductInfo(showQRCode)}
                   size={200}
                   level="H"
                   includeMargin={true}
-                  id="product-qrcode"
                 />
               </div>
-          
               <div className="text-center">
                 <h3 className="font-semibold">{showQRCode.name}</h3>
                 <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
                   Scan this code to view product details
                 </p>
               </div>
-          
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {exportModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className={`rounded-xl shadow-2xl max-w-md w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <Download size={24} />
+                Export Data
+              </h2>
               <button
-                onClick={() => {
-                  const svgElement = document.getElementById('product-qrcode');
-                  if (!svgElement) return;
-              
-                  const canvas = document.createElement('canvas');
-                  const ctx = canvas.getContext('2d');
-              
-                  const size = 200;
-                  canvas.width = size;
-                  canvas.height = size;
-              
-                  const svgData = new XMLSerializer().serializeToString(svgElement);
-                  const img = new Image();
-                  const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-                  const url = URL.createObjectURL(svgBlob);
-              
-                  img.onload = function() {
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, size, size);
-                
-                    const pngUrl = canvas.toDataURL('image/png');
-                
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = pngUrl;
-                    downloadLink.download = `${showQRCode.name.replace(/\s+/g, '-').toLowerCase()}-qrcode.png`;
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
-                
-                    URL.revokeObjectURL(url);
-                  };
-              
-                  img.src = url;
-                }}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors duration-200"
+                onClick={() => setExportModal({ ...exportModal, open: false })}
+                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
               >
-                <Download size={16} />
-                Download QR Code
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Export Format
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setExportModal({...exportModal, format: 'excel'})}
+                    className={`p-3 rounded-lg border flex flex-col items-center justify-center ${
+                      exportModal.format === 'excel' 
+                        ? 'border-green-500 bg-green-50 text-green-600' 
+                        : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileSpreadsheet size={24} />
+                    <span className="mt-1 text-sm">Excel</span>
+                  </button>
+                  <button
+                    onClick={() => setExportModal({...exportModal, format: 'pdf'})}
+                    className={`p-3 rounded-lg border flex flex-col items-center justify-center ${
+                      exportModal.format === 'pdf' 
+                        ? 'border-green-500 bg-green-50 text-green-600' 
+                        : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileText size={24} />
+                    <span className="mt-1 text-sm">PDF</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Data Selection
+                </label>
+                <div className="space-y-2">
+                  <label className={`flex items-center ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <input
+                      type="radio"
+                      name="selection"
+                      value="current"
+                      checked={exportModal.selection === 'current'}
+                      onChange={(e) => setExportModal({...exportModal, selection: e.target.value})}
+                      className="mr-2"
+                    />
+                    Current View ({filteredProducts.length} items)
+                  </label>
+                  <label className={`flex items-center ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <input
+                      type="radio"
+                      name="selection"
+                      value="all"
+                      checked={exportModal.selection === 'all'}
+                      onChange={(e) => setExportModal({...exportModal, selection: e.target.value})}
+                      className="mr-2"
+                    />
+                    All Data ({inventory.length} items)
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setExportModal({ ...exportModal, open: false })}
+                className={`flex-1 px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} transition-all`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className={`flex-1 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all`}
+              >
+                Export {exportModal.format.toUpperCase()}
               </button>
             </div>
           </div>

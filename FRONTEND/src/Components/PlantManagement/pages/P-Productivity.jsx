@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit, Trash } from 'lucide-react';
+import { Plus, Edit, Trash, Send } from 'lucide-react';
 import Modal from '../P-Modal.jsx';
 import { useTheme } from '../context/ThemeContext';
+import Loader from '../Loader/Loader';
 import "../styles/theme.css";
 
 import {
@@ -17,6 +18,7 @@ const Productivity = () => {
   const [editingRecord, setEditingRecord] = useState(null);
   const [selectedPlant, setSelectedPlant] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
 
   // Theme-based colors
   const bgCard = theme === 'dark' ? 'bg-[#2d2d2d]' : 'bg-white';
@@ -28,10 +30,13 @@ const Productivity = () => {
   // Fetch records from backend
   const fetchRecords = async (plantType = '') => {
     try {
+      setLoading(true);
       const res = await axios.get(`http://localhost:5000/api/productivity${plantType ? `?plantType=${plantType}` : ''}`);
       setRecords(res.data || []);
     } catch (err) {
       console.error('Fetch error:', err.response || err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,6 +67,56 @@ const Productivity = () => {
     } catch (err) { console.error(err); }
   };
 
+  // Send harvest record to Inventory Management
+  const handleSendToInventory = async (record) => {
+    try {
+      setLoading(true);
+      const notificationData = {
+        title: 'New Harvest Record',
+        message: `${record.quantity}kg of ${record.plantType} harvested from ${record.greenhouseNo} on ${new Date(record.harvestDate).toLocaleDateString()}`,
+        type: 'success',
+        source: 'Plant Management',
+        targetModule: 'Inventory Management',
+        data: {
+          harvestId: record._id,
+          plantType: record.plantType,
+          greenhouseNo: record.greenhouseNo,
+          harvestDate: record.harvestDate,
+          quantity: record.quantity,
+          qualityGrade: record.qualityGrade,
+          worker: record.worker
+        }
+      };
+
+      // Create notification for Plant Management as well
+      const plantNotificationData = {
+        title: 'Harvest Record Sent',
+        message: `Harvest record sent to Inventory Management: ${record.quantity}kg of ${record.plantType} from ${record.greenhouseNo}`,
+        type: 'success',
+        source: 'Plant Management',
+        targetModule: 'Plant Management',
+        data: {
+          harvestId: record._id,
+          plantType: record.plantType,
+          greenhouseNo: record.greenhouseNo,
+          harvestDate: record.harvestDate,
+          quantity: record.quantity,
+          qualityGrade: record.qualityGrade,
+          worker: record.worker
+        }
+      };
+
+      await axios.post('http://localhost:5000/api/notifications', notificationData);
+      await axios.post('http://localhost:5000/api/notifications', plantNotificationData);
+      alert('Harvest record sent to Inventory Management successfully!');
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      alert('Failed to send notification. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openModal = (record = null) => {
     setEditingRecord(record);
     setShowModal(true);
@@ -90,6 +145,11 @@ const Productivity = () => {
       });
     return months.map((month, idx) => ({ month, yield: monthMap[idx] || 0 }));
   };
+
+  // Show loader while data is being fetched
+  if (loading) {
+    return <Loader darkMode={theme === 'dark'} />;
+  }
 
   return (
     <div className={`flex flex-col gap-6 p-4 ${textColor}`}>
@@ -184,8 +244,9 @@ const Productivity = () => {
                 <td className="px-4 py-2">{record.qualityGrade || '-'}</td>
                 <td className="px-4 py-2">{record.worker || '-'}</td>
                 <td className="px-4 py-2 flex gap-2">
-                  <button className="p-1 hover:text-blue-500" onClick={()=>openModal(record)}><Edit size={16}/></button>
-                  <button className="p-1 hover:text-red-500" onClick={()=>handleDelete(record._id)}><Trash size={16}/></button>
+                  <button className="p-1 hover:text-blue-500" onClick={()=>openModal(record)} title="Edit"><Edit size={16}/></button>
+                  <button className="p-1 hover:text-green-500" onClick={()=>handleSendToInventory(record)} title="Send to Inventory Management"><Send size={16}/></button>
+                  <button className="p-1 hover:text-red-500" onClick={()=>handleDelete(record._id)} title="Delete"><Trash size={16}/></button>
                 </td>
               </tr>
             ))}

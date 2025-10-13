@@ -1,0 +1,34 @@
+{
+  "name": "smart-farm-system",
+  "version": "1.0.0",
+  "description": "Smart Farm Management System - Monorepo",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix BACKEND && npm install --prefix FRONTEND",
+    "install:backend": "npm install --prefix BACKEND",
+    "install:frontend": "npm install --prefix FRONTEND",
+    "start": "concurrently \"npm run dev --prefix BACKEND\" \"npm start --prefix FRONTEND\"",
+    "start:backend": "npm run dev --prefix BACKEND",
+    "start:frontend": "npm start --prefix FRONTEND",
+    "dev": "concurrently \"npm run dev --prefix BACKEND\" \"npm start --prefix FRONTEND\"",
+    "build": "npm run build --prefix FRONTEND",
+    "test": "npm test --prefix FRONTEND",
+    "clean": "rimraf BACKEND/node_modules FRONTEND/node_modules node_modules",
+    "clean:install": "npm run clean && npm run install:all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "smart-farm",
+    "agriculture",
+    "management-system",
+    "monorepo"
+  ],
+  "author": "randiv",
+  "license": "ISC"
+}

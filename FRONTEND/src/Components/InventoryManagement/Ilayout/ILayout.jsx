@@ -13,7 +13,7 @@ const ILayout = () => {
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   return (
-    <div className={darkMode ? "bg-gray-900 text-white min-h-screen flex" : "bg-white text-black min-h-screen flex"}>
+    <div className={darkMode ? "bg-dark-bg text-dark-text min-h-screen flex" : "bg-light-beige text-gray-900 min-h-screen flex"}>
       {/* Sidebar */}
       <Sidebar darkMode={darkMode} sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 

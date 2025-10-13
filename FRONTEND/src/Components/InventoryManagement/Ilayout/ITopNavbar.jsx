@@ -17,8 +17,8 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Load user data from localStorage
+  // Function to load user data from localStorage
+  const loadUserData = () => {
     const user = {
       name: localStorage.getItem("name") || "Admin",
       firstName: localStorage.getItem("firstName"),
@@ -28,6 +28,12 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       userId: localStorage.getItem("userId")
     };
     setUserData(user);
+    return user;
+  };
+
+  useEffect(() => {
+    // Load initial user data
+    const user = loadUserData();
     
     // Initialize Socket.io connection
     const newSocket = io('http://localhost:5000');
@@ -46,6 +52,17 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     newSocket.on('refillRequestUpdate', (data) => {
       addNotification(data);
     });
+
+    // Listen for user profile updates
+    newSocket.on('userProfileUpdated', (updatedUser) => {
+      // Update localStorage with new data
+      if (updatedUser.firstName) localStorage.setItem("firstName", updatedUser.firstName);
+      if (updatedUser.lastName) localStorage.setItem("lastName", updatedUser.lastName);
+      if (updatedUser.profileImage) localStorage.setItem("profileImage", updatedUser.profileImage);
+      
+      // Reload user data
+      loadUserData();
+    });
     
     // Fetch initial notifications
     fetchNotifications();
@@ -53,9 +70,19 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     // Set up interval to check for new notifications every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
     
+    // Listen for storage events (for cross-tab updates)
+    const handleStorageChange = (e) => {
+      if (e.key === "firstName" || e.key === "lastName" || e.key === "profileImage") {
+        loadUserData();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
     return () => {
       newSocket.disconnect();
       clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -83,20 +110,41 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       
       if (!token) return;
       
-      const response = await axios.get("http://localhost:5000/api/refill-requests/notifications", {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { limit: 10 }
-      });
+      // Fetch both refill request notifications and general notifications for Inventory Management
+      const [refillResponse, generalResponse] = await Promise.all([
+        axios.get("http://localhost:5000/api/refill-requests/notifications", {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { limit: 10 }
+        }).catch(() => ({ data: [] })),
+        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } }))
+      ]);
       
-      // Merge with existing notifications, avoiding duplicates
+      // Combine both notification sources
+      const refillNotifications = refillResponse.data || [];
+      const generalNotifications = generalResponse.data?.data?.notifications || [];
+      
+      // Convert general notifications to match the expected format
+      const convertedGeneralNotifications = generalNotifications.map(notification => ({
+        id: notification._id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type === 'success' ? 'harvest' : notification.type,
+        priority: notification.type === 'success' ? 'medium' : 'low',
+        read: notification.read,
+        timestamp: notification.createdAt,
+        data: notification.data
+      }));
+      
+      // Merge all notifications, avoiding duplicates
+      const allNotifications = [...refillNotifications, ...convertedGeneralNotifications];
       setNotifications(prev => {
         const existingIds = new Set(prev.map(n => n.id));
-        const newNotifications = response.data.filter(n => !existingIds.has(n.id));
+        const newNotifications = allNotifications.filter(n => !existingIds.has(n.id));
         return [...newNotifications, ...prev].slice(0, 20); // Keep only latest 20
       });
       
       // Update unread count
-      setUnreadCount(response.data.filter(n => !n.read).length);
+      setUnreadCount(allNotifications.filter(n => !n.read).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
@@ -107,10 +155,21 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const markAsRead = async (id) => {
     try {
       const token = localStorage.getItem("token");
-      if (token) {
-        await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      
+      // Find the notification to determine its type
+      const notification = notifications.find(n => n.id === id);
+      
+      if (notification) {
+        // Mark as read in the appropriate system
+        if (notification.type === 'harvest') {
+          // Mark general notification as read
+          await axios.patch(`http://localhost:5000/api/notifications/${id}/read`);
+        } else if (token) {
+          // Mark refill request notification as read
+          await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
       }
       
       setNotifications(prev => 
@@ -194,6 +253,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       case "refillRequestUpdate": return <CheckCircle size={16} className="text-green-500" />;
       case "lowStock": return <AlertTriangle size={16} className="text-yellow-500" />;
       case "order": return <Package size={16} className="text-purple-500" />;
+      case "harvest": return <CheckCircle size={16} className="text-green-600" />;
       default: return <Bell size={16} className="text-gray-500" />;
     }
   };
@@ -329,7 +389,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                 {notifications.length > 0 && (
                   <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
                     <button
-                      onClick={() => navigate("/InventoryManagement")}
+                      onClick={() => navigate("/InventoryManagement/notification")}
                       className={`w-full text-center text-sm ${darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
                     >
                       View all notifications
@@ -382,6 +442,12 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
                     </p>
                   </div>
                 </div>
+                <button
+                  onClick={() => navigate("/InventoryManagement/isettings")}
+                  className={`flex items-center w-full text-left px-4 py-2 text-sm ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`}
+                >
+                  <User size={16} className="mr-2" /> Profile Settings
+                </button>
                 <button
                   onClick={handleLogout}
                   className={`flex items-center w-full text-left px-4 py-2 text-sm ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-100"}`}

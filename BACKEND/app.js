@@ -55,10 +55,11 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------- Uploads Setup -----------------------
+const animalUploadsDir = path.join(__dirname, "AnimalManagement", "Uploads");
 const uploadsDir = path.join(__dirname, "uploads");
 const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_uploads");
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
@@ -68,17 +69,47 @@ const plantReportsDir = path.join(__dirname, "uploads", "plant-reports");
 [uploadsDir, healthUploadsDir, plantUploadsDir, animalReportsDir, plantReportsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
-    console.log(`📁 Created directory: ${dir}`);
+    console.log(` Created directory: ${dir}`);
   }
 });
 
 // Serve static folders
 app.use("/uploads", express.static(uploadsDir));
+app.use("/animal-uploads", express.static(animalUploadsDir));
 app.use("/Health_uploads", express.static(healthUploadsDir));
 app.use("/Health_Uploads", express.static(healthUploadsDir)); // for case-insensitive use
 app.use("/plant-uploads", express.static(plantUploadsDir));
+app.use('/api/PlantManagement/Uploads', express.static(path.join(__dirname, 'PlantManagement', 'Uploads')));
 
-// ----------------------- Multer Setup -----------------------
+// ----------------------- Batch Expiry Notification Function -----------------------
+const checkExpiryNotifications = async () => {
+  try {
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const batchesNearingExpiry = await MeatProductivity.find({
+      expiryDate: { $lte: threeDaysFromNow, $gte: now },
+      status: { $in: ["Fresh", "Stored", "Processed"] }, // Exclude already expired or sold
+    });
+
+    batchesNearingExpiry.forEach((batch) => {
+      const daysUntilExpiry = Math.ceil((new Date(batch.expiryDate) - now) / (24 * 60 * 60 * 1000));
+      if (daysUntilExpiry <= 3 && daysUntilExpiry >= 0) {
+        io.emit("batchExpiring", {
+          message: `Batch ${batch.batchId} (${batch.animalType}, ${batch.meatType}) is nearing expiry in ${daysUntilExpiry} day(s)`,
+          batchId: batch.batchId,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error checking batch expiry:", error);
+  }
+};
+
+// Set up interval for expiry checks (every 12 hours)
+setInterval(checkExpiryNotifications, 12 * 60 * 60 * 1000);
+
+// ----------------------- Multer setup -----------------------
+// This is a fallback; some routes define their own multer configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
@@ -98,22 +129,32 @@ const upload = multer({ storage, fileFilter });
 
 // ----------------------- Import Routes -----------------------
 
-// 🌿 Animal Management
+// Animal Management
 import { animalRouter } from "./AnimalManagement/routes/animalRoutes.js";
 import { animalTypeRouter } from "./AnimalManagement/routes/animalTypeRoutes.js";
 import feedStockRouter from "./AnimalManagement/routes/feedStockRoutes.js";
 import chatbotRoutes from "./AnimalManagement/routes/chatbotRoutes.js";
 import zonesRouter from "./AnimalManagement/routes/zoneRoutes.js";
 import emergencyRoutes from "./AnimalManagement/routes/emergencyRoutes.js";
+import feedingRoutes from "./AnimalManagement/routes/feedingRoutes.js";
+import automatedFeedingRoutes from "./AnimalManagement/routes/automatedFeedingRoutes.js";
 import { doctorRouter as animalDoctorRouter } from "./AnimalManagement/routes/doctorRoutes.js";
+
 import {
   sendMedicalRequest,
   testEmail,
 } from "./AnimalManagement/controllers/medicalRequestController.js";
-import productivityRouter from "./AnimalManagement/routes/productivityRoutes.js";
+import animalProductivityRouter from "./AnimalManagement/routes/animalProductivityRoutes.js";
+import { productivityNotificationRouter } from "./AnimalManagement/routes/productivityNotificationRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import meatRoutes from "./AnimalManagement/routes/meatRoutes.js";
+import notificationRoutes from "./AnimalManagement/routes/notificationRoutes.js";
+import MeatProductivity from "./AnimalManagement/models/MeatProductivity.js";
+import HarvestHistory from "./AnimalManagement/models/HarvestHistory.js";
+import NotificationService from "./AnimalManagement/services/notificationService.js";
+import automatedFeedingService from "./AnimalManagement/services/automatedFeedingService.js";
 
-// 💊 Health Management
+// Health Management
 import doctorRoutes from "./HealthManagement/Routes/DoctorDetailsRoute.js";
 import specialistRoutes from "./HealthManagement/Routes/HealthSpecialistRoute.js";
 import medicineCompanyRoutes from "./HealthManagement/Routes/H_MedicineCompanyRoute.js";
@@ -122,50 +163,65 @@ import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologist
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
 
-// 🌱 Plant Management
+// Treatments and Contact
+import animalTreatmentRoutes from "./HealthManagement/Routes/H_animalTreatmentRoutes.js";
+import H_plantTreatmentRoutes from "./HealthManagement/Routes/H_plantTreatmentRoutes.js";
+import contact from "./ContactUs/routes/contactRoutes.js";
+
+// Plant Management
 import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
 import plantRoutes from "./PlantManagement/Routes/plantRoutes.js";
 import fertilizingRoutes from "./PlantManagement/Routes/fertilizingRoutes.js";
 import plantProductivityRoutes from "./PlantManagement/Routes/productivityRoutes.js";
 import pestRoutes from "./PlantManagement/Routes/pestRoutes.js";
 import consultationRoutes from "./PlantManagement/Routes/consultationRoutes.js";
+import dashboardRoutes from "./PlantManagement/Routes/dashboardRoutes.js";
 
-// 🏭 Inventory Management
+// Inventory Management
 import productRoutes from "./InventoryManagement/Iroutes/productRoutes.js";
 import orderRoutes from "./InventoryManagement/Iroutes/orderRoutes.js";
 import animalFoodRoutes from "./InventoryManagement/Iroutes/animalfoodRoutes.js";
 import IfertilizerstockRoutes from "./InventoryManagement/Iroutes/IfertilizerstockRoutes.js";
 import supplierRoutes from "./InventoryManagement/Iroutes/IsupplierRoutes.js";
 import refillRequestRoutes from "./InventoryManagement/Iroutes/refillRequestRoutes.js";
+import exportMarketRoutes from "./InventoryManagement/Iroutes/IexportmarketRoutes.js";
 
-// 👷 Employee Management
+// Employee Management
 import employeeRoutes from "./EmployeeManager/E-route/employeeRoutes.js";
 import attendanceRoutes from "./EmployeeManager/E-route/attendanceRoutes.js";
 import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
+import salaryRoutes from "./EmployeeManager/E-route/salaryRoutes.js";
+import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
 
-// ----------------------- Debug Environment Variables -----------------------
-console.log("✅ OPENAI_API_KEY loaded:", process.env.OPENAI_API_KEY ? "YES" : "NO");
-console.log("✅ EMAIL_USER loaded:", process.env.EMAIL_USER ? "YES" : "NO");
+// ESP32 Proxy Routes
+import esp32Routes from "./routes/esp32Routes.js";
 
 // ----------------------- Routes Setup -----------------------
 
-// 🧠 Chatbot
+// Chatbot
 app.use("/api/chatbot", chatbotRoutes);
 
-// 🐄 Animal Management
+// Animal Management
 app.use("/animals", animalRouter);
 app.use("/animal-types", animalTypeRouter);
 app.use("/feed-stocks", feedStockRouter);
 app.use("/zones", zonesRouter);
 app.use("/emergency", emergencyRoutes);
+app.use("/api/feeding", feedingRoutes);
+app.use("/api/automated-feeding", automatedFeedingRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/animal-doctors", animalDoctorRouter); // avoid conflict with /api/doctors
-app.use("/productivity", productivityRouter);
+// Avoid conflict with /api/doctors from HealthManagement
+app.use("/api/animal-doctors", animalDoctorRouter);
+app.use("/animal-productivity", animalProductivityRouter);
+app.use("/api/notifications", productivityNotificationRouter);
+
 app.post("/api/medical-request", sendMedicalRequest);
 app.post("/api/test-email", testEmail);
+app.use("/api/meats", meatRoutes);
+app.use("/api/animal-management/notifications", notificationRoutes);
 
-// 🩺 Health Management
+// Health Management
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/specialists", specialistRoutes);
 app.use("/api/medicine-companies", medicineCompanyRoutes);
@@ -174,42 +230,48 @@ app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
 
-//Contact us
+// Contact us
 app.use("/api/contact", contact);
 
-
-// IMPORTANT: Match frontend endpoint
+// Match frontend endpoint
 app.use("/api/animal-treatments", animalTreatmentRoutes);
 
-// ✅ NEW Plant Treatment Routes
+// NEW Plant Treatment Routes
 app.use("/api/plant-treatments", H_plantTreatmentRoutes);
 
-// 📞 Contact Us
+// Contact Us
 app.use("/api/contact", contact);
 
-// 🌿 Plant Management
+// Plant Management
 app.use("/api/inspections", inspectionRoutes);
 app.use("/api/plants", plantRoutes);
 app.use("/api/fertilizing", fertilizingRoutes);
 app.use("/api/productivity", plantProductivityRoutes);
 app.use("/api/pests", pestRoutes);
 app.use("/api/consultations", consultationRoutes);
+app.use("/api", dashboardRoutes);
 
-// 🏭 Inventory Management
+// Inventory Management
 app.use("/api/inventory/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/animalfood", animalFoodRoutes);
 app.use("/api/Ifertilizerstock", IfertilizerstockRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/refill-requests", refillRequestRoutes);
+app.use("/api/export-market", exportMarketRoutes);
 
-// 👷 Employee Management
+// Employee Management
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
+app.use("/api/salary", salaryRoutes);
+app.use("/api/employee-reports", reportRoutes);
 
-// 🖼️ Customer Profile Image Upload
+// ESP32 Proxy Routes - These proxy requests to your ESP32 device
+app.use("/", esp32Routes);
+
+// Customer Profile Image Upload
 app.post("/api/customers/profile-upload", upload.single("profileImage"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   res.json({
@@ -218,7 +280,7 @@ app.post("/api/customers/profile-upload", upload.single("profileImage"), (req, r
   });
 });
 
-// 🧩 Debug Endpoints
+// Debug Endpoints
 app.get("/api/debug", (req, res) => {
   res.json({
     message: "Server is working",
@@ -247,45 +309,78 @@ app.get("/api/check-db", async (req, res) => {
   }
 });
 
-// ----------------------- Health Check -----------------------
+// Health Check
 app.get("/health", (req, res) => res.json({ status: "OK", message: "Server is running" }));
-app.get("/", (req, res) => res.send("🌿 Easy Farming Backend is running!"));
+app.get("/", (req, res) => res.send(" Easy Farming Backend is running!"));
 
-// ----------------------- 404 Not Found -----------------------
+// 404 Not Found
 app.use((req, res) => {
   res.status(404).json({ message: "Route Not Found" });
 });
 
-// ----------------------- Error Handling Middleware -----------------------
+// Error Handling Middleware
 app.use((err, req, res, next) => {
-  console.error("🔥 Server error:", err);
-  res.status(err.status || 500).json({
-    error: err.message || "Internal server error",
-  });
+  console.error("Server error:", err);
+
+  // Handle multer errors specifically
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: "File too large. Maximum size is 5MB." });
+    }
+  }
+
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || "Internal server error" });
 });
 
-// ----------------------- MongoDB Connection -----------------------
+// MongoDB Connection
 const MONGO_URI =
   process.env.MONGO_URI ||
   "mongodb+srv://EasyFarming:sliit123@easyfarming.owlbj1f.mongodb.net/EasyFarming?retryWrites=true&w=majority";
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    const conn = await mongoose.connect(MONGO_URI);
+    console.log(` MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ MongoDB connection failed: ${error.message}`);
+    console.error(` MongoDB connection failed: ${error.message}`);
+    console.error(`\n Troubleshooting tips:`);
+    console.error(`   1. Check if your IP address is whitelisted in MongoDB Atlas`);
+    console.error(`   2. Verify your MongoDB connection string in .env file`);
+    console.error(`   3. Ensure your MongoDB Atlas cluster is running`);
+    console.error(`   4. Check your network connection\n`);
     process.exit(1);
   }
 };
 
-// ----------------------- Start Server -----------------------
+// Start Server
 connectDB().then(() => {
   const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  server.listen(PORT, () => {
+    console.log(` Server running on port ${PORT}`);
+
+    // Start notification service
+    console.log(' Starting notification service...');
+
+    // Run initial notification check
+    NotificationService.runAllChecks();
+
+    // Schedule notification checks every 5 minutes
+    setInterval(() => {
+      NotificationService.runAllChecks();
+    }, 5 * 60 * 1000);
+
+    // Clean up expired notifications every hour
+    setInterval(() => {
+      NotificationService.cleanupExpiredNotifications();
+    }, 60 * 60 * 1000);
+
+    console.log(' Notification service started');
+
+    // Start automated feeding service
+    automatedFeedingService.start();
+    console.log(' Automated feeding service started');
+  });
 });
 
 export default app;

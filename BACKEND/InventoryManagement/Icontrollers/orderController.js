@@ -1,69 +1,191 @@
 import Order from "../Imodels/Order.js";
 import Product from "../Imodels/Product.js";
+import mongoose from "mongoose";
 
-// Create new order
-export const createOrder = async (req, res) => {
+// Create new order from payment
+export const createOrderFromPayment = async (req, res) => {
   try {
-    const { customer, items, paymentMethod } = req.body;
+    const { 
+      customer, 
+      items, 
+      paymentMethod, 
+      subtotal, 
+      shipping, 
+      tax, 
+      totalAmount,
+      transactionId 
+    } = req.body;
    
+    // Validate required fields
+    if (!customer || !items || !paymentMethod || !totalAmount) {
+      return res.status(400).json({
+        message: "Missing required order fields"
+      });
+    }
+
+    // Validate items and check stock availability
+    const stockValidation = await validateStockAvailability(items);
+    if (!stockValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: stockValidation.message
+      });
+    }
+
     // Calculate estimated delivery (3 days from now)
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
    
     // Prepare order items with totals
     const orderItems = items.map(item => ({
-      productId: item.productId,
+      productId: item._id || item.productId,
       name: item.name,
       price: item.price,
       quantity: item.quantity,
+      image: item.image || '',
       total: item.price * item.quantity
     }));
    
-    // Calculate totals
-    const subtotal = orderItems.reduce((sum, item) => sum + item.total, 0);
-    const shipping = 5.00; // Fixed shipping cost
-    const totalAmount = subtotal + shipping;
-   
-    // Generate order number first
+    // Generate order number
     const orderNumber = Order.generateOrderNumber();
    
-    // Create order with all required fields
+    // Create order
     const order = new Order({
-      orderNumber, // This is now set explicitly
+      orderNumber,
       customer,
       items: orderItems,
-      subtotal,
-      shipping,
+      subtotal: subtotal || orderItems.reduce((sum, item) => sum + item.total, 0),
+      shipping: shipping || 5.00,
+      tax: tax || 0,
       totalAmount,
       paymentMethod,
+      paymentStatus: 'completed', // Ensure payment status is set to completed
+      status: 'confirmed',
       estimatedDelivery,
-      status: 'pending'
+      transactionId
     });
    
     const savedOrder = await order.save();
    
-    // Update product stock quantities
-    await Promise.all(
-      items.map(async (item) => {
-        await Product.findByIdAndUpdate(
-          item.productId,
-          { $inc: { 'stock.quantity': -item.quantity } }
-        );
-      })
-    );
+    // Update product stock quantities - DECREMENT STOCK
+    await updateProductStock(items, 'decrement');
    
     res.status(201).json({
+      success: true,
       message: 'Order created successfully',
       order: savedOrder
     });
   } catch (error) {
+    console.error('Order creation error:', error);
+    
     if (error.code === 11000) {
-      // Handle duplicate key error (retry with new order number)
       return res.status(400).json({
+        success: false,
         message: 'Order number conflict. Please try again.'
       });
     }
-    res.status(400).json({ message: error.message });
+    
+    res.status(400).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// Validate stock availability before creating order
+const validateStockAvailability = async (items) => {
+  try {
+    for (const item of items) {
+      const productId = item._id || item.productId;
+      
+      if (!productId) {
+        return {
+          valid: false,
+          message: `Product ID missing for item: ${item.name}`
+        };
+      }
+
+      // Find the product in database
+      const product = await Product.findById(productId);
+      
+      if (!product) {
+        return {
+          valid: false,
+          message: `Product not found: ${item.name}`
+        };
+      }
+
+      if (!product.isActive) {
+        return {
+          valid: false,
+          message: `Product is no longer available: ${item.name}`
+        };
+      }
+
+      if (product.stock.quantity < item.quantity) {
+        return {
+          valid: false,
+          message: `Insufficient stock for ${item.name}. Available: ${product.stock.quantity}, Requested: ${item.quantity}`
+        };
+      }
+
+      // Check if product is expired
+      if (new Date(product.expiryDate) < new Date()) {
+        return {
+          valid: false,
+          message: `Product expired: ${item.name}`
+        };
+      }
+    }
+
+    return { valid: true };
+  } catch (error) {
+    console.error('Stock validation error:', error);
+    return {
+      valid: false,
+      message: 'Error validating stock availability'
+    };
+  }
+};
+
+// Update product stock (increment or decrement)
+const updateProductStock = async (items, operation) => {
+  try {
+    for (const item of items) {
+      const productId = item._id || item.productId;
+      
+      if (!productId) {
+        console.warn(`Skipping stock update for item without ID: ${item.name}`);
+        continue;
+      }
+
+      const product = await Product.findById(productId);
+      
+      if (!product) {
+        console.warn(`Product not found for stock update: ${productId}`);
+        continue;
+      }
+
+      const quantityChange = operation === 'decrement' ? -item.quantity : item.quantity;
+      
+      // Update stock quantity
+      product.stock.quantity += quantityChange;
+      
+      // Ensure stock doesn't go negative
+      if (product.stock.quantity < 0) {
+        product.stock.quantity = 0;
+      }
+
+      // Update product status based on new stock level
+      product.updateStatus();
+      
+      await product.save();
+      
+      console.log(`Stock updated for ${product.name}: ${operation === 'decrement' ? 'Decreased' : 'Increased'} by ${item.quantity}. New stock: ${product.stock.quantity}`);
+    }
+  } catch (error) {
+    console.error('Error updating product stock:', error);
+    throw new Error('Failed to update product stock');
   }
 };
 
@@ -100,13 +222,17 @@ export const getOrders = async (req, res) => {
     const total = await Order.countDocuments(query);
    
     res.status(200).json({
+      success: true,
       orders,
       totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       total
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -130,13 +256,17 @@ export const getCustomerOrders = async (req, res) => {
     });
    
     res.status(200).json({
+      success: true,
       orders,
       totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       total
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -146,12 +276,21 @@ export const getOrder = async (req, res) => {
     const order = await Order.findById(req.params.id);
    
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
     }
    
-    res.status(200).json(order);
+    res.status(200).json({
+      success: true,
+      order
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -160,6 +299,14 @@ export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
    
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status value'
+      });
+    }
+   
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       { status },
@@ -167,108 +314,245 @@ export const updateOrderStatus = async (req, res) => {
     );
    
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
     }
    
     res.status(200).json({
+      success: true,
       message: 'Order status updated successfully',
       order
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
-// Cancel order
-export const cancelOrder = async (req, res) => {
+// Update payment status
+export const updatePaymentStatus = async (req, res) => {
   try {
+    const { paymentStatus, transactionId } = req.body;
+   
+    const validStatuses = ['pending', 'completed', 'failed', 'refunded'];
+    if (!validStatuses.includes(paymentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment status value'
+      });
+    }
+   
+    const updateData = { paymentStatus };
+    if (transactionId) {
+      updateData.transactionId = transactionId;
+    }
+   
     const order = await Order.findByIdAndUpdate(
       req.params.id,
-      { status: 'cancelled' },
-      { new: true }
+      updateData,
+      { new: true, runValidators: true }
     );
    
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
     }
    
-    // Restore product stock quantities
-    await Promise.all(
-      order.items.map(async (item) => {
-        await Product.findByIdAndUpdate(
-          item.productId,
-          { $inc: { 'stock.quantity': item.quantity } }
-        );
-      })
-    );
+    res.status(200).json({
+      success: true,
+      message: 'Payment status updated successfully',
+      order
+    });
+  } catch (error) {
+    res.status(400).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// Cancel order - RESTORE STOCK
+export const cancelOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+   
+    if (!order) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
+    }
+
+    // Update order status
+    order.status = 'cancelled';
+    order.paymentStatus = 'refunded';
+    await order.save();
+   
+    // Restore product stock quantities - INCREMENT STOCK
+    await updateProductStock(order.items, 'increment');
    
     res.status(200).json({
+      success: true,
       message: 'Order cancelled successfully',
       order
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
-// Delete order (soft delete)
+// Delete order (soft delete) - RESTORE STOCK if not delivered/cancelled
 export const deleteOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
+    const order = await Order.findById(req.params.id);
     
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
     }
+    
+    // Soft delete
+    order.isActive = false;
+    await order.save();
     
     // Restore stock if the order is not delivered or cancelled
     if (order.status !== 'delivered' && order.status !== 'cancelled') {
-      await Promise.all(
-        order.items.map(async (item) => {
-          await Product.findByIdAndUpdate(
-            item.productId,
-            { $inc: { 'stock.quantity': item.quantity } }
-          );
-        })
-      );
+      await updateProductStock(order.items, 'increment');
     }
     
     res.status(200).json({
+      success: true,
       message: 'Order deleted successfully'
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
-// Get order statistics
+// Get order statistics - FIXED REVENUE CALCULATION
 export const getOrderStats = async (req, res) => {
   try {
+    // Basic order counts
     const totalOrders = await Order.countDocuments({ isActive: true });
+    const allOrdersCount = await Order.countDocuments({});
     const pendingOrders = await Order.countDocuments({
       status: 'pending',
       isActive: true
     });
-    const completedOrders = await Order.countDocuments({
+    const confirmedOrders = await Order.countDocuments({
+      status: 'confirmed',
+      isActive: true
+    });
+    const processingOrders = await Order.countDocuments({
+      status: 'processing',
+      isActive: true
+    });
+    const shippedOrders = await Order.countDocuments({
+      status: 'shipped',
+      isActive: true
+    });
+    const deliveredOrders = await Order.countDocuments({
       status: 'delivered',
       isActive: true
     });
-    const totalRevenue = await Order.aggregate([
-      { $match: { isActive: true, status: 'delivered' } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-    ]);
-   
+    const cancelledOrders = await Order.countDocuments({
+      status: 'cancelled',
+      isActive: true
+    });
+
+    // SIMPLIFIED REVENUE CALCULATION
+    
+    // Get all orders (not just active ones) and calculate revenue manually
+    const allActiveOrders = await Order.find({}).select('totalAmount paymentStatus status orderNumber subtotal shipping tax isActive');
+    
+    // Calculate total revenue from all active orders
+    let totalRevenue = allActiveOrders.reduce((sum, order) => {
+      // Try different fields for total amount
+      const amount = order.totalAmount || order.subtotal || 0;
+      return sum + amount;
+    }, 0);
+
+    // If still 0, try calculating from order items
+    if (totalRevenue === 0) {
+      const ordersWithItems = await Order.find({}).select('items');
+      totalRevenue = ordersWithItems.reduce((sum, order) => {
+        if (order.items && Array.isArray(order.items)) {
+          const orderTotal = order.items.reduce((itemSum, item) => {
+            return itemSum + ((item.price || 0) * (item.quantity || 0));
+          }, 0);
+          return sum + orderTotal;
+        }
+        return sum;
+      }, 0);
+    }
+
+
+
+    // Monthly revenue (current month) - simplified
+    const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const monthlyOrders = await Order.find({
+          isActive: true,
+          orderDate: { $gte: currentMonthStart }
+    }).select('totalAmount');
+    
+    const monthlyRevenue = monthlyOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+    // Weekly revenue (last 7 days) - simplified
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const weeklyOrders = await Order.find({
+          isActive: true,
+          orderDate: { $gte: lastWeek }
+    }).select('totalAmount');
+    
+    const weeklyRevenue = weeklyOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+    // Today's revenue - simplified
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayOrders = await Order.find({
+          isActive: true,
+          orderDate: { $gte: todayStart }
+    }).select('totalAmount');
+    
+    const todayRevenue = todayOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
     res.status(200).json({
-      totalOrders,
-      pendingOrders,
-      completedOrders,
-      totalRevenue: totalRevenue[0]?.total || 0
+      success: true,
+      stats: {
+        totalOrders,
+        pendingOrders,
+        confirmedOrders,
+        processingOrders,
+        shippedOrders,
+        deliveredOrders,
+        cancelledOrders,
+        totalRevenue,
+        monthlyRevenue,
+        weeklyRevenue,
+        todayRevenue,
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error in getOrderStats:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -280,19 +564,141 @@ export const sendOrderNotification = async (req, res) => {
    
     const order = await Order.findById(id);
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
     }
    
-    // Here you would integrate with your email service
-    // For now, we'll just log the email details
-    console.log(`Would send email to ${email} about order ${order.orderNumber} status: ${status}`);
+    // Simulate email sending (in production, integrate with email service)
+    console.log(`Order notification sent to ${email}`);
+    console.log(`Order: ${order.orderNumber}, Status: ${status}`);
    
     res.status(200).json({
+      success: true,
       message: 'Notification sent successfully',
       order: order.orderNumber,
       status: status
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// Process payment simulation
+export const processPayment = async (req, res) => {
+  try {
+    const { orderData, paymentDetails } = req.body;
+    
+    console.log('Received payment request:', { 
+      customer: orderData.customer?.email,
+      itemsCount: orderData.items?.length,
+      totalAmount: orderData.totalAmount 
+    });
+    
+    // Validate required fields
+    if (!orderData || !orderData.customer || !orderData.items || !orderData.totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required order data"
+      });
+    }
+
+    // Validate stock availability before processing payment
+    const stockValidation = await validateStockAvailability(orderData.items);
+    if (!stockValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: stockValidation.message
+      });
+    }
+
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Simulate random payment failure (5% chance for testing)
+    if (Math.random() < 0.05) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment declined. Please check your card details or try a different payment method."
+      });
+    }
+    
+    // Generate transaction ID
+    const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    
+    // Calculate estimated delivery (3 days from now)
+    const estimatedDelivery = new Date();
+    estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
+    
+    // Prepare order items with totals
+    const orderItems = orderData.items.map(item => ({
+      productId: item._id || `temp-${Math.random().toString(36).substr(2, 9)}`,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      image: item.image || '',
+      total: item.price * item.quantity
+    }));
+    
+    // Calculate totals if not provided
+    const subtotal = orderData.subtotal || orderItems.reduce((sum, item) => sum + item.total, 0);
+    const shipping = orderData.shipping || 5.00;
+    const tax = orderData.tax || subtotal * 0.08;
+    const totalAmount = orderData.totalAmount || subtotal + shipping + tax;
+    
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    // Create order object - MAKE SURE PAYMENT STATUS IS SET TO 'completed'
+    const order = new Order({
+      orderNumber,
+      customer: orderData.customer,
+      items: orderItems,
+      subtotal,
+      shipping,
+      tax,
+      totalAmount,
+      paymentMethod: orderData.paymentMethod || 'card',
+      paymentStatus: 'completed', // This is crucial for revenue calculation
+      status: 'confirmed',
+      estimatedDelivery,
+      transactionId
+    });
+    
+    // Save order to database
+    const savedOrder = await order.save();
+    console.log('Order saved successfully:', {
+      orderNumber: savedOrder.orderNumber,
+      totalAmount: savedOrder.totalAmount,
+      paymentStatus: savedOrder.paymentStatus
+    });
+    
+    // Update product stock quantities - DECREMENT STOCK
+    await updateProductStock(orderData.items, 'decrement');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Payment processed and order created successfully',
+      order: savedOrder
+    });
+    
+  } catch (error) {
+    console.error('Payment processing error:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order number conflict. Please try again.'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Payment processing failed: ' + error.message
+    });
   }
 };

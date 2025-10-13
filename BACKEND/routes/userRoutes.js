@@ -1,3 +1,4 @@
+// BACKEND/routes/userRoutes.js
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -12,7 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_here";
 // ------------------- Multer config for profile images -------------------
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(process.cwd(), 'uploads/profile-images');
+    const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
     cb(null, uploadDir);
   },
@@ -23,7 +24,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  cb(null, file.mimetype.startsWith('image/'));
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed'), false);
+  }
 };
 
 const upload = multer({
@@ -58,13 +63,16 @@ router.post("/register", async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ error: "User already exists with this email" });
 
+    // Check if email is a manager email
+    const isManagerEmail = email.includes('@mountolive.com');
+    
     const user = await User.create({
       firstName,
       lastName,
       email,
       password,
       phone,
-      role: "normal"
+      role: isManagerEmail ? "normal" : "normal" // Default for customers, will be updated on login
     });
 
     const token = jwt.sign({ id: user._id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: "1d" });
@@ -103,16 +111,19 @@ router.post("/login", async (req, res) => {
 
     let role = user.role;
 
-    const atIndex = email.indexOf("@");
-    const lastDotIndex = email.lastIndexOf(".", atIndex);
-    if (lastDotIndex !== -1 && lastDotIndex < atIndex) {
-      const extractedRole = email.substring(lastDotIndex + 1, atIndex);
-      const validRoles = ["animal", "plant", "inv", "emp", "health", "owner", "admin"];
-      if (validRoles.includes(extractedRole)) {
-        role = extractedRole;
-        if (user.role !== extractedRole) {
-          user.role = extractedRole;
-          await user.save();
+    // Check if email is from mountolive.com (manager)
+    if (email.includes('@mountolive.com')) {
+      const atIndex = email.indexOf("@");
+      const lastDotIndex = email.lastIndexOf(".", atIndex);
+      if (lastDotIndex !== -1 && lastDotIndex < atIndex) {
+        const extractedRole = email.substring(lastDotIndex + 1, atIndex);
+        const validRoles = ["animal", "plant", "inv", "emp", "health", "owner", "admin"];
+        if (validRoles.includes(extractedRole)) {
+          role = extractedRole;
+          if (user.role !== extractedRole) {
+            user.role = extractedRole;
+            await user.save();
+          }
         }
       }
     }
@@ -122,6 +133,7 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ id: user._id, role, email: user.email }, JWT_SECRET, { expiresIn: "1d" });
 
+    // Login endpoint in userRoutes.js - Ensure this returns all necessary data
     res.json({
       token,
       role,
@@ -129,7 +141,15 @@ router.post("/login", async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      profileImage: user.profileImage
+      profileImage: user.profileImage,
+      isManager: email.includes('@mountolive.com'),
+      // ✅ Add these fields if available
+      phone: user.phone,
+      address: user.address,
+      city: user.city,
+      country: user.country,
+      dateOfBirth: user.dateOfBirth,
+      bio: user.bio
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -175,27 +195,75 @@ router.get("/", verifyToken, requireRole(["owner", "admin"]), async (req, res) =
 // Get logged-in customer profile
 router.get("/profile", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select("-password");
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    
+    // Convert to plain object and add fullName
+    const userObj = user.toObject();
+    userObj.fullName = `${user.firstName} ${user.lastName}`;
+    
+    res.json(userObj);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update logged-in customer profile
-router.put("/profile", verifyToken, async (req, res) => {
+// Update logged-in customer profile (with optional image upload)
+router.put("/profile", verifyToken, upload.single('profileImage'), async (req, res) => {
   try {
+    console.log('Profile update request received:', {
+      body: req.body,
+      file: req.file,
+      user: req.user
+    });
+
     const { firstName, lastName, phone, address, city, country, dateOfBirth, bio } = req.body;
+
+    // Build update object
+    const updateData = { firstName, lastName, phone, address, city, country, bio };
+
+    // Handle dateOfBirth conversion
+    if (dateOfBirth) {
+      updateData.dateOfBirth = new Date(dateOfBirth);
+    } else {
+      updateData.dateOfBirth = null; // Clear if empty
+    }
+
+    // Handle profile image upload if provided
+    if (req.file) {
+      console.log('Profile image uploaded:', req.file);
+      const user = await User.findById(req.user.id);
+      
+      // Delete old profile image if exists
+      if (user.profileImage) {
+        const oldPath = path.join(process.cwd(), user.profileImage);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+      
+      updateData.profileImage = `/uploads/${req.file.filename}`;
+    }
+
+    console.log('Updating user with data:', updateData);
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { firstName, lastName, phone, address, city, country, dateOfBirth, bio },
+      updateData,
       { new: true, runValidators: true }
-    );
+    ).select("-password");
 
-    res.json(user);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // ✅ FIX: Return complete user data
+    const userObj = user.toObject();
+    userObj.fullName = `${user.firstName} ${user.lastName}`;
+
+    console.log('Profile updated successfully:', userObj);
+
+    res.json(userObj);
   } catch (err) {
+    console.error("Profile update error:", err);
     if (err.name === 'ValidationError') {
       const errors = Object.values(err.errors).map(error => error.message);
       return res.status(400).json({ error: errors.join(', ') });
@@ -231,20 +299,22 @@ router.post("/upload-profile-image", verifyToken, upload.single('profileImage'),
 
     const user = await User.findById(req.user.id);
 
+    // Delete old profile image if exists
     if (user.profileImage) {
       const oldPath = path.join(process.cwd(), user.profileImage);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
 
-    user.profileImage = path.join('uploads/profile-images', req.file.filename);
+    // Update user with new profile image path
+    user.profileImage = `/uploads/${req.file.filename}`;
     await user.save();
 
-    res.json({
-      message: "Profile image uploaded successfully",
-      imageUrl: `/api/users/profile-image/${req.file.filename}`
+    res.json({ 
+      message: "Profile image uploaded successfully", 
+      imageUrl: `/uploads/${req.file.filename}` 
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -252,54 +322,100 @@ router.post("/upload-profile-image", verifyToken, upload.single('profileImage'),
 router.delete("/profile-image", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
+
     if (user.profileImage) {
-      const imgPath = path.join(process.cwd(), user.profileImage);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-      user.profileImage = null;
-      await user.save();
+      const imagePath = path.join(process.cwd(), user.profileImage);
+      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
     }
+
+    user.profileImage = "";
+    await user.save();
+
     res.json({ message: "Profile image removed successfully" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
 // Serve profile images
-router.get("/profile-image/:filename", (req, res) => {
-  const imagePath = path.join(process.cwd(), 'uploads/profile-images', req.params.filename);
-  if (fs.existsSync(imagePath)) res.sendFile(imagePath);
-  else res.status(404).json({ error: "Image not found" });
-});
-
-// Deactivate account
-router.put("/deactivate", verifyToken, async (req, res) => {
+router.get("/profile-image/:filename", async (req, res) => {
   try {
-    await User.findByIdAndUpdate(req.user.id, { isActive: false });
-    res.json({ message: "Account deactivated successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Delete account
-router.delete("/account", verifyToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (user.profileImage) {
-      const imgPath = path.join(process.cwd(), user.profileImage);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    const filename = req.params.filename;
+    const imagePath = path.join(process.cwd(), 'uploads', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(imagePath)) {
+      return res.status(404).json({ error: "Image not found" });
     }
-    await User.findByIdAndDelete(req.user.id);
-    res.json({ message: "Account deleted successfully" });
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    
+    // Send the file
+    res.sendFile(imagePath);
+  } catch (err) {
+    console.error("Error serving profile image:", err);
+    res.status(500).json({ error: "Error serving image" });
+  }
+});
+
+// Get available roles
+router.get("/roles", verifyToken, async (req, res) => {
+  try {
+    const roles = [
+      { value: 'normal', label: 'Normal User' },
+      { value: 'animal', label: 'Animal Specialist' },
+      { value: 'plant', label: 'Plant Specialist' },
+      { value: 'inv', label: 'Inventory Manager' },
+      { value: 'emp', label: 'Employee Manager' },
+      { value: 'health', label: 'Health Specialist' },
+      { value: 'owner', label: 'Owner' },
+      { value: 'admin', label: 'Administrator' }
+    ];
+    res.json(roles);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ------------------- Roles endpoint -------------------
-router.get("/roles", verifyToken, (req, res) => {
-  res.json(["animal", "plant", "inv", "emp", "health", "owner", "normal", "admin"]);
+// ------------------- Admin Routes -------------------
+
+// Get user by ID
+router.get("/:id", verifyToken, requireRole(["owner", "admin"]), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-export { verifyToken, requireRole };
+// Update user by ID
+router.put("/:id", verifyToken, requireRole(["owner", "admin"]), async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).select("-password");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(error => error.message);
+      return res.status(400).json({ error: errors.join(', ') });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Delete user (soft delete)
+router.delete("/:id", verifyToken, requireRole(["owner", "admin"]), async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

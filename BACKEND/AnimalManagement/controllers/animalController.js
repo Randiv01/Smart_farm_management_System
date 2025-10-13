@@ -4,6 +4,57 @@ import AnimalType from '../models/AnimalType.js';
 import mongoose from 'mongoose';
 import { canZoneAccommodate, updateZoneOccupancy } from '../utils/zoneOccupancy.js';
 
+// Helper function to delete all productivity records for a batch
+const deleteAllProductivityRecords = async (batchId, batchAnimal, individualAnimals, session) => {
+  const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+  
+  // Get all possible IDs that might be linked to productivity records
+  const allAnimalIds = [
+    batchAnimal._id,
+    ...individualAnimals.map(a => a._id)
+  ];
+  
+  // Try multiple deletion strategies
+  const deletionQueries = [
+    { batchId: batchId },
+    { batchId: batchAnimal.batchId },
+    { animalId: { $in: allAnimalIds } },
+    { isGroup: true, batchId: batchId },
+    { isGroup: false, animalId: { $in: allAnimalIds } }
+  ];
+  
+  let totalDeleted = 0;
+  
+  for (const query of deletionQueries) {
+    const result = await AnimalProductivity.deleteMany(query, { session });
+    if (result.deletedCount > 0) {
+      console.log(`Deleted ${result.deletedCount} productivity records with query:`, query);
+      totalDeleted += result.deletedCount;
+    }
+  }
+  
+  // Also try to find any remaining records by searching for the batch name or animal IDs
+  const remainingRecords = await AnimalProductivity.find({
+    $or: [
+      { animalId: { $in: allAnimalIds } },
+      { batchId: batchId },
+      { batchId: batchAnimal.batchId }
+    ]
+  });
+  
+  if (remainingRecords.length > 0) {
+    console.log(`Found ${remainingRecords.length} remaining productivity records, deleting by ID...`);
+    const finalResult = await AnimalProductivity.deleteMany({
+      _id: { $in: remainingRecords.map(r => r._id) }
+    }, { session });
+    totalDeleted += finalResult.deletedCount;
+  }
+  
+  console.log(`Total productivity records deleted: ${totalDeleted}`);
+  return totalDeleted;
+};
+
+
 // Create new animal with auto-generated AnimalID
 export const createAnimal = async (req, res) => {
   try {
@@ -30,18 +81,49 @@ export const createAnimal = async (req, res) => {
 
     const qrCode = generateQR ? uuidv4() : undefined;
 
-    // Auto-generate AnimalID
-    const lastAnimal = await Animal.find({ type: animalType._id })
-      .sort({ createdAt: -1 })
-      .limit(1);
-
+    // FIXED: Better animal ID generation with proper error handling
     let nextNumber = 1;
-    if (lastAnimal.length > 0 && lastAnimal[0].animalId) {
-      const lastIdParts = lastAnimal[0].animalId.split('-');
-      nextNumber = parseInt(lastIdParts[2]) + 1;
-    }
+    let animalId;
+    let attempts = 0;
+    const maxAttempts = 10;
 
-    const animalId = `MO-${animalType.typeId}-${String(nextNumber).padStart(3, '0')}`;
+    do {
+      // Get the highest animal ID for this type
+      const lastAnimal = await Animal.findOne({ 
+        type: animalType._id,
+        animalId: new RegExp(`^MO-${animalType.typeId}-`)
+      })
+      .sort({ animalId: -1 })
+      .select('animalId');
+
+      if (lastAnimal && lastAnimal.animalId) {
+        const lastIdParts = lastAnimal.animalId.split('-');
+        if (lastIdParts.length === 3) {
+          const lastNumber = parseInt(lastIdParts[2]);
+          if (!isNaN(lastNumber)) {
+            nextNumber = lastNumber + 1;
+          }
+        }
+      }
+
+      animalId = `MO-${animalType.typeId}-${String(nextNumber).padStart(3, '0')}`;
+      
+      // Check if this ID already exists (double-check)
+      const existingAnimal = await Animal.findOne({ animalId });
+      if (!existingAnimal) {
+        break; // ID is available
+      }
+      
+      nextNumber++;
+      attempts++;
+      
+    } while (attempts < maxAttempts);
+
+    if (attempts >= maxAttempts) {
+      return res.status(500).json({ 
+        message: 'Failed to generate unique animal ID after multiple attempts' 
+      });
+    }
 
     const animal = new Animal({ 
       type: animalType._id, 
@@ -62,11 +144,57 @@ export const createAnimal = async (req, res) => {
     res.status(201).json(animal);
   } catch (error) {
     console.error('Create animal error:', error);
+    if (error.code === 11000) {
+      // If we still get a duplicate error, try one more time with a different approach
+      try {
+        // Emergency fallback: find the absolute highest number across all animals
+        const allAnimals = await Animal.find({
+          animalId: new RegExp(`^MO-${animalType.typeId}-`)
+        }).select('animalId');
+        
+        let maxNumber = 0;
+        allAnimals.forEach(animal => {
+          const parts = animal.animalId.split('-');
+          if (parts.length === 3) {
+            const num = parseInt(parts[2]);
+            if (!isNaN(num) && num > maxNumber) {
+              maxNumber = num;
+            }
+          }
+        });
+        
+        const animalId = `MO-${animalType.typeId}-${String(maxNumber + 1).padStart(3, '0')}`;
+        
+        // Retry with the new ID
+        const animal = new Animal({ 
+          type: animalType._id, 
+          data, 
+          qrCode, 
+          animalId,
+          assignedZone: zoneId || null,
+          batchId: batchId || null
+        });
+        
+        await animal.save();
+        
+        if (zoneId) {
+          await updateZoneOccupancy(zoneId, 1);
+        }
+        
+        
+        return res.status(201).json(animal.toObject());
+      } catch (fallbackError) {
+        return res.status(500).json({ 
+          message: 'Critical error in animal ID generation',
+          error: fallbackError.message 
+        });
+      }
+    }
     res.status(400).json({ message: error.message });
   }
 };
 
-// Create batch animals - UPDATED: Don't generate individual QR codes
+// Create batch animals - FIXED: Create only ONE record for the entire batch
 export const createBatchAnimals = async (req, res) => {
   try {
     const { type, data, zoneId, batchId, count, generateQR } = req.body;
@@ -90,42 +218,43 @@ export const createBatchAnimals = async (req, res) => {
       }
     }
 
-    const animals = [];
+    // Generate batch ID if not provided
     const batchIdentifier = batchId || `BATCH-${Date.now()}`;
-    
-    // Get last animal ID to start numbering from there
-    const lastAnimal = await Animal.find({ type: animalType._id })
-      .sort({ createdAt: -1 })
-      .limit(1);
+
+    // Generate a single animal ID for the entire batch
+    const lastAnimal = await Animal.findOne({ type: animalType._id })
+      .sort({ animalId: -1 })
+      .select('animalId');
 
     let nextNumber = 1;
-    if (lastAnimal.length > 0 && lastAnimal[0].animalId) {
-      const lastIdParts = lastAnimal[0].animalId.split('-');
-      nextNumber = parseInt(lastIdParts[2]) + 1;
+    if (lastAnimal && lastAnimal.animalId) {
+      const lastIdParts = lastAnimal.animalId.split('-');
+      if (lastIdParts.length >= 3) {
+        const lastNumber = parseInt(lastIdParts[2]);
+        if (!isNaN(lastNumber)) {
+          nextNumber = lastNumber + 1;
+        }
+      }
     }
 
-    // Create all animals in the batch - NO individual QR codes for batch animals
-    for (let i = 0; i < count; i++) {
-      const animalId = `MO-${animalType.typeId}-${String(nextNumber + i).padStart(3, '0')}`;
-      
-      const animal = new Animal({
-        type: animalType._id,
-        data: { 
-          ...data, 
-          batchNumber: i + 1, // Add batch position to data
-          batchId: batchIdentifier // Also store batch ID in data for easy filtering
-        },
-        qrCode: null, // No individual QR codes for batch animals
-        animalId,
-        assignedZone: zoneId || null,
+    const animalId = `MO-${animalType.typeId}-${String(nextNumber).padStart(3, '0')}`;
+
+    // Create ONLY ONE animal record for the entire batch
+    const animal = new Animal({
+      type: animalType._id,
+      data: { 
+        ...data, 
         batchId: batchIdentifier
-      });
-      
-      animals.push(animal);
-    }
+      },
+      qrCode: batchIdentifier, // Use batch ID as QR code
+      animalId,
+      assignedZone: zoneId || null,
+      batchId: batchIdentifier,
+      count: count, // Store the total count
+      isBatch: true // Mark as batch record
+    });
 
-    // Save all animals
-    await Animal.insertMany(animals);
+    await animal.save();
 
     // Update zone occupancy if zone is assigned
     if (zoneId) {
@@ -133,18 +262,26 @@ export const createBatchAnimals = async (req, res) => {
     }
 
     res.status(201).json({
-      message: `Created ${count} animals in batch ${batchIdentifier}`,
+      message: `Created batch of ${count} animals`,
       batchId: batchIdentifier,
       animalsCount: count,
-      batchQRCode: batchIdentifier // Use batch ID as the QR code for the entire batch
+      animal: animal, // Return the single animal record
+      batchQRCode: batchIdentifier
     });
   } catch (error) {
     console.error('Create batch animals error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Duplicate animal ID. Please try again.',
+        error: error.message 
+      });
+    }
     res.status(400).json({ message: error.message });
   }
 };
 
 // Get all animals (optionally filtered by type) - FIXED: Proper population
+// Get all animals (optionally filtered by type)
 export const getAnimals = async (req, res) => {
   try {
     const query = {};
@@ -162,12 +299,29 @@ export const getAnimals = async (req, res) => {
       query.type = typeDoc._id;
     }
     
-    // FIXED: Properly populate assignedZone field
     const animals = await Animal.find(query)
       .populate('type')
-      .populate('assignedZone');
+      .populate('assignedZone')
+      .sort({ isBatch: 1, createdAt: -1 }); // Sort batch records first
     
-    res.json(animals);
+    // Transform the data for frontend
+    const transformedAnimals = animals.map(animal => {
+      const animalObj = animal.toObject();
+      
+      // For batch animals, show count instead of individual animal
+      if (animal.isBatch) {
+        return {
+          ...animalObj,
+          // This will make it display as "Batch: ID" with the count
+          displayId: `Batch: ${animal.animalId}`,
+          count: animal.count
+        };
+      }
+      
+      return animalObj;
+    });
+    
+    res.json(transformedAnimals);
   } catch (error) {
     console.error('Get animals error:', error);
     res.status(500).json({ message: error.message });
@@ -245,17 +399,85 @@ export const deleteAnimal = async (req, res) => {
     const animal = await Animal.findById(req.params.id);
     if (!animal) return res.status(404).json({ message: 'Animal not found' });
 
-    // Store zone ID before deletion
+    // Store zone ID and batch ID before deletion
     const zoneId = animal.assignedZone;
+    const batchId = animal.batchId;
+    const animalId = animal._id;
 
-    await Animal.findByIdAndDelete(req.params.id);
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Update zone occupancy if animal was assigned to a zone
-    if (zoneId) {
-      await updateZoneOccupancy(zoneId.toString(), -1);
+    try {
+      // 1. Delete the animal record
+      await Animal.findByIdAndDelete(req.params.id, { session });
+
+      // 2. Delete productivity records for this specific animal
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const productivityResult = await AnimalProductivity.deleteMany({ animalId }, { session });
+      console.log(`Deleted ${productivityResult.deletedCount} productivity records for animal ${animalId}`);
+
+      // 3. Delete feeding history records for this animal
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ animalId }, { session });
+      console.log(`Deleted ${feedingResult.deletedCount} feeding history records for animal ${animalId}`);
+
+      // 4. Delete harvest history records if this animal has any
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ 
+        $or: [
+          { animalId: animalId },
+          { batchId: batchId }
+        ]
+      }, { session });
+      console.log(`Deleted ${harvestResult.deletedCount} harvest records for animal ${animalId}`);
+
+      // 5. Delete meat productivity records if this animal has any
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ 
+        $or: [
+          { animalId: animalId },
+          { batchId: batchId }
+        ]
+      }, { session });
+      console.log(`Deleted ${meatResult.deletedCount} meat productivity records for animal ${animalId}`);
+
+      // 6. Delete notifications related to this animal
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        'relatedEntity.id': animalId
+      }, { session });
+      console.log(`Deleted ${notificationResult.deletedCount} notifications for animal ${animalId}`);
+
+      // 3. Update zone occupancy if animal was assigned to a zone
+      if (zoneId) {
+        await updateZoneOccupancy(zoneId.toString(), -1);
+        console.log(`Updated zone ${zoneId} occupancy by -1`);
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: 'Animal deleted successfully',
+        details: {
+          productivityRecords: productivityResult.deletedCount,
+          feedingRecords: feedingResult.deletedCount,
+          harvestRecords: harvestResult.deletedCount,
+          meatRecords: meatResult.deletedCount,
+          notifications: notificationResult.deletedCount,
+          zoneOccupancyReduced: 1
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
     }
 
-    res.json({ message: 'Animal deleted successfully' });
   } catch (error) {
     console.error('Delete animal error:', error);
     res.status(500).json({ message: error.message });
@@ -263,39 +485,382 @@ export const deleteAnimal = async (req, res) => {
 };
 
 // Delete batch animals
+// Delete batch animals - FIXED: Handle count properly
 export const deleteBatchAnimals = async (req, res) => {
   try {
     const { batchId } = req.params;
     
-    // Get all animals in the batch
-    const batchAnimals = await Animal.find({ batchId });
-    if (batchAnimals.length === 0) {
+    // Find the batch animal record
+    const batchAnimal = await Animal.findOne({ batchId, isBatch: true });
+    if (!batchAnimal) {
       return res.status(404).json({ message: 'Batch not found' });
     }
 
-    // Group animals by zone for efficient occupancy updates
-    const zoneCounts = {};
-    batchAnimals.forEach(animal => {
-      if (animal.assignedZone) {
-        const zoneId = animal.assignedZone.toString();
-        zoneCounts[zoneId] = (zoneCounts[zoneId] || 0) + 1;
+    // Store zone ID and count before deletion
+    const zoneId = batchAnimal.assignedZone;
+    const count = batchAnimal.count || 1; // Ensure count is at least 1
+    const animalType = batchAnimal.type;
+    
+    console.log(`Deleting batch ${batchId}: count=${count}, zoneId=${zoneId}`);
+
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // 1. Delete all individual animals in this batch (if any exist)
+      const individualAnimals = await Animal.find({ batchId, isBatch: false });
+      const individualCount = individualAnimals.length;
+      
+      if (individualCount > 0) {
+        await Animal.deleteMany({ batchId, isBatch: false }, { session });
+        console.log(`Deleted ${individualCount} individual animals from batch ${batchId}`);
+      }
+
+      // 2. Delete the batch record
+      await Animal.findByIdAndDelete(batchAnimal._id, { session });
+
+      // 3. Delete all productivity records for this batch (total/day/week/month/year)
+      const productivityDeletedCount = await deleteAllProductivityRecords(batchId, batchAnimal, individualAnimals, session);
+      
+      // Verify all productivity records are deleted
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const remainingProductivity = await AnimalProductivity.find({
+        $or: [
+          { batchId: batchId },
+          { animalId: batchAnimal._id },
+          { animalId: { $in: individualAnimals.map(a => a._id) } }
+        ]
+      });
+      
+      if (remainingProductivity.length > 0) {
+        console.log(`WARNING: ${remainingProductivity.length} productivity records still exist after deletion!`);
+        console.log('Remaining records:', remainingProductivity.map(r => ({ id: r._id, batchId: r.batchId, animalId: r.animalId })));
+      } else {
+        console.log(`✅ All productivity records successfully deleted for batch ${batchId}`);
+      }
+
+      // 4. Delete all harvest history records for this batch
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ batchId }, { session });
+      console.log(`Deleted ${harvestResult.deletedCount} harvest records for batch ${batchId}`);
+
+      // 5. Delete all meat productivity records for this batch
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ batchId }, { session });
+      console.log(`Deleted ${meatResult.deletedCount} meat productivity records for batch ${batchId}`);
+
+      // 6. Delete all feeding history records for individual animals in this batch
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ 
+        animalId: { $in: individualAnimals.map(a => a._id) } 
+      }, { session });
+      console.log(`Deleted ${feedingResult.deletedCount} feeding history records for batch ${batchId}`);
+
+      // 7. Delete all notifications related to this batch
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        $or: [
+          { 'relatedEntity.id': { $in: individualAnimals.map(a => a._id) } },
+          { 'relatedEntity.id': batchAnimal._id }
+        ]
+      }, { session });
+      console.log(`Deleted ${notificationResult.deletedCount} notifications for batch ${batchId}`);
+
+      // 6. Update zone occupancy if batch was assigned to a zone
+      if (zoneId) {
+        console.log(`Updating zone ${zoneId} occupancy by -${count} (current count: ${count})`);
+        const updatedZone = await updateZoneOccupancy(zoneId.toString(), -count);
+        console.log(`Zone ${zoneId} occupancy updated: ${updatedZone.currentOccupancy}/${updatedZone.capacity}`);
+      } else {
+        console.log(`No zone assigned to batch ${batchId}, skipping zone update`);
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: `Successfully deleted batch ${batchId}`,
+        details: {
+          batchAnimals: count,
+          individualAnimals: individualCount,
+          productivityRecords: productivityDeletedCount,
+          harvestRecords: harvestResult.deletedCount,
+          meatRecords: meatResult.deletedCount,
+          feedingRecords: feedingResult.deletedCount,
+          notifications: notificationResult.deletedCount,
+          zoneOccupancyReduced: count
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+
+  } catch (error) {
+    console.error('Delete batch animals error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete all animals of a specific type (cascading delete for animal type deletion)
+export const deleteAnimalsByType = async (req, res) => {
+  try {
+    const { animalTypeId } = req.params;
+    
+    // Find all animals of this type
+    const animals = await Animal.find({ type: animalTypeId });
+    if (animals.length === 0) {
+      return res.json({ 
+        message: 'No animals found for this type',
+        details: { deletedCount: 0 }
+      });
+    }
+
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      let totalZoneOccupancyReduced = 0;
+      let totalProductivityRecords = 0;
+      let totalHarvestRecords = 0;
+      let totalMeatRecords = 0;
+      const batchIds = new Set();
+
+      // Collect batch IDs and count zone occupancy
+      animals.forEach(animal => {
+        if (animal.batchId) {
+          batchIds.add(animal.batchId);
+        }
+        if (animal.assignedZone) {
+          totalZoneOccupancyReduced += animal.count || 1;
+        }
+      });
+
+      // 1. Delete all animals of this type
+      await Animal.deleteMany({ type: animalTypeId }, { session });
+      console.log(`Deleted ${animals.length} animals of type ${animalTypeId}`);
+
+      // 2. Delete productivity records for all animals of this type
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const productivityResult = await AnimalProductivity.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      totalProductivityRecords = productivityResult.deletedCount;
+      console.log(`Deleted ${totalProductivityRecords} productivity records`);
+
+      // 3. Delete feeding history records for all animals of this type
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      const totalFeedingRecords = feedingResult.deletedCount;
+      console.log(`Deleted ${totalFeedingRecords} feeding history records`);
+
+      // 4. Delete harvest history records for all batches of this type
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalHarvestRecords = harvestResult.deletedCount;
+      console.log(`Deleted ${totalHarvestRecords} harvest records`);
+
+      // 5. Delete meat productivity records for all batches of this type
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalMeatRecords = meatResult.deletedCount;
+      console.log(`Deleted ${totalMeatRecords} meat productivity records`);
+
+      // 6. Delete all notifications related to this animal type
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        $or: [
+          { 'relatedEntity.id': { $in: animals.map(a => a._id) } },
+          { 'relatedEntity.type': 'animal' }
+        ]
+      }, { session });
+      const totalNotifications = notificationResult.deletedCount;
+      console.log(`Deleted ${totalNotifications} notifications for animal type ${animalTypeId}`);
+
+      // 5. Update zone occupancy for all affected zones
+      const zoneUpdates = {};
+      animals.forEach(animal => {
+        if (animal.assignedZone) {
+          const zoneId = animal.assignedZone.toString();
+          zoneUpdates[zoneId] = (zoneUpdates[zoneId] || 0) + (animal.count || 1);
+        }
+      });
+
+      for (const [zoneId, count] of Object.entries(zoneUpdates)) {
+        await updateZoneOccupancy(zoneId, -count);
+        console.log(`Updated zone ${zoneId} occupancy by -${count}`);
+      }
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: `Successfully deleted all animals of type ${animalTypeId}`,
+        details: {
+          animalsDeleted: animals.length,
+          productivityRecords: totalProductivityRecords,
+          feedingRecords: totalFeedingRecords,
+          harvestRecords: totalHarvestRecords,
+          meatRecords: totalMeatRecords,
+          notifications: totalNotifications,
+          zoneOccupancyReduced: totalZoneOccupancyReduced,
+          affectedZones: Object.keys(zoneUpdates).length
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+
+  } catch (error) {
+    console.error('Delete animals by type error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete entire animal type and ALL related data (PERMANENT DELETION)
+export const deleteAnimalTypeCompletely = async (req, res) => {
+  try {
+    const { animalTypeId } = req.params;
+    
+    // First, get the animal type to get its name
+    const animalType = await AnimalType.findById(animalTypeId);
+    if (!animalType) {
+      return res.status(404).json({ message: 'Animal type not found' });
+    }
+    
+    // Find all animals of this type
+    const animals = await Animal.find({ type: animalTypeId });
+    const batchIds = new Set();
+    animals.forEach(animal => {
+      if (animal.batchId) {
+        batchIds.add(animal.batchId);
       }
     });
 
-    // Delete all animals in the batch
-    await Animal.deleteMany({ batchId });
+    // Start a transaction for cascading deletes
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Update occupancy for all affected zones
-    for (const [zoneId, count] of Object.entries(zoneCounts)) {
-      await updateZoneOccupancy(zoneId, -count);
+    try {
+      let totalZoneOccupancyReduced = 0;
+      let totalProductivityRecords = 0;
+      let totalFeedingRecords = 0;
+      let totalHarvestRecords = 0;
+      let totalMeatRecords = 0;
+      let totalNotifications = 0;
+
+      // 1. Delete all animals of this type
+      await Animal.deleteMany({ type: animalTypeId }, { session });
+      console.log(`Deleted ${animals.length} animals of type ${animalTypeId}`);
+
+      // 2. Delete productivity records for all animals of this type
+      const AnimalProductivity = (await import('../models/AnimalProductivity.js')).default;
+      const productivityResult = await AnimalProductivity.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      totalProductivityRecords = productivityResult.deletedCount;
+      console.log(`Deleted ${totalProductivityRecords} productivity records`);
+
+      // 3. Delete feeding history records for all animals of this type
+      const FeedingHistory = (await import('../models/feedingHistoryModel.js')).default;
+      const feedingResult = await FeedingHistory.deleteMany({ 
+        animalId: { $in: animals.map(a => a._id) } 
+      }, { session });
+      totalFeedingRecords = feedingResult.deletedCount;
+      console.log(`Deleted ${totalFeedingRecords} feeding history records`);
+
+      // 4. Delete harvest history records for all batches of this type
+      const HarvestHistory = (await import('../models/HarvestHistory.js')).default;
+      const harvestResult = await HarvestHistory.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalHarvestRecords = harvestResult.deletedCount;
+      console.log(`Deleted ${totalHarvestRecords} harvest records`);
+
+      // 5. Delete meat productivity records for all batches of this type
+      const MeatProductivity = (await import('../models/MeatProductivity.js')).default;
+      const meatResult = await MeatProductivity.deleteMany({ 
+        batchId: { $in: Array.from(batchIds) } 
+      }, { session });
+      totalMeatRecords = meatResult.deletedCount;
+      console.log(`Deleted ${totalMeatRecords} meat productivity records`);
+
+      // 6. Delete all notifications related to this animal type
+      const Notification = (await import('../models/Notification.js')).default;
+      const notificationResult = await Notification.deleteMany({
+        $or: [
+          { 'relatedEntity.id': { $in: animals.map(a => a._id) } },
+          { 'relatedEntity.type': 'animal' }
+        ]
+      }, { session });
+      totalNotifications = notificationResult.deletedCount;
+      console.log(`Deleted ${totalNotifications} notifications for animal type ${animalTypeId}`);
+
+      // 7. Update zone occupancy for all affected zones
+      const zoneUpdates = {};
+      animals.forEach(animal => {
+        if (animal.assignedZone) {
+          const zoneId = animal.assignedZone.toString();
+          zoneUpdates[zoneId] = (zoneUpdates[zoneId] || 0) + (animal.count || 1);
+          totalZoneOccupancyReduced += (animal.count || 1);
+        }
+      });
+
+      for (const [zoneId, count] of Object.entries(zoneUpdates)) {
+        await updateZoneOccupancy(zoneId, -count);
+        console.log(`Updated zone ${zoneId} occupancy by -${count}`);
+      }
+
+      // 8. Finally, delete the animal type itself
+      await AnimalType.findByIdAndDelete(animalTypeId, { session });
+      console.log(`Deleted animal type: ${animalType.name}`);
+
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({ 
+        message: `PERMANENTLY deleted animal type "${animalType.name}" and ALL related data`,
+        details: {
+          animalTypeDeleted: animalType.name,
+          animalsDeleted: animals.length,
+          productivityRecords: totalProductivityRecords,
+          feedingRecords: totalFeedingRecords,
+          harvestRecords: totalHarvestRecords,
+          meatRecords: totalMeatRecords,
+          notifications: totalNotifications,
+          zoneOccupancyReduced: totalZoneOccupancyReduced,
+          affectedZones: Object.keys(zoneUpdates).length,
+          warning: "This action is PERMANENT and cannot be undone!"
+        }
+      });
+
+    } catch (transactionError) {
+      // Rollback the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
     }
 
-    res.json({ 
-      message: `Deleted ${batchAnimals.length} animals from batch ${batchId}`,
-      deletedCount: batchAnimals.length
-    });
   } catch (error) {
-    console.error('Delete batch animals error:', error);
+    console.error('Delete animal type completely error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -511,5 +1076,70 @@ export const updateBatchAnimals = async (req, res) => {
   } catch (error) {
     console.error('Update batch animals error:', error);
     res.status(400).json({ message: error.message });
+  }
+};
+
+// Get animal/batch data by QR code
+export const getAnimalByQRCode = async (req, res) => {
+  try {
+    const { qrCode } = req.params;
+    
+    console.log('QR Code search request:', qrCode);
+    
+    if (!qrCode) {
+      return res.status(400).json({ message: 'QR code is required' });
+    }
+
+    // Search for animal by QR code (could be animalId, batchId, qrCode field, or MongoDB ObjectId)
+    const searchConditions = [
+      { animalId: qrCode },
+      { batchId: qrCode },
+      { qrCode: qrCode }
+    ];
+    
+    // If the QR code looks like a MongoDB ObjectId, also search by _id
+    if (mongoose.Types.ObjectId.isValid(qrCode)) {
+      searchConditions.push({ _id: qrCode });
+      console.log('QR code is valid ObjectId, searching by _id as well');
+    }
+    
+    console.log('Search conditions:', searchConditions);
+    
+    const animal = await Animal.findOne({
+      $or: searchConditions
+    }).populate('type', 'name typeId managementType')
+      .populate('assignedZone', 'name type capacity currentOccupancy');
+      
+    console.log('Found animal:', animal ? 'Yes' : 'No');
+
+    if (!animal) {
+      return res.status(404).json({ 
+        message: 'Animal or batch not found with this QR code',
+        qrCode: qrCode
+      });
+    }
+
+    // Format the response data
+    const responseData = {
+      _id: animal._id,
+      animalId: animal.animalId,
+      batchId: animal.batchId,
+      qrCode: animal.qrCode || animal.animalId || animal.batchId,
+      type: animal.type,
+      data: animal.data,
+      assignedZone: animal.assignedZone,
+      count: animal.count || 1,
+      isBatch: animal.isBatch || false,
+      createdAt: animal.createdAt,
+      updatedAt: animal.updatedAt
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('Get animal by QR code error:', error);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message 
+    });
   }
 };

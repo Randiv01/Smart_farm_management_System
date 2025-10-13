@@ -7,24 +7,27 @@ import { OvertimeMonitor } from "./pages/E-OvertimeMonitor";
 import { SalaryDesk } from "./pages/E-SalaryDesk";
 import { EmployeeReportCenter } from "./pages/E-EmployeeReportCenter";
 import { SystemSettings } from "./pages/E-SystemSettings";
+import { useETheme } from './Econtexts/EThemeContext.jsx';
 
-export const ModulePanel = ({ module, darkMode, onClose }) => {
+export const ModulePanel = ({ module, onClose }) => {
+  const { theme } = useETheme();
+  const darkMode = theme === 'dark';
   const renderModule = () => {
     switch (module) {
       case "staff":
-        return <StaffHub darkMode={darkMode} />;
+        return <StaffHub />;
       case "attendance":
-        return <AttendanceTracker darkMode={darkMode} />;
+        return <AttendanceTracker />;
       case "leave":
-        return <LeavePlanner darkMode={darkMode} />;
+        return <LeavePlanner />;
       case "overtime":
-        return <OvertimeMonitor darkMode={darkMode} />;
+        return <OvertimeMonitor />;
       case "salary":
-        return <SalaryDesk darkMode={darkMode} />;
+        return <SalaryDesk />;
       case "reports":
-        return <EmployeeReportCenter darkMode={darkMode} />;
+        return <EmployeeReportCenter />;
       case "settings":
-        return <SystemSettings darkMode={darkMode} />;
+        return <SystemSettings />;
       default:
         return <div>Module not found</div>;
     }

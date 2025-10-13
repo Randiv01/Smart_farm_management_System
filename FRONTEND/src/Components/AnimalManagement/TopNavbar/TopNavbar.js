@@ -12,18 +12,23 @@ import {
   BotIcon,
   GripVerticalIcon,
   SearchIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  QrCode
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext.js";
 import { useUser } from "../contexts/UserContext.js";
+import { useNotifications } from "../contexts/NotificationContext.js";
 import { useNavigate } from "react-router-dom";
+import QRScanner from "../QRScanner/QRScanner.jsx";
 
 const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   const { theme, toggleTheme } = useTheme();
   const darkMode = theme === "dark";
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const { userData, isLoading } = useUser();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
@@ -237,11 +242,9 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
   // Helper function to get proper image URL
   const getProfileImageUrl = (path) => {
     if (!path) return null;
-    if (path.includes("http")) return path;
-    const cleanPath = path.replace(/\\/g, "/");
-    const parts = cleanPath.split("/");
-    const filename = parts[parts.length - 1];
-    return `http://localhost:5000/api/users/profile-image/${filename}`;
+    // The path from context will now include the cache-buster, which is fine.
+    const baseUrl = "http://localhost:5000";
+    return `${baseUrl}${path}`;
   };
 
   // Handle FAQ question click
@@ -436,6 +439,19 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
             )}
           </button>
 
+          {/* QR Scanner Button */}
+          <button
+            onClick={() => setQrScannerOpen(true)}
+            className={`p-2 rounded-md outline-none transition-colors ${
+              darkMode 
+                ? "hover:bg-gray-700 text-gray-200 hover:text-green-400" 
+                : "hover:bg-gray-100 text-gray-600 hover:text-green-600"
+            }`}
+            title="Scan QR Code"
+          >
+            <QrCode size={20} />
+          </button>
+
           <div className="relative">
             <button
               className={`p-2 rounded-full relative outline-none ${
@@ -446,7 +462,11 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
               onClick={() => setNotificationsOpen(!notificationsOpen)}
             >
               <BellIcon size={20} />
-              <span className="absolute top-1 right-1 bg-[#E67E22] rounded-full w-2 h-2"></span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
             {notificationsOpen && (
               <div
@@ -456,32 +476,96 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                     : "bg-white border border-gray-200"
                 }`}
               >
-                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                   <p
                     className={`text-sm font-medium ${
                       darkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
                     Notifications
+                    {unreadCount > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                        {unreadCount}
+                      </span>
+                    )}
                   </p>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className={`text-xs ${
+                        darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-500"
+                      }`}
+                    >
+                      Mark all read
+                    </button>
+                  )}
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  <div className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <p
-                      className={`text-sm ${
-                        darkMode ? "text-gray-200" : "text-gray-800"
-                      }`}
-                    >
-                      System is running smoothly.
-                    </p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        darkMode ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    >
-                      Just now
-                    </p>
-                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-3 text-center">
+                      <p
+                        className={`text-sm ${
+                          darkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        No notifications
+                      </p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 5).map((notification) => (
+                      <div
+                        key={notification._id}
+                        className={`px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-l-4 ${
+                          notification.priority === 'critical' ? 'border-red-500' :
+                          notification.priority === 'high' ? 'border-orange-500' :
+                          notification.priority === 'medium' ? 'border-yellow-500' :
+                          'border-blue-500'
+                        } ${!notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                        onClick={() => {
+                          if (!notification.read) {
+                            markAsRead(notification._id);
+                          }
+                        }}
+                      >
+                        <p
+                          className={`text-sm font-medium ${
+                            darkMode ? "text-white" : "text-gray-800"
+                          }`}
+                        >
+                          {notification.title}
+                        </p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            darkMode ? "text-gray-300" : "text-gray-600"
+                          }`}
+                        >
+                          {notification.message}
+                        </p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            darkMode ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          {notification.timeAgo || notification.formattedTime || 'Unknown time'}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                  {notifications.length > 5 && (
+                    <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-center">
+                      <button
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          navigate('/AnimalManagement/alerts');
+                        }}
+                        className={`text-sm ${
+                          darkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-500"
+                        }`}
+                      >
+                        View all notifications
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -778,12 +862,14 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
                 }`}
               >
                 {userData.profileImage ? (
-                  <img
+                 <img
                     src={getProfileImageUrl(userData.profileImage)}
                     alt="Profile"
                     className="w-full h-full object-cover"
                     onError={(e) => {
+                      // This is a good fallback, keep it
                       e.target.style.display = "none";
+                      // You can also show an icon inside the parent div here
                     }}
                   />
                 ) : (
@@ -883,6 +969,12 @@ const TopNavbar = ({ onMenuClick, sidebarOpen }) => {
           </div>
         </div>
       </div>
+      
+      {/* QR Scanner Modal */}
+      <QRScanner 
+        isOpen={qrScannerOpen} 
+        onClose={() => setQrScannerOpen(false)} 
+      />
     </header>
   );
 };

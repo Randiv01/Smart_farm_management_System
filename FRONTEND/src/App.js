@@ -20,6 +20,7 @@ import { LanguageProvider as HLanguageProvider } from "./Components/HealthManage
 import { ThemeProvider as HThemeProvider } from "./Components/HealthManagement/H_contexts/H_ThemeContext.js";
 import { ThemeProvider as HealthThemeProvider } from "./Components/HealthManagement/ThemeProvider/ThemeProvider.js";
 
+
 // ----------------- User Components -----------------
 import CartSidebar from "./Components/UserHome/UHCartSidebar/CartSidebar.jsx";
 import Navbar from "./Components/UserHome/UHNavbar/UHNavbar.jsx";
@@ -58,6 +59,7 @@ import AnimalZones from "./Components/AnimalManagement/AnimalZones/AnimalZones.j
 import Productivity from "./Components/AnimalManagement/Productivity/Productivity.jsx";
 import Settings from "./Components/AnimalManagement/Settings/Settings.jsx";
 import Alerts from "./Components/AnimalManagement/Alerts/Alerts.jsx";
+import MeatManagement from "./Components/AnimalManagement/MeatManagement/MeatManagement.jsx";
 
 // ----------------- Inventory Management -----------------
 import ILayout from "./Components/InventoryManagement/Ilayout/ILayout.jsx";
@@ -67,8 +69,10 @@ import Orders from "./Components/InventoryManagement/Ipages/Orders.jsx";
 import Expiry from "./Components/InventoryManagement/Ipages/expiry.jsx";
 import AnimalFoodStock from "./Components/InventoryManagement/Ipages/AnimalFoodstock.jsx";
 import FertilizerStock from "./Components/InventoryManagement/Ipages/FertilizerStock.jsx";
+import ExportMarket from "./Components/InventoryManagement/Ipages/ExportMarket.jsx";
 import ISupplier from "./Components/InventoryManagement/Ipages/ISupplier.jsx";
 import ISettings from "./Components/InventoryManagement/Ipages/ISettings.jsx";
+import INotifications from "./Components/InventoryManagement/Ipages/INotifications.jsx";
 
 <<<<<<< Updated upstream
 // ----------------- Employee Management -----------------
@@ -80,7 +84,7 @@ import { ELeavePlanner } from "./Components/EmployeeManagement/pages/E-LeavePlan
 import { OvertimeMonitor as EOvertimeMonitor } from "./Components/EmployeeManagement/pages/E-OvertimeMonitor.js";
 import { SalaryDesk as ESalaryDesk } from "./Components/EmployeeManagement/pages/E-SalaryDesk.js";
 import { EEmployeeReportCenter } from "./Components/EmployeeManagement/pages/E-EmployeeReportCenter.js";
-import { SystemSettings as ESystemSettings } from "./Components/EmployeeManagement/pages/E-SystemSettings.js";
+import  ESystemSettings  from "./Components/EmployeeManagement/pages/E-SystemSettings.js";
 
 // NEW: Fertiliser Companies page
 import FertiliserCompanies from './Components/HealthManagement/PlantPathologistPart/FertiliserCompanies.js';
@@ -225,8 +229,8 @@ function App() {
                             <Route path="/contact" element={<ContactUs />} />
 
                             {/* ----------------- Customer Protected ----------------- */}
-                            <Route path="/profile" element={<UserProtectedRoute><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
-                            <Route path="/orders" element={<UserProtectedRoute><><Navbar /><MyOrders /></></UserProtectedRoute>} />
+                            <Route path="/profile" element={<UserProtectedRoute customerOnly={true}><><Navbar /><CustomerProfile /></></UserProtectedRoute>} />
+                            <Route path="/orders" element={<UserProtectedRoute customerOnly={true}><><Navbar /><MyOrders /></></UserProtectedRoute>} />
 
                             {/* ----------------- Animal Management ----------------- */}
                             <Route path="/AnimalManagement/*" element={
@@ -246,6 +250,7 @@ function App() {
                               <Route path="settings" element={<Settings />} />
                               <Route path="alerts" element={<Alerts />} />
                               <Route path=":type" element={<AnimalList />} />
+                              <Route path="MeatManagement" element={<MeatManagement />} />
                             </Route>
 
                             {/* ----------------- Inventory Management ----------------- */}
@@ -260,7 +265,9 @@ function App() {
                               <Route path="expiry" element={<Expiry />} />
                               <Route path="animalfood" element={<AnimalFoodStock />} />
                               <Route path="FertilizerStock" element={<FertilizerStock />} />
+                              <Route path="export" element={<ExportMarket />} />
                               <Route path="isuppliers" element={<ISupplier />} />
+                              <Route path="notification" element={<INotifications />} />
                               <Route path="isettings" element={<ISettings />} />
                             </Route>
 
