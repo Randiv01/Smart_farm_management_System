@@ -15,11 +15,13 @@ import {
   X
 } from 'lucide-react';
 import { useTheme } from '../../AnimalManagement/contexts/ThemeContext.js';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const ProductivityNotifications = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const darkMode = theme === 'dark';
+  const navigate = useNavigate();
   
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,27 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
   const [realProductivityData, setRealProductivityData] = useState([]);
   const [realMeatData, setRealMeatData] = useState([]);
   const [loadingRealData, setLoadingRealData] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Load persisted read status from localStorage
+  const getPersistedReadStatus = () => {
+    try {
+      const persisted = localStorage.getItem('productivity_notifications_read');
+      return persisted ? JSON.parse(persisted) : [];
+    } catch (error) {
+      console.error('Error loading persisted read status:', error);
+      return [];
+    }
+  };
+
+  // Save read status to localStorage
+  const persistReadStatus = (readIds) => {
+    try {
+      localStorage.setItem('productivity_notifications_read', JSON.stringify(readIds));
+    } catch (error) {
+      console.error('Error persisting read status:', error);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -40,6 +63,57 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
       fetchRealProductivityData();
     }
   }, [isOpen]);
+
+  // Listen for notification events from other components
+  useEffect(() => {
+    const handleNotificationRead = (event) => {
+      const { notificationId, unreadCount: newUnreadCount, type } = event.detail;
+      
+      if (type === 'single' || type === 'revert') {
+        // Update the specific notification
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === notificationId 
+              ? { ...notification, read: type === 'single' }
+              : notification
+          )
+        );
+        setUnreadCount(newUnreadCount);
+      }
+    };
+
+    const handleAllNotificationsRead = (event) => {
+      const { unreadCount: newUnreadCount } = event.detail;
+      
+      // Mark all productivity notifications as read
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, read: true }))
+      );
+      setUnreadCount(0);
+    };
+
+    const handleNotificationDeleted = (event) => {
+      const { notificationId, wasUnread, unreadCount: newUnreadCount } = event.detail;
+      
+      if (wasUnread) {
+        // Remove the notification and update count
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        setUnreadCount(newUnreadCount);
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('notificationRead', handleNotificationRead);
+    window.addEventListener('allNotificationsRead', handleAllNotificationsRead);
+    window.addEventListener('notificationDeleted', handleNotificationDeleted);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('notificationRead', handleNotificationRead);
+      window.removeEventListener('allNotificationsRead', handleAllNotificationsRead);
+      window.removeEventListener('notificationDeleted', handleNotificationDeleted);
+    };
+  }, []);
 
   // Fetch real productivity data from database
   const fetchRealProductivityData = async () => {
@@ -71,12 +145,222 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      setNotifications(response.data.notifications || []);
+      const notificationsData = response.data.notifications || [];
+      
+      // Apply persisted read status
+      const persistedReadIds = getPersistedReadStatus();
+      const notificationsWithPersistence = notificationsData.map(notification => ({
+        ...notification,
+        read: notification.read || persistedReadIds.includes(notification.id)
+      }));
+      
+      setNotifications(notificationsWithPersistence);
+      // Calculate unread count
+      const unreadNotifications = notificationsWithPersistence.filter(n => !n.read);
+      setUnreadCount(unreadNotifications.length);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError('Failed to fetch notifications');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Optimistic UI update
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+
+      // Emit custom event to notify other components
+      window.dispatchEvent(new CustomEvent('notificationRead', { 
+        detail: { 
+          notificationId, 
+          unreadCount: Math.max(0, unreadCount - 1),
+          type: 'single'
+        } 
+      }));
+      
+      // Persist to localStorage immediately
+      const persistedReadIds = getPersistedReadStatus();
+      if (!persistedReadIds.includes(notificationId)) {
+        const updatedReadIds = [...persistedReadIds, notificationId];
+        persistReadStatus(updatedReadIds);
+      }
+      
+      // Backend API call
+      await axios.patch(
+        `http://localhost:5000/api/notifications/productivity/${notificationId}/read`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+      // Revert optimistic update on error
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read: false }
+            : notification
+        )
+      );
+      setUnreadCount(prev => prev + 1);
+
+      // Emit custom event to revert the change
+      window.dispatchEvent(new CustomEvent('notificationRead', { 
+        detail: { 
+          notificationId, 
+          unreadCount: unreadCount + 1,
+          type: 'revert'
+        } 
+      }));
+      
+      // Remove from persisted read status on error
+      const persistedReadIds = getPersistedReadStatus();
+      const updatedReadIds = persistedReadIds.filter(id => id !== notificationId);
+      persistReadStatus(updatedReadIds);
+    }
+  };
+
+  // Handle notification click to mark as read and navigate
+  const handleNotificationClick = (notification, event) => {
+    // Prevent event bubbling to avoid conflicts
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    console.log('Notification clicked:', notification.id); // Debug log
+    
+    // Mark as read if unread
+    if (!notification.read) {
+      markAsRead(notification.id);
+    }
+    
+    // Close the modal first
+    onClose();
+    
+    // Use setTimeout to ensure modal is closed before navigation
+    setTimeout(() => {
+      console.log('Navigating to notifications page'); // Debug log
+      try {
+        // Ensure navigate function is available and route exists
+        if (navigate && typeof navigate === 'function') {
+          navigate('/InventoryManagement/notification');
+        } else {
+          console.error('Navigate function not available');
+          // Fallback: use window.location
+          window.location.href = '/InventoryManagement/notification';
+        }
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback: use window.location
+        window.location.href = '/InventoryManagement/notification';
+      }
+    }, 150); // Increased timeout slightly for better reliability
+  };
+
+  // Delete notification
+  const deleteNotification = async (notificationId, event) => {
+    event?.stopPropagation(); // Prevent triggering click to mark as read
+    
+    if (!window.confirm('Are you sure you want to delete this notification?')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const notification = notifications.find(n => n.id === notificationId);
+      
+      // Optimistic UI update
+      const wasUnread = !notification?.read;
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        
+        // Emit custom event to notify other components
+        window.dispatchEvent(new CustomEvent('notificationDeleted', { 
+          detail: { 
+            notificationId,
+            wasUnread: true,
+            unreadCount: Math.max(0, unreadCount - 1)
+          } 
+        }));
+      }
+      
+      // Remove from persisted read status
+      const persistedReadIds = getPersistedReadStatus();
+      const updatedReadIds = persistedReadIds.filter(id => id !== notificationId);
+      persistReadStatus(updatedReadIds);
+      
+      // Backend deletion
+      await axios.delete(
+        `http://localhost:5000/api/notifications/productivity/${notificationId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      // Revert optimistic update on error
+      fetchNotifications();
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Persist all unread IDs to localStorage
+      const persistedReadIds = getPersistedReadStatus();
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      const updatedReadIds = [...new Set([...persistedReadIds, ...unreadIds])];
+      persistReadStatus(updatedReadIds);
+      
+      // Optimistic UI update
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, read: true }))
+      );
+      setUnreadCount(0);
+
+      // Emit custom event to notify other components
+      window.dispatchEvent(new CustomEvent('allNotificationsRead', { 
+        detail: { 
+          unreadCount: 0,
+          type: 'markAllRead'
+        } 
+      }));
+      
+      // Use the new bulk endpoint
+      await axios.patch(
+        'http://localhost:5000/api/notifications/productivity/mark-all-read',
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      setError('Failed to mark all notifications as read');
     }
   };
 
@@ -101,6 +385,12 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
             : notification
         )
       );
+      
+      // If this was an unread notification, mark it as read and decrease unread count
+      const currentNotification = notifications.find(n => n.id === notificationId);
+      if (currentNotification && !currentNotification.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
       
       setEditingNotification(null);
       setEditForm({ quantity: '', notes: '', estimatedValue: '' });
@@ -236,16 +526,45 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode 
-                ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
-                : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <X className="h-6 w-6" />
-          </button>
+           <div className="flex items-center gap-3">
+             <button
+               onClick={() => {
+                 onClose();
+                 navigate('/InventoryManagement/notification');
+               }}
+               className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                 darkMode
+                   ? 'bg-gray-600 hover:bg-gray-700 text-white'
+                   : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+               }`}
+             >
+               <Package className="h-4 w-4" />
+               View All Notifications
+             </button>
+             {unreadCount > 0 && (
+               <button
+                 onClick={markAllAsRead}
+                 className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                   darkMode
+                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                     : 'bg-blue-600 hover:bg-blue-700 text-white'
+                 }`}
+               >
+                 <CheckCircle className="h-4 w-4" />
+                 Mark All Read
+               </button>
+             )}
+             <button
+               onClick={onClose}
+               className={`p-2 rounded-lg transition-colors ${
+                 darkMode 
+                   ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
+                   : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+               }`}
+             >
+               <X className="h-6 w-6" />
+             </button>
+           </div>
         </div>
 
         {/* Content */}
@@ -281,8 +600,11 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-6 rounded-xl border ${
-                    darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+                  onClick={(event) => handleNotificationClick(notification, event)}
+                  className={`p-6 rounded-xl border cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    notification.read 
+                      ? (darkMode ? 'bg-gray-600/50 border-gray-500 opacity-75' : 'bg-gray-50 border-gray-200 opacity-75')
+                      : (darkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50')
                   }`}
                 >
                   {/* Header */}
@@ -309,6 +631,25 @@ const ProductivityNotifications = ({ isOpen, onClose }) => {
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(notification.data.status)}`}>
                         {notification.data.status}
                       </span>
+                      {notification.read && (
+                        <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                          <Check className="h-3 w-3" />
+                          Read
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => deleteNotification(notification.id, e)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          darkMode 
+                            ? 'hover:bg-gray-600 text-gray-400 hover:text-red-400' 
+                            : 'hover:bg-gray-200 text-gray-600 hover:text-red-600'
+                        }`}
+                        title="Delete notification"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
 

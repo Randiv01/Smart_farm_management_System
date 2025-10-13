@@ -197,6 +197,11 @@ const Stock = () => {
 
   // Get status based on stock and expiry
   const getProductStatus = (product) => {
+    // Safety check: ensure product has required properties
+    if (!product || !product.expiryDate || !product.stock || typeof product.stock.quantity !== 'number') {
+      return "Unknown";
+    }
+    
     const days = calculateDaysUntilExpiry(product.expiryDate);
     const percentage = (product.stock.quantity / (product.stock.quantity + 10)) * 100; // Simplified for demo
     
@@ -209,6 +214,11 @@ const Stock = () => {
 
   // Prepare chart data for stock distribution (Pie Chart)
   const getStockChartData = () => {
+    // Safety check: ensure filteredProducts is an array
+    if (!filteredProducts || !Array.isArray(filteredProducts)) {
+      return [];
+    }
+    
     const critical = filteredProducts.filter(product => {
       const status = getProductStatus(product);
       return status === "Critical Stock" || status === "Expired";
@@ -233,6 +243,11 @@ const Stock = () => {
 
   // Prepare category-wise stock data (Bar Chart)
   const getCategoryWiseData = () => {
+    // Safety check: ensure filteredProducts is an array
+    if (!filteredProducts || !Array.isArray(filteredProducts)) {
+      return [];
+    }
+    
     const uniqueCategories = [...new Set(filteredProducts.map(product => product.category))];
 
     return uniqueCategories.map(category => {
@@ -264,6 +279,11 @@ const Stock = () => {
 
   // Filter and sort products
   const filteredAndSortedProducts = () => {
+    // Safety check: ensure inventory is an array
+    if (!inventory || !Array.isArray(inventory)) {
+      return [];
+    }
+    
     let filtered = inventory.filter(product =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -545,6 +565,11 @@ const Stock = () => {
 
   // Calculate summary stats
   const getSummary = () => {
+    // Safety check: ensure inventory is an array
+    if (!inventory || !Array.isArray(inventory)) {
+      return { totalProducts: 0, lowStock: 0, criticalStock: 0, expiringSoon: 0, expired: 0 };
+    }
+    
     const totalProducts = inventory.length;
     const lowStock = inventory.filter(product => {
       const status = getProductStatus(product);

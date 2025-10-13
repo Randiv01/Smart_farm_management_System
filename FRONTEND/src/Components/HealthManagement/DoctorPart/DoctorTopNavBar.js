@@ -5,8 +5,7 @@ import { useTheme } from "../H_contexts/H_ThemeContext.js";
 
 const DoctorTopNavBar = ({ onMenuClick, isCollapsed }) => {
   const { language, toggleLanguage } = useLanguage();
-  const { theme, toggleTheme } = useTheme();
-  const darkMode = theme === "dark";
+  const { darkMode, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // Match Admin widths: collapsed 80px, expanded 256px; topbar height 64px

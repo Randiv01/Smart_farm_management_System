@@ -32,6 +32,26 @@ export default function INotifications() {
   const [showRead, setShowRead] = useState(true);
   const [socket, setSocket] = useState(null);
 
+  // Load persisted read status from localStorage
+  const getPersistedReadStatus = () => {
+    try {
+      const persisted = localStorage.getItem('inventory_notifications_read');
+      return persisted ? JSON.parse(persisted) : [];
+    } catch (error) {
+      console.error('Error loading persisted read status:', error);
+      return [];
+    }
+  };
+
+  // Save read status to localStorage
+  const persistReadStatus = (readIds) => {
+    try {
+      localStorage.setItem('inventory_notifications_read', JSON.stringify(readIds));
+    } catch (error) {
+      console.error('Error persisting read status:', error);
+    }
+  };
+
   useEffect(() => {
     document.title = "Inventory Notifications - Inventory Manager";
     
@@ -95,18 +115,22 @@ export default function INotifications() {
       
       if (!token) return;
       
-      // Fetch both refill request notifications and general notifications for Inventory Management
-      const [refillResponse, generalResponse] = await Promise.all([
+      // Fetch refill request notifications, general notifications, and productivity notifications
+      const [refillResponse, generalResponse, productivityResponse] = await Promise.all([
         axios.get("http://localhost:5000/api/refill-requests/notifications", {
           headers: { Authorization: `Bearer ${token}` },
           params: { limit: 50 }
         }).catch(() => ({ data: [] })),
-        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } }))
+        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } })),
+        axios.get("http://localhost:5000/api/notifications/productivity", {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: { notifications: [] } }))
       ]);
       
-      // Combine both notification sources
+      // Combine all notification sources
       const refillNotifications = refillResponse.data || [];
       const generalNotifications = generalResponse.data?.data?.notifications || [];
+      const productivityNotifications = productivityResponse.data?.notifications || [];
       
       // Convert general notifications to match the expected format
       const convertedGeneralNotifications = generalNotifications.map(notification => ({
@@ -115,6 +139,27 @@ export default function INotifications() {
         message: notification.message,
         type: notification.type === 'success' ? 'harvest' : notification.type,
         priority: notification.type === 'success' ? 'medium' : 'low',
+        read: notification.read,
+        timestamp: notification.createdAt,
+        timeAgo: getTimeAgo(notification.createdAt),
+        formattedTime: new Date(notification.createdAt).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
+        data: notification.data
+      }));
+      
+      // Convert productivity notifications to match the expected format
+      const convertedProductivityNotifications = productivityNotifications.map(notification => ({
+        id: notification.id,
+        title: notification.data?.harvestType === 'meat' ? 'Meat Harvest Notification' : 'Productivity Harvest Notification',
+        message: `${notification.data?.senderName} reported ${notification.data?.quantity} ${notification.data?.unit} of ${notification.data?.productType} (${notification.data?.quality} quality)`,
+        type: 'productivity',
+        priority: notification.data?.quality === 'excellent' ? 'high' : notification.data?.quality === 'poor' ? 'low' : 'medium',
         read: notification.read,
         timestamp: notification.createdAt,
         timeAgo: getTimeAgo(notification.createdAt),
@@ -144,9 +189,17 @@ export default function INotifications() {
       }));
       
       // Merge all notifications, avoiding duplicates
-      const allNotifications = [...processedRefillNotifications, ...convertedGeneralNotifications];
-      setNotifications(allNotifications);
-      setUnreadCount(allNotifications.filter(n => !n.read).length);
+      const allNotifications = [...processedRefillNotifications, ...convertedGeneralNotifications, ...convertedProductivityNotifications];
+      
+      // Apply persisted read status
+      const persistedReadIds = getPersistedReadStatus();
+      const notificationsWithPersistence = allNotifications.map(notification => ({
+        ...notification,
+        read: notification.read || persistedReadIds.includes(notification.id)
+      }));
+      
+      setNotifications(notificationsWithPersistence);
+      setUnreadCount(notificationsWithPersistence.filter(n => !n.read).length);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
@@ -169,6 +222,28 @@ export default function INotifications() {
     try {
       const token = localStorage.getItem("token");
       
+      // Optimistic UI update
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+
+      // Emit custom event to notify other components
+      window.dispatchEvent(new CustomEvent('notificationRead', { 
+        detail: { 
+          notificationId, 
+          unreadCount: Math.max(0, unreadCount - 1),
+          type: 'single'
+        } 
+      }));
+      
+      // Persist to localStorage immediately
+      const persistedReadIds = getPersistedReadStatus();
+      if (!persistedReadIds.includes(notificationId)) {
+        const updatedReadIds = [...persistedReadIds, notificationId];
+        persistReadStatus(updatedReadIds);
+      }
+      
       // Find the notification to determine its type
       const notification = notifications.find(n => n.id === notificationId);
       
@@ -177,6 +252,11 @@ export default function INotifications() {
         if (notification.type === 'harvest') {
           // Mark general notification as read
           await axios.patch(`http://localhost:5000/api/notifications/${notificationId}/read`);
+        } else if (notification.type === 'productivity') {
+          // Mark productivity notification as read
+          await axios.patch(`http://localhost:5000/api/notifications/productivity/${notificationId}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
         } else if (token) {
           // Mark refill request notification as read
           await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${notificationId}/read`, {}, {
@@ -184,13 +264,27 @@ export default function INotifications() {
           });
         }
       }
-      
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
+      // Revert optimistic update on error
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, read: false } : n)
+      );
+      setUnreadCount(prev => prev + 1);
+
+      // Emit custom event to revert the change
+      window.dispatchEvent(new CustomEvent('notificationRead', { 
+        detail: { 
+          notificationId, 
+          unreadCount: unreadCount + 1,
+          type: 'revert'
+        } 
+      }));
+      
+      // Remove from persisted read status on error
+      const persistedReadIds = getPersistedReadStatus();
+      const updatedReadIds = persistedReadIds.filter(id => id !== notificationId);
+      persistReadStatus(updatedReadIds);
     }
   };
 
@@ -201,22 +295,97 @@ export default function INotifications() {
       // Mark all notifications as read in both systems
       const unreadNotifications = notifications.filter(n => !n.read);
       
+      // Persist all unread IDs to localStorage
+      const persistedReadIds = getPersistedReadStatus();
+      const unreadIds = unreadNotifications.map(n => n.id);
+      const updatedReadIds = [...new Set([...persistedReadIds, ...unreadIds])];
+      persistReadStatus(updatedReadIds);
+      
+      // Optimistic UI update
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, read: true }))
+      );
+      setUnreadCount(0);
+
+      // Emit custom event to notify other components
+      window.dispatchEvent(new CustomEvent('allNotificationsRead', { 
+        detail: { 
+          unreadCount: 0,
+          type: 'markAllRead'
+        } 
+      }));
+      
+      // Backend updates
       for (const notification of unreadNotifications) {
         if (notification.type === 'harvest') {
           await axios.patch(`http://localhost:5000/api/notifications/${notification.id}/read`);
+        } else if (notification.type === 'productivity') {
+          await axios.patch(`http://localhost:5000/api/notifications/productivity/${notification.id}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
         } else if (token) {
           await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${notification.id}/read`, {}, {
             headers: { Authorization: `Bearer ${token}` }
           });
         }
       }
-      
-      setNotifications(prev => 
-        prev.map(n => ({ ...n, read: true }))
-      );
-      setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  // Delete notification
+  const deleteNotification = async (notificationId, event) => {
+    event?.stopPropagation(); // Prevent triggering click to mark as read
+    
+    if (!window.confirm('Are you sure you want to delete this notification?')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      const notification = notifications.find(n => n.id === notificationId);
+      
+      // Optimistic UI update
+      const wasUnread = !notification?.read;
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        
+        // Emit custom event to notify other components
+        window.dispatchEvent(new CustomEvent('notificationDeleted', { 
+          detail: { 
+            notificationId,
+            wasUnread: true,
+            unreadCount: Math.max(0, unreadCount - 1)
+          } 
+        }));
+      }
+      
+      // Remove from persisted read status
+      const persistedReadIds = getPersistedReadStatus();
+      const updatedReadIds = persistedReadIds.filter(id => id !== notificationId);
+      persistReadStatus(updatedReadIds);
+      
+      // Backend deletion
+      if (notification?.type === 'harvest') {
+        await axios.delete(`http://localhost:5000/api/notifications/${notificationId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else if (notification?.type === 'productivity') {
+        await axios.delete(`http://localhost:5000/api/notifications/productivity/${notificationId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else if (token) {
+        // For refill requests, use the appropriate endpoint
+        await axios.delete(`http://localhost:5000/api/refill-requests/notifications/${notificationId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
+      // Revert optimistic update on error
+      fetchNotifications();
     }
   };
 
@@ -257,6 +426,8 @@ export default function INotifications() {
         return <ShoppingCart className="text-purple-500" size={20} />;
       case 'harvest':
         return <CheckCircle className="text-green-600" size={20} />;
+      case 'productivity':
+        return <Package className="text-orange-500" size={20} />;
       case 'supplier':
         return <Truck className="text-orange-500" size={20} />;
       case 'expiry':
@@ -304,6 +475,7 @@ export default function INotifications() {
       lowStock: 'Low Stock',
       order: 'Order',
       harvest: 'Harvest',
+      productivity: 'Productivity',
       supplier: 'Supplier',
       expiry: 'Expiry',
       stock: 'Stock',
@@ -419,7 +591,9 @@ export default function INotifications() {
             <div
               key={notification.id}
               className={`p-4 rounded-lg shadow border-l-4 transition-all cursor-pointer ${
-                getPriorityColor(notification.priority)
+                notification.read 
+                  ? (darkMode ? 'bg-gray-600/30 border-gray-400 opacity-75' : 'bg-gray-50 border-gray-300 opacity-75')
+                  : getPriorityColor(notification.priority)
               } ${!notification.read ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''} ${
                 darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'
               }`}
@@ -445,6 +619,12 @@ export default function INotifications() {
                       {!notification.read && (
                         <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                       )}
+                      {notification.read && (
+                        <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                          <CheckCircle className="h-3 w-3" />
+                          Read
+                        </span>
+                      )}
                     </div>
                     <p className={`text-sm mb-2 ${
                       darkMode ? "text-gray-200" : "text-gray-600"
@@ -458,6 +638,19 @@ export default function INotifications() {
                       <span className="capitalize">{notification.priority} priority</span>
                     </div>
                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => deleteNotification(notification.id, e)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      darkMode 
+                        ? 'hover:bg-gray-600 text-gray-400 hover:text-red-400' 
+                        : 'hover:bg-gray-200 text-gray-600 hover:text-red-600'
+                    }`}
+                    title="Delete notification"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </div>

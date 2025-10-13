@@ -1,8 +1,6 @@
 // frontend/src/components/H_SpecialistDetails.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import H_SpecialistForm from "./H_SpecialistForm.js";
 
 // React Icons (replacing PNGs)
@@ -15,14 +13,17 @@ import sp2 from "../../../UserHome/Images/specilist2.jpg";
 import sp3 from "../../../UserHome/Images/specilist3.jpg";
 import sp4 from "../../../UserHome/Images/specilist4.jpg";
 
+const API_BASE = "http://localhost:5000";
+
 const H_SpecialistDetails = () => {
   const [specialists, setSpecialists] = useState([]);
   const [filteredSpecialists, setFilteredSpecialists] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Dark mode state
   const [darkMode, setDarkMode] = useState(() => {
@@ -68,49 +69,59 @@ const H_SpecialistDetails = () => {
   }, [darkMode]);
 
   // Fetch all specialists
-  const fetchSpecialists = () => {
-    setLoading(true);
-    axios
-      .get("http://localhost:5000/api/specialists")
-      .then((res) => {
-        setSpecialists(res.data);
-        setFilteredSpecialists(res.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError("Failed to fetch specialists");
-        setLoading(false);
-      });
+  const fetchSpecialists = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const res = await axios.get(`${API_BASE}/api/specialists`);
+      setSpecialists(res.data);
+      setFilteredSpecialists(res.data);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch specialists");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchSpecialists();
   }, []);
 
-  // Handle search
   useEffect(() => {
-    const filtered = specialists.filter((s) =>
-      `${s.fullName} ${s.email} ${Array.isArray(s.specializations) ? s.specializations.join(" ") : s.specializations}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
-    );
+    filterSpecialists();
+  }, [searchTerm, specialists]);
+
+  const filterSpecialists = () => {
+    if (!searchTerm) {
+      setFilteredSpecialists(specialists);
+      return;
+    }
+    
+    const filtered = specialists.filter((s) => {
+      const searchableText = Object.values(s)
+        .join(" ")
+        .toLowerCase();
+      return searchableText.includes(searchTerm.toLowerCase());
+    });
     setFilteredSpecialists(filtered);
-  }, [searchQuery, specialists]);
+  };
 
   // Delete specialist
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this specialist?")) {
-      axios
-        .delete(`http://localhost:5000/api/specialists/${id}`)
-        .then(() => fetchSpecialists())
-        .catch((err) => console.error(err));
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this specialist?")) return;
+    try {
+      await axios.delete(`${API_BASE}/api/specialists/${id}`);
+      fetchSpecialists();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete specialist");
     }
   };
 
   // Edit specialist
-  const handleEdit = (id) => {
-    setEditingId(id);
+  const handleEdit = (specialist) => {
+    setEditingId(specialist._id);
     setShowForm(true);
   };
 
@@ -120,49 +131,225 @@ const H_SpecialistDetails = () => {
     setShowForm(true);
   };
 
-  // Download PDF
+  // Professional PDF Report Generation
   const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("Mount Olive Specialist Details", 14, 20);
+    try {
+      const dataToExport = filteredSpecialists;
+      
+      // Create HTML content for PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Specialist Records - Mount Olive Farm House</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
+                
+                body {
+                    font-family: 'Times New Roman', serif;
+                    font-size: 11pt;
+                    line-height: 1.2;
+                    margin: 2cm;
+                    color: #000;
+                }
+                
+                .header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                    border-bottom: 2px solid #000;
+                    padding-bottom: 20px;
+                }
+                
+                .farm-name {
+                    font-size: 16pt;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                }
+                
+                .report-title {
+                    font-size: 14pt;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                }
+                
+                .report-info {
+                    font-size: 10pt;
+                    margin-bottom: 5px;
+                }
+                
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                    font-size: 9pt;
+                }
+                
+                th, td {
+                    border: 1px solid #000;
+                    padding: 6px 8px;
+                    text-align: left;
+                }
+                
+                th {
+                    background-color: #f0f0f0;
+                    font-weight: bold;
+                }
+                
+                .footer {
+                    text-align: center;
+                    margin-top: 30px;
+                    font-size: 8pt;
+                    color: #666;
+                }
+                
+                .filter-info {
+                    background-color: #f8f8f8;
+                    padding: 10px;
+                    margin: 15px 0;
+                    border-left: 4px solid #007bff;
+                    font-size: 10pt;
+                }
+                
+                .page-break {
+                    page-break-after: always;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="farm-name">MOUNT OLIVE FARM HOUSE</div>
+                <div class="report-title">SPECIALIST RECORDS REPORT</div>
+                <div class="report-info">Generated on: ${new Date().toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</div>
+                <div class="report-info">Total Records: ${dataToExport.length}</div>
+            </div>
 
-    const today = new Date().toLocaleDateString();
-    doc.setFontSize(11);
-    doc.text(`Generated on: ${today}`, 14, 28);
+            ${searchTerm ? `
+            <div class="filter-info">
+                <strong>Filtered Records:</strong><br>
+                Search: "${searchTerm}"<br>
+            </div>
+            ` : ''}
 
-    const tableColumn = [
-      "Full Name",
-      "Email",
-      "Phone",
-      "License",
-      "Specializations",
-      "Qualifications",
-      "Experience",
-      "DOB",
-      "Gender",
-    ];
+            <table>
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Medical License</th>
+                        <th>Specializations</th>
+                        <th>Qualifications</th>
+                        <th>Experience (Years)</th>
+                        <th>Date of Birth</th>
+                        <th>Gender</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dataToExport.map(specialist => `
+                        <tr>
+                            <td>${specialist.fullName || 'N/A'}</td>
+                            <td>${specialist.email || 'N/A'}</td>
+                            <td>${specialist.phoneNo || 'N/A'}</td>
+                            <td>${specialist.medicalLicenseNumber || 'N/A'}</td>
+                            <td>${Array.isArray(specialist.specializations) ? 
+                                 specialist.specializations.join(', ') : 
+                                 specialist.specializations || 'N/A'}</td>
+                            <td>${specialist.qualifications || 'N/A'}</td>
+                            <td>${specialist.yearsOfExperience || '0'}</td>
+                            <td>${specialist.dateOfBirth ? 
+                                 new Date(specialist.dateOfBirth).toLocaleDateString() : 
+                                 'N/A'}</td>
+                            <td>${specialist.gender || 'N/A'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
 
-    const tableRows = filteredSpecialists.map((s) => [
-      s.fullName,
-      s.email,
-      s.phoneNo,
-      s.medicalLicenseNumber,
-      Array.isArray(s.specializations) ? s.specializations.join(", ") : s.specializations,
-      s.qualifications,
-      s.yearsOfExperience,
-      s.dateOfBirth ? s.dateOfBirth.split("T")[0] : "",
-      s.gender,
-    ]);
+            <div class="footer">
+                Page 1 of 1 • Mount Olive Farm House Specialist Records
+            </div>
+        </body>
+        </html>
+      `;
 
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 35,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [22, 160, 133] },
-    });
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
 
-    doc.save("Mount_Olive_Specialists.pdf");
+      // Wait for content to load then print
+      printWindow.onload = function() {
+        printWindow.print();
+      };
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error generating PDF. Please try printing the page instead.");
+    }
+  };
+
+  // Download as CSV
+  const downloadCSV = () => {
+    try {
+      const dataToExport = filteredSpecialists;
+      
+      const headers = [
+        'Full Name',
+        'Email', 
+        'Phone',
+        'Medical License Number',
+        'Specializations',
+        'Qualifications',
+        'Experience (Years)',
+        'Date of Birth',
+        'Gender'
+      ];
+      
+      const csvData = dataToExport.map(specialist => [
+        specialist.fullName || 'N/A',
+        specialist.email || 'N/A',
+        specialist.phoneNo || 'N/A',
+        specialist.medicalLicenseNumber || 'N/A',
+        Array.isArray(specialist.specializations) ? 
+          specialist.specializations.join('; ') : 
+          specialist.specializations || 'N/A',
+        specialist.qualifications || 'N/A',
+        specialist.yearsOfExperience || '0',
+        specialist.dateOfBirth ? 
+          new Date(specialist.dateOfBirth).toLocaleDateString() : 
+          'N/A',
+        specialist.gender || 'N/A'
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(field => 
+          `"${String(field).replace(/"/g, '""')}"`
+        ).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `specialists_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error("Error downloading CSV:", error);
+      alert("Error downloading data. Please try again.");
+    }
   };
 
   // Sanitize number for wa.me (digits only)
@@ -171,9 +358,6 @@ const H_SpecialistDetails = () => {
     const digits = String(input).replace(/[^\d]/g, "");
     return digits;
   };
-
-  // Component for the specialist form
-  const SpecialistForm = H_SpecialistForm;
 
   return (
     <div
@@ -212,91 +396,137 @@ const H_SpecialistDetails = () => {
           </div>
         </div>
 
-        {/* Top Buttons and Search Bar */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 space-y-4 sm:space-y-0 sm:space-x-4">
-          {/* Search Bar with Search Button */}
-          <div className="flex items-center w-full sm:w-auto relative">
+        {/* Controls */}
+        <div className="flex flex-col md:flex-row md:justify-between items-center mb-6 space-y-3 md:space-y-0">
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center gap-2"
+              onClick={handleAddNew}
+            >
+              <span>➕</span>
+              Add New Specialist
+            </button>
+            <button
+              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition flex items-center gap-2"
+              onClick={handleDownloadPDF}
+            >
+              <span>📄</span>
+              Print Report
+            </button>
+            <button
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2"
+              onClick={downloadCSV}
+            >
+              <span>📊</span>
+              Download CSV
+            </button>
+          </div>
+
+          <div className="flex gap-2 w-full md:w-auto">
             <input
               type="text"
-              placeholder="Search by name, email, or specialization..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full sm:w-80 pl-4 pr-28 py-2 rounded-l-md border focus:outline-none focus:ring-2 focus:ring-green-500 transition-all shadow-sm placeholder-gray-400 ${
-                darkMode
-                  ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                  : "bg-white border-gray-300 text-gray-900"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search specialists..."
+              className={`w-full md:w-80 border px-4 py-2 rounded-l-md focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                darkMode 
+                  ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400" 
+                  : "border-gray-300 text-gray-900"
               }`}
             />
             <button
-              className="absolute right-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-1"
-              onClick={() => {}}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition flex items-center gap-2"
+              onClick={() => setSearchTerm(searchInput)}
             >
               <span>🔍</span>
-              <span>Search</span>
+              Search
             </button>
-          </div>
-
-          {/* Add New & Download Buttons */}
-          <div className="flex space-x-4">
-            <button
-              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-md"
-              onClick={handleAddNew}
-            >
-              <i className="fas fa-user-plus"></i>
-              <span>➕Add New Specialist</span>
-            </button>
-            <button
-              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-md"
-              onClick={handleDownloadPDF}
-            >
-              <i className="fas fa-download"></i>
-              <span>📄Download PDF</span>
-            </button>
+            {(searchTerm || searchInput) && (
+              <button
+                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition"
+                onClick={() => {
+                  setSearchTerm("");
+                  setSearchInput("");
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Active Filters Info */}
+        {searchTerm && (
+          <div className={`mb-4 p-3 rounded-lg border ${
+            darkMode ? "bg-green-900 border-green-700" : "bg-green-50 border-green-200"
+          }`}>
+            <div className={`text-sm ${darkMode ? "text-green-200" : "text-green-800"}`}>
+              <strong>Active filters:</strong>
+              <span className={`ml-2 px-2 py-1 rounded ${
+                darkMode ? "bg-green-800" : "bg-green-100"
+              }`}>Search: "{searchTerm}"</span>
+              <span className={`ml-2 ${darkMode ? "text-green-300" : "text-green-600"}`}>
+                Showing {filteredSpecialists.length} of {specialists.length} records
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Specialist Form */}
         {showForm && (
-          <SpecialistForm
-            specialistId={editingId}
-            onSuccess={() => {
-              setShowForm(false);
-              fetchSpecialists();
-            }}
-          />
+          <div className={`mb-6 p-4 rounded-lg shadow border ${
+            darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+          }`}>
+            <H_SpecialistForm
+              specialistId={editingId}
+              onSuccess={() => {
+                setShowForm(false);
+                setEditingId(null);
+                fetchSpecialists();
+              }}
+              onCancel={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}
+            />
+          </div>
         )}
 
         {/* Table */}
         {loading ? (
-          <p
-            className={`text-center text-lg transition-colors duration-300 ${
-              darkMode ? "text-gray-300" : "text-gray-600"
-            }`}
-          >
-            Loading specialists...
-          </p>
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+            <p className={`mt-2 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+              Loading specialists...
+            </p>
+          </div>
         ) : error ? (
-          <p
-            className={`text-center text-lg transition-colors duration-300 ${
-              darkMode ? "text-red-400" : "text-red-600"
-            }`}
-          >
-            {error}
-          </p>
+          <div className="text-center py-8">
+            <p className={`text-lg ${darkMode ? "text-red-400" : "text-red-600"}`}>
+              {error}
+            </p>
+          </div>
         ) : filteredSpecialists.length === 0 ? (
-          <p
-            className={`text-center text-lg transition-colors duration-300 ${
-              darkMode ? "text-gray-300" : "text-gray-600"
-            }`}
-          >
-            No specialists found.
-          </p>
+          <div className="text-center py-12 rounded-lg shadow">
+            <p className={`text-lg mb-4 ${darkMode ? "text-gray-300" : "text-gray-500"}`}>
+              {specialists.length === 0 ? "No specialist records found." : "No records match your search criteria."}
+            </p>
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setSearchInput("");
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md font-semibold transition-colors"
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
         ) : (
-          <div
-            className={`overflow-x-auto rounded-lg shadow-lg transition-colors duration-300 ${
-              darkMode ? "bg-gray-800" : "bg-white"
-            }`}
-          >
+          <div className={`overflow-x-auto rounded-lg shadow-lg transition-colors duration-300 ${
+            darkMode ? "bg-gray-800" : "bg-white"
+          }`}>
             <table className="w-full table-auto">
               <thead
                 className={`transition-colors duration-300 ${
@@ -304,18 +534,18 @@ const H_SpecialistDetails = () => {
                 }`}
               >
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Photo</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Full Name</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">License</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Specializations</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Qualifications</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Experience</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">DOB</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Gender</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Direct Contact</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                  <th className="px-4 py-3 text-left">Photo</th>
+                  <th className="px-4 py-3 text-left">Full Name</th>
+                  <th className="px-4 py-3 text-left">Email</th>
+                  <th className="px-4 py-3 text-left">Phone</th>
+                  <th className="px-4 py-3 text-left">License</th>
+                  <th className="px-4 py-3 text-left">Specializations</th>
+                  <th className="px-4 py-3 text-left">Qualifications</th>
+                  <th className="px-4 py-3 text-left">Experience</th>
+                  <th className="px-4 py-3 text-left">DOB</th>
+                  <th className="px-4 py-3 text-left">Gender</th>
+                  <th className="px-4 py-3 text-left">Direct Contact</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody
@@ -325,6 +555,7 @@ const H_SpecialistDetails = () => {
               >
                 {filteredSpecialists.map((s) => {
                   const waNumber = formatWhatsAppNumber(s.phoneNo);
+                  const hasPhoto = s.profilePhoto && s.profilePhoto !== "null";
                   return (
                     <tr
                       key={s._id}
@@ -333,18 +564,19 @@ const H_SpecialistDetails = () => {
                       }`}
                     >
                       <td className="px-4 py-3">
-                        {s.profilePhoto ? (
+                        {hasPhoto ? (
                           <img
-                            src={`http://localhost:5000/Health_Uploads/${s.profilePhoto}`}
+                            src={`${API_BASE}/Health_Uploads/${s.profilePhoto}`}
                             alt={s.fullName}
-                            className="w-12 h-12 rounded-full object-cover shadow-sm"
+                            className="w-14 h-14 rounded-full object-cover border-2 border-green-500"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
                           />
                         ) : (
-                          <div
-                            className={`w-12 h-12 rounded-full transition-colors duration-300 ${
-                              darkMode ? "bg-gray-600" : "bg-gray-200"
-                            }`}
-                          />
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                            darkMode ? "bg-gray-600 text-gray-300" : "bg-gray-200 text-gray-600"
+                          }`}>
+                            {s.fullName ? s.fullName.charAt(0) : "?"}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3">{s.fullName}</td>
@@ -363,17 +595,17 @@ const H_SpecialistDetails = () => {
 
                       {/* Direct Contact Column with WhatsApp and Email Icons */}
                       <td className="px-4 py-3">
-                        <div className="flex space-x-3 items-center">
+                        <div className="flex space-x-2 items-center">
                           {waNumber ? (
                             <a
                               href={`https://wa.me/${waNumber}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title="Contact via WhatsApp"
-                              aria-label="WhatsApp"
                               className={`p-1 rounded transition-colors ${
                                 darkMode ? "hover:bg-gray-600" : "hover:bg-gray-100"
                               }`}
+                              title="WhatsApp"
+                              aria-label="WhatsApp"
                             >
                               <FaWhatsapp
                                 size={28}
@@ -391,11 +623,11 @@ const H_SpecialistDetails = () => {
                               href={`mailto:${s.email}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title="Send Email"
-                              aria-label="Email"
                               className={`p-1 rounded transition-colors ${
                                 darkMode ? "hover:bg-gray-600" : "hover:bg-gray-100"
                               }`}
+                              title="Email"
+                              aria-label="Email"
                             >
                               <FiMail
                                 size={28}
@@ -414,12 +646,12 @@ const H_SpecialistDetails = () => {
                       <td className="px-4 py-3">
                         <div className="flex space-x-2 items-center">
                           <button
-                            title="Edit Specialist"
-                            aria-label="Edit"
-                            onClick={() => handleEdit(s._id)}
+                            onClick={() => handleEdit(s)}
                             className={`p-1 rounded transition-colors ${
                               darkMode ? "hover:bg-gray-600" : "hover:bg-gray-100"
                             }`}
+                            title="Edit"
+                            aria-label="Edit"
                           >
                             <FiEdit2
                               size={28}
@@ -428,12 +660,12 @@ const H_SpecialistDetails = () => {
                           </button>
 
                           <button
-                            title="Delete Specialist"
-                            aria-label="Delete"
                             onClick={() => handleDelete(s._id)}
                             className={`p-1 rounded transition-colors ${
                               darkMode ? "hover:bg-red-900" : "hover:bg-red-50"
                             }`}
+                            title="Delete"
+                            aria-label="Delete"
                           >
                             <FiTrash2
                               size={28}

@@ -283,6 +283,15 @@ export const StaffHub = () => {
       if (!["Full-time", "Part-time", "Contract"].includes(fd.type)) {
         e.type = "Select a valid employee type.";
       }
+      if (!isEmail(fd.email)) {
+        e.email = "Enter a valid email address.";
+      }
+      if (!fd.department || fd.department.trim() === "") {
+        e.department = "Department is required.";
+      }
+      if (!fd.address || fd.address.trim() === "") {
+        e.address = "Address is required.";
+      }
     }
 
     // Doctors / Pathologists
@@ -322,8 +331,11 @@ export const StaffHub = () => {
 
     // Check if form has required data
     console.log("Current form data:", formData);
-    if (!formData.name || !formData.contact || !formData.title || !formData.joined || !formData.email || !formData.department || !formData.address) {
-      alert("Please fill in all required fields");
+    const requiredFields = ['name', 'contact', 'title', 'joined', 'email', 'department', 'address'];
+    const missingFields = requiredFields.filter(field => !formData[field] || formData[field].toString().trim() === '');
+    
+    if (missingFields.length > 0) {
+      alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -331,8 +343,8 @@ export const StaffHub = () => {
     setShowLoader(true);
     try {
       const form = new FormData();
-      // Only send the required fields, explicitly excluding ID
-      const fieldsToSend = ['name', 'contact', 'title', 'type', 'joined'];
+      // Send all required fields including email, department, and address
+      const fieldsToSend = ['name', 'contact', 'title', 'type', 'joined', 'email', 'department', 'address', 'status'];
       fieldsToSend.forEach(field => {
         if (formData[field]) {
           console.log(`Adding to form: ${field} = ${formData[field]}`);
@@ -1040,7 +1052,7 @@ export const StaffHub = () => {
           <tbody>
             {loading.employees ? (
               <tr>
-                <td colSpan="14" className="px-6 py-8 text-center">
+                <td colSpan="14" className={`px-6 py-8 text-center ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                   <div className="flex justify-center items-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
                     Loading employees...
@@ -1070,7 +1082,7 @@ export const StaffHub = () => {
                       : "border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <td className={`px-3 py-4 whitespace-nowrap text-sm font-medium ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                     {index + 1}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
@@ -1095,9 +1107,15 @@ export const StaffHub = () => {
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         employee.type === "Full-time"
-                          ? "bg-green-100 text-green-800"
+                          ? darkMode
+                            ? "bg-green-900 text-green-200"
+                            : "bg-green-100 text-green-800"
                           : employee.type === "Part-time"
-                          ? "bg-blue-100 text-blue-800"
+                          ? darkMode
+                            ? "bg-blue-900 text-blue-200"
+                            : "bg-blue-100 text-blue-800"
+                          : darkMode
+                          ? "bg-purple-900 text-purple-200"
                           : "bg-purple-100 text-purple-800"
                       }`}
                     >
@@ -1108,9 +1126,15 @@ export const StaffHub = () => {
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         employee.status === "Active"
-                          ? "bg-green-100 text-green-800"
+                          ? darkMode
+                            ? "bg-green-900 text-green-200"
+                            : "bg-green-100 text-green-800"
                           : employee.status === "Inactive"
-                          ? "bg-red-100 text-red-800"
+                          ? darkMode
+                            ? "bg-red-900 text-red-200"
+                            : "bg-red-100 text-red-800"
+                          : darkMode
+                          ? "bg-orange-900 text-orange-200"
                           : "bg-orange-100 text-orange-800"
                       }`}
                     >
@@ -1237,7 +1261,7 @@ export const StaffHub = () => {
           <tbody>
             {loading.doctors ? (
               <tr>
-                <td colSpan="7" className="px-6 py-8 text-center">
+                <td colSpan="7" className={`px-6 py-8 text-center ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                   <div className="flex justify-center items-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
                     Loading doctors...
@@ -1429,7 +1453,7 @@ export const StaffHub = () => {
           <tbody>
             {loading.pathologists ? (
               <tr>
-                <td colSpan="7" className="px-6 py-8 text-center">
+                <td colSpan="7" className={`px-6 py-8 text-center ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                   <div className="flex justify-center items-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
                     Loading pathologists...
@@ -1686,7 +1710,7 @@ export const StaffHub = () => {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="ml-2 text-gray-400 hover:text-gray-600"
+              className={`ml-2 ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <X size={16} />
             </button>
@@ -1806,12 +1830,12 @@ export const StaffHub = () => {
                   size={180} 
                 />
               </div>
-              <p className="text-sm text-center">
+              <p className={`text-sm text-center ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                 <strong>{qrItem.name || qrItem.fullName}</strong>
                 <br />
-                <span className="text-gray-500">ID: {qrItem.id || qrItem._id}</span>
+                <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>ID: {qrItem.id || qrItem._id}</span>
                 <br />
-                <span className="text-gray-500">Type: {qrItem.type}</span>
+                <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Type: {qrItem.type}</span>
               </p>
               <div className="flex gap-2">
                 <button
@@ -2278,7 +2302,7 @@ export const StaffHub = () => {
             } animate-scale-in`}
           >
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">
+              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                 {editingItem
                   ? `Edit ${
                       editingItem.type === "employee"

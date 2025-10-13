@@ -43,6 +43,7 @@ export default function Dashboard() {
     const [nameInput, setNameInput] = useState("");
     const [caretakerInput, setCaretakerInput] = useState("");
     const [imageInput, setImageInput] = useState({});
+    const [imagePreview, setImagePreview] = useState({});
     const [totalAnimals, setTotalAnimals] = useState(0);
     const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
     const [confirmDelete, setConfirmDelete] = useState({ show: false, animal: null });
@@ -178,7 +179,15 @@ export default function Dashboard() {
      */
     const handleImageChange = (e, animal) => {
         if (e.target.files && e.target.files[0]) {
-            setImageInput({ ...imageInput, [animal._id]: e.target.files[0] });
+            const file = e.target.files[0];
+            setImageInput({ ...imageInput, [animal._id]: file });
+            
+            // Create preview URL
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview({ ...imagePreview, [animal._id]: reader.result });
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -195,6 +204,7 @@ export default function Dashboard() {
             });
             setAnimalTypes(animalTypes.map(a => a._id === animal._id ? res.data : a));
             setImageInput({ ...imageInput, [animal._id]: null });
+            setImagePreview({ ...imagePreview, [animal._id]: null });
             showPopup("success", "Image updated!");
         } catch {
             showPopup("error", "Image update failed!");
@@ -494,7 +504,7 @@ export default function Dashboard() {
                                     <div className="relative group">
                                         <div className="relative">
                                             <img
-                                                src={animal.bannerImage ? `http://localhost:5000${animal.bannerImage}` : "/images/default.jpg"}
+                                                src={imagePreview[animal._id] || (animal.bannerImage ? `http://localhost:5000${animal.bannerImage}` : "/images/default.jpg")}
                                                 alt={animal.name}
                                                 className="w-full h-32 sm:h-40 object-cover transition-all duration-300 group-hover:brightness-90"
                                             />

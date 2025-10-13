@@ -599,3 +599,79 @@ export const markProductivityNotificationAsRead = async (req, res) => {
     });
   }
 };
+
+// Mark all productivity notifications as read
+export const markAllProductivityNotificationsAsRead = async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+
+    // Only inventory managers can mark productivity notifications as read
+    if (role !== 'inventory_manager') {
+      return res.status(403).json({
+        message: 'Access denied. Only inventory managers can mark productivity notifications as read.'
+      });
+    }
+
+    const result = await Notification.updateMany(
+      { 
+        type: 'productivity_notification',
+        status: 'unread'
+      },
+      { 
+        $set: { 
+          status: 'read',
+          updatedAt: new Date()
+        } 
+      }
+    );
+
+    res.json({
+      message: 'All productivity notifications marked as read',
+      modifiedCount: result.modifiedCount
+    });
+
+  } catch (error) {
+    console.error('Error marking all productivity notifications as read:', error);
+    res.status(500).json({
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Delete productivity notification
+export const deleteProductivityNotification = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const { userId, role } = req.user;
+
+    // Only inventory managers can delete productivity notifications
+    if (role !== 'inventory_manager') {
+      return res.status(403).json({
+        message: 'Access denied. Only inventory managers can delete productivity notifications.'
+      });
+    }
+
+    const notification = await Notification.findOneAndDelete({
+      _id: notificationId,
+      type: 'productivity_notification'
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        message: 'Productivity notification not found'
+      });
+    }
+
+    res.json({
+      message: 'Productivity notification deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting productivity notification:', error);
+    res.status(500).json({
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};

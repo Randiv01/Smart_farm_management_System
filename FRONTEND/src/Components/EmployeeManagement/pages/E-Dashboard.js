@@ -1,50 +1,76 @@
 // FRONTEND/src/Components/EmployeeManagement/pages/E-Dashboard.js
 import React, { useState, useEffect } from "react";
 import {
-  Users,
-  ClipboardCheck,
-  Calendar,
-  Clock,
-  DollarSign,
-  FileText,
-  Settings,
-  FileDown,
+  RefreshCw,
 } from "lucide-react";
 
 // ✅ Use default imports for charts
 import { EmployeeChart } from "../charts/E-EmployeeChart.js";
 import { AttendanceChart } from "../charts/E-AttendanceChart.js";
+import { DepartmentChart } from "../charts/E-DepartmentChart.js";
+import { MonthlyAttendanceChart } from "../charts/E-MonthlyAttendanceChart.js";
+import { LeaveAnalyticsChart } from "../charts/E-LeaveAnalyticsChart.js";
+import { OvertimeAnalyticsChart } from "../charts/E-OvertimeAnalyticsChart.js";
 import Loader from "../Loader/Loader.js";
 import { useETheme } from '../Econtexts/EThemeContext.jsx'; // Import the Loader component
 
-export const Dashboard = ({ setActiveModule }) => {
+export const Dashboard = () => {
   const { theme } = useETheme();
   const darkMode = theme === 'dark';
-  const [showLoader, setShowLoader] = useState(true); // Loader state
+  const [showLoader, setShowLoader] = useState(true);
+  const [dashboardData, setDashboardData] = useState({
+    metrics: {
+      totalEmployees: { value: 0, change: "0%", label: "Total Employees" },
+      presentToday: { value: 0, change: "0%", label: "Present Today" },
+      onLeave: { value: 0, change: "0", label: "On Leave" },
+      overtimeHours: { value: 0, change: "0", label: "Overtime Hours" }
+    },
+    employeeStatus: [],
+    weeklyAttendance: [],
+    departmentData: [],
+    monthlyAttendance: [],
+    leaveAnalytics: { byType: [], byMonth: [] },
+    overtimeData: { byDepartment: [], totalHours: 0 }
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // Set browser tab title
   useEffect(() => {
     document.title = "Dashboard - Employee Manager";
   }, []);
 
-  const modules = [
-    { id: "staff", name: "Staff Hub", icon: <Users size={24} />, count: 48, change: "+2" },
-    { id: "attendance", name: "Attendance Tracker", icon: <ClipboardCheck size={24} />, count: 42, change: "-3" },
-    { id: "leave", name: "Leave Planner", icon: <Calendar size={24} />, count: 6, change: "+1" },
-    { id: "overtime", name: "Overtime Monitor", icon: <Clock size={24} />, count: 15, change: "+5" },
-    { id: "salary", name: "Salary Desk", icon: <DollarSign size={24} />, count: 48, change: "0" },
-    { id: "reports", name: "Employee Report Center", icon: <FileText size={24} /> },
-    { id: "settings", name: "System Settings", icon: <Settings size={24} /> },
-  ];
-
-  // Simulate loading data
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setIsRefreshing(true);
+      const response = await fetch('http://localhost:5000/api/dashboard/summary');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setDashboardData(data.data);
+          setLastUpdated(new Date());
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsRefreshing(false);
       setShowLoader(false);
-    }, 1500); // Show loader for 1.5 seconds
+    }
+  };
 
-    return () => clearTimeout(timer);
+  // Initial data fetch
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
 
   // Show loader while loading
   if (showLoader) {
@@ -55,81 +81,146 @@ export const Dashboard = ({ setActiveModule }) => {
     <div className={`min-h-screen p-6 ${darkMode ? 'bg-gray-900' : 'bg-light-beige'}`}>
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-dark-green'}`}>Employee Management Dashboard</h2>
+        <div>
+          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-dark-green'}`}>Employee Management Dashboard</h2>
+          {lastUpdated && (
+            <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
         <button
+          onClick={fetchDashboardData}
+          disabled={isRefreshing}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white shadow-btn transition-colors
-            ${darkMode ? "bg-green-600 hover:bg-green-700" : "bg-btn-teal hover:bg-green-600"}`}
+            ${darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"}
+            ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          <FileDown size={18} />
-          <span>Export Reports</span>
+          <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+          <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <div className={`p-6 rounded-2xl shadow-card ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h4 className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Employees</h4>
-          <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>48</p>
-          <span className="text-green-600 text-sm">+4%</span>
-        </div>
-        <div className={`p-6 rounded-2xl shadow-card ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h4 className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Present Today</h4>
-          <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>42</p>
-          <span className="text-red-500 text-sm">-6%</span>
-        </div>
-        <div className={`p-6 rounded-2xl shadow-card ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h4 className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>On Leave</h4>
-          <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>6</p>
-          <span className="text-orange-500 text-sm">+2</span>
-        </div>
-        <div className={`p-6 rounded-2xl shadow-card ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h4 className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Overtime Hours</h4>
-          <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>87</p>
-          <span className="text-green-600 text-sm">+12</span>
-        </div>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className={`p-6 rounded-2xl shadow-card ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-dark-green'}`}>Employee Status</h3>
-          <EmployeeChart />
-        </div>
-        <div className={`p-6 rounded-2xl shadow-card ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-dark-green'}`}>Monthly Attendance</h3>
-          <AttendanceChart />
-        </div>
-      </div>
-
-      {/* Modules */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {modules.map((module) => (
-          <button
-            key={module.id}
-            onClick={() => setActiveModule(module.id)}
-            className={`flex flex-col items-center justify-center p-6 rounded-2xl shadow-card transition-transform transform hover:scale-105 ${
-              darkMode 
-                ? 'bg-gray-800 hover:bg-gray-700' 
-                : 'bg-white hover:bg-gray-50'
-            }`}
-          >
-            <div className="p-4 rounded-full bg-orange-100 text-orange-600 mb-4">
-              {module.icon}
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{dashboardData.metrics.totalEmployees.label}</h4>
+              <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>{dashboardData.metrics.totalEmployees.value}</p>
+              <span className={`text-sm font-medium ${dashboardData.metrics.totalEmployees.change.includes('+') ? 'text-green-600' : 'text-red-500'}`}>
+                {dashboardData.metrics.totalEmployees.change}
+              </span>
             </div>
-            <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{module.name}</h3>
-            {module.count !== undefined && (
-              <p className={`mt-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
-                {module.count}{" "}
-                {module.change && (
-                  <span className={module.change.includes("+") ? "text-green-600" : "text-red-500"}>
-                    {module.change}
-                  </span>
-                )}
-              </p>
-            )}
-          </button>
-        ))}
+            <div className={`p-3 rounded-full ${darkMode ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
+              <RefreshCw className={`w-6 h-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            </div>
+          </div>
+        </div>
+        
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{dashboardData.metrics.presentToday.label}</h4>
+              <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>{dashboardData.metrics.presentToday.value}</p>
+              <span className={`text-sm font-medium ${dashboardData.metrics.presentToday.change.includes('+') ? 'text-green-600' : 'text-red-500'}`}>
+                {dashboardData.metrics.presentToday.change}
+              </span>
+            </div>
+            <div className={`p-3 rounded-full ${darkMode ? 'bg-green-500/20' : 'bg-green-100'}`}>
+              <div className={`w-6 h-6 rounded-full ${darkMode ? 'bg-green-400' : 'bg-green-600'}`}></div>
+            </div>
+          </div>
+        </div>
+        
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{dashboardData.metrics.onLeave.label}</h4>
+              <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>{dashboardData.metrics.onLeave.value}</p>
+              <span className={`text-sm font-medium ${dashboardData.metrics.onLeave.change.includes('+') ? 'text-orange-500' : 'text-gray-500'}`}>
+                {dashboardData.metrics.onLeave.change}
+              </span>
+            </div>
+            <div className={`p-3 rounded-full ${darkMode ? 'bg-orange-500/20' : 'bg-orange-100'}`}>
+              <div className={`w-6 h-6 rounded-full ${darkMode ? 'bg-orange-400' : 'bg-orange-600'}`}></div>
+            </div>
+          </div>
+        </div>
+        
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{dashboardData.metrics.overtimeHours.label}</h4>
+              <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>{dashboardData.metrics.overtimeHours.value}</p>
+              <span className={`text-sm font-medium ${dashboardData.metrics.overtimeHours.change.includes('+') ? 'text-green-600' : 'text-gray-500'}`}>
+                {dashboardData.metrics.overtimeHours.change}
+              </span>
+            </div>
+            <div className={`p-3 rounded-full ${darkMode ? 'bg-purple-500/20' : 'bg-purple-100'}`}>
+              <div className={`w-6 h-6 rounded-full ${darkMode ? 'bg-purple-400' : 'bg-purple-600'}`}></div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Main Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-dark-green'}`}>
+            <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-green-400' : 'bg-green-600'}`}></div>
+            Employee Status Distribution
+          </h3>
+          <EmployeeChart data={dashboardData.employeeStatus} />
+        </div>
+        
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-dark-green'}`}>
+            <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`}></div>
+            Weekly Attendance Overview
+          </h3>
+          <AttendanceChart data={dashboardData.weeklyAttendance} />
+        </div>
+      </div>
+
+      {/* Department & Monthly Attendance Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-dark-green'}`}>
+            <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-purple-400' : 'bg-purple-600'}`}></div>
+            Department Distribution
+          </h3>
+          <DepartmentChart data={dashboardData.departmentData} />
+        </div>
+        
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-dark-green'}`}>
+            <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-orange-400' : 'bg-orange-600'}`}></div>
+            Monthly Attendance Trend
+          </h3>
+          <MonthlyAttendanceChart data={dashboardData.monthlyAttendance} />
+        </div>
+      </div>
+
+      {/* Leave & Overtime Analytics Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-dark-green'}`}>
+            <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-red-400' : 'bg-red-600'}`}></div>
+            Leave Analytics
+          </h3>
+          <LeaveAnalyticsChart data={dashboardData.leaveAnalytics.byType} />
+        </div>
+        
+        <div className={`p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 ${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700' : 'bg-gradient-to-br from-white to-gray-50 border border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-dark-green'}`}>
+            <div className={`w-3 h-3 rounded-full ${darkMode ? 'bg-cyan-400' : 'bg-cyan-600'}`}></div>
+            Overtime Analytics
+          </h3>
+          <OvertimeAnalyticsChart data={dashboardData.overtimeData} />
+        </div>
+      </div>
+
     </div>
   );
 };
