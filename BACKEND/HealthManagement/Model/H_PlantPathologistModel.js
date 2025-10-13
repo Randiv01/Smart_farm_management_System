@@ -17,3 +17,4 @@ const plantPathologistSchema = new mongoose.Schema(
 );
 
 export default mongoose.model("PlantPathologist", plantPathologistSchema);
+
