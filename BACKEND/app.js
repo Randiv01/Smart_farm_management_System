@@ -65,7 +65,7 @@ const healthUploadsDir = path.join(__dirname, "HealthManagement", "Health_upload
 const plantUploadsDir = path.join(__dirname, "PlantManagement", "Uploads");
 const animalReportsDir = path.join(__dirname, "uploads", "animal-reports");
 const plantReportsDir = path.join(__dirname, "uploads", "plant-reports");
-const employeeUploadsDir = path.join(__dirname, "EmployeeManager", "E-uploads");
+const employeeUploadsDir = path.join(__dirname, "EmployeeManager", "uploads");
 
 [uploadsDir, healthUploadsDir, plantUploadsDir, animalReportsDir, plantReportsDir, employeeUploadsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {

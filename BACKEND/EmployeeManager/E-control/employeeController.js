@@ -58,10 +58,10 @@ export const addEmployee = async (req, res) => {
     console.log("Generated next ID:", nextId);
 
     const photoPath = req.files?.photo?.[0]?.filename
-      ? `/uploads/${req.files.photo[0].filename}`
+      ? `/employee-uploads/${req.files.photo[0].filename}`
       : null;
     const cvPath = req.files?.cv?.[0]?.filename
-      ? `/uploads/${req.files.cv[0].filename}`
+      ? `/employee-uploads/${req.files.cv[0].filename}`
       : null;
 
     const newEmployee = new Employee({
@@ -92,9 +92,9 @@ export const updateEmployee = async (req, res) => {
   try {
     const updateData = { ...req.body };
     if (req.files?.photo?.[0]?.filename)
-      updateData.photo = `/uploads/${req.files.photo[0].filename}`;
+      updateData.photo = `/employee-uploads/${req.files.photo[0].filename}`;
     if (req.files?.cv?.[0]?.filename)
-      updateData.cv = `/uploads/${req.files.cv[0].filename}`;
+      updateData.cv = `/employee-uploads/${req.files.cv[0].filename}`;
 
     const updated = await Employee.findOneAndUpdate(
       { id: req.params.id },

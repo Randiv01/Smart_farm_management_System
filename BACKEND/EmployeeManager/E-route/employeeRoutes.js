@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
+import { fileURLToPath } from "url";
 import {
   getEmployees,
   getEmployeeById,
@@ -13,9 +14,16 @@ import {
 
 const router = express.Router();
 
-// Multer storage
+// Fix __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Multer storage - use absolute path to EmployeeManager/uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
+  destination: (req, file, cb) => {
+    const uploadsPath = path.join(__dirname, "..", "uploads");
+    cb(null, uploadsPath);
+  },
   filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
 });
 const upload = multer({ storage });
