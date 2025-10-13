@@ -4,6 +4,8 @@ import {
   getProductivityNotifications,
   updateProductivityNotification,
   markProductivityNotificationAsRead,
+  markAllProductivityNotificationsAsRead,
+  deleteProductivityNotification,
   getRealProductivityData,
   updateRealProductivityData,
   getAvailableProductivities
@@ -23,6 +25,12 @@ router.put('/productivity/:notificationId', protect, updateProductivityNotificat
 
 // Mark productivity notification as read
 router.patch('/productivity/:notificationId/read', protect, markProductivityNotificationAsRead);
+
+// Mark all productivity notifications as read
+router.patch('/productivity/mark-all-read', protect, markAllProductivityNotificationsAsRead);
+
+// Delete productivity notification
+router.delete('/productivity/:notificationId', protect, deleteProductivityNotification);
 
 // Get available productivities for auto-filling form
 router.get('/available-productivities', protect, getAvailableProductivities);

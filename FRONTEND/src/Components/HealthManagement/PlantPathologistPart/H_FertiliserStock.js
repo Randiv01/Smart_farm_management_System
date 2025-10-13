@@ -1,9 +1,6 @@
 // frontend/src/components/H_FertiliserStock.js
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import html2canvas from "html2canvas";
 import { useLocation } from "react-router-dom";
 import {
   BarChart,
@@ -69,12 +66,13 @@ const getRowLevelClass = (item) => {
   return "bg-green-100 text-green-800";
 };
 
+const API_BASE = "http://localhost:5000";
+
 const H_FertiliserStock = () => {
   const [stock, setStock] = useState([]);
+  const [filteredStock, setFilteredStock] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-
-  // Search state
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -117,12 +115,16 @@ const H_FertiliserStock = () => {
 
   const fetchStock = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/fertilisers");
-      setStock(res.data || []);
-      setLoading(false);
+      setLoading(true);
+      const res = await axios.get(`${API_BASE}/api/fertilisers`);
+      const stockData = res.data || [];
+      setStock(stockData);
+      setFilteredStock(stockData);
     } catch (err) {
       console.error(err);
       setStock([]);
+      setFilteredStock([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -131,67 +133,292 @@ const H_FertiliserStock = () => {
     fetchStock();
   }, []);
 
-  const captureElementAsImage = async (element) => {
-    const canvas = await html2canvas(element, {
-      backgroundColor: "#ffffff",
-      scale: 2, // sharper
+  useEffect(() => {
+    filterStock();
+  }, [searchTerm, stock]);
+
+  const filterStock = () => {
+    if (!searchTerm) {
+      setFilteredStock(stock);
+      return;
+    }
+    
+    const filtered = stock.filter((f) => {
+      const searchableText = Object.values(f)
+        .join(" ")
+        .toLowerCase();
+      return searchableText.includes(searchTerm.toLowerCase());
     });
-    return canvas.toDataURL("image/png");
+    setFilteredStock(filtered);
   };
 
-  const downloadElementAsImage = async (ref, fileName) => {
-    if (!ref.current) return;
+  // Professional PDF Report Generation
+  const handleDownloadPDF = () => {
     try {
-      const dataUrl = await captureElementAsImage(ref.current);
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `${fileName}.png`;
-      link.click();
-    } catch (e) {
-      console.error("Failed to download image:", e);
-      alert("Failed to download image");
+      const dataToExport = filteredStock;
+      
+      // Create HTML content for PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Fertiliser Stock Records - Mount Olive Farm House</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
+                
+                body {
+                    font-family: 'Times New Roman', serif;
+                    font-size: 11pt;
+                    line-height: 1.2;
+                    margin: 2cm;
+                    color: #000;
+                }
+                
+                .header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                    border-bottom: 2px solid #000;
+                    padding-bottom: 20px;
+                }
+                
+                .farm-name {
+                    font-size: 16pt;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                }
+                
+                .report-title {
+                    font-size: 14pt;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                }
+                
+                .report-info {
+                    font-size: 10pt;
+                    margin-bottom: 5px;
+                }
+                
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                    font-size: 9pt;
+                }
+                
+                th, td {
+                    border: 1px solid #000;
+                    padding: 6px 8px;
+                    text-align: left;
+                }
+                
+                th {
+                    background-color: #f0f0f0;
+                    font-weight: bold;
+                }
+                
+                .footer {
+                    text-align: center;
+                    margin-top: 30px;
+                    font-size: 8pt;
+                    color: #666;
+                }
+                
+                .filter-info {
+                    background-color: #f8f8f8;
+                    padding: 10px;
+                    margin: 15px 0;
+                    border-left: 4px solid #007bff;
+                    font-size: 10pt;
+                }
+                
+                .critical {
+                    background-color: #fee2e2;
+                    color: #dc2626;
+                    font-weight: bold;
+                }
+                
+                .low {
+                    background-color: #fef3c7;
+                    color: #d97706;
+                }
+                
+                .healthy {
+                    background-color: #dcfce7;
+                    color: #16a34a;
+                }
+                
+                .page-break {
+                    page-break-after: always;
+                }
+                
+                .stock-level {
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-size: 8pt;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="farm-name">MOUNT OLIVE FARM HOUSE</div>
+                <div class="report-title">FERTILISER STOCK RECORDS REPORT</div>
+                <div class="report-info">Generated on: ${new Date().toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</div>
+                <div class="report-info">Total Records: ${dataToExport.length}</div>
+                <div class="report-info">
+                    Stock Levels: 
+                    <span class="stock-level critical">Critical</span> 
+                    <span class="stock-level low">Low</span> 
+                    <span class="stock-level healthy">Healthy</span>
+                </div>
+            </div>
+
+            ${searchTerm ? `
+            <div class="filter-info">
+                <strong>Filtered Records:</strong><br>
+                Search: "${searchTerm}"<br>
+            </div>
+            ` : ''}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fertilizer Name</th>
+                        <th>Type</th>
+                        <th>Current Stock</th>
+                        <th>Unit</th>
+                        <th>Supplier</th>
+                        <th>Storage Location</th>
+                        <th>Purchase Date</th>
+                        <th>Stock Level</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dataToExport.map(fertiliser => {
+                      const stockLevel = getStockLevelClass(fertiliser);
+                      const levelText = getStockLevelText(fertiliser);
+                      return `
+                        <tr>
+                            <td>${fertiliser.name || 'N/A'}</td>
+                            <td>${fertiliser.type || 'N/A'}</td>
+                            <td>${fertiliser.currentStock || '0'}</td>
+                            <td>${fertiliser.unit || 'N/A'}</td>
+                            <td>${fertiliser.supplierName || 'N/A'}</td>
+                            <td>${fertiliser.storageLocation || 'N/A'}</td>
+                            <td>${fertiliser.purchaseDate ? 
+                                 new Date(fertiliser.purchaseDate).toLocaleDateString() : 
+                                 'N/A'}</td>
+                            <td><span class="stock-level ${stockLevel}">${levelText}</span></td>
+                        </tr>
+                    `}).join('')}
+                </tbody>
+            </table>
+
+            <div class="footer">
+                Page 1 of 1 • Mount Olive Farm House Fertiliser Stock Records
+            </div>
+        </body>
+        </html>
+      `;
+
+      // Helper functions for PDF
+      function getStockLevelClass(item) {
+        const v = Number(item.currentStock);
+        if (isCriticalItem(item)) return "critical";
+        if (v <= 10) return "critical";
+        if (v <= 50) return "low";
+        return "healthy";
+      }
+
+      function getStockLevelText(item) {
+        const v = Number(item.currentStock);
+        if (isCriticalItem(item)) return "CRITICAL";
+        if (v <= 10) return "LOW";
+        if (v <= 50) return "MEDIUM";
+        return "HEALTHY";
+      }
+
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+
+      // Wait for content to load then print
+      printWindow.onload = function() {
+        printWindow.print();
+      };
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error generating PDF. Please try printing the page instead.");
     }
   };
 
-  const handleDownloadPDF = async () => {
-    const doc = new jsPDF("p", "mm", "a4");
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(34, 139, 34);
-    doc.text("Mount Olive Farm House - Fertiliser Stock Report", 14, 20);
-
-    const img = new Image();
-    img.src = "/logo192.png";
-    doc.addImage(img, "png", 150, 10, 40, 20);
-
-    let yPos = 40;
-
-    if (barRef.current) {
-      const barImg = await captureElementAsImage(barRef.current);
-      doc.addImage(barImg, "PNG", 14, yPos, 180, 70);
-      yPos += 80;
+  // Download as CSV
+  const downloadCSV = () => {
+    try {
+      const dataToExport = filteredStock;
+      
+      const headers = [
+        'Fertilizer Name',
+        'Type', 
+        'Current Stock',
+        'Unit',
+        'Supplier Name',
+        'Supplier Contact',
+        'Email',
+        'Purchase Price',
+        'Purchase Date',
+        'Storage Location',
+        'Storage Conditions',
+        'Notes'
+      ];
+      
+      const csvData = dataToExport.map(fertiliser => [
+        fertiliser.name || 'N/A',
+        fertiliser.type || 'N/A',
+        fertiliser.currentStock || '0',
+        fertiliser.unit || 'N/A',
+        fertiliser.supplierName || 'N/A',
+        fertiliser.supplierContact || 'N/A',
+        fertiliser.email || 'N/A',
+        fertiliser.purchasePrice || 'N/A',
+        fertiliser.purchaseDate ? 
+          new Date(fertiliser.purchaseDate).toLocaleDateString() : 
+          'N/A',
+        fertiliser.storageLocation || 'N/A',
+        fertiliser.storageConditions || 'N/A',
+        fertiliser.notes || 'N/A'
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(field => 
+          `"${String(field).replace(/"/g, '""')}"`
+        ).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `fertiliser_stock_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error("Error downloading CSV:", error);
+      alert("Error downloading data. Please try again.");
     }
-    if (lineRef.current) {
-      const lineImg = await captureElementAsImage(lineRef.current);
-      doc.addImage(lineImg, "PNG", 14, yPos, 180, 70);
-      yPos += 80;
-    }
-    if (pieRef.current) {
-      const pieImg = await captureElementAsImage(pieRef.current);
-      doc.addImage(pieImg, "PNG", 14, yPos, 180, 70);
-      yPos += 80;
-    }
-
-    autoTable(doc, {
-      head: [["ID", "Fertilizer Name", "Type", "Current Stock", "Unit"]],
-      body: stock.map((f) => [f._id, f.name, f.type, f.currentStock, f.unit]),
-      startY: yPos,
-      theme: "grid",
-      headStyles: { fillColor: [34, 139, 34], textColor: [255, 255, 255] },
-      styles: { textColor: [51, 51, 51], fontSize: 10 },
-    });
-
-    doc.save("FertiliserStock_Report.pdf");
   };
 
   const handleChange = (e) => {
@@ -201,7 +428,7 @@ const H_FertiliserStock = () => {
   const handleAddFertiliser = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:5000/api/fertilisers", newFertiliser);
+      await axios.post(`${API_BASE}/api/fertilisers`, newFertiliser);
       setShowForm(false);
       setNewFertiliser({
         name: "",
@@ -223,30 +450,6 @@ const H_FertiliserStock = () => {
       alert("Error adding fertiliser");
     }
   };
-
-  // Search filter across most fields
-  const filteredStock = stock.filter((f) => {
-    const q = (searchTerm || "").trim().toLowerCase();
-    if (!q) return true;
-    const fields = [
-      f._id,
-      f.name,
-      f.type,
-      f.unit,
-      f.supplierName,
-      f.supplierContact,
-      f.email,
-      f.storageLocation,
-      f.storageConditions,
-      f.notes,
-      f.purchaseDate,
-    ];
-    return (
-      fields.some((v) => String(v || "").toLowerCase().includes(q)) ||
-      String(f.currentStock || "").toLowerCase().includes(q) ||
-      String(f.purchasePrice || "").toLowerCase().includes(q)
-    );
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4 sm:px-6 lg:px-8">
@@ -282,54 +485,76 @@ const H_FertiliserStock = () => {
         </div>
 
         {/* Controls */}
-        <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
-          <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row md:justify-between items-center mb-8 space-y-3 md:space-y-0">
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition flex items-center gap-2"
+              onClick={() => setShowForm(!showForm)}
+            >
+              <span>➕</span>
+              {showForm ? "Close Form" : "Add New Fertiliser"}
+            </button>
+            <button
+              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition flex items-center gap-2"
+              onClick={handleDownloadPDF}
+            >
+              <span>📄</span>
+              Print Report
+            </button>
+            <button
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2"
+              onClick={downloadCSV}
+            >
+              <span>📊</span>
+              Download CSV
+            </button>
+          </div>
+
+          <div className="flex gap-2 w-full md:w-auto">
             <input
               type="text"
-              placeholder="Search fertiliser..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && setSearchTerm(searchInput)}
-              className="border border-gray-300 px-4 py-2 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              placeholder="Search fertiliser stock..."
+              className="w-full md:w-80 border border-gray-300 px-4 py-2 rounded-l-md focus:outline-none focus:ring-2 focus:ring-green-500"
             />
             <button
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition flex items-center gap-2"
               onClick={() => setSearchTerm(searchInput)}
             >
-              🔍 Search
+              <span>🔍</span>
+              Search
             </button>
-            {searchTerm && (
+            {(searchTerm || searchInput) && (
               <button
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded-lg"
+                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition"
                 onClick={() => {
-                  setSearchInput("");
                   setSearchTerm("");
+                  setSearchInput("");
                 }}
               >
                 Clear
               </button>
             )}
           </div>
-
-          <div className="flex space-x-4">
-            <button
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
-              onClick={() => setShowForm(!showForm)}
-            >
-              {showForm ? "Close Form" : "➕ Add New Fertiliser"}
-            </button>
-            <button
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200"
-              onClick={handleDownloadPDF}
-            >
-              📄 Download Report PDF
-            </button>
-          </div>
         </div>
+
+        {/* Active Filters Info */}
+        {searchTerm && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="text-sm text-green-800">
+              <strong>Active filters:</strong>
+              <span className="ml-2 bg-green-100 px-2 py-1 rounded">Search: "{searchTerm}"</span>
+              <span className="ml-2 text-green-600">
+                Showing {filteredStock.length} of {stock.length} records
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Add Fertiliser Form */}
         {showForm && (
-          <div className="bg-white p-8 rounded-xl shadow-lg mb-8">
+          <div className="mb-6 p-4 bg-white rounded-lg shadow border border-gray-200">
             <h2 className="text-2xl font-semibold text-green-700 mb-6">
               Add New Fertiliser
             </h2>
@@ -369,12 +594,20 @@ const H_FertiliserStock = () => {
                   />
                 </div>
               ))}
-              <div className="md:col-span-2 flex justify-end">
+              <div className="md:col-span-2 flex justify-end gap-2">
                 <button
                   type="submit"
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md"
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition flex items-center gap-2"
                 >
+                  <span>💾</span>
                   Save Fertiliser
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg shadow-md transition"
+                >
+                  Cancel
                 </button>
               </div>
             </form>
@@ -382,14 +615,32 @@ const H_FertiliserStock = () => {
         )}
 
         {loading ? (
-          <div className="text-center text-gray-600 text-lg">Loading stock...</div>
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+            <p className="mt-2 text-gray-600">Loading fertiliser stock...</p>
+          </div>
         ) : filteredStock.length === 0 ? (
-          <div className="text-center text-gray-600 text-lg">No stock available.</div>
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <p className="text-gray-500 text-lg mb-4">
+              {stock.length === 0 ? "No fertiliser stock records found." : "No records match your search criteria."}
+            </p>
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setSearchInput("");
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md font-semibold transition-colors"
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
         ) : (
           <>
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-              {/* Bar Chart - color coded with legend + download */}
+              {/* Bar Chart - color coded with legend */}
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div ref={barRef} className="flex justify-center">
                   <BarChart width={500} height={350} data={filteredStock}>
@@ -444,18 +695,9 @@ const H_FertiliserStock = () => {
                     </div>
                   </div>
                 </div>
-
-                <div className="mt-4 flex">
-                  <button
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
-                    onClick={() => downloadElementAsImage(barRef, "Fertiliser_BarChart")}
-                  >
-                    Download Bar Chart
-                  </button>
-                </div>
               </div>
 
-              {/* Line Chart + download */}
+              {/* Line Chart */}
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div ref={lineRef} className="flex justify-center">
                   <LineChart width={500} height={350} data={filteredStock}>
@@ -466,17 +708,9 @@ const H_FertiliserStock = () => {
                     <Line type="monotone" dataKey="currentStock" stroke="#60a5fa" strokeWidth={2} />
                   </LineChart>
                 </div>
-                <div className="mt-4 flex">
-                  <button
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
-                    onClick={() => downloadElementAsImage(lineRef, "Fertiliser_LineGraph")}
-                  >
-                    Download Line Graph
-                  </button>
-                </div>
               </div>
 
-              {/* Pie Chart + download */}
+              {/* Pie Chart */}
               <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center col-span-1 lg:col-span-2">
                 <div ref={pieRef} className="flex justify-center">
                   <PieChart width={500} height={350}>
@@ -497,14 +731,6 @@ const H_FertiliserStock = () => {
                     <Tooltip />
                   </PieChart>
                 </div>
-                <div className="mt-4 flex">
-                  <button
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md"
-                    onClick={() => downloadElementAsImage(pieRef, "Fertiliser_PieChart")}
-                  >
-                    Download Pie Chart
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -521,6 +747,8 @@ const H_FertiliserStock = () => {
                     <th className="py-3 px-6 text-left">Type</th>
                     <th className="py-3 px-6 text-left">Current Stock</th>
                     <th className="py-3 px-6 text-left">Unit</th>
+                    <th className="py-3 px-6 text-left">Supplier</th>
+                    <th className="py-3 px-6 text-left">Storage Location</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -534,6 +762,8 @@ const H_FertiliserStock = () => {
                       <td className="py-3 px-6 border-b">{f.type}</td>
                       <td className="py-3 px-6 border-b font-semibold">{f.currentStock}</td>
                       <td className="py-3 px-6 border-b">{f.unit}</td>
+                      <td className="py-3 px-6 border-b">{f.supplierName || "N/A"}</td>
+                      <td className="py-3 px-6 border-b">{f.storageLocation || "N/A"}</td>
                     </tr>
                   ))}
                 </tbody>
