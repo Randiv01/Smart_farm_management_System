@@ -191,6 +191,9 @@ import leaveRoutes from "./EmployeeManager/E-route/leaveRoutes.js";
 import overtimeRoutes from "./EmployeeManager/E-route/overtimeRoutes.js";
 import salaryRoutes from "./EmployeeManager/E-route/salaryRoutes.js";
 import reportRoutes from "./EmployeeManager/E-route/reportRoutes.js";
+import employeeDashboardRoutes from "./EmployeeManager/E-route/dashboardRoutes.js";
+import employeeNotificationRoutes from "./EmployeeManager/E-route/ENotificationRoutes.js";
+import employeeNotificationScheduler from "./EmployeeManager/E-services/ENotificationScheduler.js";
 
 // ESP32 Proxy Routes
 import esp32Routes from "./routes/esp32Routes.js";
@@ -261,6 +264,8 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/overtime", overtimeRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/employee-reports", reportRoutes);
+app.use("/api/dashboard", employeeDashboardRoutes);
+app.use("/api/employee-notifications", employeeNotificationRoutes);
 
 // ESP32 Proxy Routes - These proxy requests to your ESP32 device
 app.use("/", esp32Routes);
@@ -376,6 +381,11 @@ connectDB().then(() => {
     }, 60 * 60 * 1000);
     
     console.log('✅ Notification service started');
+    
+    // Start employee management notification scheduler
+    console.log('🔔 Starting Employee Management notification scheduler...');
+    employeeNotificationScheduler.start();
+    console.log('✅ Employee Management notification scheduler started');
     
     // Start automated feeding service
     automatedFeedingService.start();

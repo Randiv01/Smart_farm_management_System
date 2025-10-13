@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Menu, Bell, Sun, Moon, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, Sun, Moon, User, LogOut, ChevronDown, Bell } from "lucide-react";
 import { useETheme } from '../Econtexts/EThemeContext.jsx';
 import { useNavigate } from "react-router-dom";
 
@@ -7,7 +7,6 @@ export default function ETopNavbar({ onMenuClick, sidebarOpen }) {
   const { theme, toggleTheme } = useETheme();
   const darkMode = theme === "dark";
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const navigate = useNavigate();
 
@@ -104,21 +103,16 @@ export default function ETopNavbar({ onMenuClick, sidebarOpen }) {
             {darkMode ? <Sun size={20} className="text-yellow-300" /> : <Moon size={20} className="text-gray-600" />}
           </button>
 
-          {/* Notifications */}
-          <div className="relative">
-            <button
-              className={`p-2 rounded-full relative ${darkMode ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-600"}`}
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
-            >
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 bg-red-500 rounded-full w-2 h-2"></span>
-            </button>
-            {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-64 rounded-md shadow-lg py-2 z-50 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"}`}>
-                <p className="px-4 text-sm">No new notifications</p>
-              </div>
-            )}
-          </div>
+          {/* Notification Bell */}
+          <button
+            className={`p-2 rounded-md ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+            onClick={() => {
+              // Navigate to notifications page
+              navigate("/EmployeeManagement/notifications");
+            }}
+          >
+            <Bell size={20} className={darkMode ? "text-gray-200" : "text-gray-600"} />
+          </button>
 
           {/* User Menu */}
           <div className="relative">
