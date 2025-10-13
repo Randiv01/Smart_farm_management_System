@@ -163,6 +163,23 @@ export const deleteEmployee = async (req, res) => {
   }
 };
 
+// Get Caretakers (employees with "Care Taker" job title)
+export const getCaretakers = async (req, res) => {
+  try {
+    console.log("getCaretakers endpoint called");
+    const caretakers = await Employee.find({ 
+      title: { $regex: /care\s*taker/i },
+      status: "Active" 
+    }).select('id name department title contact');
+    
+    console.log(`Found ${caretakers.length} active caretakers`);
+    res.json({ caretakers });
+  } catch (err) {
+    console.error("Get caretakers error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // Generate Employee PDF
 export const generatePDF = async (req, res) => {
   try {

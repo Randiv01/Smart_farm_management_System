@@ -15,9 +15,9 @@ function AddAnimalType() {
   const [banner, setBanner] = useState(null);
   const [bannerError, setBannerError] = useState("");
   
-  // State for multiple caretakers
-  const [caretakers, setCaretakers] = useState([{ id: "", name: "", mobile: "" }]);
-  const [caretakerErrors, setCaretakerErrors] = useState([{}]);
+  // State for available caretakers from Employee Management
+  const [availableCaretakers, setAvailableCaretakers] = useState([]);
+  const [selectedCaretakers, setSelectedCaretakers] = useState([]);
   
   // States for dynamically fetched zone data
   const [zones, setZones] = useState([]);
@@ -64,26 +64,11 @@ const defaultIndividualCategories = [
       { name: "lastCheckup", label: "Last Checkup", type: "date", required: false },
       { name: "symptoms", label: "Symptoms", type: "text", required: false },
       {
-        name: "vaccinations",
-        label: "Vaccinations",
-        type: "select",
-        options: ["Not Vaccinated", "Partially Vaccinated", "Fully Vaccinated", "Overdue", "Unknown"],
-        required: true,readOnly: true
-      },
-      {
-  name: "reproductiveStatus",
-  label: "Reproductive Status",
+  name: "vaccinations",
+  label: "Vaccinations",
   type: "select",
-  options: [
-    "Not Pregnant",
-    "Pregnant",
-    "Lactating",
-    "Ready for Breeding",
-    "Unknown",
-    "None (Male)"
-  ],
-  required: false,
-  readOnly: true
+  options: ["Not Vaccinated", "Partially Vaccinated", "Fully Vaccinated", "Overdue", "Unknown"],
+  required: true,readOnly: true
 }
 
     ],
@@ -123,8 +108,8 @@ const defaultOtherCategories = [
   useEffect(() => {
     document.title = "Add New Animal Type";
 
-    // Fetch zones and zone types from the backend
-    const fetchZoneData = async () => {
+    // Fetch zones, zone types, and available caretakers from the backend
+    const fetchInitialData = async () => {
       try {
         setLoading(true);
         
@@ -139,16 +124,22 @@ const defaultOtherCategories = [
         if (!zoneTypesResponse.ok) throw new Error('Failed to fetch zone types');
         const zoneTypesData = await zoneTypesResponse.json();
         setZoneTypes(Object.keys(zoneTypesData) || []);
+        
+        // Fetch available caretakers from Employee Management
+        const caretakersResponse = await fetch('http://localhost:5000/api/employees/caretakers');
+        if (!caretakersResponse.ok) throw new Error('Failed to fetch caretakers');
+        const caretakersData = await caretakersResponse.json();
+        setAvailableCaretakers(caretakersData.caretakers || []);
 
       } catch (err) {
-        console.error("Failed to fetch zone data:", err);
-        setPopup({ show: true, success: false, message: "Failed to load zone data. Please try again." });
+        console.error("Failed to fetch initial data:", err);
+        setPopup({ show: true, success: false, message: "Failed to load data. Please try again." });
       } finally {
         setLoading(false);
       }
     };
     
-    fetchZoneData();
+    fetchInitialData();
   }, []);
 
   // Use a second useEffect to update categories based on the fetched data
@@ -217,18 +208,25 @@ const defaultOtherCategories = [
     setCategories(newCategories);
   };
 
-  // Handler for adding a new caretaker to the list
-  const handleAddCaretaker = () => {
-    setCaretakers([...caretakers, { id: "", name: "", mobile: "" }]);
-    setCaretakerErrors([...caretakerErrors, {}]);
+  // Handler for adding a selected caretaker from the dropdown
+  const handleAddCaretaker = (caretakerId) => {
+    if (!caretakerId) return;
+    
+    const caretaker = availableCaretakers.find(c => c.id === caretakerId);
+    if (!caretaker) return;
+    
+    // Check if already selected
+    if (selectedCaretakers.some(c => c.id === caretaker.id)) {
+      setPopup({ show: true, success: false, message: "This caretaker is already assigned" });
+      return;
+    }
+    
+    setSelectedCaretakers([...selectedCaretakers, caretaker]);
   };
 
   // Handler for removing a caretaker
-  const handleRemoveCaretaker = (index) => {
-    const newCaretakers = caretakers.filter((_, i) => i !== index);
-    const newCaretakerErrors = caretakerErrors.filter((_, i) => i !== index);
-    setCaretakers(newCaretakers);
-    setCaretakerErrors(newCaretakerErrors);
+  const handleRemoveCaretaker = (caretakerId) => {
+    setSelectedCaretakers(selectedCaretakers.filter(c => c.id !== caretakerId));
   };
 
   // NEW: Productivity field handlers
@@ -258,49 +256,17 @@ const defaultOtherCategories = [
     setProductivityFields(newFields);
   };
 
-  // Validate caretaker data
-  const validateCaretaker = (caretaker, index) => {
-    const errors = {};
-    
-    // Validate ID
-    if (!caretaker.id.trim()) {
-      errors.id = "Caretaker ID is required";
+  // Validate that at least one caretaker is selected
+  const validateCaretakers = () => {
+    if (selectedCaretakers.length === 0) {
+      return "At least one caretaker must be assigned";
     }
-    
-    // Validate Name
-    if (!caretaker.name.trim()) {
-      errors.name = "Caretaker name is required";
-    } else if (caretaker.name.trim().length < 2) {
-      errors.name = "Name must be at least 2 characters";
-    }
-    
-    // Validate Mobile
-    if (!caretaker.mobile.trim()) {
-      errors.mobile = "Mobile number is required";
-    } else if (!/^\d{10}$/.test(caretaker.mobile.trim())) {
-      errors.mobile = "Mobile number must be exactly 10 digits";
-    }
-    
-    return errors;
-  };
-
-  // Handler for changing caretaker fields
-  const handleCaretakerChange = (index, key, value) => {
-    const newCaretakers = [...caretakers];
-    newCaretakers[index][key] = value;
-    setCaretakers(newCaretakers);
-    
-    // Validate on change
-    const errors = validateCaretaker(newCaretakers[index], index);
-    const newCaretakerErrors = [...caretakerErrors];
-    newCaretakerErrors[index] = errors;
-    setCaretakerErrors(newCaretakerErrors);
+    return null;
   };
 
   // Validate all form data
   const validateForm = () => {
     let isValid = true;
-    const errors = {};
     
     // Validate animal type name
     if (!name.trim()) {
@@ -325,15 +291,11 @@ const defaultOtherCategories = [
     }
     
     // Validate caretakers
-    const newCaretakerErrors = [];
-    caretakers.forEach((caretaker, index) => {
-      const errors = validateCaretaker(caretaker, index);
-      if (Object.keys(errors).length > 0) {
-        isValid = false;
-      }
-      newCaretakerErrors.push(errors);
-    });
-    setCaretakerErrors(newCaretakerErrors);
+    const caretakerError = validateCaretakers();
+    if (caretakerError) {
+      setPopup({ show: true, success: false, message: caretakerError });
+      isValid = false;
+    }
     
     return isValid;
   };
@@ -341,11 +303,6 @@ const defaultOtherCategories = [
   // Handler for saving the animal type
   const handleSave = async () => {
     if (!validateForm()) {
-      setPopup({ 
-        show: true, 
-        success: false, 
-        message: "Please fix the validation errors before submitting" 
-      });
       return;
     }
 
@@ -356,7 +313,13 @@ const defaultOtherCategories = [
       const formData = new FormData();
       formData.append('name', name);
       formData.append('managementType', managementType);
-      formData.append('caretakers', JSON.stringify(caretakers));
+      // Send selected caretakers with their full information
+      formData.append('caretakers', JSON.stringify(selectedCaretakers.map(c => ({
+        id: c.id,
+        name: c.name,
+        mobile: c.contact || '',
+        department: c.department || ''
+      }))));
       formData.append('categories', JSON.stringify(categories));
       formData.append('productivityFields', JSON.stringify(productivityFields)); // NEW
       
@@ -384,8 +347,7 @@ const defaultOtherCategories = [
       // Reset form after successful save
       setName("");
       setBanner(null);
-      setCaretakers([{ id: "", name: "", mobile: "" }]);
-      setCaretakerErrors([{}]);
+      setSelectedCaretakers([]);
       setProductivityFields([{ name: "", label: "", type: "number", unit: "", required: false }]); // Reset productivity fields
 
     } catch (error) {
@@ -487,91 +449,78 @@ const defaultOtherCategories = [
           </div>
         </div>
 
-        {/* Caretaker fields for all management types */}
+        {/* Caretaker Selection from Employee Management */}
         <div className="mb-6 p-4 rounded-xl bg-white dark:bg-gray-800 shadow-md">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-            <h3 className="font-semibold text-lg dark:text-gray-200">Assigned Caretakers: *</h3>
-            <button
-              onClick={handleAddCaretaker}
-              className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center gap-1 transition-colors"
+          <h3 className="font-semibold text-lg mb-4 dark:text-gray-200">Assigned Caretakers: *</h3>
+          
+          {/* Dropdown to select caretakers */}
+          <div className="mb-4">
+            <label className="mb-2 text-sm font-medium dark:text-gray-200 block">
+              Select Caretaker from Employee Management System:
+            </label>
+            <select
+              onChange={(e) => handleAddCaretaker(e.target.value)}
+              value=""
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-gray-200"
             >
-              <span>+</span> Add Caretaker
-            </button>
+              <option value="">-- Select a Caretaker --</option>
+              {availableCaretakers
+                .filter(c => !selectedCaretakers.some(sc => sc.id === c.id))
+                .map((caretaker) => (
+                  <option key={caretaker.id} value={caretaker.id}>
+                    {caretaker.id} - {caretaker.name} ({caretaker.department})
+                  </option>
+                ))}
+            </select>
+            {availableCaretakers.length === 0 && (
+              <p className="text-yellow-600 dark:text-yellow-400 text-sm mt-2">
+                No active caretakers found in the system. Please add caretakers in Employee Management first.
+              </p>
+            )}
           </div>
-          <div className="flex flex-col gap-4">
-            {caretakers.map((caretaker, index) => (
-              <div key={index} className="flex flex-wrap gap-4 items-start p-4 rounded-xl bg-gray-100 dark:bg-gray-700 relative">
-                <div className="flex-1 min-w-[120px]">
-                  <label className="mb-1 text-sm font-medium dark:text-gray-200">ID: *</label>
-                  <input
-                    type="text"
-                    value={caretaker.id}
-                    onChange={(e) => handleCaretakerChange(index, "id", e.target.value)}
-                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
-                      caretakerErrors[index]?.id 
-                        ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
-                        : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
-                    }`}
-                    placeholder="CT-001"
-                  />
-                  {caretakerErrors[index]?.id && (
-                    <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].id}</p>
-                  )}
-                </div>
-                <div className="flex-1 min-w-[120px]">
-                  <label className="mb-1 text-sm font-medium dark:text-gray-200">Name: *</label>
-                  <input
-                    type="text"
-                    value={caretaker.name}
-                    onChange={(e) => handleCaretakerChange(index, "name", e.target.value)}
-                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
-                      caretakerErrors[index]?.name 
-                        ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
-                        : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
-                    }`}
-                    placeholder="John Doe"
-                  />
-                  {caretakerErrors[index]?.name && (
-                    <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].name}</p>
-                  )}
-                </div>
-                <div className="flex-1 min-w-[120px]">
-                  <label className="mb-1 text-sm font-medium dark:text-gray-200">Mobile: *</label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"   // mobile shows numeric keyboard
-                    pattern="[0-9]*"      // only allows digits in some browsers
-                    value={caretaker.mobile}
-                    onChange={(e) => {
-                      // Only allow digits in the state
-                      const value = e.target.value.replace(/\D/g, "");
-                      handleCaretakerChange(index, "mobile", value);
-                    }}
-                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 transition-colors ${
-                      caretakerErrors[index]?.mobile 
-                        ? "border-red-500 focus:ring-red-500 dark:bg-gray-600 dark:text-gray-200" 
-                        : "border-gray-300 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200"
-                    }`}
-                    placeholder="0765432140"
-                    maxLength={10}
-                  />
 
-                  {caretakerErrors[index]?.mobile && (
-                    <p className="text-red-500 text-xs mt-1">{caretakerErrors[index].mobile}</p>
-                  )}
-                </div>
-                {caretakers.length > 1 && (
-                  <button
-                    onClick={() => handleRemoveCaretaker(index)}
-                    className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm hover:bg-red-700 transition-colors mt-6"
-                    aria-label="Remove caretaker"
+          {/* Display selected caretakers */}
+          {selectedCaretakers.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold mb-2 dark:text-gray-300">Selected Caretakers:</h4>
+              <div className="flex flex-col gap-3">
+                {selectedCaretakers.map((caretaker) => (
+                  <div
+                    key={caretaker.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
                   >
-                    ✕
-                  </button>
-                )}
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">ID:</span>
+                        <p className="text-sm font-semibold dark:text-gray-200">{caretaker.id}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Name:</span>
+                        <p className="text-sm font-semibold dark:text-gray-200">{caretaker.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Department:</span>
+                        <p className="text-sm font-semibold dark:text-gray-200">{caretaker.department}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveCaretaker(caretaker.id)}
+                      className="ml-3 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm hover:bg-red-700 transition-colors flex-shrink-0"
+                      aria-label="Remove caretaker"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          
+          {selectedCaretakers.length === 0 && (
+            <p className="text-gray-500 dark:text-gray-400 text-sm italic mt-2">
+              No caretakers assigned yet. Please select at least one caretaker.
+            </p>
+          )}
         </div>
 
         {/* NEW: Productivity Fields Section */}
