@@ -58,10 +58,10 @@ export const addEmployee = async (req, res) => {
     console.log("Generated next ID:", nextId);
 
     const photoPath = req.files?.photo?.[0]?.filename
-      ? `/uploads/${req.files.photo[0].filename}`
+      ? `/employee-uploads/${req.files.photo[0].filename}`
       : null;
     const cvPath = req.files?.cv?.[0]?.filename
-      ? `/uploads/${req.files.cv[0].filename}`
+      ? `/employee-uploads/${req.files.cv[0].filename}`
       : null;
 
     const newEmployee = new Employee({
@@ -92,9 +92,9 @@ export const updateEmployee = async (req, res) => {
   try {
     const updateData = { ...req.body };
     if (req.files?.photo?.[0]?.filename)
-      updateData.photo = `/uploads/${req.files.photo[0].filename}`;
+      updateData.photo = `/employee-uploads/${req.files.photo[0].filename}`;
     if (req.files?.cv?.[0]?.filename)
-      updateData.cv = `/uploads/${req.files.cv[0].filename}`;
+      updateData.cv = `/employee-uploads/${req.files.cv[0].filename}`;
 
     const updated = await Employee.findOneAndUpdate(
       { id: req.params.id },
@@ -159,6 +159,26 @@ export const deleteEmployee = async (req, res) => {
     res.json({ message: "Employee deleted successfully" });
   } catch (err) {
     console.error("Delete employee error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get Employees by Job Title (e.g., Care Taker)
+export const getEmployeesByTitle = async (req, res) => {
+  try {
+    const { title } = req.params;
+    console.log("Fetching employees with title:", title);
+    
+    // Case-insensitive search for job title
+    const employees = await Employee.find({ 
+      title: { $regex: new RegExp(title, 'i') },
+      status: "Active" // Only active employees
+    }).select('id name department contact email');
+    
+    console.log(`Found ${employees.length} employees with title: ${title}`);
+    res.json({ employees });
+  } catch (err) {
+    console.error("Get employees by title error:", err);
     res.status(500).json({ error: err.message });
   }
 };

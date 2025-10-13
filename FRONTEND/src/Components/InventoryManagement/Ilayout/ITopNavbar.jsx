@@ -78,11 +78,56 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
     };
     
     window.addEventListener('storage', handleStorageChange);
+
+    // Listen for notification events from other components
+    const handleNotificationRead = (event) => {
+      const { notificationId, unreadCount: newUnreadCount, type } = event.detail;
+      
+      if (type === 'single' || type === 'revert') {
+        // Update the specific notification
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === notificationId 
+              ? { ...notification, read: type === 'single' }
+              : notification
+          )
+        );
+        setUnreadCount(newUnreadCount);
+      }
+    };
+
+    const handleAllNotificationsRead = (event) => {
+      const { unreadCount: newUnreadCount } = event.detail;
+      
+      // Mark all notifications as read
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, read: true }))
+      );
+      setUnreadCount(0);
+    };
+
+    const handleNotificationDeleted = (event) => {
+      const { notificationId, wasUnread, unreadCount: newUnreadCount } = event.detail;
+      
+      if (wasUnread) {
+        // Remove the notification and update count
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        setUnreadCount(newUnreadCount);
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('notificationRead', handleNotificationRead);
+    window.addEventListener('allNotificationsRead', handleAllNotificationsRead);
+    window.addEventListener('notificationDeleted', handleNotificationDeleted);
     
     return () => {
       newSocket.disconnect();
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('notificationRead', handleNotificationRead);
+      window.removeEventListener('allNotificationsRead', handleAllNotificationsRead);
+      window.removeEventListener('notificationDeleted', handleNotificationDeleted);
     };
   }, []);
 
@@ -110,20 +155,22 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       
       if (!token) return;
       
-      // Fetch both refill request notifications and general notifications for Inventory Management
-      const [refillResponse, generalResponse] = await Promise.all([
+      // Fetch refill request notifications, general notifications, and productivity notifications
+      const [refillResponse, generalResponse, productivityResponse] = await Promise.all([
         axios.get("http://localhost:5000/api/refill-requests/notifications", {
           headers: { Authorization: `Bearer ${token}` },
           params: { limit: 10 }
         }).catch(() => ({ data: [] })),
-        axios.get("http://localhost:5000/api/animal-management/notifications").catch(() => ({ data: { data: [] } }))
+        axios.get("http://localhost:5000/api/notifications/Inventory Management").catch(() => ({ data: { data: { notifications: [] } } })),
+        axios.get("http://localhost:5000/api/notifications/productivity", {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: { notifications: [] } }))
       ]);
       
-      // Combine both notification sources
+      // Combine all notification sources
       const refillNotifications = refillResponse.data || [];
-      const generalNotifications = Array.isArray(generalResponse.data?.data)
-        ? generalResponse.data.data
-        : (generalResponse.data?.data?.notifications || []);
+      const generalNotifications = generalResponse.data?.data?.notifications || [];
+      const productivityNotifications = productivityResponse.data?.notifications || [];
       
       // Convert general notifications to match the expected format
       const convertedGeneralNotifications = generalNotifications.map(notification => ({
@@ -137,8 +184,21 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
         data: notification.data
       }));
       
+      // Convert productivity notifications to match the expected format
+      const convertedProductivityNotifications = productivityNotifications.map(notification => ({
+        id: notification.id,
+        title: notification.data?.harvestType === 'meat' ? 'Meat Harvest Notification' : 'Productivity Harvest Notification',
+        message: `${notification.data?.senderName} reported ${notification.data?.quantity} ${notification.data?.unit} of ${notification.data?.productType} (${notification.data?.quality} quality)`,
+        type: 'productivity',
+        priority: notification.data?.quality === 'excellent' ? 'high' : notification.data?.quality === 'poor' ? 'low' : 'medium',
+        read: notification.read,
+        timestamp: notification.createdAt,
+        data: notification.data,
+        isProductivity: true
+      }));
+      
       // Merge all notifications, avoiding duplicates
-      const allNotifications = [...refillNotifications, ...convertedGeneralNotifications];
+      const allNotifications = [...refillNotifications, ...convertedGeneralNotifications, ...convertedProductivityNotifications];
       setNotifications(prev => {
         const existingIds = new Set(prev.map(n => n.id));
         const newNotifications = allNotifications.filter(n => !existingIds.has(n.id));
@@ -165,7 +225,12 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
         // Mark as read in the appropriate system
         if (notification.type === 'harvest') {
           // Mark general notification as read
-          await axios.patch(`http://localhost:5000/api/animal-management/notifications/${id}/read`);
+          await axios.patch(`http://localhost:5000/api/notifications/${id}/read`);
+        } else if (notification.type === 'productivity') {
+          // Mark productivity notification as read
+          await axios.patch(`http://localhost:5000/api/notifications/productivity/${id}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
         } else if (token) {
           // Mark refill request notification as read
           await axios.patch(`http://localhost:5000/api/refill-requests/notifications/${id}/read`, {}, {
@@ -195,15 +260,9 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
   const handleNotificationClick = (notification) => {
     markAsRead(notification.id);
     
-    // Navigate based on notification type
-    if (notification.type === "refillRequest" || notification.type === "lowStock") {
-      navigate("/InventoryManagement");
-    } else if (notification.type === "order") {
-      navigate("/InventoryManagement/orders");
-    } else if (notification.type === "refillRequestUpdate") {
-      // Navigate to refill requests page if available
-      navigate("/InventoryManagement/refill-requests");
-    }
+    // Navigate to the full notifications page for all notification types
+    // This provides a consistent experience like the "View all notifications" button
+    navigate("/InventoryManagement/notification");
     
     setNotificationsOpen(false);
   };
@@ -256,6 +315,7 @@ export default function TopNavbar({ onMenuClick, sidebarOpen }) {
       case "lowStock": return <AlertTriangle size={16} className="text-yellow-500" />;
       case "order": return <Package size={16} className="text-purple-500" />;
       case "harvest": return <CheckCircle size={16} className="text-green-600" />;
+      case "productivity": return <Package size={16} className="text-orange-500" />;
       default: return <Bell size={16} className="text-gray-500" />;
     }
   };

@@ -5,6 +5,7 @@ import {
   createFertiliser,
   updateFertiliser,
   deleteFertiliser,
+  decreaseFertiliserStock
 } from "../Controllers/H_FertiliserController.js";
 
 const router = express.Router();
@@ -14,5 +15,6 @@ router.get("/:id", getFertiliserById);
 router.post("/", createFertiliser);
 router.put("/:id", updateFertiliser);
 router.delete("/:id", deleteFertiliser);
+router.post("/decrease-stock", decreaseFertiliserStock);
 
 export default router;

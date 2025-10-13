@@ -29,6 +29,7 @@ import {
 import axios from 'axios';
 import Footer from '../UHFooter/UHFooter';
 import ChatBot from '../UHChatbot/UHChatbot';
+import SeasonalEffects from '../SeasonalEffects/SeasonalEffects';
 import { FaWhatsapp } from 'react-icons/fa';
 import { Link, useNavigate } from "react-router-dom";
 
@@ -452,6 +453,9 @@ const Home = () => {
 
   return (
     <>
+      {/* Seasonal Effects */}
+      <SeasonalEffects />
+      
       <main className="w-full bg-light-beige dark:bg-dark-bg min-h-screen">
         {/* Success Popup */}
         {showSuccessPopup && (
@@ -858,7 +862,7 @@ const Home = () => {
       </main>
       <Footer />
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
@@ -918,8 +922,9 @@ const Home = () => {
           visibility: visible;
           opacity: 1;
         }
-      `}</style>
+      `}} />
     </>
+
   );
 };
 

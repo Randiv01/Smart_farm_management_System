@@ -157,11 +157,11 @@ function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen p-6 bg-light-beige dark:bg-slate-900">
       <div className="max-w-7xl mx-auto space-y-12">
 
         {/* -------------------- Hero Slideshow -------------------- */}
-        <div className="relative rounded-xl overflow-hidden shadow-lg">
+        <div className="relative rounded-xl overflow-hidden shadow-lg bg-white/0 dark:bg-transparent">
           <img
             src={slides[slideIndex]}
             alt="Admin slide"
@@ -195,7 +195,7 @@ function Dashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Bar Chart */}
-            <div className="bg-white shadow-lg rounded-lg p-4" ref={barChartRef}>
+            <div className="rounded-lg p-4 shadow border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800" ref={barChartRef}>
               <h3 className="text-xl font-semibold text-green-700 mb-2">
                 Medicine Stock (Bar Chart)
               </h3>
@@ -223,7 +223,7 @@ function Dashboard() {
             </div>
 
             {/* Line Chart */}
-            <div className="bg-white shadow-lg rounded-lg p-4" ref={lineChartRef}>
+            <div className="rounded-lg p-4 shadow border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800" ref={lineChartRef}>
               <h3 className="text-xl font-semibold text-green-700 mb-2">
                 Medicine Stock (Line Chart)
               </h3>
@@ -262,11 +262,11 @@ function Dashboard() {
           </h2>
 
           {loadingDoctors ? (
-            <p className="text-center text-gray-600">Loading doctors...</p>
+            <p className="text-center text-gray-600 dark:text-slate-300">Loading doctors...</p>
           ) : doctors.length === 0 ? (
-            <p className="text-center text-gray-600">No doctors found.</p>
+            <p className="text-center text-gray-600 dark:text-slate-300">No doctors found.</p>
           ) : (
-            <div className="overflow-x-auto bg-white rounded-lg shadow">
+            <div className="overflow-x-auto rounded-lg shadow border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <table className="w-full table-auto">
                 <thead className="bg-green-600 text-white">
                   <tr>
@@ -280,7 +280,7 @@ function Dashboard() {
                   {doctors.map((d) => {
                     const waNumber = formatWhatsAppNumber(d.phoneNo);
                     return (
-                      <tr key={d._id} className="border-b hover:bg-green-50">
+                      <tr key={d._id} className="border-b border-gray-200 dark:border-slate-700 hover:bg-green-50 dark:hover:bg-slate-700/50">
                         <td className="px-6 py-3">
                           {d.profilePhoto ? (
                             <img
@@ -289,15 +289,15 @@ function Dashboard() {
                               className="w-14 h-14 rounded-full object-cover border-2 border-green-500"
                             />
                           ) : (
-                            <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
+                            <div className="w-14 h-14 rounded-full bg-gray-200 dark:bg-slate-600 flex items-center justify-center text-gray-600 dark:text-slate-100">
                               {d.fullName ? d.fullName.charAt(0) : "?"}
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-3 font-semibold text-gray-700">
+                        <td className="px-6 py-3 font-semibold text-gray-700 dark:text-slate-100">
                           {d.fullName}
                         </td>
-                        <td className="px-6 py-3 text-gray-600">{d.phoneNo}</td>
+                        <td className="px-6 py-3 text-gray-600 dark:text-slate-300">{d.phoneNo}</td>
                         <td className="px-6 py-3">
                           <div className="flex space-x-2 items-center">
                             {/* WhatsApp */}
@@ -306,7 +306,7 @@ function Dashboard() {
                                 href={`https://wa.me/${waNumber}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="p-1 rounded hover:bg-gray-100 transition-colors"
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                                 title="WhatsApp"
                                 aria-label="WhatsApp"
                               >
@@ -323,7 +323,7 @@ function Dashboard() {
                                 href={`mailto:${d.email}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="p-1 rounded hover:bg-gray-100 transition-colors"
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                                 title="Email"
                                 aria-label="Email"
                               >

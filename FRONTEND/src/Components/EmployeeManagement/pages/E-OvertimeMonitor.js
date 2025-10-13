@@ -526,6 +526,23 @@ export const OvertimeMonitor = () => {
   // pie colors
   const PIE_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f97316', '#f43f5e', '#a78bfa', '#22d3ee'];
 
+  // legend text color based on theme
+  const legendStyle = { color: darkMode ? '#E5E7EB' : '#374151' };
+
+  // custom pie label so text stays readable in dark mode
+  const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 1.1;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const label = `${name} (${formatHours(value)})`;
+    return (
+      <text x={x} y={y} fill={darkMode ? '#E5E7EB' : '#374151'} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12}>
+        {label}
+      </text>
+    );
+  };
+
   return (
     <div className={`p-4 space-y-6 min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'light-beige'}`}>
       {/* PAGE HEADER — title + one-line tagline */}
@@ -765,13 +782,13 @@ export const OvertimeMonitor = () => {
         <div className="space-y-6">
           {/* Controls (Export removed) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
+            <div className={`p-4 rounded-xl shadow ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold">Overtime Trend</h3>
                 <select
                   value={trendWindow}
                   onChange={(e) => setTrendWindow(e.target.value)}
-                  className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                  className={`border rounded-md px-2 py-1 ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-800'}`}
                 >
                   <option value="30">Last 30 Days</option>
                   <option value="90">Last 90 Days</option>
@@ -792,21 +809,21 @@ export const OvertimeMonitor = () => {
                           : {}
                       }
                     />
-                    <Legend />
+                    <Legend wrapperStyle={legendStyle} />
                     <Line type="monotone" dataKey="hours" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl shadow bg-white dark:bg-dark-card">
+            <div className={`p-4 rounded-xl shadow ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold">Top Overtime Employees</h3>
                 <button className="flex items-center gap-1 text-sm">
                   <select
                     value={topRange}
                     onChange={(e) => setTopRange(e.target.value)}
-                    className="border rounded-md px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+                    className={`border rounded-md px-2 py-1 ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-800'}`}
                   >
                     <option value="thisMonth">This Month</option>
                     <option value="lastMonth">Last Month</option>
@@ -824,13 +841,21 @@ export const OvertimeMonitor = () => {
                       nameKey="name"
                       data={topEmployees}
                       outerRadius={100}
-                      label={(d) => `${d.name} (${formatHours(d.hours)})`}
+                      label={renderPieLabel}
+                      labelLine={{ stroke: darkMode ? '#6B7280' : '#9CA3AF' }}
                     >
                       {topEmployees.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={
+                        darkMode
+                          ? { backgroundColor: '#1F2937', borderColor: '#374151', color: '#F9FAFB' }
+                          : {}
+                      }
+                    />
+                    <Legend wrapperStyle={legendStyle} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -865,7 +890,11 @@ export const OvertimeMonitor = () => {
                   value={formData.employee}
                   onChange={handleInputChange}
                   required
-                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                  className={`w-full border rounded-md px-3 py-2 ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
                 >
                   <option value="">Select Employee</option>
                   {employees.map((emp) => (
@@ -884,7 +913,11 @@ export const OvertimeMonitor = () => {
                   value={formData.date}
                   onChange={handleInputChange}
                   required
-                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                  className={`w-full border rounded-md px-3 py-2 ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
                 />
               </div>
 
@@ -899,7 +932,11 @@ export const OvertimeMonitor = () => {
                     value={formData.regularHours}
                     onChange={handleInputChange}
                     required
-                    className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                    className={`w-full border rounded-md px-3 py-2 ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }`}
                   />
                 </div>
 
@@ -913,7 +950,11 @@ export const OvertimeMonitor = () => {
                     value={formData.overtimeHours}
                     onChange={handleInputChange}
                     required
-                    className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                    className={`w-full border rounded-md px-3 py-2 ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }`}
                   />
                 </div>
               </div>
@@ -925,7 +966,11 @@ export const OvertimeMonitor = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                  className={`w-full border rounded-md px-3 py-2 ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-300'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
                 />
               </div>
 

@@ -1049,7 +1049,10 @@ const MonitorControl = () => {
       </div>
 
       {/* Compact ESP32 Connection Card */}
-      {(selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01') && (
+
+
+      {selectedGreenhouse === 'GH-01' && (
+
         <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">

@@ -607,7 +607,7 @@ const Catalog = () => {
     return (
       <>
         <Navbar onCartClick={toggleCart} />
-        <div className={`min-h-screen p-6 flex items-center justify-center bg-gray-50 text-gray-900`}>
+        <div className={`min-h-screen p-6 flex items-center justify-center ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
             <p className="mt-4">Loading products...</p>
@@ -641,7 +641,7 @@ const Catalog = () => {
       </div>
       <div ref={catalogRef} className="pt-0"></div>
    
-      <div className={`min-h-screen bg-gray-50 text-gray-900`}>
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
         {/* Hero Carousel - Smaller height */}
         <section className="relative w-full h-[50vh] overflow-hidden">
           {heroSlides.map((slide, index) => (
@@ -716,14 +716,14 @@ const Catalog = () => {
 
         {/* Trust Badges */}
         <section className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-white shadow-sm">
+          <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-2xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
             {features.map((feature, index) => (
               <div key={index} className="flex flex-col items-center text-center gap-2 p-3">
-                <div className="p-2 bg-green-50 rounded-full shadow-sm">
+                <div className={`p-2 rounded-full shadow-sm ${darkMode ? 'bg-green-900' : 'bg-green-50'}`}>
                   {feature.icon}
                 </div>
                 <span className="font-semibold text-sm">{feature.title}</span>
-                <p className="text-xs text-gray-600">{feature.description}</p>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{feature.description}</p>
               </div>
             ))}
           </div>
@@ -740,7 +740,7 @@ const Catalog = () => {
               <input
                 type="text"
                 placeholder="Search organic products..."
-                className="w-full pl-12 pr-10 py-3 rounded-xl border-2 bg-white border-gray-200 text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className={`w-full pl-12 pr-10 py-3 rounded-xl border-2 focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`}
                 value={searchTerm}
                 onChange={handleSearch}
                 onFocus={() => setShowSearchSuggestions(true)}
@@ -760,7 +760,7 @@ const Catalog = () => {
                 </div>
               )}
               {showSearchSuggestions && (
-                <div className="absolute top-full left-0 right-0 mt-2 rounded-xl shadow-lg z-10 bg-white">
+                <div className={`absolute top-full left-0 right-0 mt-2 rounded-xl shadow-lg z-10 ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
                   {searchTerm ? (
                     <div className="p-3 text-sm">
                       <p className="p-2">Search for "{searchTerm}"</p>
@@ -771,7 +771,7 @@ const Catalog = () => {
                       {popularSearches.map((search, index) => (
                         <div
                           key={index}
-                          className="p-3 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
+                          className={`p-3 rounded-lg cursor-pointer transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                           onClick={() => {
                             setSearchTerm(search);
                             setShowSearchSuggestions(false);
@@ -789,7 +789,7 @@ const Catalog = () => {
               <select
                 value={selectedMarket}
                 onChange={handleMarketChange}
-                className="px-4 py-3 rounded-xl border-2 bg-white border-gray-200 text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className={`px-4 py-3 rounded-xl border-2 focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
               >
                 <option value="Local Market">Local Market</option>
                 <option value="Export Market">Export Market</option>
@@ -797,7 +797,7 @@ const Catalog = () => {
               <select
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
-                className="px-4 py-3 rounded-xl border-2 bg-white border-gray-200 text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className={`px-4 py-3 rounded-xl border-2 focus:ring-2 focus:ring-green-500 focus:border-transparent ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
               >
                 {categories.map(category => (
                   <option key={category} value={category}>{category}</option>
@@ -806,13 +806,13 @@ const Catalog = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                  className="p-3 rounded-xl flex items-center gap-2 transition-colors bg-white hover:bg-gray-100 border-2 border-gray-200 focus:ring-2 focus:ring-green-500"
+                  className={`p-3 rounded-xl flex items-center gap-2 transition-colors border-2 focus:ring-2 focus:ring-green-500 ${darkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-100 border-gray-200'}`}
                 >
                   <Filter size={20} />
                   <span className="font-semibold hidden sm:inline">Filters</span>
                 </button>
                 {showFilterDropdown && (
-                  <div className="absolute right-0 mt-2 w-80 rounded-xl shadow-xl z-20 p-5 bg-white border border-gray-200 animate-slideDown">
+                  <div className={`absolute right-0 mt-2 w-80 rounded-xl shadow-xl z-20 p-5 border animate-slideDown ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="font-semibold text-lg">Filter Products</h3>
                       <button
@@ -895,7 +895,7 @@ const Catalog = () => {
                           type="number"
                           value={priceRange[0]}
                           onChange={(e) => handlePriceRangeChange(e, 0)}
-                          className="w-20 p-2 rounded-lg border text-sm bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500"
+                          className={`w-20 p-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                           min="0"
                           max={priceRange[1]}
                         />
@@ -904,7 +904,7 @@ const Catalog = () => {
                           type="number"
                           value={priceRange[1]}
                           onChange={(e) => handlePriceRangeChange(e, 1)}
-                          className="w-20 p-2 rounded-lg border text-sm bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500"
+                          className={`w-20 p-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                           min={priceRange[0]}
                           max="100"
                         />
@@ -953,13 +953,13 @@ const Catalog = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowRecentlyViewedDropdown(!showRecentlyViewedDropdown)}
-                  className="p-3 rounded-xl flex items-center gap-2 transition-colors bg-white hover:bg-gray-100 border-2 border-gray-200"
+                  className={`p-3 rounded-xl flex items-center gap-2 transition-colors border-2 ${darkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-100 border-gray-200'}`}
                 >
                   <Clock size={20} />
                   <span className="font-semibold hidden sm:inline">Viewed</span>
                 </button>
                 {showRecentlyViewedDropdown && (
-                  <div className="absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 bg-white border border-gray-200 max-h-96 overflow-y-auto">
+                  <div className={`absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 border max-h-96 overflow-y-auto ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                     <div className="p-4">
                       <h3 className="font-semibold mb-3">Recently Viewed</h3>
                       {recentlyViewed.length > 0 ? (
@@ -967,7 +967,7 @@ const Catalog = () => {
                           {recentlyViewed.slice(0, 6).map((product) => (
                             <div
                               key={product._id}
-                              className="rounded-xl p-3 cursor-pointer transition-all hover:scale-105 bg-gray-50"
+                              className={`rounded-xl p-3 cursor-pointer transition-all hover:scale-105 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
                               onClick={() => {
                                 openQuickView(product);
                                 setShowRecentlyViewedDropdown(false);
@@ -986,7 +986,7 @@ const Catalog = () => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500">No recently viewed items.</p>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No recently viewed items.</p>
                       )}
                     </div>
                   </div>
@@ -997,7 +997,7 @@ const Catalog = () => {
        
           {/* Filter Summary */}
           {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
-            <div className="mb-6 p-4 rounded-xl bg-green-50">
+            <div className={`mb-6 p-4 rounded-xl ${darkMode ? 'bg-green-900/30' : 'bg-green-50'}`}>
               <p className="text-sm">
                 Showing results for
                 {searchTerm && <span className="font-semibold"> "{searchTerm}"</span>}
@@ -1047,7 +1047,7 @@ const Catalog = () => {
                   return (
                     <div
                       key={product._id}
-                      className="relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 group bg-white"
+                      className={`relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 group ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
                     >
                       {/* Product Image Container */}
                       <div
@@ -1199,14 +1199,14 @@ const Catalog = () => {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex justify-center mt-10">
-                  <div className="flex items-center gap-2 bg-white rounded-xl p-2 shadow-sm">
+                  <div className={`flex items-center gap-2 rounded-xl p-2 shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                       className={`p-2 rounded-lg flex items-center justify-center transition-all ${
                         currentPage === 1
                           ? 'opacity-50 cursor-not-allowed text-gray-400'
-                          : 'text-green-600 hover:bg-green-50'
+                          : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-green-50'
                       }`}
                       aria-label="Previous page"
                     >
@@ -1220,7 +1220,7 @@ const Catalog = () => {
                         className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all font-medium text-sm ${
                           currentPage === page
                             ? 'bg-green-600 text-white shadow-sm'
-                            : 'text-gray-600 hover:bg-green-50'
+                            : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-green-50'
                         }`}
                         aria-label={`Page ${page}`}
                       >
@@ -1234,7 +1234,7 @@ const Catalog = () => {
                       className={`p-2 rounded-lg flex items-center justify-center transition-all ${
                         currentPage === totalPages
                           ? 'opacity-50 cursor-not-allowed text-gray-400'
-                          : 'text-green-600 hover:bg-green-50'
+                          : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-green-50'
                       }`}
                       aria-label="Next page"
                     >
@@ -1245,13 +1245,13 @@ const Catalog = () => {
               )}
             </>
           ) : (
-            <div className="text-center py-12 rounded-2xl bg-white shadow-sm">
+            <div className={`text-center py-12 rounded-2xl shadow-sm ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="max-w-md mx-auto">
-                <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                <div className={`w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
                   <Search size={32} className="text-gray-400" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">No products found</h3>
-                <p className="text-gray-500 mb-6">
+                <p className={`mb-6 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   Try adjusting your search or filter criteria to find what you're looking for.
                 </p>
                 {(searchTerm || selectedCategory !== "All" || selectedMarket !== "Local Market") && (
@@ -1275,8 +1275,8 @@ const Catalog = () => {
         {/* Quick View Modal */}
         {quickViewProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fadeIn">
-            <div className="max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl bg-white max-h-[90vh] flex flex-col">
-              <div className="p-5 border-b flex justify-between items-center bg-gradient-to-r from-green-50 to-green-100">
+            <div className={`max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className={`p-5 border-b flex justify-between items-center ${darkMode ? 'bg-gradient-to-r from-gray-700 to-gray-600 border-gray-700' : 'bg-gradient-to-r from-green-50 to-green-100'}`}>
                 <h2 className="text-xl font-bold">{quickViewProduct.name}</h2>
                 <button
                   onClick={() => setQuickViewProduct(null)}
@@ -1308,7 +1308,7 @@ const Catalog = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => shareProduct(quickViewProduct)}
-                        className="flex-1 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        className={`flex-1 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                       >
                         <Share size={16} /> Share
                       </button>
@@ -1317,7 +1317,7 @@ const Catalog = () => {
                           setQuickViewProduct(null);
                           openReviewModal(quickViewProduct);
                         }}
-                        className="flex-1 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        className={`flex-1 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                       >
                         <MessageCircle size={16} /> Write Review
                       </button>
@@ -1326,7 +1326,7 @@ const Catalog = () => {
                   <div className="space-y-5">
                     <div>
                       <p className="text-2xl font-bold text-green-600 mb-1">${quickViewProduct.price}/{quickViewProduct.stock.unit}</p>
-                      <p className="text-base text-gray-700 leading-relaxed">
+                      <p className={`text-base leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         {quickViewProduct.description || "Fresh farm product with premium quality."}
                       </p>
                     </div>
@@ -1335,7 +1335,7 @@ const Catalog = () => {
                         {renderStars(getAverageRating(quickViewProduct._id), 18)}
                         <span className="text-base font-semibold">{getAverageRating(quickViewProduct._id)}/5</span>
                       </div>
-                      <span className="text-sm text-gray-500">
+                      <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                         ({getReviewCount(quickViewProduct._id)} {getReviewCount(quickViewProduct._id) === 1 ? 'review' : 'reviews'})
                       </span>
                     </div>
@@ -1349,26 +1349,26 @@ const Catalog = () => {
                           return (
                             <div key={star} className="flex items-center gap-2">
                               <div className="flex">{renderStars(star, 14)}</div>
-                              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                                 <div
                                   className="h-full bg-yellow-400"
                                   style={{ width: `${percentage}%` }}
                                 ></div>
                               </div>
-                              <span className="w-6 text-xs text-gray-700">{count}</span>
+                              <span className={`w-6 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{count}</span>
                             </div>
                           );
                         })
                       )}
                     </div>
-                    <div className="p-3 rounded-lg bg-green-50">
+                    <div className={`p-3 rounded-lg ${darkMode ? 'bg-green-900/30' : 'bg-green-50'}`}>
                       <div className="flex items-center gap-2 mb-1">
                         <Truck size={18} className="text-green-600" />
                         <span className="font-semibold text-sm">Delivery Information</span>
                       </div>
                       <p className="text-xs">Free delivery on orders over $50. Next day delivery available.</p>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       Stock: {quickViewProduct.stock.quantity} {quickViewProduct.stock.unit}
                     </p>
                     <button
@@ -1395,7 +1395,7 @@ const Catalog = () => {
                       {reviews[quickViewProduct._id].map((review, index) => (
                         <div
                           key={index}
-                          className="p-3 rounded-lg border bg-gray-50 border-gray-200"
+                          className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex flex-col">
@@ -1411,21 +1411,21 @@ const Catalog = () => {
                                   </button>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-500">
+                              <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {new Date(review.date).toLocaleDateString()}
                               </span>
                             </div>
                             <div className="flex">{renderStars(review.rating, 14)}</div>
                           </div>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          <p className={`text-sm whitespace-pre-wrap ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                             {review.comment}
                           </p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="p-4 rounded-lg bg-gray-50">
-                      <p className="text-sm text-gray-500 mb-2 text-center">
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <p className={`text-sm mb-2 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                         No reviews yet. Be the first to review this product!
                       </p>
                       <button
@@ -1445,7 +1445,7 @@ const Catalog = () => {
         {/* Image Modal */}
         {showImageModal && (
           <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 animate-fadeIn">
-            <div className="max-w-3xl w-full rounded-2xl overflow-hidden shadow-2xl bg-white">
+            <div className={`max-w-3xl w-full rounded-2xl overflow-hidden shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="p-3 border-b flex justify-between items-center">
                 <h2 className="text-lg font-bold">Product Image</h2>
                 <button
@@ -1477,7 +1477,7 @@ const Catalog = () => {
         {/* Review Modal */}
         {showReviewModal && reviewProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center animate-fadeIn">
-            <div className="max-w-md w-full m-4 rounded-xl overflow-hidden shadow-2xl bg-white">
+            <div className={`max-w-md w-full m-4 rounded-xl overflow-hidden shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="p-4 border-b flex justify-between items-center">
                 <h2 className="text-lg font-bold">{editingReview ? "Edit Review" : "Review"} {reviewProduct.name}</h2>
                 <button onClick={() => {
@@ -1494,7 +1494,7 @@ const Catalog = () => {
                     <div className="flex justify-center mb-2">
                       {renderInteractiveStars(userReview.rating, (rating) => setUserReview({...userReview, rating}))}
                     </div>
-                    <div className="text-center text-xs text-gray-500">
+                    <div className={`text-center text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       {userReview.rating === 0 ? "Select your rating" :
                        userReview.rating === 1 ? "Poor" :
                        userReview.rating === 2 ? "Fair" :
@@ -1507,7 +1507,7 @@ const Catalog = () => {
                     <textarea
                       value={userReview.comment}
                       onChange={(e) => setUserReview({...userReview, comment: e.target.value})}
-                      className="w-full p-3 rounded-lg border bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500 text-sm"
+                      className={`w-full p-3 rounded-lg border focus:ring-2 focus:ring-green-500 text-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`}
                       rows="3"
                       placeholder="Share your experience with this product..."
                       required
@@ -1520,7 +1520,7 @@ const Catalog = () => {
                         type="text"
                         value={userReview.name}
                         onChange={(e) => setUserReview({...userReview, name: e.target.value})}
-                        className="w-full p-2.5 rounded-lg border bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500 text-sm"
+                        className={`w-full p-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 text-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="John Doe"
                         required
                       />
@@ -1531,7 +1531,7 @@ const Catalog = () => {
                         type="email"
                         value={userReview.email}
                         onChange={(e) => setUserReview({...userReview, email: e.target.value})}
-                        className="w-full p-2.5 rounded-lg border bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500 text-sm"
+                        className={`w-full p-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 text-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="john@example.com"
                         required
                       />

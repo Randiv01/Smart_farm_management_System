@@ -13,7 +13,7 @@ const AdminLayout = () => {
   const { darkMode, toggleTheme, sidebarOpen, toggleSidebar } = useTheme();
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div className={`min-h-screen ${darkMode ? "bg-slate-900" : "bg-light-beige"}`}>
       {/* Fixed Sidebar */}
       <NavBar 
         sidebarOpen={sidebarOpen}  // Changed from isCollapsed to sidebarOpen

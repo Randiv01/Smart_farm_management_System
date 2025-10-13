@@ -9,10 +9,12 @@ import {
 } from "recharts";
 import { useETheme } from '../Econtexts/EThemeContext.jsx';
 
-export const EmployeeChart = () => {
+export const EmployeeChart = ({ data: propData }) => {
   const { theme } = useETheme();
   const darkMode = theme === 'dark';
-  const data = [
+  
+  // Use prop data if available, otherwise use default data
+  const data = propData && propData.length > 0 ? propData : [
     { name: "Full-time", value: 35, color: "#22c55e" },
     { name: "Part-time", value: 8, color: "#3b82f6" },
     { name: "Contract", value: 5, color: "#f59e0b" },
