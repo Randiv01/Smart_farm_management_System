@@ -121,11 +121,6 @@ import mediStoreRoutes from "./HealthManagement/Routes/H_mediStoreRoute.js";
 import plantPathologistRoutes from "./HealthManagement/Routes/H_PlantPathologistRoute.js";
 import fertiliserRoutes from "./HealthManagement/Routes/H_FertiliserRoute.js";
 import fertiliserCompanyRoutes from "./HealthManagement/Routes/fertiliserCompanyRoutes.js";
-import animalTreatmentRoutes from "./HealthManagement/Routes/H_animalTreatmentRoutes.js";
-import H_plantTreatmentRoutes from "./HealthManagement/Routes/H_plantTreatmentRoutes.js"; // ✅ Your new route
-
-// 📞 Contact Us
-import contact from "./ContactUs/routes/contactRoutes.js";
 
 // 🌱 Plant Management
 import inspectionRoutes from "./PlantManagement/Routes/inspectionRoutes.js";
@@ -178,6 +173,10 @@ app.use("/api/medistore", mediStoreRoutes);
 app.use("/api/plant-pathologists", plantPathologistRoutes);
 app.use("/api/fertilisers", fertiliserRoutes);
 app.use("/api/fertiliser-companies", fertiliserCompanyRoutes);
+
+//Contact us
+app.use("/api/contact", contact);
+
 
 // IMPORTANT: Match frontend endpoint
 app.use("/api/animal-treatments", animalTreatmentRoutes);
