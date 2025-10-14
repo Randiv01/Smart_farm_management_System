@@ -118,3 +118,31 @@ export const createFeedingHistory = async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 };
+
+// Update feeding history (for cancellation, etc.)
+export const updateFeedingHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    console.log(`Updating feeding history ${id}:`, updateData);
+
+    const updatedHistory = await FeedingHistory.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    )
+    .populate("zoneId", "name type")
+    .populate("foodId", "name remaining unit");
+
+    if (!updatedHistory) {
+      return res.status(404).json({ message: "Feeding history not found" });
+    }
+
+    console.log(`Feeding history updated successfully:`, updatedHistory);
+    res.json(updatedHistory);
+  } catch (err) {
+    console.error("Error updating feeding history:", err);
+    res.status(400).json({ message: err.message });
+  }
+};

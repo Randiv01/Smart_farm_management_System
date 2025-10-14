@@ -83,7 +83,7 @@ class AutomatedFeedingService {
           $lte: new Date(currentTime + 60000), // Due within next 1 minute
           $gte: new Date(currentTime - 60000) // Or up to 1 minute ago
         },
-        status: "scheduled", // ONLY scheduled status (not processing, completed, or failed)
+        status: "scheduled", // ONLY scheduled status (not processing, completed, failed, or cancelled)
         immediate: false, // ONLY automated feedings (exclude manual "Feed Now")
         attemptCount: { $lt: 3 } // ONLY feedings that haven't exceeded max attempts
       })

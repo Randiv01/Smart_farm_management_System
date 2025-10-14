@@ -724,6 +724,43 @@ export default function FeedingScheduler() {
     }
   };
 
+  // Cancel a scheduled feeding
+  const cancelScheduledFeeding = async (feedingId, zoneName, feedName) => {
+    // Confirm cancellation
+    if (!window.confirm(`Are you sure you want to cancel this scheduled feeding?\n\nZone: ${zoneName}\nFeed: ${feedName}`)) {
+      return;
+    }
+
+    try {
+      console.log(`[FRONTEND] Cancelling feeding: ${feedingId}`);
+      
+      const response = await fetch(`http://localhost:5000/api/feeding/history/${feedingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          status: "cancelled",
+          cancelledAt: new Date().toISOString()
+        }),
+      });
+
+      if (response.ok) {
+        console.log(`[FRONTEND] Feeding cancelled successfully`);
+        showPopup("success", `Scheduled feeding cancelled: ${zoneName} - ${feedName}`);
+        
+        // Refresh all data
+        await refreshFeedingData();
+        await fetchNextScheduledFeeding();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`[FRONTEND] Failed to cancel feeding:`, errorData);
+        showPopup("error", "Failed to cancel scheduled feeding");
+      }
+    } catch (error) {
+      console.error("[FRONTEND] Error cancelling scheduled feeding:", error);
+      showPopup("error", "Failed to cancel scheduled feeding");
+    }
+  };
+
   // Sync ESP32 IP with backend service
   const syncEsp32IpWithBackend = async () => {
     if (!esp32Ip) return;
@@ -1263,24 +1300,46 @@ export default function FeedingScheduler() {
                         </div>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium text-blue-500">
-                        {new Date(feeding.feedingTime).toLocaleDateString()}
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <div>
+                        <div className="font-medium text-blue-500">
+                          {new Date(feeding.feedingTime).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(feeding.feedingTime).toLocaleTimeString()}
+                        </div>
+                        <div className={`text-xs mt-1 px-2 py-1 rounded-full ${
+                          feeding.status === "completed" 
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : feeding.status === "failed"
+                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                            : feeding.status === "retrying"
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        }`}>
+                          {feeding.status || "scheduled"}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {new Date(feeding.feedingTime).toLocaleTimeString()}
-                      </div>
-                      <div className={`text-xs mt-1 px-2 py-1 rounded-full ${
-                        feeding.status === "completed" 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : feeding.status === "failed"
-                          ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                          : feeding.status === "retrying"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      }`}>
-                        {feeding.status || "scheduled"}
-                      </div>
+                      
+                      {/* Cancel button - only show for scheduled feedings */}
+                      {feeding.status === "scheduled" && (
+                        <button
+                          onClick={() => cancelScheduledFeeding(
+                            feeding._id,
+                            feeding.zoneId?.name || "Unknown Zone",
+                            getFoodName(feeding.foodId)
+                          )}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                            darkMode 
+                              ? "bg-red-900/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 border border-red-500/30" 
+                              : "bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200"
+                          }`}
+                          title="Cancel this scheduled feeding"
+                        >
+                          <X size={14} />
+                          <span>Cancel</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
