@@ -11,7 +11,7 @@ const feedingHistorySchema = new mongoose.Schema({
   animalCount: { type: Number, default: 1 }, // Number of animals fed in this zone
   status: { 
     type: String, 
-    enum: ["scheduled", "completed", "failed", "cancelled", "retrying"], 
+    enum: ["scheduled", "completed", "failed", "cancelled", "processing"], 
     default: "scheduled" 
   },
   executedAt: { type: Date }, // When the feeding was actually executed

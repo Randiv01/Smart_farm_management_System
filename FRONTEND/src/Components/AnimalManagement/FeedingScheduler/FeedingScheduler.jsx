@@ -150,41 +150,19 @@ export default function FeedingScheduler() {
     return () => clearInterval(countdownInterval);
   }, [nextScheduledFeeding]);
 
-  // Set up real-time updates for automated feeding status
+  // Set up periodic updates for automated feeding status (reduced frequency to prevent premature triggers)
   useEffect(() => {
-    let statusInterval;
-    
-    const updateInterval = () => {
-      // Check if we have a feeding due soon (within 30 seconds)
-      const hasFeedingSoon = nextScheduledFeeding && nextScheduledFeeding.feedingTime && 
-        (new Date(nextScheduledFeeding.feedingTime).getTime() - new Date().getTime()) <= 30000;
-      
-      // Use faster updates when feeding is due soon, slower otherwise
-      const intervalMs = hasFeedingSoon ? 500 : 5000; // 500ms for more responsive updates
-      
-      statusInterval = setInterval(() => {
-        fetchAutomatedFeedingStatus();
-        fetchNextScheduledFeeding();
-        refreshFeedingData(); // Also refresh history data
-      }, intervalMs);
-      
-      return intervalMs;
-    };
-    
-    // Set initial interval
-    const initialInterval = updateInterval();
-    
-    // Update interval when nextScheduledFeeding changes
-    const intervalUpdateTimer = setInterval(() => {
-      clearInterval(statusInterval);
-      updateInterval();
-    }, 10000); // Check every 10 seconds if we need to change update frequency
-    
+    // Update every 30 seconds to match backend check interval
+    const statusInterval = setInterval(() => {
+      fetchAutomatedFeedingStatus();
+      fetchNextScheduledFeeding();
+      refreshFeedingData();
+    }, 30000); // 30 seconds to match backend
+
     return () => {
       clearInterval(statusInterval);
-      clearInterval(intervalUpdateTimer);
     };
-  }, [nextScheduledFeeding]);
+  }, []);
 
   // Update max quantity when feed changes
   useEffect(() => {
@@ -409,14 +387,16 @@ export default function FeedingScheduler() {
   // Update feeding history and reduce feed stock for immediate feeding
   const updateFeedingHistoryAndStock = async () => {
     try {
-      // Create feeding history entry
+      // Create feeding history entry with completed status
       const historyData = {
         zoneId: formData.zoneId,
         foodId: formData.foodId,
         quantity: formData.quantity,
         feedingTime: new Date().toISOString(),
         notes: formData.notes + " (Immediate feeding)",
-        immediate: true
+        immediate: true,
+        status: "completed", // Mark as completed immediately
+        executedAt: new Date().toISOString()
       };
 
       await fetch("http://localhost:5000/api/feeding/history", {
@@ -638,9 +618,24 @@ export default function FeedingScheduler() {
   // Refresh feeding history and scheduled feedings
   const refreshFeedingData = async () => {
     try {
+      console.log("[FRONTEND] Refreshing feeding history...");
       const historyRes = await fetch("http://localhost:5000/api/feeding/history");
       if (historyRes.ok) {
         const historyData = await historyRes.json();
+        console.log("[FRONTEND] Feeding history count:", historyData.length);
+        
+        // Log recent feedings
+        const recentFeedings = historyData.slice(0, 3);
+        recentFeedings.forEach((f, i) => {
+          console.log(`[FRONTEND] Recent feeding ${i+1}:`, {
+            zone: f.zoneId?.name,
+            feed: f.foodId?.name || f.foodId?.foodName,
+            time: f.feedingTime,
+            status: f.status,
+            immediate: f.immediate
+          });
+        });
+        
         setFeedingHistory(historyData || []);
         
         // Filter scheduled feedings (future feedings)
@@ -648,10 +643,11 @@ export default function FeedingScheduler() {
         const scheduled = historyData.filter(h => 
           h.feedingTime && new Date(h.feedingTime) > now && !h.immediate
         );
+        console.log("[FRONTEND] Scheduled feedings count:", scheduled.length);
         setScheduledFeedings(scheduled);
       }
     } catch (error) {
-      console.error("Error refreshing feeding data:", error);
+      console.error("[FRONTEND] Error refreshing feeding data:", error);
     }
   };
 
@@ -671,26 +667,40 @@ export default function FeedingScheduler() {
   // Fetch automated feeding service status
   const fetchAutomatedFeedingStatus = async () => {
     try {
+      console.log("[FRONTEND] Fetching automated feeding status...");
       const response = await fetch("http://localhost:5000/api/automated-feeding/status");
       if (response.ok) {
         const data = await response.json();
+        console.log("[FRONTEND] Automated feeding status:", data.data);
         setAutomatedFeedingStatus(data.data);
+      } else {
+        console.error("[FRONTEND] Failed to fetch status, response:", response.status);
       }
     } catch (error) {
-      console.error("Error fetching automated feeding status:", error);
+      console.error("[FRONTEND] Error fetching automated feeding status:", error);
     }
   };
 
   // Fetch next scheduled feeding
   const fetchNextScheduledFeeding = async () => {
     try {
+      console.log("[FRONTEND] Fetching next scheduled feeding...");
       const response = await fetch("http://localhost:5000/api/automated-feeding/next-feeding");
       if (response.ok) {
         const data = await response.json();
+        console.log("[FRONTEND] Next scheduled feeding:", data.data);
+        if (data.data) {
+          console.log("[FRONTEND] - Zone:", data.data.zoneId?.name);
+          console.log("[FRONTEND] - Feed:", data.data.foodId?.name);
+          console.log("[FRONTEND] - Time:", data.data.feedingTime);
+          console.log("[FRONTEND] - Status:", data.data.status);
+        }
         setNextScheduledFeeding(data.data);
+      } else {
+        console.error("[FRONTEND] Failed to fetch next feeding, response:", response.status);
       }
     } catch (error) {
-      console.error("Error fetching next scheduled feeding:", error);
+      console.error("[FRONTEND] Error fetching next scheduled feeding:", error);
     }
   };
 
@@ -748,41 +758,10 @@ export default function FeedingScheduler() {
     if (timeDiff <= 1000) {
       setCountdownTime({ days: 0, hours: 0, minutes: 0, seconds: 0, isDue: true });
       
-      // Trigger immediate refresh when countdown reaches 0 to check for execution
+      // Trigger refresh when countdown reaches 0 to update UI (backend handles execution)
       if (timeDiff <= 0) {
-        // Immediate refresh without delay for faster execution
         fetchNextScheduledFeeding();
         refreshFeedingData();
-        
-        // Also trigger manual feeding check to ensure immediate execution
-        try {
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/automated-feeding/check`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-          
-          if (response.ok) {
-            console.log('Manual feeding check triggered successfully');
-          }
-          
-          // Also handle any overdue feedings
-          const overdueResponse = await fetch(`${process.env.REACT_APP_API_URL}/automated-feeding/handle-overdue`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-          
-          if (overdueResponse.ok) {
-            console.log('Overdue feedings handled successfully');
-          }
-        } catch (error) {
-          console.error('Failed to trigger manual feeding check:', error);
-        }
       }
       return;
     }
