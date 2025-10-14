@@ -451,31 +451,334 @@ export default function AnimalZones() {
     setInsights(newInsights);
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    const date = new Date().toLocaleDateString();
+  const exportPDF = async () => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-    doc.setFontSize(18);
-    doc.text("Animal Zones Report", 14, 16);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Generated on ${date}`, 14, 23);
+      // Company information
+      const companyName = "Mount Olive Farm House";
+      const companyAddress = "No. 45, Green Valley Road, Boragasketiya, Nuwaraeliya, Sri Lanka";
+      const companyContact = "Phone: +94 81 249 2134 | Email: info@mountolivefarm.com";
+      const companyWebsite = "www.mountolivefarm.com";
+      const reportDate = new Date().toLocaleDateString();
+      const reportTime = new Date().toLocaleTimeString();
+      
+      // Professional color scheme
+      const primaryColor = [34, 197, 94]; // Green
+      const secondaryColor = [16, 185, 129]; // Teal
+      const accentColor = [59, 130, 246]; // Blue
+      const textColor = [31, 41, 55]; // Dark gray
+      const lightGray = [243, 244, 246];
 
-    autoTable(doc, {
-      startY: 30,
-      head: [["Name", "Type", "Capacity", "Occupancy", "Area (m²)"]],
-      body: zones.map((z) => [
-        z.name,
-        z.type,
-        z.capacity,
-        z.currentOccupancy,
-        Math.round(zoneAreaSqM(z)),
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+      // Add company logo
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 15, 10, 25, 25);
+          generatePDFContent();
+        };
+        logoImg.onerror = () => {
+          // Fallback to placeholder if logo fails to load
+          doc.setFillColor(...primaryColor);
+          doc.rect(15, 10, 25, 25, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('MOF', 27, 25, { align: 'center' });
+          generatePDFContent();
+        };
+        logoImg.src = '/logo512.png';
+      } catch (error) {
+        console.error('Error loading logo:', error);
+        // Fallback to placeholder
+        doc.setFillColor(...primaryColor);
+        doc.rect(15, 10, 25, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MOF', 27, 25, { align: 'center' });
+        generatePDFContent();
+      }
 
-    doc.save(`zones-report-${date.replace(/\//g, "-")}.pdf`);
+      const generatePDFContent = () => {
+        // Company header
+        doc.setTextColor(...textColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(companyName, 45, 18);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(companyAddress, 45, 25);
+        doc.text(companyContact, 45, 30);
+        doc.text(companyWebsite, 45, 35);
+
+        // Report title with professional styling
+        doc.setFillColor(...lightGray);
+        doc.rect(15, 40, 180, 10, 'F');
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ANIMAL ZONES MANAGEMENT REPORT', 105, 47, { align: 'center' });
+
+        // Report metadata
+        doc.setTextColor(...textColor);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Report Generated: ${reportDate} at ${reportTime}`, 15, 58);
+        doc.text(`Total Zones: ${zones.length}`, 15, 63);
+        doc.text(`Total Animals: ${totalAnimals}`, 15, 68);
+        doc.text(`Report ID: MOF-AZ-${Date.now().toString().slice(-6)}`, 15, 73);
+        
+        // Key zone metrics
+        const totalOccupancy = zones.reduce((sum, z) => sum + (Number(z.currentOccupancy) || 0), 0);
+        const averageUtilization = totalCapacity > 0 ? ((totalOccupancy / totalCapacity) * 100).toFixed(1) : 0;
+        const highUtilZones = zones.filter(z => {
+          const cap = Number(z.capacity) || 0;
+          const occ = Number(z.currentOccupancy) || 0;
+          return cap > 0 && (occ / cap) * 100 > 90;
+        }).length;
+        
+        doc.text(`Total Farm Area: ${Math.round(totalFarmSizeSqM).toLocaleString()} m²`, 15, 78);
+        doc.text(`Total Capacity: ${totalCapacity.toLocaleString()} animals`, 15, 83);
+        doc.text(`Current Occupancy: ${totalOccupancy.toLocaleString()} animals`, 15, 88);
+        doc.text(`Average Utilization: ${averageUtilization}%`, 15, 93);
+        doc.text(`High Utilization Zones (>90%): ${highUtilZones}`, 15, 98);
+
+        // Overall Summary Section
+        doc.setFillColor(...secondaryColor);
+        doc.rect(15, 105, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ZONE SUMMARY BY TYPE', 20, 111);
+
+        // Zone type summary table
+        const zoneTypeSummary = {};
+        zones.forEach(z => {
+          const type = z.type || 'Unknown';
+          if (!zoneTypeSummary[type]) {
+            zoneTypeSummary[type] = {
+              count: 0,
+              totalCapacity: 0,
+              totalOccupancy: 0,
+              totalArea: 0
+            };
+          }
+          zoneTypeSummary[type].count++;
+          zoneTypeSummary[type].totalCapacity += Number(z.capacity) || 0;
+          zoneTypeSummary[type].totalOccupancy += Number(z.currentOccupancy) || 0;
+          zoneTypeSummary[type].totalArea += zoneAreaSqM(z);
+        });
+
+        const summaryTableData = Object.entries(zoneTypeSummary).map(([type, data]) => {
+          const utilization = data.totalCapacity > 0 
+            ? ((data.totalOccupancy / data.totalCapacity) * 100).toFixed(1) 
+            : '0.0';
+          return [
+            type,
+            data.count.toString(),
+            data.totalCapacity.toLocaleString(),
+            data.totalOccupancy.toLocaleString(),
+            `${utilization}%`,
+            Math.round(data.totalArea).toLocaleString()
+          ];
+        });
+
+        autoTable(doc, {
+          startY: 120,
+          head: [["Zone Type", "Count", "Capacity", "Occupancy", "Utilization", "Area (m²)"]],
+          body: summaryTableData,
+          theme: "grid",
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 9
+          },
+          bodyStyles: {
+            fontSize: 8,
+            textColor: textColor,
+            cellPadding: 3
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 15, right: 15 },
+          styles: {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5,
+            halign: 'left',
+            valign: 'middle'
+          },
+          didDrawPage: (data) => {
+            addHeaderFooter();
+          }
+        });
+
+        // Detailed Zone Information Section
+        doc.setFillColor(...accentColor);
+        doc.rect(15, doc.lastAutoTable.finalY + 15, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('DETAILED ZONE INFORMATION', 20, doc.lastAutoTable.finalY + 21);
+
+        // Prepare detailed zone data
+        const detailedTableData = filteredZones.map((z) => {
+          const cap = Number(z.capacity) || 0;
+          const occ = Number(z.currentOccupancy) || 0;
+          const util = cap > 0 ? ((occ / cap) * 100).toFixed(1) : '0.0';
+          const area = Math.round(zoneAreaSqM(z));
+          const dimensions = `${z?.dimensions?.length || 0}×${z?.dimensions?.width || 0} ${z?.dimensions?.unit || 'm'}`;
+          
+          return [
+            z.name || 'N/A',
+            z.type || 'N/A',
+            cap.toString(),
+            occ.toString(),
+            `${util}%`,
+            area.toLocaleString(),
+            dimensions
+          ];
+        });
+
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 30,
+          head: [["Zone Name", "Type", "Capacity", "Occupancy", "Utilization", "Area (m²)", "Dimensions"]],
+          body: detailedTableData,
+          theme: "grid",
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 8
+          },
+          bodyStyles: {
+            fontSize: 7,
+            textColor: textColor,
+            cellPadding: 2
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251]
+          },
+          margin: { left: 15, right: 15 },
+          styles: {
+            lineColor: [209, 213, 219],
+            lineWidth: 0.5,
+            halign: 'left',
+            valign: 'middle',
+            overflow: 'linebreak'
+          },
+          columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 20 },
+            3: { cellWidth: 22 },
+            4: { cellWidth: 22 },
+            5: { cellWidth: 22 },
+            6: { cellWidth: 30 }
+          },
+          didDrawPage: (data) => {
+            addHeaderFooter();
+          }
+        });
+
+        // Insights Section if available
+        if (insights.length > 0) {
+          const currentY = doc.lastAutoTable.finalY + 15;
+          
+          // Check if we need a new page
+          if (currentY > 240) {
+            doc.addPage();
+            doc.setFillColor(...accentColor);
+            doc.rect(15, 20, 180, 8, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('KEY INSIGHTS & RECOMMENDATIONS', 20, 26);
+            
+            let insightY = 35;
+            insights.forEach((insight, index) => {
+              doc.setTextColor(...textColor);
+              doc.setFontSize(9);
+              doc.setFont('helvetica', 'bold');
+              doc.text(`${index + 1}. ${insight.type.toUpperCase()}:`, 20, insightY);
+              doc.setFont('helvetica', 'normal');
+              const lines = doc.splitTextToSize(insight.message, 170);
+              doc.text(lines, 20, insightY + 5);
+              insightY += 5 + (lines.length * 4) + 3;
+            });
+          } else {
+            doc.setFillColor(...accentColor);
+            doc.rect(15, currentY, 180, 8, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('KEY INSIGHTS & RECOMMENDATIONS', 20, currentY + 6);
+            
+            let insightY = currentY + 15;
+            insights.forEach((insight, index) => {
+              doc.setTextColor(...textColor);
+              doc.setFontSize(9);
+              doc.setFont('helvetica', 'bold');
+              doc.text(`${index + 1}. ${insight.type.toUpperCase()}:`, 20, insightY);
+              doc.setFont('helvetica', 'normal');
+              const lines = doc.splitTextToSize(insight.message, 170);
+              doc.text(lines, 20, insightY + 5);
+              insightY += 5 + (lines.length * 4) + 3;
+            });
+          }
+        }
+
+        // Professional footer for all pages
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          addHeaderFooter();
+        }
+
+        // Save PDF with professional naming
+        const fileName = `MOF_Animal_Zones_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        showPopup("success", "Professional PDF report generated successfully!");
+      };
+
+      const addHeaderFooter = () => {
+        const pageCount = doc.internal.getNumberOfPages();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+        
+        // Footer background
+        doc.setFillColor(...lightGray);
+        doc.rect(0, 275, 210, 20, 'F');
+        
+        // Footer content
+        doc.setTextColor(...textColor);
+        doc.setFontSize(8);
+        doc.text(`Page ${currentPage} of ${pageCount}`, 15, 283);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 283, { align: 'center' });
+        doc.text(companyName, 195, 283, { align: 'right' });
+        
+        // Footer line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(15, 285, 195, 285);
+        
+        // Disclaimer
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.text("This report is generated by Mount Olive Farm House Management System", 105, 290, { align: 'center' });
+      };
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      showPopup("error", "Error creating the PDF. Please try again.");
+    }
   };
 
   return (

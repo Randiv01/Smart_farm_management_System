@@ -111,7 +111,7 @@ const getImageBase64 = async (url) => {
     fetchData();
 
     const interval = setInterval(() => {
-      fetchData();
+      fetchData(true); // Pass true for background refresh
     }, 30000);
 
     return () => clearInterval(interval);
@@ -935,13 +935,14 @@ const exportPDF = async () => {
       <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={fetchData}
+            onClick={() => fetchData(true)}
+            disabled={isRefreshing}
             className={`px-5 py-2.5 rounded-full flex items-center gap-2 ${
               darkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-200 hover:bg-gray-300 text-gray-800"
-            } transition-all`}
+            } transition-all ${isRefreshing ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            <RefreshCw size={18} />
-            Refresh
+            <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
          <button
   onClick={() => setShowAnalytics(!showAnalytics)}

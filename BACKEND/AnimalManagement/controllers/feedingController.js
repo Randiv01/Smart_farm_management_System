@@ -35,7 +35,14 @@ export const scheduleFeeding = async (req, res) => {
     // Validate feed exists and has enough quantity
     const feed = await AnimalFood.findById(foodId);
     if (!feed) return res.status(404).json({ message: "Feed not found" });
-    if (feed.remaining < quantity) return res.status(400).json({ message: "Not enough feed remaining" });
+    
+    // Calculate total quantity needed for all feeding times
+    const totalQuantityNeeded = quantity * feedingTimes.length;
+    if (feed.remaining < totalQuantityNeeded) {
+      return res.status(400).json({ 
+        message: `Not enough feed remaining. Required: ${totalQuantityNeeded}g, Available: ${feed.remaining}g` 
+      });
+    }
 
     // Get animals in the selected zone
     const animalsInZone = await Animal.find({ assignedZone: zoneId });
@@ -43,9 +50,7 @@ export const scheduleFeeding = async (req, res) => {
       return res.status(400).json({ message: "No animals found in the selected zone" });
     }
 
-    // Update feed stock
-    feed.remaining -= quantity;
-    await feed.save();
+    // DO NOT reduce stock here - let automated service handle it when feeding is executed
 
     // Create feeding history entries for each feeding time
     const feedingEntries = [];
@@ -58,7 +63,8 @@ export const scheduleFeeding = async (req, res) => {
           feedingTime,
           notes,
           immediate: immediate || false,
-          animalCount: animalsInZone.length
+          animalCount: animalsInZone.length,
+          status: "scheduled" // Explicitly set status to scheduled
         });
         feedingEntries.push(await feeding.save());
       }
@@ -92,7 +98,7 @@ export const getFeedingHistory = async (req, res) => {
 // Create feeding history entry
 export const createFeedingHistory = async (req, res) => {
   try {
-    const { zoneId, foodId, quantity, feedingTime, notes, immediate } = req.body;
+    const { zoneId, foodId, quantity, feedingTime, notes, immediate, status, executedAt } = req.body;
 
     const feedingHistory = new FeedingHistory({
       zoneId,
@@ -101,12 +107,42 @@ export const createFeedingHistory = async (req, res) => {
       feedingTime,
       notes,
       immediate: immediate || false,
-      animalCount: 1 // Default to 1 for immediate feeding
+      animalCount: 1, // Default to 1 for immediate feeding
+      status: status || "scheduled", // Use provided status or default to scheduled
+      executedAt: executedAt || null // Set execution time if provided
     });
 
     const savedHistory = await feedingHistory.save();
     res.status(201).json(savedHistory);
   } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// Update feeding history (for cancellation, etc.)
+export const updateFeedingHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    console.log(`Updating feeding history ${id}:`, updateData);
+
+    const updatedHistory = await FeedingHistory.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    )
+    .populate("zoneId", "name type")
+    .populate("foodId", "name remaining unit");
+
+    if (!updatedHistory) {
+      return res.status(404).json({ message: "Feeding history not found" });
+    }
+
+    console.log(`Feeding history updated successfully:`, updatedHistory);
+    res.json(updatedHistory);
+  } catch (err) {
+    console.error("Error updating feeding history:", err);
     res.status(400).json({ message: err.message });
   }
 };

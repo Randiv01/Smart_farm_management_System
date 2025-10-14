@@ -1294,9 +1294,10 @@ export const StaffHub = () => {
                   <td className="px-4 py-3">
                     {doctor.profilePhoto ? (
                       <img
-                        src={`http://localhost:5000${doctor.profilePhoto}`}
+                        src={`http://localhost:5000/Health_Uploads/${doctor.profilePhoto}`}
                         alt={doctor.fullName}
                         className="h-10 w-10 rounded-full object-cover"
+                        onError={(e) => { e.target.src = '/default-profile.png'; }}
                       />
                     ) : (
                       <div
@@ -1486,9 +1487,10 @@ export const StaffHub = () => {
                   <td className="px-4 py-3">
                     {pathologist.profilePhoto ? (
                       <img
-                        src={`http://localhost:5000${pathologist.profilePhoto}`}
+                        src={`http://localhost:5000/Health_Uploads/${pathologist.profilePhoto}`}
                         alt={pathologist.fullName}
                         className="h-10 w-10 rounded-full object-cover"
+                        onError={(e) => { e.target.src = '/default-profile.png'; }}
                       />
                     ) : (
                       <div
