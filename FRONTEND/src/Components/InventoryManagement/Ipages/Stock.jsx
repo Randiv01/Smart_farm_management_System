@@ -23,7 +23,6 @@ import {
   ShoppingBag,
   Globe,
   Image as ImageIcon,
-  QrCode,
 } from "lucide-react";
 import { useITheme } from "../Icontexts/IThemeContext";
 import axios from "axios";
@@ -42,7 +41,6 @@ import {
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { QRCodeSVG } from "qrcode.react";
 import { exportToPDF, exportToExcel, getExportModalConfig, EXPORT_CONFIGS } from "../utils/exportUtils";
 import { FileText, FileSpreadsheet } from "lucide-react";
 
@@ -63,9 +61,6 @@ const Stock = () => {
   const [showChart, setShowChart] = useState(true);
   const [refillQuantity, setRefillQuantity] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
-  const [showQRCode, setShowQRCode] = useState(null);
-  const [showExportView, setShowExportView] = useState(false);
-  const [exportModal, setExportModal] = useState(getExportModalConfig('inventoryStock'));
   const [formData, setFormData] = useState({
     name: "",
     category: "Milk Product",
@@ -80,6 +75,8 @@ const Stock = () => {
     market: "Local",
     image: ""
   });
+  const [showExportView, setShowExportView] = useState(false);
+  const [exportModal, setExportModal] = useState(getExportModalConfig('inventoryStock'));
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
@@ -587,16 +584,6 @@ const Stock = () => {
 
   const summary = getSummary();
 
-  const generateProductInfo = (product) => {
-    return `Product: ${product.name}
-Category: ${product.category}
-Stock: ${product.stock.quantity} ${product.stock.unit}
-Price: $${product.price}
-Market: ${product.market}
-Expiry: ${new Date(product.expiryDate).toLocaleDateString()}
-Status: ${getProductStatus(product)}`;
-  };
-
   const handleExportClick = () => {
     setShowExportView(true);
     fetchProducts();
@@ -1102,13 +1089,6 @@ Status: ${getProductStatus(product)}`;
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-1">
                           <button
-                            onClick={() => setShowQRCode(product)}
-                            className={`p-2 rounded-lg transition-all ${darkMode ? "text-blue-400 hover:bg-gray-700" : "text-blue-600 hover:bg-gray-100"}`}
-                            title="View QR Code"
-                          >
-                            <QrCode size={18} />
-                          </button>
-                          <button
                             onClick={() => handleRefill(product)}
                             className={`p-2 rounded-lg transition-all ${darkMode ? "text-yellow-400 hover:bg-gray-700" : "text-yellow-600 hover:bg-gray-100"}`}
                             title="Refill Stock"
@@ -1470,39 +1450,6 @@ Status: ${getProductStatus(product)}`;
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* QR Code Modal */}
-      {showQRCode && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className={`rounded-xl shadow-2xl max-w-sm w-full p-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Product QR Code</h2>
-              <button
-                onClick={() => setShowQRCode(null)}
-                className={`p-2 rounded-lg ${darkMode ? "text-gray-400 hover:bg-gray-700" : "text-gray-500 hover:bg-gray-100"} transition-all`}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="bg-white p-4 rounded-lg mb-4">
-                <QRCodeSVG
-                  value={generateProductInfo(showQRCode)}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
-                />
-              </div>
-              <div className="text-center">
-                <h3 className="font-semibold">{showQRCode.name}</h3>
-                <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  Scan this code to view product details
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       )}
