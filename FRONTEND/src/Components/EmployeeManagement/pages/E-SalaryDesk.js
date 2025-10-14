@@ -4,7 +4,6 @@ import {
   FileDown,
   ChevronDown,
   DollarSign,
-  FileText,
   Loader2,
   AlertCircle,
   CheckCircle,
@@ -1323,11 +1322,6 @@ export const SalaryDesk = () => {
                                   title="Delete Salary"
                                 >
                                   <Trash2 size={16} className="text-red-500" />
-                                </button>
-                                <button className={`p-1 rounded ${
-                                  darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                                }`}>
-                                  <FileText size={16} className="text-green-500" />
                                 </button>
                               </div>
                             </td>
