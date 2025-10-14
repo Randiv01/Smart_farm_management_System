@@ -19,18 +19,24 @@ const ESP32_CONFIG = {
   ],
   httpPort: 80,
   wsPort: 81,
-  timeout: 5000
+  timeout: 12000
 };
 
+// Cache last known active IP to avoid probing every request
+let LAST_ACTIVE_IP = null;
+let LAST_ACTIVE_AT = 0; // epoch ms
+const LAST_ACTIVE_TTL_MS = 300_000; // 5 minutes
+
 // Helper function to test ESP32 connectivity
-const testESP32Connection = async (ip) => {
+const testESP32Connection = async (ip, customTimeout) => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), ESP32_CONFIG.timeout);
+    const effectiveTimeout = typeof customTimeout === 'number' ? customTimeout : ESP32_CONFIG.timeout;
+    const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
     
     const response = await axios.get(`http://${ip}/health`, {
       signal: controller.signal,
-      timeout: ESP32_CONFIG.timeout
+      timeout: effectiveTimeout
     });
     
     clearTimeout(timeoutId);
@@ -40,22 +46,39 @@ const testESP32Connection = async (ip) => {
   }
 };
 
-// Helper function to find active ESP32
+// Helper function to get active ESP32 quickly (prefer cached IP)
 const findActiveESP32 = async () => {
   console.log('🔍 Searching for active ESP32...');
-  
-  for (const ip of ESP32_CONFIG.primaryIPs) {
-    console.log(`📡 Testing connection to ${ip}...`);
-    const result = await testESP32Connection(ip);
-    
-    if (result.success) {
-      console.log(`✅ ESP32 found at ${ip}`);
-      return result;
-    } else {
-      console.log(`❌ ESP32 not reachable at ${ip}: ${result.error}`);
-    }
+
+  // 1) If we have a cached IP within TTL, use it immediately (no extra ping)
+  const now = Date.now();
+  if (LAST_ACTIVE_IP && now - LAST_ACTIVE_AT < LAST_ACTIVE_TTL_MS) {
+    console.log(`⚡ Using cached ESP32 IP: ${LAST_ACTIVE_IP}`);
+    return { success: true, ip: LAST_ACTIVE_IP };
   }
-  
+
+  // 2) Probe all candidate IPs in parallel with shorter timeouts
+  const candidates = [...ESP32_CONFIG.primaryIPs];
+  console.log(`📡 Probing candidates in parallel: ${candidates.join(', ')}`);
+
+  const probes = candidates.map(ip =>
+    testESP32Connection(ip, 3000).then(result => ({ ip, result }))
+  );
+
+  // Wait for the first success
+  const results = await Promise.allSettled(probes);
+  const success = results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value.result)
+    .find(r => r && r.success);
+
+  if (success) {
+    LAST_ACTIVE_IP = success.ip;
+    LAST_ACTIVE_AT = Date.now();
+    console.log(`✅ ESP32 found at ${success.ip}`);
+    return { success: true, ip: success.ip, data: success.data };
+  }
+
   console.log('❌ No active ESP32 found');
   return { success: false, error: 'No ESP32 device found' };
 };
@@ -63,7 +86,14 @@ const findActiveESP32 = async () => {
 // Proxy route to get ESP32 status
 router.get('/status', async (req, res) => {
   try {
-    const esp32Result = await findActiveESP32();
+    const directIP = req.query.ip;
+    let esp32Result;
+    if (directIP) {
+      console.log(`⚡ Direct IP provided for status: ${directIP}`);
+      esp32Result = { success: true, ip: directIP };
+    } else {
+      esp32Result = await findActiveESP32();
+    }
     
     if (!esp32Result.success) {
       return res.status(503).json({
@@ -74,15 +104,40 @@ router.get('/status', async (req, res) => {
     }
     
     // Forward request to ESP32
-    const response = await axios.get(`http://${esp32Result.ip}/status`, {
-      timeout: ESP32_CONFIG.timeout
-    });
-    
-    res.json({
-      success: true,
-      data: response.data,
-      esp32IP: esp32Result.ip
-    });
+    try {
+      const response = await axios.get(`http://${esp32Result.ip}/status`, {
+        timeout: Math.max(ESP32_CONFIG.timeout, 8000)
+      });
+      res.json({
+        success: true,
+        data: response.data,
+        esp32IP: esp32Result.ip
+      });
+    } catch (err) {
+      // Invalidate cache and retry discovery once (only if not direct IP)
+      console.warn(`⚠️ Status fetch failed at ${esp32Result.ip}, retrying discovery...: ${err.message}`);
+      if (!directIP) {
+        LAST_ACTIVE_IP = null;
+        LAST_ACTIVE_AT = 0;
+        esp32Result = await findActiveESP32();
+      } else {
+        return res.status(503).json({ success: false, error: `ESP32 not reachable at ${directIP}` });
+      }
+      if (!esp32Result.success) {
+        return res.status(503).json({
+          success: false,
+          error: 'ESP32 not reachable after retry'
+        });
+      }
+      const response = await axios.get(`http://${esp32Result.ip}/status`, {
+        timeout: Math.max(ESP32_CONFIG.timeout, 6000)
+      });
+      res.json({
+        success: true,
+        data: response.data,
+        esp32IP: esp32Result.ip
+      });
+    }
     
   } catch (error) {
     console.error('❌ ESP32 proxy error:', error.message);
@@ -97,7 +152,14 @@ router.get('/status', async (req, res) => {
 // Proxy route to get ESP32 health
 router.get('/health', async (req, res) => {
   try {
-    const esp32Result = await findActiveESP32();
+    const directIP = req.query.ip;
+    let esp32Result;
+    if (directIP) {
+      console.log(`⚡ Direct IP provided for health: ${directIP}`);
+      esp32Result = { success: true, ip: directIP };
+    } else {
+      esp32Result = await findActiveESP32();
+    }
     
     if (!esp32Result.success) {
       return res.status(503).json({
@@ -108,15 +170,28 @@ router.get('/health', async (req, res) => {
     }
     
     // Forward request to ESP32
-    const response = await axios.get(`http://${esp32Result.ip}/health`, {
-      timeout: ESP32_CONFIG.timeout
-    });
-    
-    res.json({
-      success: true,
-      data: response.data,
-      esp32IP: esp32Result.ip
-    });
+    try {
+      const response = await axios.get(`http://${esp32Result.ip}/health`, {
+        timeout: Math.max(ESP32_CONFIG.timeout, 8000)
+      });
+      res.json({ success: true, data: response.data, esp32IP: esp32Result.ip });
+    } catch (err) {
+      console.warn(`⚠️ Health fetch failed at ${esp32Result.ip}, retrying discovery...: ${err.message}`);
+      if (!directIP) {
+        LAST_ACTIVE_IP = null;
+        LAST_ACTIVE_AT = 0;
+        esp32Result = await findActiveESP32();
+      } else {
+        return res.status(503).json({ success: false, error: `ESP32 not reachable at ${directIP}` });
+      }
+      if (!esp32Result.success) {
+        return res.status(503).json({ success: false, error: 'ESP32 not reachable after retry' });
+      }
+      const response = await axios.get(`http://${esp32Result.ip}/health`, {
+        timeout: Math.max(ESP32_CONFIG.timeout, 6000)
+      });
+      res.json({ success: true, data: response.data, esp32IP: esp32Result.ip });
+    }
     
   } catch (error) {
     console.error('❌ ESP32 health check error:', error.message);

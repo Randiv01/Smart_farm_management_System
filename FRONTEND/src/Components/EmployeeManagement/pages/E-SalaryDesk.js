@@ -4,7 +4,6 @@ import {
   FileDown,
   ChevronDown,
   DollarSign,
-  FileText,
   Loader2,
   AlertCircle,
   CheckCircle,
@@ -119,7 +118,9 @@ export const SalaryDesk = () => {
         page: currentPage.toString(),
         limit: '10',
         year: year.toString(),
-        month: month.toString()
+        month: month.toString(),
+        sortBy: 'createdAt',
+        sortOrder: 'asc' // oldest first so last added is at bottom
       });
       
       if (searchTerm) params.append('search', searchTerm);
@@ -477,6 +478,7 @@ export const SalaryDesk = () => {
       setSuccess('Status updated successfully!');
       await fetchSalaryRecords();
       await fetchSalarySummary();
+      await fetchAnalytics();
       
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
@@ -842,7 +844,8 @@ export const SalaryDesk = () => {
       console.log('Refreshing salary data after form submission...');
       await Promise.all([
         fetchSalaryRecords(),
-        fetchSalarySummary()
+        fetchSalarySummary(),
+        fetchAnalytics()
       ]);
       
       // Force a re-render by updating a dummy state
@@ -916,7 +919,8 @@ export const SalaryDesk = () => {
       console.log('Refreshing salary data after deletion...');
       await Promise.all([
         fetchSalaryRecords(),
-        fetchSalarySummary()
+        fetchSalarySummary(),
+        fetchAnalytics()
       ]);
       
       // Force a re-render by updating a dummy state
@@ -1318,11 +1322,6 @@ export const SalaryDesk = () => {
                                   title="Delete Salary"
                                 >
                                   <Trash2 size={16} className="text-red-500" />
-                                </button>
-                                <button className={`p-1 rounded ${
-                                  darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                                }`}>
-                                  <FileText size={16} className="text-green-500" />
                                 </button>
                               </div>
                             </td>
@@ -2046,15 +2045,22 @@ export const SalaryDesk = () => {
 
                     <div>
                       <label className="block text-sm font-medium mb-2">Department</label>
-                      <input
-                        type="text"
+                      <select
                         value={formData.department}
                         onChange={(e) => handleFormChange('department', e.target.value)}
                         className={`w-full px-3 py-2 rounded-lg border ${
                           darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white border-gray-300"
                         }`}
-                        placeholder="e.g., Farm Operations"
-                      />
+                      >
+                        <option value="">Select Department</option>
+                        <option value="Farm Operations">Farm Operations</option>
+                        <option value="Inventory Management">Inventory Management</option>
+                        <option value="Health Management">Health Management</option>
+                        <option value="Administration">Administration</option>
+                        <option value="Employee Management">Employee Management</option>
+                        <option value="Plant Management">Plant Management</option>
+                        <option value="Animal Management">Animal Management</option>
+                      </select>
                     </div>
 
                     <div>

@@ -19,16 +19,32 @@ function buildFilter(q) {
   if (q.status && q.status !== "All Status") filter.status = q.status;
   if (q.type && q.type !== "All Types") filter.type = q.type;
   if (q.empId) filter.empId = q.empId;
-  if (q.year) filter.year = Number(q.year);
+  // Note: month filtering is handled as a date range on `from` in getLeaves
   return filter;
 }
 
 // GET /api/leaves
 export const getLeaves = async (req, res, next) => {
   try {
-    const filter = buildFilter(req.query);
+    const base = buildFilter(req.query);
     const sortBy = req.query.sortBy || "-createdAt";
-    const leaves = await Leave.find(filter).sort(sortBy).lean();
+
+    // Month filter takes precedence and uses date range on `from`
+    const query = { ...base };
+    const month = req.query.month ? Number(req.query.month) : null; // 1-12
+    const year = req.query.year ? Number(req.query.year) : null;
+
+    if (month && month >= 1 && month <= 12) {
+      const y = year || new Date().getFullYear();
+      const start = new Date(y, month - 1, 1, 0, 0, 0, 0);
+      const end = new Date(y, month, 0, 23, 59, 59, 999);
+      query.from = { $gte: start, $lte: end };
+    } else if (year) {
+      // Fallback to stored year if only year provided
+      query.year = year;
+    }
+
+    const leaves = await Leave.find(query).sort(sortBy).lean();
     res.json(leaves);
   } catch (e) {
     next(e);

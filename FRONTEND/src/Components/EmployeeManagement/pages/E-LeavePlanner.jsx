@@ -14,7 +14,7 @@ import autoTable from "jspdf-autotable";
 import Loader from "../Loader/Loader.js";
 import { useETheme } from '../Econtexts/EThemeContext.jsx'; // Import the Loader component
 
-const API = "http://localhost:5000/api/leaves";
+const API = "/api/leaves";
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, darkMode }) => (
   <div className={`p-4 rounded-lg shadow-sm ${darkMode ? "bg-gray-800" : "bg-white"} ${darkMode ? "border-gray-700" : "border-gray-100"} border flex flex-col`}>
@@ -52,6 +52,7 @@ export const ELeavePlanner = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [typeFilter, setTypeFilter] = useState("All Types");
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [monthFilter, setMonthFilter] = useState(String(new Date().getMonth() + 1)); // 1-12
   const [leaves, setLeaves] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -115,6 +116,9 @@ export const ELeavePlanner = () => {
     if (statusFilter !== "All Status") p.append("status", statusFilter);
     if (typeFilter !== "All Types") p.append("type", typeFilter);
     if (yearFilter) p.append("year", yearFilter);
+    if (monthFilter) p.append("month", monthFilter); // 1-12
+    // Oldest first so new records appear at bottom
+    p.append("sortBy", "createdAt");
     return p.toString();
   };
 
@@ -209,7 +213,7 @@ export const ELeavePlanner = () => {
       if (upcomingEmp) p.append("empId", upcomingEmp);
       const res = await fetch(`${API}/upcoming?${p.toString()}`);
       const data = await res.json();
-      setUpcoming(data.slice(0, 30));
+      setUpcoming(data.slice(0, 3));
     } catch (e) {
       console.error("Error loading upcoming:", e);
     }
@@ -242,7 +246,7 @@ export const ELeavePlanner = () => {
     es.onerror = () => {};
     return () => es.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, typeFilter, yearFilter]);
+  }, [statusFilter, typeFilter, yearFilter, monthFilter]);
 
   useEffect(() => {
     if (!trendData.length || trendData.every(m => m.leaves === 0 && m.approved === 0)) {
@@ -275,6 +279,9 @@ export const ELeavePlanner = () => {
       setShowForm(false);
       setEditing(null);
       setForm({ empId:"", name:"", type:"Annual", from:"", to:"", days:"", reason:"", status:"Pending" });
+      // Immediate refresh in case SSE is not connected
+      await loadLeaves();
+      await loadTrend();
     } catch (e) {
       console.error("Error submitting form:", e);
       alert("Error submitting form. Please try again.");
@@ -298,7 +305,17 @@ export const ELeavePlanner = () => {
 
   const onDelete = async (row) => {
     if (!window.confirm("Are you sure you want to delete this leave request?")) return;
-    try { await fetch(`${API}/${row._id}`, { method: "DELETE" }); }
+    try {
+      const res = await fetch(`${API}/${row._id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed: ${err.error || res.statusText}`);
+        return;
+      }
+      // Immediate refresh in case SSE is not connected
+      await loadLeaves();
+      await loadTrend();
+    }
     catch (e) {
       console.error("Error deleting leave:", e);
       alert("Error deleting leave request. Please try again.");
@@ -608,6 +625,21 @@ export const ELeavePlanner = () => {
                 <option>All Types</option><option>Annual</option><option>Sick</option><option>Casual</option><option>Other</option>
               </select>
               <select className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
+                      value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+              <select className={`px-3 py-2 rounded-md ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} border`}
                       value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
                 <option>2023</option><option>2024</option><option>2025</option>
               </select>
@@ -652,9 +684,9 @@ export const ELeavePlanner = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredLeaves.map((r) => (
+                    {filteredLeaves.map((r, idx) => (
                       <tr key={r._id} className={`border-t ${darkMode ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"}`}>
-                        <td className="p-3">{r.number}</td>
+                        <td className="p-3">{idx + 1}</td>
                         <td className="p-3 font-medium">{r.empId}</td>
                         <td className="p-3">{r.name}</td>
                         <td className="p-3">{r.type}</td>

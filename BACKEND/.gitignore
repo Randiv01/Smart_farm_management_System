@@ -1,8 +1,13 @@
-﻿# Node modules
+# Node modules
 node_modules/
 
-# Uploads directory
-/uploads/
+# Uploads directory - exclude all except user profile images
+/uploads/*
+!/uploads/user-*.jpg
+!/uploads/user-*.jpeg
+!/uploads/user-*.png
+!/uploads/user-*.gif
+!/uploads/user-*.webp
 
 # Environment variables
 .env

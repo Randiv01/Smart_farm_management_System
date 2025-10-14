@@ -47,7 +47,7 @@ export const getDashboardMetrics = async (req, res) => {
     const totalEmployeesChange = "+4%"; // Mock - calculate from previous month
     const presentTodayChange = presentToday < totalEmployees ? "-6%" : "+2%";
     const onLeaveChange = onLeaveToday > 0 ? `+${onLeaveToday}` : "0";
-    const overtimeChange = totalOvertimeHours > 0 ? `+${Math.round(totalOvertimeHours)}` : "0";
+    const overtimeChange = totalOvertimeHours > 0 ? `+${Math.round(totalOvertimeHours * 10) / 10}` : "0";
 
     res.json({
       success: true,
@@ -68,7 +68,7 @@ export const getDashboardMetrics = async (req, res) => {
           label: "On Leave"
         },
         overtimeHours: {
-          value: Math.round(totalOvertimeHours),
+          value: Math.round(totalOvertimeHours * 10) / 10,
           change: overtimeChange,
           label: "Overtime Hours"
         }
@@ -271,8 +271,8 @@ async function getDashboardMetricsData() {
       label: "On Leave"
     },
     overtimeHours: {
-      value: Math.round(totalOvertimeHours),
-      change: totalOvertimeHours > 0 ? `+${Math.round(totalOvertimeHours)}` : "0",
+      value: Math.round(totalOvertimeHours * 10) / 10,
+      change: totalOvertimeHours > 0 ? `+${Math.round(totalOvertimeHours * 10) / 10}` : "0",
       label: "Overtime Hours"
     }
   };

@@ -1,13 +1,14 @@
 import FeedingHistory from "../models/feedingHistoryModel.js";
 import AnimalFood from "../../InventoryManagement/Imodels/AnimalFood.js";
 import Zone from "../models/Zone.js";
+import fetch from "node-fetch";
 
 class AutomatedFeedingService {
   constructor() {
     this.isRunning = false;
     this.checkInterval = null;
     this.overdueInterval = null;
-    this.checkIntervalMs = 500; // Check every 500ms for more responsive execution
+    this.checkIntervalMs = 30000; // Check every 30 seconds to prevent premature triggers
     this.executedFeedings = new Set(); // Track recently executed feedings to prevent duplicates
     this.esp32Ip = process.env.ESP32_IP || "192.168.1.8"; // Default IP
   }
@@ -26,18 +27,18 @@ class AutomatedFeedingService {
     this.checkScheduledFeedings();
     this.handleOverdueFeedings();
     
-    // Set up interval checking
+    // Set up interval checking - every 30 seconds to prevent premature triggers
     this.checkInterval = setInterval(() => {
       this.checkScheduledFeedings();
     }, this.checkIntervalMs);
     
-    // Set up overdue feeding check (every 5 minutes)
+    // Set up overdue feeding check (every 10 minutes)
     this.overdueInterval = setInterval(() => {
       this.handleOverdueFeedings();
-    }, 300000); // 5 minutes
+    }, 600000); // 10 minutes
 
-    console.log(`✅ Automated feeding service started (checking every ${this.checkIntervalMs}ms)`);
-    console.log(`🔄 Real-time feeding scheduler is now active - will trigger feeding immediately when countdown reaches 0`);
+    console.log(`✅ Automated feeding service started (checking every ${this.checkIntervalMs / 1000} seconds)`);
+    console.log(`🔄 Feeding scheduler is now active - will trigger feedings at their scheduled time`);
   }
 
   // Stop the automated feeding service
@@ -71,13 +72,20 @@ class AutomatedFeedingService {
       
       console.log(`🕐 Checking for due feedings at ${now.toLocaleString()}`);
       
-      // Find all scheduled feedings that are due (exactly at or past the scheduled time)
+      // FIRST: Recover any stuck "processing" feedings (processing for more than 5 minutes)
+      await this.recoverStuckFeedings();
+      
+      // Find all scheduled feedings that are due (within 1 minute window to prevent premature triggers)
+      // CRITICAL: Only select feedings with status="scheduled" AND immediate=false
+      // This ensures no duplicate execution and no manual feeding interference
       const dueFeedings = await FeedingHistory.find({
         feedingTime: {
-          $lte: new Date(currentTime), // Due at or before current time
-          $gte: new Date(currentTime - 300000) // But not more than 5 minutes ago (extended window to catch missed feedings)
+          $lte: new Date(currentTime + 60000), // Due within next 1 minute
+          $gte: new Date(currentTime - 60000) // Or up to 1 minute ago
         },
-        status: { $in: ["scheduled", null] } // Not completed, failed, or cancelled (removed immediate filter to handle both types)
+        status: "scheduled", // ONLY scheduled status (not processing, completed, failed, or cancelled)
+        immediate: false, // ONLY automated feedings (exclude manual "Feed Now")
+        attemptCount: { $lt: 3 } // ONLY feedings that haven't exceeded max attempts
       })
       .populate("zoneId", "name type")
       .populate("foodId", "name remaining unit")
@@ -92,9 +100,16 @@ class AutomatedFeedingService {
           
           console.log(`📋 Checking feeding: ${feeding._id}, Scheduled: ${feeding.feedingTime.toLocaleString()}, Status: ${feeding.status}`);
           
-          // Skip if already executed recently (within 30 seconds)
+          // Skip if already executed recently (within 2 minutes)
           if (this.executedFeedings.has(feedingKey)) {
             console.log(`⏭️ Skipping already executed feeding: ${feedingKey}`);
+            continue;
+          }
+          
+          // Only execute if feeding time has actually arrived (not before)
+          const feedingTime = new Date(feeding.feedingTime).getTime();
+          if (feedingTime > currentTime + 10000) { // More than 10 seconds in future
+            console.log(`⏰ Feeding not yet due: ${feeding.feedingTime.toLocaleString()} (${Math.round((feedingTime - currentTime) / 1000)}s remaining)`);
             continue;
           }
           
@@ -103,10 +118,10 @@ class AutomatedFeedingService {
           // Mark as being executed
           this.executedFeedings.add(feedingKey);
           
-          // Remove from executed set after 30 seconds to allow retries
+          // Remove from executed set after 2 minutes to allow retries
           setTimeout(() => {
             this.executedFeedings.delete(feedingKey);
-          }, 30000);
+          }, 120000);
           
           await this.executeScheduledFeeding(feeding);
         }
@@ -124,14 +139,27 @@ class AutomatedFeedingService {
     let attemptCount = (feeding.attemptCount || 0) + 1;
     
     try {
-      console.log(`🍽️ Executing scheduled feeding (Attempt ${attemptCount}) for Zone: ${feeding.zoneId?.name}, Feed: ${feeding.foodId?.name}, Quantity: ${feeding.quantity}g`);
+      console.log(`
+========================================`);
+      console.log(`🍽️ EXECUTING SCHEDULED FEEDING`);
+      console.log(`Feeding ID: ${feeding._id}`);
+      console.log(`Zone: ${feeding.zoneId?.name}`);
+      console.log(`Feed: ${feeding.foodId?.name}`);
+      console.log(`Quantity: ${feeding.quantity}g`);
+      console.log(`Attempt: ${attemptCount}`);
+      console.log(`Current Status: ${feeding.status}`);
+      console.log(`Scheduled Time: ${feeding.feedingTime}`);
+      console.log(`========================================\n`);
       
-      // Update attempt count and last attempt time
+      // SIMPLIFIED: Just update to processing without strict atomic check
+      // The executedFeedings Set already prevents duplicates
       await FeedingHistory.findByIdAndUpdate(feeding._id, {
+        status: "processing",
         attemptCount: attemptCount,
-        lastAttemptAt: startTime,
-        status: "retrying"
+        lastAttemptAt: startTime
       });
+      
+      console.log(`🔒 Feeding ${feeding._id} marked as processing`);
 
       // Check if feed is available
       if (!feeding.foodId || feeding.foodId.remaining < feeding.quantity) {
@@ -162,8 +190,20 @@ class AutomatedFeedingService {
       console.log(`📡 Network status: ${networkStatus}`);
       
       // Send feeding command to ESP32
-      console.log(`📤 Sending feeding command: ${feeding.quantity}g to ${esp32Ip}`);
+      console.log(`\n📤 SENDING COMMAND TO ESP32`);
+      console.log(`ESP32 IP: ${esp32Ip}`);
+      console.log(`URL: http://${esp32Ip}/feed`);
+      console.log(`Quantity: ${feeding.quantity}g`);
+      console.log(`Attempting to send...\n`);
+      
       const feedingResult = await this.sendFeedingCommandToESP32(esp32Ip, feeding.quantity);
+      
+      console.log(`\n📥 ESP32 RESPONSE RECEIVED`);
+      console.log(`Success: ${feedingResult.success}`);
+      console.log(`Device Status: ${feedingResult.deviceStatus}`);
+      console.log(`Response: ${feedingResult.response || feedingResult.error}`);
+      console.log(`Full Result:`, JSON.stringify(feedingResult, null, 2));
+      console.log(``);
       
       if (feedingResult.success) {
         // Update feed stock
@@ -171,7 +211,7 @@ class AutomatedFeedingService {
           $inc: { remaining: -feeding.quantity }
         });
 
-        // Mark feeding as completed
+        // Mark feeding as completed (final status - no more retries)
         await FeedingHistory.findByIdAndUpdate(feeding._id, {
           status: "completed",
           executedAt: startTime,
@@ -179,10 +219,17 @@ class AutomatedFeedingService {
           stockReduced: true,
           deviceStatus: "Connected",
           networkStatus: networkStatus,
-          retryCount: 0
+          retryCount: 0,
+          attemptCount: attemptCount
         });
 
-        console.log(`✅ Scheduled feeding completed successfully for Zone: ${feeding.zoneId?.name}`);
+        console.log(`\n✅✅✅ FEEDING COMPLETED SUCCESSFULLY ✅✅✅`);
+        console.log(`Zone: ${feeding.zoneId?.name}`);
+        console.log(`Feed: ${feeding.foodId?.name}`);
+        console.log(`Quantity: ${feeding.quantity}g`);
+        console.log(`Status: completed`);
+        console.log(`========================================\n`);
+        
         this.sendFeedingNotification(feeding, "completed");
         
       } else {
@@ -196,22 +243,25 @@ class AutomatedFeedingService {
         if (shouldRetry) {
           console.log(`⚠️ Feeding failed (Attempt ${attemptCount}), will retry. Error: ${feedingResult.error}`);
           
+          // Reset to scheduled for retry with updated error info
+          // Set feedingTime to 1 minute in future for next retry attempt
+          const nextRetryTime = new Date(Date.now() + 60000); // Retry in 1 minute
+          
           await FeedingHistory.findByIdAndUpdate(feeding._id, {
             status: "scheduled", // Reset to scheduled for retry
+            feedingTime: nextRetryTime, // Update feeding time for retry
             retryCount: (feeding.retryCount || 0) + 1,
             failureReason: `Attempt ${attemptCount} failed: ${feedingResult.error}`,
             errorDetails: feedingResult.error,
             deviceStatus: feedingResult.deviceStatus || "Unknown",
-            networkStatus: networkStatus
+            networkStatus: networkStatus,
+            attemptCount: attemptCount
           });
           
-          // Schedule retry in 2 minutes
-          setTimeout(() => {
-            this.retryFeeding(feeding._id);
-          }, 120000); // 2 minutes
+          console.log(`🔄 Retry scheduled for ${nextRetryTime.toLocaleString()}`);
           
         } else {
-          // Max retries reached, mark as failed
+          // Max retries reached, mark as failed (final status)
           console.log(`❌ Scheduled feeding failed after ${attemptCount} attempts for Zone: ${feeding.zoneId?.name}. Error: ${feedingResult.error}`);
           
           await FeedingHistory.findByIdAndUpdate(feeding._id, {
@@ -220,7 +270,8 @@ class AutomatedFeedingService {
             errorDetails: feedingResult.error,
             executedAt: startTime,
             deviceStatus: feedingResult.deviceStatus || "Unknown",
-            networkStatus: networkStatus
+            networkStatus: networkStatus,
+            attemptCount: attemptCount
           });
           
           this.sendFeedingNotification(feeding, "failed", feedingResult.error);
@@ -231,14 +282,34 @@ class AutomatedFeedingService {
       console.error("❌ Error executing scheduled feeding:", error);
       
       // Mark as failed with detailed error
-      await FeedingHistory.findByIdAndUpdate(feeding._id, {
-        status: "failed",
-        failureReason: `System error: ${error.message}`,
-        errorDetails: error.stack,
-        executedAt: startTime,
-        deviceStatus: "Error",
-        networkStatus: "Unknown"
-      });
+      const currentFeeding = await FeedingHistory.findById(feeding._id);
+      const shouldRetry = attemptCount < 3;
+      
+      if (shouldRetry && currentFeeding?.status === "processing") {
+        // Reset to scheduled for retry
+        const nextRetryTime = new Date(Date.now() + 60000); // Retry in 1 minute
+        await FeedingHistory.findByIdAndUpdate(feeding._id, {
+          status: "scheduled",
+          feedingTime: nextRetryTime,
+          failureReason: `System error: ${error.message}`,
+          errorDetails: error.stack,
+          deviceStatus: "Error",
+          networkStatus: "Unknown",
+          attemptCount: attemptCount
+        });
+        console.log(`🔄 System error - retry scheduled for ${nextRetryTime.toLocaleString()}`);
+      } else {
+        // Mark as failed
+        await FeedingHistory.findByIdAndUpdate(feeding._id, {
+          status: "failed",
+          failureReason: `System error: ${error.message}`,
+          errorDetails: error.stack,
+          executedAt: startTime,
+          deviceStatus: "Error",
+          networkStatus: "Unknown",
+          attemptCount: attemptCount
+        });
+      }
       
       this.sendFeedingNotification(feeding, "failed", error.message);
     }
@@ -259,31 +330,47 @@ class AutomatedFeedingService {
         };
       }
 
-      const response = await fetch(`http://${esp32Ip}/feed`, {
+      console.log(`🌐 Sending POST request to http://${esp32Ip}/feed with body: ${quantity}`);
+      
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout after 15 seconds')), 15000)
+      );
+      
+      // Create fetch promise
+      const fetchPromise = fetch(`http://${esp32Ip}/feed`, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: quantity.toString(),
-        signal: AbortSignal.timeout(15000) // 15 second timeout
+        body: quantity.toString()
       });
+      
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      console.log(`📡 ESP32 response status: ${response.status}`);
 
       if (response.ok) {
         const responseText = await response.text();
+        console.log(`✅ ESP32 response text: ${responseText}`);
         return {
           success: true,
           response: responseText,
           deviceStatus: "Connected"
         };
       } else {
+        const errorText = await response.text().catch(() => 'No error text');
+        console.log(`❌ ESP32 error response: ${errorText}`);
         return {
           success: false,
-          error: `ESP32 returned status: ${response.status}`,
+          error: `ESP32 returned status: ${response.status} - ${errorText}`,
           deviceStatus: "Error"
         };
       }
     } catch (error) {
+      console.error(`❌ ESP32 communication error:`, error);
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Unknown error',
         deviceStatus: "Disconnected"
       };
     }
@@ -292,17 +379,70 @@ class AutomatedFeedingService {
   // Check network connectivity
   async checkNetworkConnectivity(esp32Ip) {
     try {
-      const response = await fetch(`http://${esp32Ip}/`, {
-        method: "GET",
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 5000)
+      );
+      
+      // Create fetch promise
+      const fetchPromise = fetch(`http://${esp32Ip}/`, {
+        method: "GET"
       });
+      
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
       return response.ok ? "Connected" : "Poor Connection";
     } catch (error) {
       return "Disconnected";
     }
   }
 
-  // Retry a failed feeding
+  // Recover stuck "processing" feedings
+  async recoverStuckFeedings() {
+    try {
+      const now = new Date();
+      const fiveMinutesAgo = new Date(now.getTime() - 300000); // 5 minutes ago
+      
+      // Find feedings stuck in "processing" status for more than 5 minutes
+      const stuckFeedings = await FeedingHistory.find({
+        status: "processing",
+        lastAttemptAt: { $lt: fiveMinutesAgo },
+        immediate: false
+      });
+      
+      if (stuckFeedings.length > 0) {
+        console.log(`🔧 Found ${stuckFeedings.length} stuck feeding(s) in processing status. Recovering...`);
+        
+        for (const feeding of stuckFeedings) {
+          const shouldRetry = (feeding.attemptCount || 0) < 3;
+          
+          if (shouldRetry) {
+            // Reset to scheduled for retry
+            const nextRetryTime = new Date(Date.now() + 60000); // Retry in 1 minute
+            await FeedingHistory.findByIdAndUpdate(feeding._id, {
+              status: "scheduled",
+              feedingTime: nextRetryTime,
+              failureReason: "Recovered from stuck processing state",
+              errorDetails: "Feeding was stuck in processing status for more than 5 minutes"
+            });
+            console.log(`✅ Recovered feeding ${feeding._id} - retry scheduled for ${nextRetryTime.toLocaleString()}`);
+          } else {
+            // Max retries reached, mark as failed
+            await FeedingHistory.findByIdAndUpdate(feeding._id, {
+              status: "failed",
+              failureReason: "Failed - stuck in processing state",
+              errorDetails: "Feeding was stuck in processing status and exceeded max retries"
+            });
+            console.log(`❌ Marked stuck feeding ${feeding._id} as failed (max retries exceeded)`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error recovering stuck feedings:", error);
+    }
+  }
+
+  // Retry a failed feeding (legacy - now handled by feedingTime update)
   async retryFeeding(feedingId) {
     try {
       const feeding = await FeedingHistory.findById(feedingId)
@@ -346,7 +486,7 @@ class AutomatedFeedingService {
       const nextFeeding = await FeedingHistory.findOne({
         feedingTime: { $gt: now },
         immediate: false,
-        status: { $in: ["scheduled", null] }
+        status: "scheduled" // Only scheduled feedings
       })
       .populate("zoneId", "name type")
       .populate("foodId", "name remaining unit")
@@ -373,12 +513,13 @@ class AutomatedFeedingService {
       
       console.log(`🔍 Checking for overdue feedings at ${now.toLocaleString()}`);
       
-      // Find feedings that are overdue (more than 5 minutes past their scheduled time)
+      // Find feedings that are overdue (more than 10 minutes past their scheduled time)
       const overdueFeedings = await FeedingHistory.find({
         feedingTime: {
-          $lt: new Date(currentTime - 300000) // More than 5 minutes ago
+          $lt: new Date(currentTime - 600000) // More than 10 minutes ago
         },
-        status: { $in: ["scheduled", null] }
+        status: "scheduled", // Only scheduled feedings
+        immediate: false // Exclude immediate feedings (manually triggered)
       })
       .populate("zoneId", "name type")
       .populate("foodId", "name remaining unit")
@@ -390,11 +531,13 @@ class AutomatedFeedingService {
         for (const feeding of overdueFeedings) {
           console.log(`  - ${feeding.feedingTime.toLocaleString()}: Zone ${feeding.zoneId?.name}, Feed ${feeding.foodId?.name}`);
           
-          // Update status to indicate it was missed
-          feeding.status = "failed";
-          feeding.failureReason = "Missed scheduled time - feeding was overdue";
-          feeding.lastAttemptAt = new Date();
-          await feeding.save();
+          // Update status to indicate it was missed (only if still scheduled)
+          if (feeding.status === "scheduled") {
+            feeding.status = "failed";
+            feeding.failureReason = "Missed scheduled time - feeding was overdue by more than 10 minutes";
+            feeding.lastAttemptAt = new Date();
+            await feeding.save();
+          }
         }
       } else {
         console.log(`✅ No overdue feedings found`);

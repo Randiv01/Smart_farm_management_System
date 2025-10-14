@@ -5,7 +5,10 @@ import { Thermometer, Droplet, Sprout, Wind, Lightbulb, Waves, AlertTriangle, Be
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Loader from '../Loader/Loader';
 import axios from 'axios';
-import esp32WebSocketService from '../../../utils/esp32WebSocketService';
+import esp32WebSocketService from "../../../utils/esp32WebSocketService";
+
+  // Backend base URL: force HTTP for local backend (port 5000 has no TLS)
+  const API_BASE = `http://localhost:5000`;
 
 const MonitorControl = () => {
   // const { t } = useLanguage(); // Unused for now
@@ -16,6 +19,7 @@ const MonitorControl = () => {
   const [loading, setLoading] = useState(true);
   const [autoMode, setAutoMode] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const fetchInFlight = useRef(false);
   const [customIP, setCustomIP] = useState('');
   const [isConnectingToCustomIP, setIsConnectingToCustomIP] = useState(false);
   const [telemetryData, setTelemetryData] = useState({
@@ -48,6 +52,56 @@ const MonitorControl = () => {
   // const [esp32ConnectionStatus, setESP32ConnectionStatus] = useState('disconnected'); // Unused for now
   const [esp32CurrentIP, setESP32CurrentIP] = useState(null);
 
+  // Normalize and apply ESP32 data to UI state
+  const handleESP32Data = (data) => {
+    try {
+      const temperature = data?.temperature ?? null;
+      const humidity = data?.humidity ?? null;
+      const dhtSensorWorking = data?.dhtSensorWorking ?? false;
+
+      setTelemetryData((prev) => ({
+        ...prev,
+        temperature,
+        humidity,
+        soilMoisture: data?.soilMoisture ?? prev.soilMoisture ?? 1500,
+        ipAddress: data?.ipAddress ?? prev.ipAddress ?? '172.20.10.2',
+        signalStrength: data?.signalStrength ?? prev.signalStrength ?? -55,
+        connectedSSID: data?.connectedSSID ?? prev.connectedSSID ?? 'Danuz',
+        webSocketClients: data?.webSocketClients ?? prev.webSocketClients ?? 0,
+        dhtSensorWorking,
+        controls: {
+          ...prev.controls,
+          fan: { ...prev.controls.fan, status: data?.fanState ? 'on' : 'off' },
+          lights: { ...prev.controls.lights, status: data?.lightState ? 'on' : 'off' },
+          waterPump: { ...prev.controls.waterPump, status: data?.pumpState ? 'on' : 'off' },
+          heater: { ...prev.controls.heater, status: data?.heaterState ? 'on' : 'off' }
+        }
+      }));
+
+      setAutoMode(data?.autoMode !== undefined ? data.autoMode : true);
+
+      // Historical data update only if sensors valid
+      if (dhtSensorWorking && temperature !== null && humidity !== null) {
+        const now = new Date();
+        const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+        setHistoricalData((prev) => {
+          const newData = [...prev, {
+            time: timeString,
+            temperature,
+            humidity,
+            soilMoisture: data?.soilMoisture
+          }];
+          return newData.slice(-50);
+        });
+      }
+
+      // Alerts
+      checkAlerts(data, dhtSensorWorking, temperature, humidity);
+    } catch (err) {
+      console.error('handleESP32Data error:', err);
+    }
+  };
+
   // Fetch valid greenhouses on component mount
   useEffect(() => {
     const fetchValidGreenhouses = async () => {
@@ -67,15 +121,15 @@ const MonitorControl = () => {
   // Test connection function
   const testConnection = async () => {
     try {
-      // Use the custom IP if available, otherwise use the first IP from the list
-      const targetIP = customIP || '172.20.10.2';
-      const url = `http://${targetIP}/health`;
+      // Use backend proxy health which discovers active ESP32
+      const targetIP = (customIP && customIP.trim()) || telemetryData.ipAddress || '172.20.10.2';
+      const url = `${API_BASE}/health?ip=${encodeURIComponent(targetIP)}`;
       
       console.log(`🔗 Testing connection to: ${url}`);
       
-      // Create an AbortController for timeout
+      // Create an AbortController for timeout (allow proxy to probe ESP32)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 13000); // 13 second timeout
       
       const response = await fetch(url, {
         method: 'GET',
@@ -98,6 +152,8 @@ const MonitorControl = () => {
   // ESP32 WebSocket service connection management
   const connectESP32WebSocket = useCallback(() => {
     console.log('🔄 Starting ESP32 WebSocket connection...');
+    console.log('📊 Current greenhouse:', selectedGreenhouse);
+    console.log('📊 WebSocket service status:', esp32WebSocketService.getConnectionStatus());
     
     // Check if already connected
     if (esp32WebSocketService.getConnectionStatus() === 'connected') {
@@ -109,10 +165,17 @@ const MonitorControl = () => {
 
     setConnectionStatus('connecting');
     setLoading(true);
+    
+    // Add a timeout to fallback to HTTP polling if WebSocket doesn't connect quickly
+    const webSocketTimeout = setTimeout(() => {
+      console.log('⏰ WebSocket connection timeout, falling back to HTTP polling...');
+      startPolling();
+    }, 3000); // 3 second timeout
 
     // Define event handlers
     const handleConnected = (data) => {
       console.log('✅ ESP32 WebSocket connected:', data);
+      clearTimeout(webSocketTimeout); // Clear the timeout since we connected successfully
       setESP32CurrentIP(data.ip);
       setConnectionStatus('connected');
       setLoading(false);
@@ -137,6 +200,7 @@ const MonitorControl = () => {
 
     const handleError = (error) => {
       console.error('❌ ESP32 WebSocket error:', error);
+      clearTimeout(webSocketTimeout); // Clear the timeout since we're handling the error
       setConnectionStatus('disconnected');
       setLoading(false);
       
@@ -186,7 +250,11 @@ const MonitorControl = () => {
 
   // Improved HTTP Polling implementation (fallback)
   const startPolling = async () => {
-    if (selectedGreenhouse !== 'GH-01') {
+    const isRealGreenhouse = selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01';
+    console.log('🔄 startPolling called:', { selectedGreenhouse, isRealGreenhouse });
+    
+    if (!isRealGreenhouse) {
+      console.log('❌ Not a real greenhouse, setting disconnected');
       setConnectionStatus('disconnected');
       setLoading(false);
       return;
@@ -199,21 +267,22 @@ const MonitorControl = () => {
     retryCountRef.current = 0;
 
     // Test connection first
+    console.log('🧪 Testing ESP32 connectivity...');
     const isReachable = await testConnection();
     if (!isReachable) {
-      console.log('❌ ESP32 not reachable');
+      console.log('❌ ESP32 not reachable via HTTP');
       handleFetchError();
       return;
     }
 
+    console.log('✅ ESP32 is reachable via HTTP, starting data polling...');
     // Fetch data immediately
     fetchDataWithRetry();
 
     // Set up polling every 2 seconds (as requested)
     pollingIntervalRef.current = setInterval(() => {
-      if (connectionStatus === 'connected') {
-        fetchDataWithRetry();
-      }
+      console.log('🔄 HTTP polling interval tick...');
+      fetchDataWithRetry();
     }, 2000);
   };
 
@@ -259,18 +328,22 @@ const MonitorControl = () => {
   };
 
   const fetchData = async () => {
+    if (fetchInFlight.current) {
+      return; // Prevent overlapping polls
+    }
+    fetchInFlight.current = true;
     try {
-      console.log('📡 Fetching data from ESP32...');
+      console.log('📡 Fetching data from ESP32 (via backend proxy)...');
       
-      // Use the custom IP if available, otherwise use the first IP from the list
-      const targetIP = customIP || '172.20.10.2';
-      const url = `http://${targetIP}/status?_t=${Date.now()}`;
+      // Use backend proxy status with direct IP to avoid discovery delays
+      const targetIP = (customIP && customIP.trim()) || telemetryData.ipAddress || '172.20.10.2';
+      const url = `${API_BASE}/status?ip=${encodeURIComponent(targetIP)}&_t=${Date.now()}`;
       
       console.log(`🔗 Fetching from: ${url}`);
       
-      // Create an AbortController for timeout
+      // Create an AbortController for timeout (allow proxy to probe ESP32)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 13000); // 13 second timeout
       
       const response = await fetch(url, {
         method: 'GET',
@@ -288,25 +361,13 @@ const MonitorControl = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const payload = await response.json();
+      const data = payload && payload.success && payload.data ? payload.data : payload; // unwrap proxy response
       console.log('✅ Data received successfully:', data);
       
       handleESP32Data(data);
       setConnectionStatus('connected');
       setLoading(false);
-      
-      return data;
-    } catch (error) {
-      console.error('❌ Fetch error details:', error);
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout - ESP32 not responding');
-      }
-      throw new Error('Network error - Check if ESP32 is reachable');
-    }
-  };
-
-  const handleESP32Data = (data) => {
-    // Handle null values from ESP32 (when sensor is not working)
     const temperature = data.temperature !== null && data.temperature !== undefined ? data.temperature : null;
     const humidity = data.humidity !== null && data.humidity !== undefined ? data.humidity : null;
     const dhtSensorWorking = data.dhtSensorWorking !== undefined ? data.dhtSensorWorking : false;
@@ -359,6 +420,15 @@ const MonitorControl = () => {
 
     // Check for alerts
     checkAlerts(data, dhtSensorWorking, temperature, humidity);
+    } catch (error) {
+      console.error('❌ Fetch error details:', error);
+      if (error.name === 'AbortError') {
+        console.warn('⏱️ Fetch aborted due to timeout');
+      }
+      throw error;
+    } finally {
+      fetchInFlight.current = false;
+    }
   };
 
   const checkAlerts = (data, dhtSensorWorking, temperature, humidity) => {
@@ -437,7 +507,8 @@ const MonitorControl = () => {
 
   // Control commands via ESP32 WebSocket service or HTTP
   const sendControlCommand = async (device, action, duration = null) => {
-    if (selectedGreenhouse !== 'GH-01') {
+    const isRealGreenhouse = selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01';
+    if (!isRealGreenhouse) {
       alert('Control not available. Equipment not connected.');
       return;
     }
@@ -478,7 +549,7 @@ const MonitorControl = () => {
 
     // Fallback to HTTP if WebSocket not available
     try {
-      const response = await fetch(`/control`, {
+      const response = await fetch(`${API_BASE}/control`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -570,7 +641,8 @@ const MonitorControl = () => {
   };
 
   const toggleAutoMode = async () => {
-    if (selectedGreenhouse !== 'GH-01') {
+    const isRealGreenhouse = selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01';
+    if (!isRealGreenhouse) {
       alert('Auto mode not available. Equipment not connected.');
       return;
     }
@@ -594,7 +666,7 @@ const MonitorControl = () => {
 
     // Fallback to HTTP if WebSocket not available
     try {
-      const response = await fetch(`/toggleMode`);
+      const response = await fetch(`${API_BASE}/toggleMode`);
       if (response.ok) {
         console.log(`✅ HTTP mode changed to: ${newMode ? 'AUTO' : 'MANUAL'}`);
         setTimeout(fetchData, 1000);
@@ -609,12 +681,40 @@ const MonitorControl = () => {
   };
 
   const manualRefresh = () => {
-    if (selectedGreenhouse === 'GH-01') {
+    const isRealGreenhouse = selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01';
+    if (isRealGreenhouse) {
       setConnectionStatus('connecting');
       setLoading(true);
       fetchDataWithRetry();
     }
   };
+
+  // Expose test functions to window for debugging
+  useEffect(() => {
+    window.testESP32Connection = async () => {
+      console.log('🧪 Testing ESP32 connection...');
+      const result = await testConnection();
+      console.log('Connection test result:', result);
+      return result;
+    };
+    
+    window.forceHTTPPolling = () => {
+      console.log('🔄 Forcing HTTP polling...');
+      startPolling();
+    };
+    
+    window.testFetchData = async () => {
+      console.log('📡 Testing fetch data...');
+      try {
+        const data = await fetchData();
+        console.log('Fetch data result:', data);
+        return data;
+      } catch (error) {
+        console.error('Fetch data error:', error);
+        return null;
+      }
+    };
+  }, []);
 
   const connectToCustomIP = async () => {
     if (!customIP.trim()) {
@@ -657,7 +757,7 @@ const MonitorControl = () => {
         esp32WebSocketService.connect();
         
         // Also update backend configuration
-        await fetch(`/api/esp32/set-custom-ip`, {
+        await fetch(`${API_BASE}/set-custom-ip`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -682,10 +782,21 @@ const MonitorControl = () => {
   };
 
   useEffect(() => {
-    if (selectedGreenhouse === 'GH-01') {
+    // Check if this is the real greenhouse (GH-01 or GH01)
+    const isRealGreenhouse = selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01';
+    
+    console.log('🔄 useEffect triggered:', {
+      selectedGreenhouse,
+      isRealGreenhouse,
+      validGreenhouses: validGreenhouses.map(g => g.greenhouseName)
+    });
+    
+    if (isRealGreenhouse) {
+      console.log('✅ Real greenhouse detected, starting connection...');
       // Try ESP32 WebSocket connection first, fallback to HTTP polling
       connectESP32WebSocket();
     } else {
+      console.log('❌ Mock greenhouse detected, setting disconnected status');
       // Disconnect ESP32 WebSocket and stop polling for other greenhouses
       disconnectESP32WebSocket();
       stopPolling();
@@ -930,7 +1041,7 @@ const MonitorControl = () => {
           >
             {validGreenhouses.map(greenhouse => (
               <option key={greenhouse._id} value={greenhouse.greenhouseName}>
-                {greenhouse.greenhouseName} {greenhouse.greenhouseName === 'GH-01' ? '(Real Data)' : '(Mock Data)'}
+                {greenhouse.greenhouseName} {(greenhouse.greenhouseName === 'GH-01' || greenhouse.greenhouseName === 'GH01') ? '(Real Data)' : '(Mock Data)'}
               </option>
             ))}
           </select>
@@ -938,7 +1049,10 @@ const MonitorControl = () => {
       </div>
 
       {/* Compact ESP32 Connection Card */}
+
+
       {selectedGreenhouse === 'GH-01' && (
+
         <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -988,7 +1102,7 @@ const MonitorControl = () => {
       )}
 
       {/* Error message for non-GH-01 greenhouses */}
-      {selectedGreenhouse !== 'GH-01' && (
+      {selectedGreenhouse !== 'GH-01' && selectedGreenhouse !== 'GH01' && (
         <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-200 px-4 py-3 rounded">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 mr-2" />
@@ -1005,7 +1119,7 @@ const MonitorControl = () => {
           <div className="flex justify-between items-center">
             <span>Connection: {getConnectionStatusText()} ({esp32WebSocketService.getConnectionStatus() === 'connected' ? 'ESP32 WebSocket' : 'HTTP Polling'})</span>
             <span className="text-sm bg-black bg-opacity-20 px-2 py-1 rounded">
-              {selectedGreenhouse === 'GH-01' ? 'Real Data' : 'Mock Data'}
+              {(selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01') ? 'Real Data' : 'Mock Data'}
             </span>
           </div>
           
@@ -1047,6 +1161,9 @@ const MonitorControl = () => {
               const result = await esp32WebSocketService.testHTTPConnection();
               if (result.success) {
                 alert(`✅ ESP32 found at ${result.ip}`);
+                // If ESP32 is found, try to start HTTP polling
+                console.log('🔄 Starting HTTP polling after successful test...');
+                startPolling();
               } else {
                 alert('❌ No ESP32 devices found');
               }
@@ -1057,11 +1174,39 @@ const MonitorControl = () => {
             <Settings size={14} />
             Test
           </button>
+          <button 
+            onClick={() => {
+              console.log('🔄 Manually forcing HTTP polling...');
+              startPolling();
+            }}
+            className="px-3 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 text-sm flex items-center gap-1"
+            title="Force HTTP Polling"
+          >
+            <RefreshCw size={14} />
+            Force HTTP
+          </button>
+          <button 
+            onClick={() => {
+              console.log('🔍 Debug info:', {
+                selectedGreenhouse,
+                isRealGreenhouse: selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01',
+                connectionStatus,
+                webSocketStatus: esp32WebSocketService.getConnectionStatus(),
+                validGreenhouses: validGreenhouses.map(g => g.greenhouseName)
+              });
+              alert(`Debug Info:\nSelected: ${selectedGreenhouse}\nIs Real: ${selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01'}\nStatus: ${connectionStatus}\nWebSocket: ${esp32WebSocketService.getConnectionStatus()}`);
+            }}
+            className="px-3 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 text-sm flex items-center gap-1"
+            title="Debug Info"
+          >
+            <Settings size={14} />
+            Debug
+          </button>
         </div>
       </div>
 
       {/* Auto/Manual Mode Toggle */}
-      {selectedGreenhouse === 'GH-01' && (
+      {(selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01') && (
         <div className="flex justify-center">
           <button 
             onClick={toggleAutoMode}
@@ -1204,7 +1349,7 @@ const MonitorControl = () => {
       </div>
 
       {/* Historical Chart - Only show when DHT sensor is working */}
-      {selectedGreenhouse === 'GH-01' && historicalData.length > 0 && telemetryData.dhtSensorWorking && (
+      {(selectedGreenhouse === 'GH-01' || selectedGreenhouse === 'GH01') && historicalData.length > 0 && telemetryData.dhtSensorWorking && (
         <Card className="p-6">
           <h3 className="mt-0 mb-4 text-lg font-medium text-gray-900 dark:text-white">Sensor History</h3>
           <ResponsiveContainer width="100%" height={300}>

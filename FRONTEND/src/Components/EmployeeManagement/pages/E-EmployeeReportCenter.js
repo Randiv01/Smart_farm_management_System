@@ -213,7 +213,7 @@ export const EEmployeeReportCenter = () => {
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50"}`}>
+    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-gray-200" : "bg-light-50"}`}>
       {/* PAGE HEADER — title + one-line tagline */}
       <div className="mb-6 p-6 lg:p-8 xl:p-10">
         <div className="max-w-7xl mx-auto">
