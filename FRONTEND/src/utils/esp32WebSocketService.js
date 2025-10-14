@@ -17,8 +17,8 @@ class ESP32WebSocketService {
     // ESP32 IP addresses to try (updated to match current network)
     this.esp32IPs = [
       '172.20.10.2',    // Danuz network (current IP from serial monitor)
-      '172.20.10.5',    // Danuz network (alternative)
-      '172.20.10.6',    // Iphone 11 network (next available)
+      '172.20.10.3',    // Danuz network (alternative)
+      '172.20.10.4',    // Danuz network (alternative)
       '192.168.4.1'     // ESP32 AP mode default
     ];
     
@@ -82,12 +82,21 @@ class ESP32WebSocketService {
     this.emit('connecting');
 
     console.log('🔄 ESP32 WebSocket: Starting connection...');
+    
+    // Set a timeout to emit error if connection takes too long
+    this.connectionTimeout = setTimeout(() => {
+      if (this.isConnecting) {
+        console.log('⏰ ESP32 WebSocket: Connection timeout, emitting error...');
+        this.isConnecting = false;
+        this.emit('error', { message: 'Connection timeout' });
+      }
+    }, 8000); // 8 second timeout
 
     const tryConnect = () => {
       // If custom IP is set, try it first
       if (this.customIP) {
         const wsUrl = `ws://${this.customIP}:81`;
-        this.tryConnectToIP(this.customIP, wsUrl);
+        this.tryConnectToIP(this.customIP, wsUrl, this.connectionTimeout);
         return;
       }
 
@@ -101,14 +110,14 @@ class ESP32WebSocketService {
 
       const ip = this.esp32IPs[this.currentIPIndex];
       const wsUrl = `ws://${ip}:81`;
-      this.tryConnectToIP(ip, wsUrl);
+      this.tryConnectToIP(ip, wsUrl, this.connectionTimeout);
     };
 
     tryConnect();
   }
 
   // Try connecting to a specific IP
-  tryConnectToIP(ip, wsUrl) {
+  tryConnectToIP(ip, wsUrl, connectionTimeout) {
     console.log(`🔄 ESP32 WebSocket: Attempting connection to ${wsUrl}`);
 
     try {
@@ -116,6 +125,7 @@ class ESP32WebSocketService {
 
       ws.onopen = () => {
         console.log(`✅ ESP32 WebSocket: Connected to ${wsUrl}`);
+        clearTimeout(connectionTimeout); // Clear the connection timeout
         this.ws = ws;
         this.isConnecting = false;
         this.reconnectAttempts = 0;
@@ -162,6 +172,15 @@ class ESP32WebSocketService {
           this.currentIPIndex++;
         }
         
+        // Don't retry if we've exhausted all IPs
+        if (this.currentIPIndex >= this.esp32IPs.length) {
+          console.log('❌ ESP32 WebSocket: All IP addresses failed, emitting error...');
+          clearTimeout(connectionTimeout);
+          this.isConnecting = false;
+          this.emit('error', { message: 'All ESP32 IP addresses failed' });
+          return;
+        }
+        
         setTimeout(() => {
           this.connect();
         }, 1000);
@@ -177,6 +196,15 @@ class ESP32WebSocketService {
         this.currentIPIndex = 0;
       } else {
         this.currentIPIndex++;
+      }
+      
+      // Don't retry if we've exhausted all IPs
+      if (this.currentIPIndex >= this.esp32IPs.length) {
+        console.log('❌ ESP32 WebSocket: All IP addresses failed, emitting error...');
+        clearTimeout(connectionTimeout);
+        this.isConnecting = false;
+        this.emit('error', { message: 'All ESP32 IP addresses failed' });
+        return;
       }
       
       setTimeout(() => {
@@ -320,17 +348,28 @@ class ESP32WebSocketService {
     
     for (const ip of this.esp32IPs) {
       try {
+        // Create an AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const response = await fetch(`http://${ip}/health`, {
           method: 'GET',
-          timeout: 5000
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
           console.log(`✅ ESP32 HTTP: Device found at ${ip}`);
           return { success: true, ip };
         }
       } catch (error) {
-        console.log(`❌ ESP32 HTTP: Device not reachable at ${ip}`);
+        console.log(`❌ ESP32 HTTP: Device not reachable at ${ip}:`, error.message);
       }
     }
     

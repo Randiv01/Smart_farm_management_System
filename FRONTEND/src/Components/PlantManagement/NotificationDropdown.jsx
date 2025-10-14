@@ -15,10 +15,11 @@ export default function NotificationDropdown({ isOpen, onClose }) {
   const fetchNotifications = async () => {
     setLoadingNotifications(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/notifications/Plant Management');
+      const response = await axios.get('http://localhost:5000/api/animal-management/notifications');
       if (response.data.success) {
-        setNotifications(response.data.data.notifications || []);
-        const unreadNotifications = response.data.data.notifications.filter(n => !n.read);
+        const list = Array.isArray(response.data.data) ? response.data.data : (response.data.data?.notifications || []);
+        setNotifications(list);
+        const unreadNotifications = list.filter(n => !n.read);
         setUnreadCount(unreadNotifications.length);
       }
     } catch (error) {
@@ -31,7 +32,7 @@ export default function NotificationDropdown({ isOpen, onClose }) {
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      await axios.put(`http://localhost:5000/api/notifications/${notificationId}/read`);
+      await axios.patch(`http://localhost:5000/api/animal-management/notifications/${notificationId}/read`);
       // Update local state
       setNotifications(prev => 
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
@@ -45,7 +46,7 @@ export default function NotificationDropdown({ isOpen, onClose }) {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      await axios.put('http://localhost:5000/api/notifications/Plant Management/mark-all-read');
+      await axios.patch('http://localhost:5000/api/animal-management/notifications/mark-all-read');
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     } catch (error) {

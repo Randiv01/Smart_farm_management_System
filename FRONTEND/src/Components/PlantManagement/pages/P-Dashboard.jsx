@@ -158,7 +158,7 @@ const Dashboard = () => {
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('dashboard')}</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('dashboard')}</h1>
       </div>
 
       {/* Summary Cards */}

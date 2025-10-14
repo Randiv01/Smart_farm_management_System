@@ -34,7 +34,12 @@ BACKEND/coverage/
 FRONTEND/coverage/
 
 # Upload directories (contains user uploaded files)
-BACKEND/uploads/
+BACKEND/uploads/*
+!BACKEND/uploads/user-*.jpg
+!BACKEND/uploads/user-*.jpeg
+!BACKEND/uploads/user-*.png
+!BACKEND/uploads/user-*.gif
+!BACKEND/uploads/user-*.webp
 BACKEND/HealthManagement/Health_uploads/
 BACKEND/PlantManagement/Uploads/
 
@@ -48,17 +53,11 @@ BACKEND/AnimalManagement/uploads/*
 
 # Employee management uploads - exclude all files except images
 BACKEND/EmployeeManager/uploads/*
-!BACKEND/EmployeeManager/uploads/
 !BACKEND/EmployeeManager/uploads/*.jpg
 !BACKEND/EmployeeManager/uploads/*.jpeg
 !BACKEND/EmployeeManager/uploads/*.png
 !BACKEND/EmployeeManager/uploads/*.gif
 !BACKEND/EmployeeManager/uploads/*.webp
-!BACKEND/EmployeeManager/uploads/*.JPG
-!BACKEND/EmployeeManager/uploads/*.JPEG
-!BACKEND/EmployeeManager/uploads/*.PNG
-!BACKEND/EmployeeManager/uploads/*.GIF
-!BACKEND/EmployeeManager/uploads/*.WEBP
 
 # IDE specific files
 .vscode/

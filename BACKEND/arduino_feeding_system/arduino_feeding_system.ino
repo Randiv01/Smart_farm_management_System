@@ -1,24 +1,3 @@
-/*
- * Smart Farm Feeding System - Arduino Code
- * ESP32-based automated feeding system
- * 
- * Features:
- * - Web server for receiving feeding commands
- * - Servo motor control for feed dispensing
- * - Simple quantity-based feeding (no weight sensor)
- * - WiFi connectivity
- * - RESTful API endpoints
- * 
- * Hardware Requirements:
- * - ESP32 development board
- * - Servo motor (SG90 or similar)
- * - WiFi connection
- * - Power supply
- * 
- * Author: Smart Farm Management System
- * Version: 1.0
- */
-
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESP32Servo.h>
@@ -429,43 +408,6 @@ void updateFeeding() {
     stopFeeding();
   }
 }
-
-/*
- * Configuration Notes:
- * 
- * 1. WiFi Setup:
- *    - Update ssid and password variables with your network credentials
- *    - Ensure your network is 2.4GHz (ESP32 doesn't support 5GHz)
- * 
- * 2. Servo Motor:
- *    - Connect servo signal wire to GPIO 2
- *    - Connect servo power (5V) and ground
- *    - Adjust SERVO_OPEN_ANGLE and SERVO_CLOSE_ANGLE based on your physical setup
- * 
- * 3. Feed Rate Calibration:
- *    - Adjust FEED_RATE constant based on your actual dispensing rate
- *    - Test with known quantities and measure actual output
- *    - Formula: FEED_RATE = actual_grams_dispensed / time_in_seconds
- * 
- * 4. Safety Limits:
- *    - MIN_FEED_QUANTITY and MAX_FEED_QUANTITY prevent invalid feeding requests
- *    - Adjust based on your system's capabilities
- * 
- * 5. API Usage:
- *    - POST /feed with quantity as plain text in request body
- *    - Example: curl -X POST http://ESP32_IP/feed -d "50"
- *    - System will dispense 50 grams of feed
- * 
- * 6. Monitoring:
- *    - GET /status returns JSON with current system status
- *    - GET / returns HTML status page
- *    - Serial monitor shows detailed logs
- * 
- * 7. Buzzer Functions:
- *    - Startup beeps when system initializes
- *    - Success beeps when feeding starts/completes
- *    - Error beeps for invalid requests or system errors
- */
 
 // Buzzer control functions
 void buzzerBeep(int duration) {

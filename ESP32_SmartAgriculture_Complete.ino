@@ -139,28 +139,25 @@ void initializeDHT() {
 }
 
 void setupServerRoutes() {
-  // Enable CORS for all routes
-  server.enableCORS(true);
-  
   // Handle OPTIONS requests for CORS preflight
   server.on("/status", HTTP_OPTIONS, []() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Cache-Control, Accept");
     server.send(204);
   });
   
   server.on("/control", HTTP_OPTIONS, []() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Cache-Control, Accept");
     server.send(204);
   });
   
   server.on("/health", HTTP_OPTIONS, []() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Cache-Control, Accept");
     server.send(204);
   });
 
@@ -674,7 +671,6 @@ void handleRoot() {
 
 void handleToggleLight() {
   lastClientRequest = millis();
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   lightState = !lightState;
   digitalWrite(LIGHT_RELAY_PIN, lightState ? LOW : HIGH);
   server.send(200, "text/plain", "Light " + String(lightState ? "ON" : "OFF"));
@@ -683,7 +679,6 @@ void handleToggleLight() {
 
 void handleTogglePump() {
   lastClientRequest = millis();
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   pumpState = !pumpState;
   digitalWrite(PUMP_RELAY_PIN, pumpState ? LOW : HIGH);
   server.send(200, "text/plain", "Pump " + String(pumpState ? "ON" : "OFF"));
@@ -692,7 +687,6 @@ void handleTogglePump() {
 
 void handleToggleMode() {
   lastClientRequest = millis();
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   autoMode = !autoMode;
   server.send(200, "text/plain", "Mode " + String(autoMode ? "AUTO" : "MANUAL"));
   broadcastStatus();
@@ -700,7 +694,6 @@ void handleToggleMode() {
 
 void handleToggleWatering() {
   lastClientRequest = millis();
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   autoWatering = !autoWatering;
   server.send(200, "text/plain", "Auto Watering " + String(autoWatering ? "ON" : "OFF"));
   broadcastStatus();
@@ -708,7 +701,6 @@ void handleToggleWatering() {
 
 void handleSensorData() {
   lastClientRequest = millis();
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", getStatusJSON());
 }
 
@@ -752,7 +744,6 @@ void handleControl() {
 }
 
 void handleRestart() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "text/plain", "System restarting...");
   delay(1000);
   ESP.restart();
@@ -760,6 +751,5 @@ void handleRestart() {
 
 void handleNotFound() {
   lastClientRequest = millis();
-  server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(404, "text/plain", "Endpoint not found");
 }

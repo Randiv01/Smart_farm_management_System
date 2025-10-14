@@ -553,6 +553,7 @@ export default function INotifications() {
             <option value="lowStock">Low Stock</option>
             <option value="order">Order</option>
             <option value="harvest">Harvest</option>
+            <option value="productivity">Productivity</option>
             <option value="supplier">Supplier</option>
             <option value="expiry">Expiry</option>
             <option value="stock">Stock</option>
