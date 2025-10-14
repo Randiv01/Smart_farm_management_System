@@ -117,6 +117,8 @@ export const ELeavePlanner = () => {
     if (typeFilter !== "All Types") p.append("type", typeFilter);
     if (yearFilter) p.append("year", yearFilter);
     if (monthFilter) p.append("month", monthFilter); // 1-12
+    // Oldest first so new records appear at bottom
+    p.append("sortBy", "createdAt");
     return p.toString();
   };
 
@@ -211,7 +213,7 @@ export const ELeavePlanner = () => {
       if (upcomingEmp) p.append("empId", upcomingEmp);
       const res = await fetch(`${API}/upcoming?${p.toString()}`);
       const data = await res.json();
-      setUpcoming(data.slice(0, 30));
+      setUpcoming(data.slice(0, 3));
     } catch (e) {
       console.error("Error loading upcoming:", e);
     }
@@ -277,6 +279,9 @@ export const ELeavePlanner = () => {
       setShowForm(false);
       setEditing(null);
       setForm({ empId:"", name:"", type:"Annual", from:"", to:"", days:"", reason:"", status:"Pending" });
+      // Immediate refresh in case SSE is not connected
+      await loadLeaves();
+      await loadTrend();
     } catch (e) {
       console.error("Error submitting form:", e);
       alert("Error submitting form. Please try again.");
@@ -300,7 +305,17 @@ export const ELeavePlanner = () => {
 
   const onDelete = async (row) => {
     if (!window.confirm("Are you sure you want to delete this leave request?")) return;
-    try { await fetch(`${API}/${row._id}`, { method: "DELETE" }); }
+    try {
+      const res = await fetch(`${API}/${row._id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed: ${err.error || res.statusText}`);
+        return;
+      }
+      // Immediate refresh in case SSE is not connected
+      await loadLeaves();
+      await loadTrend();
+    }
     catch (e) {
       console.error("Error deleting leave:", e);
       alert("Error deleting leave request. Please try again.");
@@ -671,7 +686,7 @@ export const ELeavePlanner = () => {
                   <tbody>
                     {filteredLeaves.map((r, idx) => (
                       <tr key={r._id} className={`border-t ${darkMode ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"}`}>
-                        <td className="p-3">{r.number ?? (idx + 1)}</td>
+                        <td className="p-3">{idx + 1}</td>
                         <td className="p-3 font-medium">{r.empId}</td>
                         <td className="p-3">{r.name}</td>
                         <td className="p-3">{r.type}</td>
