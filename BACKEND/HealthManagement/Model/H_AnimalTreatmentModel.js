@@ -15,12 +15,12 @@ const animalTreatmentSchema = new mongoose.Schema(
     },
     doctor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Doctor",
+      ref: "DoctorDetails",
       required: [true, "Veterinary surgeon is required"]
     },
     specialist: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Specialist",
+      ref: "HealthSpecialist",
       default: null
     },
     reports: {
