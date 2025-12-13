@@ -342,13 +342,15 @@ const MONGO_URI =
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    const conn = await mongoose.connect(MONGO_URI);
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`❌ MongoDB connection failed: ${error.message}`);
+    console.error(`\n💡 Troubleshooting tips:`);
+    console.error(`   1. Check if your IP address is whitelisted in MongoDB Atlas`);
+    console.error(`   2. Verify your MongoDB connection string in .env file`);
+    console.error(`   3. Ensure your MongoDB Atlas cluster is running`);
+    console.error(`   4. Check your network connection\n`);
     process.exit(1);
   }
 };
