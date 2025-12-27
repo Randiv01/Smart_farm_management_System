@@ -76,7 +76,7 @@ const AboutUs = () => {
       {/* Navbar */}
       <Navbar cartItems={cartItems} onCartClick={handleCartClick} />
       <ChatBot/>
-
+      
       {/* Modern Hero Section */}
       <section className="relative w-full overflow-hidden">
         <div className="relative h-[85vh] w-full flex items-center justify-center">
@@ -431,10 +431,10 @@ const AboutUs = () => {
             ))}
           </div>
         </div>
-
-        {/* Footer */}
-        <Footer />
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
